@@ -5,6 +5,7 @@ import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useT } from '@renderer/i18n';
+import { loaderLabel } from '@shared/labels';
 import type { CataloguePack } from '@shared/ipc-types';
 
 const api = window.ravenforge;
@@ -183,7 +184,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                     </p>
                     <p className="text-xs text-rf-text-muted">{pack.summary}</p>
                     <p className="mt-0.5 text-xs text-rf-text-muted">
-                      MC {pack.minecraftVersion} • {pack.modLoader} •{' '}
+                      MC {pack.minecraftVersion} • {loaderLabel(pack.modLoader)} •{' '}
                       {t.plural('packs.mods', pack.modCount)}
                       {pack.totalDownloadBytes > 0 && ` • ${formatBytes(pack.totalDownloadBytes)}`}
                     </p>

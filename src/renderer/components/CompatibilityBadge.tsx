@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { acceptedLoaders } from '@shared/constants';
+import { loaderLabel } from '@shared/labels';
 import { useT } from '@renderer/i18n';
 import type { ModSearchResult } from '@shared/ipc-types';
 
@@ -37,7 +38,7 @@ export function CompatibilityBadge({ item, gameVersion, modLoader }: Props) {
       <AlertTriangle size={11} aria-hidden="true" />
       {wrongVersion
         ? t('compat.badgeVersion', { version: gameVersion! })
-        : t('compat.badgeLoader', { loader: modLoader! })}
+        : t('compat.badgeLoader', { loader: loaderLabel(modLoader!) })}
     </span>
   );
 }

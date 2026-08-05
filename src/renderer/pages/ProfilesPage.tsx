@@ -24,6 +24,7 @@ import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
 import { ProfileSourcePicker } from '@components/ProfileSourcePicker';
 import { formatBytes } from '@renderer/format';
 import { useLocale, useT } from '@renderer/i18n';
+import { loaderLabel } from '@shared/labels';
 import type {
   ModLoaderType,
   OrphanedProfile,
@@ -269,7 +270,7 @@ export function ProfilesPage() {
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="truncate text-sm font-medium text-rf-text">{profile.name}</span>
                 <span className="truncate text-xs text-rf-text-muted">
-                  MC {profile.minecraftVersion} • {profile.modLoader}
+                  MC {profile.minecraftVersion} • {loaderLabel(profile.modLoader)}
                 </span>
               </span>
             </button>
@@ -296,7 +297,8 @@ export function ProfilesPage() {
                 <div key={profile.id} className="mt-2 rounded-lg border border-rf-border p-2">
                   <p className="truncate text-sm font-medium text-rf-text">{profile.name}</p>
                   <p className="text-xs text-rf-text-muted">
-                    MC {profile.minecraftVersion} • {profile.modLoader} • {formatBytes(files.bytes)}
+                    MC {profile.minecraftVersion} • {loaderLabel(profile.modLoader)} •{' '}
+                    {formatBytes(files.bytes)}
                   </p>
                   {files.worlds > 0 && (
                     <p className="text-xs text-rf-warning">
@@ -456,7 +458,7 @@ function ProfileDetail({
         <Field label={t('profiles.fieldMinecraft')} value={profile.minecraftVersion} />
         <Field
           label={t('profiles.fieldLoader')}
-          value={`${profile.modLoader}${profile.modLoaderVersion ? ` ${profile.modLoaderVersion}` : ''}`}
+          value={`${loaderLabel(profile.modLoader)}${profile.modLoaderVersion ? ` ${profile.modLoaderVersion}` : ''}`}
         />
         <Field label={t('profiles.fieldRam')} value={`${profile.allocatedRamMb} MB`} />
         <Field
@@ -731,7 +733,7 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
             onChange={() => {}}
             disabled
             error={t('profileForm.noLoaderBuilds', {
-              loader: draft.modLoader,
+              loader: loaderLabel(draft.modLoader),
               mcVersion: draft.minecraftVersion,
             })}
           />

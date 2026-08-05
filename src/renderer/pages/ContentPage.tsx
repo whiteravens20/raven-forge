@@ -6,6 +6,7 @@ import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
 import { useLocale, useT } from '@renderer/i18n';
+import { loaderLabel } from '@shared/labels';
 import {
   SearchFilters,
   EMPTY_FILTERS,
@@ -511,7 +512,10 @@ function LoaderNote({
     case 'no-build':
       return (
         <Banner type="warning" dismissible onDismiss={onDismiss}>
-          {t('content.loaderNoBuild', { loader: note.modLoader, version: note.mcVersion })}
+          {t('content.loaderNoBuild', {
+            loader: loaderLabel(note.modLoader),
+            version: note.mcVersion,
+          })}
         </Banner>
       );
     case 'unsupported':

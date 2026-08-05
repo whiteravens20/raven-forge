@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AlertTriangle, X, Package } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useT, type TFunction } from '@renderer/i18n';
+import { loaderLabel } from '@shared/labels';
 import type { CompatibilityIssue, InstallPlan } from '@shared/ipc-types';
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
 function describe(t: TFunction, issue: CompatibilityIssue): string {
   switch (issue.kind) {
     case 'wrong-loader':
-      return t('compat.wrongLoader', { loaders: issue.supported.join(', ') });
+      return t('compat.wrongLoader', { loaders: issue.supported.map(loaderLabel).join(', ') });
     case 'wrong-version':
       return t('compat.wrongVersion', { versions: issue.supported.join(', ') });
     case 'no-build':

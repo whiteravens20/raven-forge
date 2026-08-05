@@ -15,6 +15,7 @@ import { ArticleReader, type Article } from '@components/ArticleReader';
 import { BackgroundRotator } from '@components/layout/BackgroundRotator';
 import { ForgeBackdrop } from '@components/layout/ForgeBackdrop';
 import { useLocale, useT } from '@renderer/i18n';
+import { loaderLabel } from '@shared/labels';
 import { useUpdaterStore } from '@stores/updater-store';
 
 const api = window.ravenforge;
@@ -295,7 +296,7 @@ export function HomePage() {
         {selectedProfile && (
           <p className="text-xs text-rf-text-muted">
             {selectedProfile.modLoader !== 'vanilla'
-              ? `${selectedProfile.modLoader} ${selectedProfile.modLoaderVersion ?? ''}`
+              ? `${loaderLabel(selectedProfile.modLoader)} ${selectedProfile.modLoaderVersion ?? ''}`
               : 'Vanilla'}{' '}
             • {t('home.ram', { mb: selectedProfile.allocatedRamMb })}
           </p>

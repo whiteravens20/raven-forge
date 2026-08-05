@@ -32,3 +32,16 @@ export function tagLabel(name: string): string {
   const spaced = name.replace(/(?<=\w)-(?=\w)/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
+
+/**
+ * A mod loader as its makers write it: `fabric` → `Fabric`, `neoforge` →
+ * `NeoForge`.
+ *
+ * Stored lowercase because that is what Modrinth's facets and the loader APIs
+ * expect, and these are proper names — printing `neoforge` next to a version
+ * number reads like a field key that leaked into the interface. Same vocabulary
+ * as Modrinth's loader facet, so the same rules apply.
+ */
+export function loaderLabel(loader: string): string {
+  return tagLabel(loader);
+}

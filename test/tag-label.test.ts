@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tagLabel } from '../src/shared/labels';
+import { tagLabel, loaderLabel } from '../src/shared/labels';
 
 /**
  * Modrinth's tags are facet keys first and labels second. The rule has to
@@ -51,4 +51,15 @@ describe('tagLabel', () => {
     // than vanishing or arriving as a raw key.
     expect(tagLabel('ray-reconstruction')).toBe('Ray reconstruction');
   });
+});
+
+/** A profile stores its loader lowercase; nothing on screen should say so. */
+describe('loaderLabel', () => {
+  it.each([
+    ['vanilla', 'Vanilla'],
+    ['fabric', 'Fabric'],
+    ['quilt', 'Quilt'],
+    ['forge', 'Forge'],
+    ['neoforge', 'NeoForge'],
+  ])('%s → %s', (input, expected) => expect(loaderLabel(input)).toBe(expected));
 });
