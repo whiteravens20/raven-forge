@@ -1,0 +1,234 @@
+# Raven Forge Launcher — Architecture
+
+## Tech stack
+
+| Layer | Choice | Rationale |
+|---|---|---|
+| Shell | **Electron 41** | Mature ecosystem, first-class Windows + Linux packaging via electron-builder, signed auto-updates via electron-updater, and predictable Node integration for game-launching subprocesses. Tauri was considered but its Rust toolchain raises the contributor bar and its WebView2/WebKitGTK story complicates spawning Java with full stdio capture across platforms. |
+| Renderer | **React 19 + Vite 7** | Strict typing, fast HMR, broad ecosystem (Zustand, Framer Motion, react-router). |
+| Styling | **Tailwind v4 + CSS custom properties** | Theming via `--rf-*` variables on `[data-theme]`, atomic utility classes for the dark gaming aesthetic. The Vite plugin (`@tailwindcss/vite`) is the supported v4 integration; PostCSS is intentionally not configured. |
+| State | **Zustand** | Tiny, no providers, easy to share between pages. |
+| Validation | **Zod** | Runtime validation at IPC + manifest boundaries; types inferred via `z.infer`. |
+| Crypto | **tweetnacl** | Pure-JS Ed25519 for manifest signature verification — avoids native dependency churn. |
+| Secret storage | **keytar** | OS keychain (Credential Manager / libsecret / Keychain) for MSA refresh tokens and Minecraft session tokens. Degrades to a `0600` file where no keyring exists. |
+| Logging | **electron-log** | File rotation, level filtering, accessible from `Settings → Open logs folder`. |
+
+## Project layout
+
+```
+raven-forge/
+├── PLAN.md                       # original brief, preserved as work plan
+├── README.md                     # dev setup + feature overview
+├── docs/
+│   ├── ARCHITECTURE.md           # this document
+│   └── MANIFEST-SCHEMA.md        # remote manifest spec
+├── electron-builder.config.js    # NSIS + .deb + AppImage targets
+├── eslint.config.mjs             # flat-config, react + @typescript-eslint
+├── tsconfig.json                 # umbrella project for typecheck-all
+├── tsconfig.main.json            # main + preload + core + shared (Node ESM)
+├── tsconfig.renderer.json        # renderer (DOM)
+├── tailwind.config.ts            # design tokens + custom animations
+├── vite.config.ts                # renderer build + path aliases
+├── .github/workflows/
+│   ├── build.yml                 # PR / push CI
+│   └── release.yml               # tag-triggered, signs + drafts release
+└── src/
+    ├── main/                     # Electron main process
+    │   ├── index.ts              # entry — single-instance, lifecycle, IPC bootstrap
+    │   ├── window.ts             # BrowserWindow factory (frameless, secure defaults)
+    │   ├── ipc-handlers.ts       # all ipcMain.handle registrations
+    │   ├── init.ts               # data-directory bootstrap
+    │   └── logger.ts             # electron-log setup
+    ├── preload/
+    │   └── index.ts              # contextBridge — exposes typed RavenForgeAPI
+    ├── renderer/                 # React SPA
+    │   ├── main.tsx, App.tsx
+    │   ├── pages/                # one per route
+    │   ├── components/           # ui/ (Button, Input, Banner, Select) + layout/
+    │   ├── stores/               # Zustand stores (auth, profiles, news, settings, launch)
+    │   └── styles/global.css     # @import "tailwindcss" + CSS variables
+    ├── core/                     # business logic, runs in main process
+    │   ├── auth/                 # MS OAuth → Xbox → XSTS → MC chain, keytar token store
+    │   ├── java/                 # Adoptium Temurin download + version selection
+    │   ├── minecraft/            # version manifest, asset/library download, game launcher
+    │   ├── modloader/            # Fabric, Quilt, Forge and NeoForge installers
+    │   ├── mods/                 # manifest sync, Modrinth API, content (shaders/RP) manager
+    │   ├── updater/              # electron-updater wiring, manifest signature verification
+    │   ├── profiles/             # profile CRUD + import/export
+    │   ├── news/                 # news + announcement fetcher with mock fallback
+    │   └── config/               # paths.ts, settings-manager.ts, defaults.ts
+    └── shared/                   # types + validators consumed by both processes
+        ├── ipc-types.ts          # InvokeChannels, EventChannels, RavenForgeAPI
+        ├── validators.ts         # Zod schemas for settings + profiles
+        ├── manifest-schema.ts    # Zod schema for remote manifests
+        └── constants.ts          # endpoints, defaults, MC→Java mapping
+```
+
+## IPC contract
+
+All renderer → main calls go through typed channels declared in [`src/shared/ipc-types.ts`](../src/shared/ipc-types.ts) and exposed as `window.ravenforge.<domain>.<method>` via the preload contextBridge. Returns `IpcResult<T> = { success, data?, error? }` so renderer code never throws on cross-process errors.
+
+Channels are grouped by domain: `auth`, `profiles`, `mods`, `content` (shaders + resource packs), `java`, `loaders`, `game`, `settings`, `news`, `announcements`, `manifest` (verification), `updater`, `system`, `window`.
+
+Push events from main → renderer (`webContents.send`) cover progress (`progress:mod-sync`, `progress:java-download`, …), game lifecycle (`game:log`, `game:started`, `game:exited`), auth state changes, and updater state.
+
+## Mod-sync data flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Renderer
+    participant Main as Main process
+    participant FS as Profile dir
+    participant Manifest as Remote manifest
+    participant Modrinth as Modrinth / URL host
+
+    User->>UI: Click "Sync" or launch profile
+    UI->>Main: mods:sync-manifest(profileId)
+    Main->>Manifest: GET manifest.json (If-None-Match)
+    Manifest-->>Main: 200 manifest JSON | 304 not modified
+    Main->>Main: Zod-validate modManifestSchema
+    Main->>Main: Verify Ed25519 signature (if signed)
+    Main->>FS: Read installed.lock
+    Main->>Main: Diff manifest vs lock
+    par Parallel downloads (concurrency limit)
+        Main->>Modrinth: GET mod jar
+        Modrinth-->>Main: bytes
+        Main->>Main: SHA-256 verify (3 retries)
+        Main->>FS: write .minecraft/mods/<file>.jar
+    end
+    Main->>FS: Write installed.lock
+    Main-->>UI: progress:mod-sync events throughout
+    Main-->>UI: IpcResult<void>
+```
+
+## Microsoft auth chain
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Renderer
+    participant Main as Main process
+    participant MS as login.microsoftonline.com
+    participant XBL as user.auth.xboxlive.com
+    participant XSTS as xsts.auth.xboxlive.com
+    participant MC as api.minecraftservices.com
+    participant KC as OS keychain (keytar)
+
+    User->>UI: Click "Login with Microsoft"
+    UI->>Main: auth:login-microsoft
+    Main->>MS: Open OAuth window — authorize endpoint
+    User->>MS: Sign in + consent
+    MS-->>Main: redirect with ?code
+    Main->>MS: POST /token (code → access + refresh)
+    MS-->>Main: ms_access_token, ms_refresh_token
+    Main->>XBL: POST /authenticate (RpsTicket=d=ms_access_token)
+    XBL-->>Main: xbl_token, userHash
+    Main->>XSTS: POST /authorize (xbl_token → minecraft RP)
+    XSTS-->>Main: xsts_token  (XErr 2148916233/238 surfaced as friendly errors)
+    Main->>MC: POST /authentication/login_with_xbox (XBL3.0 x=hash;xsts)
+    MC-->>Main: mc_access_token
+    Main->>MC: GET /minecraft/profile (Bearer mc_access_token)
+    MC-->>Main: { id, name, skins }  (404 ⇒ "Account does not own Java Edition")
+    Main->>KC: setPassword("msRefresh:<id>", ms_refresh_token)
+    Main->>KC: setPassword("mcAccess:<id>", mc_access_token)
+    Main-->>UI: IpcResult<MinecraftAccount>
+```
+
+### Where credentials live
+
+`auth.json` holds the account list, the active account id, and each session's
+**expiry** — no secrets. The tokens themselves go to the OS keychain under
+service `com.ravenforge.launcher`:
+
+| Key | Lifetime | Used for |
+|---|---|---|
+| `msRefresh:<accountId>` | months, until revoked | Re-running the Xbox→XSTS→MC chain silently |
+| `mcAccess:<accountId>` | ~24 h | The `--accessToken` JVM argument at launch |
+
+Keeping `expiresAt` in the file is deliberate: the "does this need refreshing?"
+check on every launch costs a file read, and only actually *spending* the token
+touches the keychain.
+
+**Fallback.** A machine with no keyring daemon — headless Linux, a bare window
+manager, a locked keyring — makes keytar throw at call time, not load time.
+Rather than making Microsoft login impossible there, `secret-store.ts` reports
+the failure and `token-store.ts` writes the secret to `auth.json` instead, with
+the file forced to mode `0600` and a warning in the log. This is a deliberate
+downgrade, not an accident; on a healthy install `refreshTokens` stays `{}`.
+
+Upgrading from a pre-keychain build migrates automatically on first read:
+plaintext secrets move into the keychain and are stripped from the file. Any
+entry the keychain rejects is left untouched, so a failed migration never costs
+the user a login.
+
+## Launcher startup sequence
+
+```mermaid
+sequenceDiagram
+    participant Boot as electron main
+    participant App as app
+    participant Init as init.ts
+    participant Settings as settings-manager
+    participant IPC as ipc-handlers
+    participant Win as window.ts
+    participant Renderer
+
+    Boot->>App: requestSingleInstanceLock()
+    App->>App: app.whenReady()
+    App->>Boot: initLogger() (electron-log → userData/logs)
+    App->>Init: ensureDataDirectories() (profiles, loaders, java, cache, logs, backgrounds)
+    App->>Settings: loadSettings() — Zod-validated, defaults written if missing
+    App->>IPC: registerAllIpcHandlers()
+    App->>Win: createMainWindow()
+    Win->>Win: BrowserWindow(frameless, contextIsolation:true, preload)
+    Win->>Renderer: loadURL(VITE_DEV_SERVER_URL) | loadFile(dist/renderer/index.html)
+    Renderer->>Renderer: App mounts → stores load() in parallel (auth, profiles, settings, news)
+    Renderer->>Win: ready-to-show → window.show()
+```
+
+## Security posture
+
+- `contextIsolation: true`, `nodeIntegration: false`. `sandbox` is currently `false`; the original reason (keytar in the preload) was never true — keytar is main-process only and the preload imports nothing but `electron`. Flip it to `true` during the Phase 11 smoke test, where a broken preload is immediately visible.
+- Credentials are stored in the OS keychain, not in `auth.json` — see [the auth flow](#where-credentials-live) for the fallback and its trade-off.
+- The preload script is the only bridge — every renderer-callable function goes through `ipcRenderer.invoke` against a known channel name.
+- `system:open-url` rejects anything that isn't `http://` / `https://`.
+- `setWindowOpenHandler` denies in-app navigation and routes external links to the OS browser.
+- All remote downloads SHA-256-verified against either the manifest entry or, for Modrinth installs, the API response hash. Mismatches retry up to 3 times then fail loudly.
+- Manifest Ed25519 signatures are verified against the user's trusted-keys list before any mod is downloaded for a signed manifest.
+
+## Build pipeline
+
+| Step | Tool | Output |
+|---|---|---|
+| Renderer | `vite build` | `dist/renderer/` (HTML + hashed JS/CSS) |
+| Main + preload + core + shared | `tsc -p tsconfig.main.json` | `dist/main/`, `dist/preload/`, `dist/core/`, `dist/shared/` |
+| Package | `electron-builder` | `out/` — NSIS `.exe` (Windows), `.deb` + `.AppImage` (Linux) |
+
+The `package.json` `main` field points at `dist/main/index.js`; the preload reference inside `window.ts` is `path.join(__dirname, '..', 'preload', 'index.js')`, which resolves correctly from `dist/main/`.
+
+## Open implementation gaps
+
+Last checked against the code on **2026-08-05**. Keep it that way — a stale gap
+list is worse than none, because it sends people looking for problems that were
+fixed and hides the ones that were not.
+
+- **Microsoft login is untested against a real Azure app.** The OAuth → Xbox Live
+  → Minecraft JWT chain is written and the client id is injected at build time,
+  but no approved application exists yet, so the whole path — including the
+  `AUTH_UNREACHABLE` offline offer — has only ever been exercised against stubs.
+- **CurseForge is untested against a real key.** Search, version resolution and
+  download are implemented; nothing has run with a live API key.
+- **The launcher has never updated itself from a published release.** The update
+  check, platform matrix and install-before-play path are covered by tests, but
+  there is no tagged release to update *from*.
+- **Resource-pack order is index-only.** `reorderResourcePacks` rewrites the
+  launcher's own index; it does not write Minecraft's `options.txt`
+  `resourcePacks` line, which is what the game actually reads.
+- No Mica/acrylic backdrop on Windows 11; no one-click rollback to the previous
+  launcher version; no warning when a user-installed mod collides with a manifest
+  mod.
+- Dead IPC surface: `java:*`, `game:kill`, `game:is-running` and
+  `announcements:dismiss` are declared, handled and exposed but never called from
+  the renderer. `game:kill` is the one that costs the user something — there is
+  no way to stop a running game from the launcher.
