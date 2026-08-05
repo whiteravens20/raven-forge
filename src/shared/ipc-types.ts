@@ -555,6 +555,8 @@ export interface InvokeChannels {
   'packs:list-catalogue': () => Promise<IpcResult<CataloguePack[]>>;
   /** Create a profile that follows a manifest URL and keeps updating from it. */
   'packs:create-from-manifest': (url: string) => Promise<IpcResult<Profile>>;
+  /** Create a profile from a link to either a `.mrpack` or a manifest, sniffed apart. */
+  'packs:create-from-url': (url: string) => Promise<IpcResult<Profile>>;
   /** Import a Modrinth `.mrpack` as a new profile — a snapshot, not a subscription. */
   'packs:import-mrpack': (filePath: string) => Promise<IpcResult<Profile>>;
 
@@ -776,6 +778,7 @@ export interface RavenForgeAPI {
   packs: {
     listCatalogue: InvokeChannels['packs:list-catalogue'];
     createFromManifest: InvokeChannels['packs:create-from-manifest'];
+    createFromUrl: InvokeChannels['packs:create-from-url'];
     importMrpack: InvokeChannels['packs:import-mrpack'];
   };
   mods: {

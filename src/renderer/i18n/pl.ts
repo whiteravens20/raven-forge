@@ -202,7 +202,7 @@ export const pl: Translations = {
   'packs.listFailed': 'Nie udało się wczytać listy paczek.',
   'packs.installFailed': 'Nie udało się zainstalować {name}.',
   'packs.importFailed': 'Nie udało się zaimportować tej paczki.',
-  'packs.manifestFailed': 'Ten adres nie zwrócił użytecznego manifestu.',
+  'packs.manifestFailed': 'Pod tym adresem nie ma paczki ani manifestu.',
   'packs.wrSyncNote': 'Te profile trzymają się serwera: każda synchronizacja przynosi zmiany.',
   'packs.mods.one': '{count} mod',
   'packs.mods.few': '{count} mody',
@@ -212,8 +212,9 @@ export const pl: Translations = {
   'packs.fileBody':
     'Format paczek Modrintha, który czytają też Prism, ATLauncher i aplikacja Modrintha. Instalowany jako migawka — sam się nie zaktualizuje.',
   'packs.chooseFile': 'Wybierz plik…',
-  'packs.urlTitle': 'Link do manifestu',
-  'packs.urlBody': 'Profil utworzony w ten sposób aktualizuje się z tego adresu.',
+  'packs.urlTitle': 'Link do paczki',
+  'packs.urlBody':
+    'Link do pliku .mrpack — na przykład ten spod „Download" na Modrincie — albo do manifestu Raven Forge. Launcher sam rozpozna, co dostał; manifest daje profil, który aktualizuje się z tego adresu.',
 
   // ── Pliki pozostawione po usunięciu ──────────────────────
   'orphans.title': 'Pozostawione pliki',

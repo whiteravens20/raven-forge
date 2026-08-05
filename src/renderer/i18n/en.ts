@@ -202,7 +202,7 @@ export const en = {
   'packs.listFailed': 'Could not load the pack list.',
   'packs.installFailed': 'Could not install {name}.',
   'packs.importFailed': 'Could not import that pack.',
-  'packs.manifestFailed': 'That address did not give a usable manifest.',
+  'packs.manifestFailed': 'That address holds neither a pack nor a manifest.',
   'packs.wrSyncNote': 'These profiles follow the server: every sync brings whatever changed.',
   'packs.mods.one': '{count} mod',
   'packs.mods.other': '{count} mods',
@@ -210,8 +210,9 @@ export const en = {
   'packs.fileBody':
     'The Modrinth pack format, which Prism, ATLauncher and the Modrinth app also read. Installed as a snapshot — it will not update itself.',
   'packs.chooseFile': 'Choose a file…',
-  'packs.urlTitle': 'A manifest link',
-  'packs.urlBody': 'A profile created this way keeps updating from that address.',
+  'packs.urlTitle': 'A pack link',
+  'packs.urlBody':
+    'A link to a .mrpack file — Modrinth’s “Download” link is one — or to a Raven Forge manifest. The launcher works out which it got; a manifest gives a profile that keeps updating from that address.',
 
   // ── Files left behind by a delete ────────────────────────
   'orphans.title': 'Leftover files',

@@ -39,7 +39,11 @@ import {
 import { searchMods, getSearchFacets } from '../core/mods/modrinth-api';
 import { planModInstall, planContentInstall } from '../core/mods/compatibility';
 import { listCataloguePacks } from '../core/packs/catalogue';
-import { importMrpack, createProfileFromManifest } from '../core/packs/pack-installer';
+import {
+  importMrpack,
+  createProfileFromManifest,
+  createProfileFromUrl,
+} from '../core/packs/pack-installer';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
 import {
   listContent,
@@ -466,6 +470,13 @@ export function registerAllIpcHandlers(): void {
       return ok(await createProfileFromManifest(url));
     } catch (err) {
       return fail(`Could not create a profile from that manifest: ${reason(err)}`);
+    }
+  });
+  ipcMain.handle('packs:create-from-url', async (_event, url: string) => {
+    try {
+      return ok(await createProfileFromUrl(url));
+    } catch (err) {
+      return fail(`Could not create a profile from that link: ${reason(err)}`);
     }
   });
   ipcMain.handle('packs:import-mrpack', async (_event, filePath: string) => {

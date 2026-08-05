@@ -34,7 +34,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const [packs, setPacks] = useState<CataloguePack[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [manifestUrl, setManifestUrl] = useState('');
+  const [packUrl, setPackUrl] = useState('');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -83,12 +83,15 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     else setError(result.error ?? t('packs.importFailed'));
   };
 
+  // One field for both kinds of link. Which one it is gets decided in the main
+  // process from the bytes at the address, so there is nothing here for the
+  // player to pick wrong.
   const followUrl = async () => {
-    const url = manifestUrl.trim();
+    const url = packUrl.trim();
     if (!url) return;
     setBusy('url');
     setError(null);
-    const result = await api.packs.createFromManifest(url);
+    const result = await api.packs.createFromUrl(url);
     setBusy(null);
     if (result.success && result.data) onCreated(result.data.id);
     else setError(result.error ?? t('packs.manifestFailed'));
@@ -234,9 +237,9 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                 >
                   <div className="flex-1">
                     <Input
-                      placeholder="https://…/manifest.json"
-                      value={manifestUrl}
-                      onChange={(e) => setManifestUrl(e.target.value)}
+                      placeholder="https://…/pack.mrpack"
+                      value={packUrl}
+                      onChange={(e) => setPackUrl(e.target.value)}
                     />
                   </div>
                   <Button
@@ -244,7 +247,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                     type="submit"
                     variant="secondary"
                     loading={busy === 'url'}
-                    disabled={Boolean(busy) || !manifestUrl.trim()}
+                    disabled={Boolean(busy) || !packUrl.trim()}
                   >
                     {t('common.add')}
                   </Button>

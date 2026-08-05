@@ -252,8 +252,14 @@ A new profile can start from a whole pack rather than an empty form.
 | Route | Format | Keeps updating? |
 |---|---|---|
 | **White Ravens packs** | The catalogue at [`raven-packs`](https://github.com/whiteravens20/raven-packs), which publishes a `packs.json` index beside each pack's manifest | Yes — the profile stores the manifest URL and every sync reconciles against it |
-| **Manifest URL** | A Raven Forge manifest v2, from any address you paste | Yes, same mechanism |
+| **A link** | Either a Raven Forge manifest v2 or a `.mrpack` — including the link behind Modrinth's Download button | A manifest, yes; a `.mrpack`, no |
 | **`.mrpack` file** | [Modrinth's modpack format](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack) — a zip holding `modrinth.index.json` and `overrides/` | No — an import is a snapshot of one version |
+
+One field takes both kinds of link, and which one arrived is decided from the
+bytes at the address rather than from the file extension: Modrinth's CDN ends
+its URLs in `.mrpack`, but a signed or proxied link need not, and it is the
+content that decides what a thing is. A manifest is stored on the profile and
+re-read on every sync; a `.mrpack` is unpacked once, exactly like the file route.
 
 `.mrpack` is the only open, cross-launcher pack format the launcher reads; Prism,
 ATLauncher, MultiMC and the Modrinth app produce and consume the same files. An

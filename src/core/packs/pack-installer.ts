@@ -1,6 +1,9 @@
+import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
+import { downloadToFile } from '../net/download';
 import { createProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
 import { readMrpack, applyOverrides, type MrpackContents, type MrpackFile } from './mrpack';
@@ -145,6 +148,57 @@ export async function importMrpack(filePath: string): Promise<Profile> {
   return profile;
 }
 
+/** A local zip starts with these four bytes; JSON never does. */
+const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+
+/**
+ * Create a profile from a link, whichever of the two kinds it turns out to be.
+ *
+ * Modrinth hands out `.mrpack` links — the "Download" button on a modpack page
+ * is one — and a Raven Forge manifest is also just a URL, so the field takes
+ * either rather than making the player know which they were given. Deciding by
+ * the file extension would be the obvious way and the wrong one: Modrinth's CDN
+ * ends its URLs in `.mrpack` but a signed or proxied link need not, and it is
+ * the bytes that decide what a thing is.
+ *
+ * That is why this downloads first and sniffs after. Both kinds are small — a
+ * pack file is metadata plus config, never the jars — so the cost of being
+ * right is one short download.
+ */
+export async function createProfileFromUrl(url: string): Promise<Profile> {
+  requireHttpUrl(url);
+
+  const scratch = path.join(paths.cacheDir, `pack-${crypto.randomUUID()}`);
+  try {
+    await downloadToFile(url, scratch);
+
+    const head = Buffer.alloc(ZIP_MAGIC.length);
+    const handle = await fs.open(scratch, 'r');
+    try {
+      await handle.read(head, 0, head.length, 0);
+    } finally {
+      await handle.close();
+    }
+
+    // A manifest is refetched by `createProfileFromManifest` rather than read
+    // from here. It is a few kilobytes, and the alternative is a second way of
+    // building a profile from a manifest that has to stay in step with the
+    // first one.
+    return head.equals(ZIP_MAGIC)
+      ? await importMrpack(scratch)
+      : await createProfileFromManifest(url);
+  } finally {
+    await fs.rm(scratch, { force: true });
+  }
+}
+
+function requireHttpUrl(url: string): void {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('A pack URL must be http or https');
+  }
+}
+
 /**
  * Create a profile that follows a manifest URL.
  *
@@ -153,10 +207,7 @@ export async function importMrpack(filePath: string): Promise<Profile> {
  * `.mrpack` import, which is a snapshot of a pack at one version.
  */
 export async function createProfileFromManifest(url: string): Promise<Profile> {
-  const parsed = new URL(url);
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new Error('A manifest URL must be http or https');
-  }
+  requireHttpUrl(url);
 
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`Could not fetch the manifest: ${res.status} ${res.statusText}`);

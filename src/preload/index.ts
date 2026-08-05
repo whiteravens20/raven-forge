@@ -39,6 +39,7 @@ const api: RavenForgeAPI = {
   packs: {
     listCatalogue: () => ipcRenderer.invoke('packs:list-catalogue'),
     createFromManifest: (url) => ipcRenderer.invoke('packs:create-from-manifest', url),
+    createFromUrl: (url) => ipcRenderer.invoke('packs:create-from-url', url),
     importMrpack: (filePath) => ipcRenderer.invoke('packs:import-mrpack', filePath),
   },
   mods: {
