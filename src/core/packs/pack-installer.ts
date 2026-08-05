@@ -26,11 +26,22 @@ const MODS_DIR = 'mods/';
 const RESOURCE_PACKS_DIR = 'resourcepacks/';
 const SHADER_PACKS_DIR = 'shaderpacks/';
 
+/** `https://cdn.modrinth.com/data/<project>/versions/<version>/<file>` */
+const MODRINTH_CDN = /^https:\/\/cdn\.modrinth\.com\/data\/([^/]+)\/versions\//;
+
 /** A stable id for a pack file, since an `.mrpack` gives its files no ids. */
 function entryId(file: MrpackFile): string {
-  // The sha512 is the one thing guaranteed present and unique per file. Using
-  // the path instead would make a version bump — which changes the filename —
-  // look like a different mod, and the old jar would never be cleaned up.
+  // A Modrinth download names its project in the path, and that is the same id
+  // the mod search speaks — carrying it through is what lets the browse list
+  // know the profile already has this mod, instead of offering it a second time
+  // under a different filename.
+  const project = MODRINTH_CDN.exec(file.downloads[0] ?? '')?.[1];
+  if (project) return project;
+
+  // Otherwise the sha512 is the one thing guaranteed present and unique per
+  // file. Using the path instead would make a version bump — which changes the
+  // filename — look like a different mod, and the old jar would never be
+  // cleaned up.
   return file.hashes.sha512?.slice(0, 32) ?? file.path;
 }
 

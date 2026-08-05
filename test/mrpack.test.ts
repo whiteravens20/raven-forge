@@ -160,6 +160,31 @@ describe('mrpackToManifest', () => {
     expect(manifest.configFiles.map((c) => c.path)).toEqual(['config/sodium-options.json']);
   });
 
+  it('keys a Modrinth download by its project, so the mod list can recognise it', async () => {
+    const contents = index({
+      files: [
+        file({
+          path: 'mods/sodium.jar',
+          downloads: ['https://cdn.modrinth.com/data/AANobbMI/versions/abc123/sodium.jar'],
+        }),
+      ],
+    });
+    const manifest = mrpackToManifest(await readMrpack(await pack('project-id', contents)));
+
+    // The same id the mod search returns — without it, browsing offers a mod
+    // the pack already installed and a second jar lands beside the first.
+    expect(manifest.mods[0].id).toBe('AANobbMI');
+  });
+
+  it('falls back to the file hash when the download names no project', async () => {
+    const contents = index({
+      files: [file({ downloads: ['https://example.com/mirror/sodium.jar'] })],
+    });
+    const manifest = mrpackToManifest(await readMrpack(await pack('hash-id', contents)));
+
+    expect(manifest.mods[0].id).toBe('b'.repeat(32));
+  });
+
   it('carries sha512 across, which is the hash both formats share', async () => {
     const contents = index({ files: [file()] });
     const manifest = mrpackToManifest(await readMrpack(await pack('hashes', contents)));
