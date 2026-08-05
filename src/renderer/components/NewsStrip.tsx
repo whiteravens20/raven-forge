@@ -4,12 +4,28 @@ import { NewsCard } from '@components/NewsCard';
 import { useT } from '@renderer/i18n';
 import type { NewsItem } from '@shared/ipc-types';
 
+/** Cards visible at once; the rest of the feed is a scroll away. */
+const VISIBLE_CARDS = 4;
+
+/** Must match the row's `gap-3`, in rem. */
+const CARD_GAP_REM = 0.75;
+
+/** Split the row evenly, taking the gaps between cards off the top first. */
+const CARD_WIDTH = `calc((100% - ${(VISIBLE_CARDS - 1) * CARD_GAP_REM}rem) / ${VISIBLE_CARDS})`;
+
 /**
- * The news row, scrollable back through older entries.
+ * The news row: the four newest entries across the full width, scrollable back
+ * through older ones.
  *
  * It used to render `news.slice(0, 4)`: anything the feed published before
  * those four was fetched, parsed and then thrown away. Scrolling keeps the
  * whole feed reachable without giving the home screen a second page.
+ *
+ * Cards are sized as a fraction of the row rather than at a fixed `w-60`, which
+ * left four tiles bunched at the left edge and a growing dead strip on the
+ * right at every window width but one. `CARD_WIDTH` derives that fraction from
+ * the same two numbers the layout uses, so the count and the gap cannot drift
+ * apart.
  *
  * The arrows are an addition to native scrolling, not a replacement for it —
  * the container still scrolls by wheel, trackpad and keyboard, which is what a
@@ -50,7 +66,9 @@ export function NewsStrip({
   const page = (direction: 1 | -1) => {
     const el = ref.current;
     if (!el) return;
-    el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: 'smooth' });
+    // A page is exactly the four cards on screen now that they tile the row;
+    // snapping takes care of the sub-pixel remainder.
+    el.scrollBy({ left: direction * el.clientWidth, behavior: 'smooth' });
   };
 
   // Nothing overflows: no arrows, rather than two dead controls.
@@ -69,7 +87,10 @@ export function NewsStrip({
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rf-accent rounded-lg"
       >
         {items.map((item) => (
-          <div key={item.id} className="w-60 shrink-0 snap-start">
+          // `min-w` is the floor a quarter of the row may not go below; past it
+          // the cards overflow and the arrows appear, rather than shrinking
+          // into four unreadable slivers.
+          <div key={item.id} style={{ width: CARD_WIDTH }} className="min-w-40 shrink-0 snap-start">
             <NewsCard item={item} onOpen={() => onOpen(item)} />
           </div>
         ))}
