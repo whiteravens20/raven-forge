@@ -164,7 +164,16 @@ export async function createProfileFromManifest(url: string): Promise<Profile> {
   // Read enough to name the profile and pin its Minecraft version. The sync
   // fetches and validates it properly a moment later; this is only so the
   // profile is not created blind and then corrected.
-  const body = (await res.json()) as Partial<ModManifest>;
+  //
+  // A page that is not JSON at all is the ordinary way to get this wrong — a
+  // repository page pasted instead of the raw file — and it must read as "wrong
+  // address", not as the parser's complaint about a `<` it did not expect.
+  let body: Partial<ModManifest>;
+  try {
+    body = (await res.json()) as Partial<ModManifest>;
+  } catch {
+    throw new Error('That URL does not look like a Raven Forge manifest');
+  }
   if (!body.serverName || !body.minecraftVersion || !body.modLoader) {
     throw new Error('That URL does not look like a Raven Forge manifest');
   }
