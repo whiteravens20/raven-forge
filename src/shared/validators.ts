@@ -54,7 +54,6 @@ export const globalSettingsSchema = z.object({
   customBackgroundsPath: z.string().optional(),
   newsFeedUrl: z.string().url().optional().or(z.literal('')),
   announcementFeedUrl: z.string().url().optional().or(z.literal('')),
-  curseforgeApiKey: z.string().optional(),
   trustedPublicKeys: z.array(trustedKeySchema).default([]),
   autoRemoveOrphanedMods: z.boolean().default(false),
   showLiveConsole: z.boolean().default(false),

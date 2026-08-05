@@ -52,8 +52,6 @@ export const MOCK_NEWS: NewsItem[] = [
       'Search mods, shaders and resource packs without leaving the launcher.',
       '',
       'Results are filtered to your profile by default, and every filter is visible so you can widen it. A mod that has no build for your Minecraft version genuinely will not appear — the filter row tells you why.',
-      '',
-      'CurseForge is available too, but it requires an API key of your own under **Settings**.',
     ].join('\n'),
     url: 'https://modrinth.com',
     imageUrl: undefined,

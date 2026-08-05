@@ -15,9 +15,6 @@ import {
 import { isClientModLoader } from '@shared/constants';
 import type { FacetGroups, ModSearchResult, InstalledMod } from '@shared/ipc-types';
 
-/** The two sources the browse tab can search. `ModSource` also covers url/local. */
-type ModSource = 'modrinth' | 'curseforge';
-
 const api = window.ravenforge;
 
 const NO_FACETS: FacetGroups = { loaders: [], groups: [], gameVersions: [] };
@@ -33,8 +30,6 @@ export function ModsPage() {
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
   const [searching, setSearching] = useState(false);
   const [tab, setTab] = useState<'installed' | 'browse'>('installed');
-  const [source, setSource] = useState<ModSource>('modrinth');
-  const [hasCfKey, setHasCfKey] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [facets, setFacets] = useState<FacetGroups>(NO_FACETS);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
@@ -44,7 +39,6 @@ export function ModsPage() {
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
   const profileLoader = selectedProfile?.modLoader;
-  const cfKeyMissing = source === 'curseforge' && !hasCfKey;
 
   const loadInstalled = useCallback(async () => {
     if (!selectedId) return;
@@ -53,21 +47,20 @@ export function ModsPage() {
   }, [selectedId]);
 
   const handleSearch = async () => {
-    if (cfKeyMissing) return;
     setSearching(true);
     setError(null);
     try {
       const result = await api.mods.search({
         query: query.trim(),
-        source,
         // Every constraint comes from the visible filter row. Reading the
         // version and loader straight off the profile is what made a search for
         // a mod that exists come back empty with nothing on screen to explain
         // it — Modrinth ANDs the facets, so "26.2 AND fabric" genuinely has no
         // Mekanism in it.
         gameVersion: filters.gameVersion || undefined,
-        // Typed and separate: Modrinth files loaders as categories, but
-        // CurseForge wants a numeric enum, so this cannot just be a tag.
+        // Typed and separate from `categories`, even though Modrinth files
+        // loaders under the same facet key — the profile's loader is a
+        // constraint, not a tag the user picked.
         loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
         categories: categoriesWithoutLoader(filters),
         limit: 20,
@@ -106,15 +99,6 @@ export function ModsPage() {
   useEffect(() => {
     void loadInstalled();
   }, [loadInstalled]);
-
-  // Re-checked whenever the browse tab opens, so a key added in Settings takes
-  // effect without a restart.
-  useEffect(() => {
-    if (tab !== 'browse') return;
-    void api.mods.hasCurseForgeKey().then((r) => {
-      if (r.success && r.data !== undefined) setHasCfKey(r.data);
-    });
-  }, [tab]);
 
   // Modrinth's own vocabulary, fetched rather than hardcoded — these lists move,
   // and a stale entry silently returns nothing for an option still on offer.
@@ -190,42 +174,14 @@ export function ModsPage() {
             }}
             className="flex gap-2"
           >
-            <div className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5">
-              {(['modrinth', 'curseforge'] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => {
-                    setSource(s);
-                    setResults([]);
-                    setError(null);
-                  }}
-                  className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                    source === s
-                      ? 'bg-rf-accent text-white'
-                      : 'text-rf-text-secondary hover:text-rf-text'
-                  }`}
-                >
-                  {s === 'modrinth' ? 'Modrinth' : 'CurseForge'}
-                </button>
-              ))}
-            </div>
             <div className="flex-1">
               <Input
-                placeholder={
-                  source === 'modrinth' ? t('mods.searchModrinth') : t('mods.searchCurseforge')
-                }
+                placeholder={t('mods.searchModrinth')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                disabled={cfKeyMissing}
               />
             </div>
-            <Button
-              type="submit"
-              icon={<Search size={14} />}
-              loading={searching}
-              disabled={cfKeyMissing}
-            >
+            <Button type="submit" icon={<Search size={14} />} loading={searching}>
               {t('common.search')}
             </Button>
           </form>
@@ -237,7 +193,6 @@ export function ModsPage() {
             loaderLabel={t('mods.loaderFilter')}
           />
 
-          {cfKeyMissing && <Banner type="info">{t('mods.curseforgeNoKey')}</Banner>}
           {error && <Banner type="urgent">{error}</Banner>}
         </div>
       )}

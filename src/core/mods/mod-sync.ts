@@ -14,7 +14,6 @@ import { paths } from '../config/paths';
 import { getSettings } from '../config/settings-manager';
 import { getProfile } from '../profiles/profile-manager';
 import { getVersionDownloadInfo, getModVersions, type ModrinthVersion } from './modrinth-api';
-import { resolveDownload as resolveCurseForgeDownload } from './curseforge-api';
 import { syncContentFromManifest } from './content-manager';
 import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import { getMainWindow } from '../../main/window';
@@ -217,25 +216,6 @@ async function resolveModEntry(entry: ModEntry, manifest: ModManifest): Promise<
         version: entry.version,
       };
     }
-
-    case 'curseforge': {
-      if (!entry.projectId) {
-        throw new Error(`${entry.name}: source "curseforge" requires projectId or url`);
-      }
-      const loader = manifest.modLoader === 'vanilla' ? undefined : manifest.modLoader;
-      const file = await resolveCurseForgeDownload(
-        entry.projectId,
-        manifest.minecraftVersion,
-        loader,
-        entry.version,
-      );
-      return {
-        url: file.url,
-        fileName: file.fileName,
-        version: file.version,
-        hashes: { sha1: file.sha1 },
-      };
-    }
   }
 }
 
@@ -254,8 +234,8 @@ async function fetchModEntry(
   }
 
   // The manifest's own hashes win — `expectedHash` prefers sha512, then sha256,
-  // then the API-supplied sha1, so spreading the entry last cannot downgrade a
-  // manifest-declared hash to whatever CurseForge reported.
+  // then sha1, so spreading the entry last cannot downgrade a manifest-declared
+  // hash to whatever the source's API happened to report.
   await verifyDownload(destPath, { ...resolved.hashes, ...entry }, entry.name);
 
   // installed.lock always records sha256 so local integrity checks stay uniform,
@@ -507,10 +487,10 @@ export async function syncManifest(profileId: string): Promise<void> {
  * Minecraft version and loader.
  *
  * The version argument is optional on purpose. `ModSearchResult.versions` holds
- * *game* versions on both sources — it is what the search endpoints return —
- * so the renderer has no version id to hand over, and passing `versions[0]`
- * (as it used to) asked Modrinth for a version called "1.21.4". Resolution
- * belongs here, where the profile is in reach.
+ * *game* versions — it is what the search endpoint returns — so the renderer
+ * has no version id to hand over, and passing `versions[0]` (as it used to)
+ * asked Modrinth for a version called "1.21.4". Resolution belongs here, where
+ * the profile is in reach.
  */
 async function resolveSearchDownload(
   profileId: string,
@@ -520,16 +500,6 @@ async function resolveSearchDownload(
   const profile = await getProfile(profileId);
   const gameVersion = profile?.minecraftVersion;
   const loader = profile && profile.modLoader !== 'vanilla' ? profile.modLoader : undefined;
-
-  if (mod.source === 'curseforge') {
-    const file = await resolveCurseForgeDownload(mod.id, gameVersion, loader, versionId);
-    return {
-      url: file.url,
-      fileName: file.fileName,
-      version: file.version,
-      hashes: { sha1: file.sha1 },
-    };
-  }
 
   const versions = await getModVersions(mod.id, gameVersion, loader);
   const match = versionId ? versions.find((v) => v.id === versionId) : versions[0];
@@ -561,9 +531,10 @@ async function installResolvedMod(
   log.info(`Installing mod ${identity.name} (${resolved.fileName}) from ${identity.source}`);
   await downloadToFile(resolved.url, destPath);
 
-  // Deletes the file and throws on mismatch. Modrinth supplies sha512;
-  // CurseForge only ever sha1. A source that supplies neither is installed
-  // unverified, which is why nothing here invents a hash to check against.
+  // Deletes the file and throws on mismatch. Modrinth supplies sha512; a
+  // manifest may supply any of sha512/sha256/sha1. An entry that supplies none
+  // is installed unverified, which is why nothing here invents a hash to check
+  // against.
   await verifyDownload(destPath, resolved.hashes, identity.name);
 
   // installed.lock always records sha256, whatever the source published.
@@ -608,7 +579,7 @@ export async function installModFromSearch(
   const resolved = await resolveSearchDownload(profileId, mod, versionId);
   return installResolvedMod(
     profileId,
-    { id: mod.id, name: mod.name, source: mod.source },
+    { id: mod.id, name: mod.name, source: 'modrinth' },
     resolved,
   );
 }

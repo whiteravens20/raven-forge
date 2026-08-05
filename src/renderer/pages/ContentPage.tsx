@@ -120,9 +120,6 @@ export function ContentPage() {
         // group and ANDs across them, so this reads as "iris AND realistic AND
         // potato" — narrowing, which is what a filter row is expected to do.
         categories: filterCategories(filters),
-        // Modrinth has no CurseForge-style class split here, and CurseForge
-        // needs a key most people will not have — one source keeps this honest.
-        source: 'modrinth',
         gameVersion: filters.gameVersion || undefined,
         limit: 20,
       });

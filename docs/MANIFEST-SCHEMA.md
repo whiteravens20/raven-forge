@@ -26,10 +26,10 @@ Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher f
 | `id` | string | yes | Stable identifier — match across versions to enable update detection. |
 | `name` | string | yes | Display name. |
 | `version` | string | yes | Free-form version label, recorded in `installed.lock`. |
-| `source` | `"modrinth" \| "curseforge" \| "url" \| "local"` | yes | Provenance. Also selects the resolver when no `url` is given. |
+| `source` | `"modrinth" \| "url" \| "local"` | yes | Provenance. Also selects the resolver when no `url` is given. |
 | `url` | string (URL) | recommended | Direct download URL. **When present the launcher skips resolution entirely** — see below. |
 | `fileName` | string | no | Exact filename to write. Defaults to the last path segment of `url`. |
-| `projectId` | string | when source = modrinth/curseforge and no `url` | Remote project identifier, resolved against `version` at sync time. |
+| `projectId` | string | when source = modrinth and no `url` | Modrinth project identifier, resolved against `version` at sync time. |
 | `localPath` | string | when source = local | Absolute path on the player's machine — niche, used for LAN / offline. |
 | `sha512` | string (128 hex) | recommended | Preferred integrity check. |
 | `sha256` | string (64 hex) | alternative | Used when `sha512` is absent. |
@@ -58,22 +58,14 @@ provenance for the UI.
 Without `url`, a `modrinth` entry resolves `projectId` through the API and
 matches `version` against `version_number` first, then the opaque version `id`.
 
-A `curseforge` entry resolves the same way — `projectId` is the numeric mod id,
-and `version` is matched against the numeric file id first, then the file's
-display name. Two things differ from Modrinth and matter when publishing:
-
-- **It needs a key the player supplies.** CurseForge issues API keys per
-  developer, so the launcher cannot ship one; a pack whose entries resolve
-  through CurseForge will not sync for anyone who has not set a key under
-  Settings. Publishing `url` + `sha512` avoids the problem entirely.
-- **CurseForge publishes no hash stronger than SHA-1.** When a `curseforge`
-  entry carries no `sha512`/`sha256` of its own, that SHA-1 is what the download
-  is verified against — better than nothing, but a manifest hash is both stronger
-  and covered by the manifest signature. Publish one.
-
-Some projects also have third-party downloads disabled by their author. Those
-files appear in the API with a null download URL and cannot be fetched by any
-launcher; the sync fails with a message saying so.
+**There is no `curseforge` source.** CurseForge's API key is issued per
+developer after a manual application and its terms make the key
+non-transferable, so it can neither be shipped nor asked of a player; since
+16 July 2026 its CDN rejects unauthenticated downloads too. A CurseForge-hosted
+file therefore cannot be resolved from a manifest at all — not even as
+`source: "url"`, because that URL is on the same authenticated CDN. Publish the
+mod from Modrinth, mirror the jar somewhere you control, or leave it to a manual
+install.
 
 ## `resourcePacks[]` and `shaders[]` entries
 

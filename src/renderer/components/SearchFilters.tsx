@@ -26,7 +26,7 @@ export function filterCategories(state: SearchFilterState): string[] {
 
 /**
  * The same, minus the loader — for searches that carry the loader in its own
- * typed field because CurseForge needs it as a numeric enum, not a tag.
+ * typed field rather than folding it in with the category tags.
  */
 export function categoriesWithoutLoader(state: SearchFilterState): string[] {
   return Object.values(state.categories).filter(Boolean);

@@ -181,26 +181,6 @@ export function SettingsPage() {
           onBlur={() => void refreshFeeds()}
           placeholder={t('settings.feedPlaceholder', { feed: 'announcements' })}
         />
-        <div className="space-y-1">
-          <Input
-            label={t('settings.curseforgeKey')}
-            type="password"
-            value={settings.curseforgeApiKey ?? ''}
-            onChange={(e) => update({ curseforgeApiKey: e.target.value || undefined })}
-            placeholder={t('settings.curseforgeKeyPlaceholder')}
-          />
-          <p className="text-xs text-rf-text-muted">
-            {t('settings.curseforgeKeyHint')}{' '}
-            <button
-              type="button"
-              onClick={() => void api.system.openUrl('https://console.curseforge.com/')}
-              className="underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent"
-            >
-              console.curseforge.com
-            </button>
-            .
-          </p>
-        </div>
       </Section>
 
       <Section title={t('settings.section.trustedKeys')}>

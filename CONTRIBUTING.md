@@ -95,7 +95,7 @@ src/
     java/        # Adoptium Temurin download and JRE selection
     minecraft/   # version manifest, inheritsFrom merging, assets, launch
     modloader/   # loader install + loader-profile merge over vanilla
-    mods/        # Modrinth + CurseForge APIs, manifest sync, hashing
+    mods/        # Modrinth API, manifest sync, hashing
     net/         # undici dispatcher + Chromium session proxy — all egress
     news/        # news and announcement feed fetching
     profiles/    # profile CRUD, per-profile directories, icons
@@ -149,7 +149,7 @@ Architecture detail lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the
 [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat: add CurseForge as a mod search source
+feat: add a shader loader picker to the content page
 fix: keep the classifier in the library dedupe key
 docs: document the canonicalization contract for signed manifests
 security: sort manifest keys recursively before signature verification

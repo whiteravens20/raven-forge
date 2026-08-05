@@ -139,7 +139,7 @@ whatever is on `main`.
 There is none. Raven Forge collects no analytics, sends no usage data, and has
 no reporting endpoint — there is nothing to opt out of, which is why there is no
 switch for it in Settings. Outbound requests go only where a feature needs them:
-Mojang and Adoptium for game files and Java, Modrinth or CurseForge for mods, the
+Mojang and Adoptium for game files and Java, Modrinth for mods, the
 manifest URL you configured, the news and announcement feeds you configured, and
 GitHub Releases for launcher updates. All of them honour the proxy set in
 Settings → Network.
@@ -171,7 +171,7 @@ Reports on the following will be closed without a fix:
 | A malicious mod on a manifest you chose to trust | Trusting the source is the user's decision; see above |
 | Reading your own tokens from your own keychain | Local user with your privileges is outside the threat model |
 | "The installer is unsigned" on a self-built binary | Signing happens in release CI with the maintainer's certificate |
-| Vulnerabilities in Minecraft, Mojang/Microsoft services, Modrinth, or CurseForge | Report those to their respective vendors |
+| Vulnerabilities in Minecraft, Mojang/Microsoft services, or Modrinth | Report those to their respective vendors |
 | Anything requiring physical access to an unlocked machine | Outside the threat model |
 | Denial of service against your own launcher instance | No multi-user surface to protect |
 | Automated scanner output with no demonstrated impact | Send the analysis, not the report |

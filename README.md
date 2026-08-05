@@ -14,7 +14,7 @@ Built with **Electron + TypeScript + React + Vite + Tailwind CSS**.
 
 - **Server Profiles** — per-server instance configs with pinned MC version, mod loader, and remote manifest
 - **Mod Auto-Sync** — fetch server manifest → diff → parallel download → SHA-256 verify → install
-- **Mod Browser** — search Modrinth from the launcher; CurseForge too, with your own API key
+- **Mod Browser** — search Modrinth from the launcher, filtered to your profile
 - **Bilingual UI** — Polish and English, switchable in Settings
 - **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla
 - **Microsoft Auth** — full OAuth 2.0 → Xbox Live → Minecraft JWT chain + offline mode
@@ -111,7 +111,7 @@ src/
 │   ├── java/       # Adoptium JRE management
 │   ├── minecraft/  # Version manifest, assets, game launcher
 │   ├── modloader/  # Fabric/Quilt/Forge/NeoForge installers
-│   ├── mods/       # Manifest fetch, sync, Modrinth + CurseForge APIs
+│   ├── mods/       # Manifest fetch, sync, Modrinth API, integrity
 │   ├── net/        # Proxy dispatcher — every outbound request goes through it
 │   ├── news/       # News + announcement feeds
 │   ├── profiles/   # Profile CRUD + import/export
@@ -213,10 +213,16 @@ Or leave empty to use the built-in default backgrounds.
 | Source | API key | Notes |
 |---|---|---|
 | **Modrinth** | not needed | The primary source. Search, version lookup and downloads all go through the [public API](https://docs.modrinth.com/). Publishes `sha512`. |
-| **CurseForge** | **yours, required** | Disabled in the UI until you add a key under Settings → Content sources. Keys are issued per developer, so the launcher cannot ship one — get yours at [console.curseforge.com](https://console.curseforge.com/). Publishes nothing stronger than SHA-1. |
 | **Direct URL** | — | For custom or private mods, via the manifest's `"source": "url"` field. Skips API lookups entirely and keeps working when a source is down. |
+| **Local file** | — | A jar you already have, via `"source": "local"`. |
 
-Some CurseForge projects have third-party downloads disabled by their author; those files cannot be fetched by any launcher and the sync says so explicitly.
+**CurseForge is deliberately not supported.** Its API key is issued per developer
+after a manual application, and the [3rd Party API terms](https://support.curseforge.com/support/solutions/articles/9000207405-curse-forge-3rd-party-api-terms-and-conditions)
+make it non-transferable and unshareable — so a key can neither be shipped in a
+public binary nor be expected from a player. Since **16 July 2026** CurseForge's
+CDN also rejects unauthenticated downloads (`401 A valid api-key is required`),
+which closes the last route that did not need one. A CurseForge-only mod has to
+be downloaded by hand and added as a local file.
 
 ---
 

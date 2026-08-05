@@ -42,7 +42,6 @@ const api: RavenForgeAPI = {
     toggleEnabled: (profileId, modId, enabled) =>
       ipcRenderer.invoke('mods:toggle-enabled', profileId, modId, enabled),
     search: (filters) => ipcRenderer.invoke('mods:search', filters),
-    hasCurseForgeKey: () => ipcRenderer.invoke('mods:has-curseforge-key'),
     getFacets: (projectType) => ipcRenderer.invoke('mods:get-facets', projectType),
   },
   content: {

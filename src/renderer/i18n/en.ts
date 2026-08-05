@@ -221,12 +221,10 @@ export const en = {
   'mods.tabInstalled': 'Installed',
   'mods.tabBrowse': 'Browse',
   'mods.searchModrinth': 'Search mods on Modrinth…',
-  'mods.searchCurseforge': 'Search mods on CurseForge…',
   'mods.searchHint': 'Type a name or just press Search — the filters work on their own.',
   'mods.loaderFilter': 'Loader',
   'mods.searchFailed': 'Search failed',
   'mods.installFailed': 'Could not install {name}',
-  'mods.curseforgeNoKey': 'CurseForge needs your own API key — add one in Settings.',
   'mods.empty': 'No mods installed',
   'mods.emptyHint': 'Search for mods in the Browse tab, or sync the profile with a manifest',
   'mods.fromManifest': 'from manifest',
@@ -292,10 +290,6 @@ export const en = {
   'settings.feedPlaceholder': 'https://your-server.com/api/{feed}.json',
   'settings.newsFeed': 'News feed URL',
   'settings.announcementFeed': 'Announcement feed URL',
-  'settings.curseforgeKey': 'CurseForge API key (optional)',
-  'settings.curseforgeKeyPlaceholder': 'Only needed for CurseForge sources',
-  'settings.curseforgeKeyHint':
-    'Without a key the CurseForge search is disabled — Modrinth always works. Generate your own at',
   'settings.trustedKeysHint':
     'Server manifests can be signed. Add the admin’s public key to trust only signed manifests.',
   'settings.trustedKeysEmpty': 'No trusted keys',

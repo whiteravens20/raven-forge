@@ -217,8 +217,6 @@ fixed and hides the ones that were not.
   → Minecraft JWT chain is written and the client id is injected at build time,
   but no approved application exists yet, so the whole path — including the
   `AUTH_UNREACHABLE` offline offer — has only ever been exercised against stubs.
-- **CurseForge is untested against a real key.** Search, version resolution and
-  download are implemented; nothing has run with a live API key.
 - **The launcher has never updated itself from a published release.** The update
   check, platform matrix and install-before-play path are covered by tests, but
   there is no tagged release to update *from*.

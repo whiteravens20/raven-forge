@@ -210,12 +210,10 @@ export const pl: Translations = {
   'mods.tabInstalled': 'Zainstalowane',
   'mods.tabBrowse': 'Przeglądaj',
   'mods.searchModrinth': 'Szukaj modów na Modrinth...',
-  'mods.searchCurseforge': 'Szukaj modów na CurseForge...',
   'mods.searchHint': 'Wpisz nazwę albo po prostu kliknij Szukaj — filtry działają same.',
   'mods.loaderFilter': 'Loader',
   'mods.searchFailed': 'Wyszukiwanie nie powiodło się',
   'mods.installFailed': 'Nie udało się zainstalować {name}',
-  'mods.curseforgeNoKey': 'CurseForge wymaga własnego klucza API — dodaj go w Ustawieniach.',
   'mods.empty': 'Brak zainstalowanych modów',
   'mods.emptyHint': 'Wyszukaj mody w zakładce Przeglądaj lub zsynchronizuj profil z manifestem',
   'mods.fromManifest': 'z manifestu',
@@ -283,10 +281,6 @@ export const pl: Translations = {
   'settings.feedPlaceholder': 'https://twoj-serwer.com/api/{feed}.json',
   'settings.newsFeed': 'News Feed URL',
   'settings.announcementFeed': 'Announcement Feed URL',
-  'settings.curseforgeKey': 'CurseForge API Key (opcjonalnie)',
-  'settings.curseforgeKeyPlaceholder': 'Wymagane tylko dla źródeł CurseForge',
-  'settings.curseforgeKeyHint':
-    'Bez klucza wyszukiwarka CurseForge jest nieaktywna — Modrinth działa zawsze. Własny klucz wygenerujesz na',
   'settings.trustedKeysHint':
     'Manifesty serwerów mogą być podpisane. Dodaj klucz publiczny administratora, aby ufać tylko podpisanym manifestom.',
   'settings.trustedKeysEmpty': 'Brak zaufanych kluczy',

@@ -35,11 +35,6 @@ import {
 import { searchMods, getSearchFacets } from '../core/mods/modrinth-api';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
 import {
-  searchMods as searchCurseForgeMods,
-  hasApiKey as hasCurseForgeKey,
-  CurseForgeKeyMissingError,
-} from '../core/mods/curseforge-api';
-import {
   listContent,
   installContent,
   removeContent,
@@ -473,14 +468,8 @@ export function registerAllIpcHandlers(): void {
   );
   ipcMain.handle('mods:search', async (_event, filters) => {
     try {
-      if (filters.source === 'curseforge') {
-        return ok(await searchCurseForgeMods(filters));
-      }
       return ok(await searchMods(filters));
     } catch (err) {
-      // A missing key is a configuration state, not a failure to report as one:
-      // the renderer turns this into a "set your key in Settings" hint.
-      if (err instanceof CurseForgeKeyMissingError) return ok([]);
       return fail(`Mod search failed: ${reason(err)}`);
     }
   });
@@ -489,13 +478,6 @@ export function registerAllIpcHandlers(): void {
       return ok(await getSearchFacets(projectType));
     } catch (err) {
       return fail(`Could not load filters: ${reason(err)}`);
-    }
-  });
-  ipcMain.handle('mods:has-curseforge-key', async () => {
-    try {
-      return ok(await hasCurseForgeKey());
-    } catch (err) {
-      return fail(`Failed to read CurseForge key: ${reason(err)}`);
     }
   });
 

@@ -17,7 +17,6 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   // See README.md → "Configuration: News Feed, Backgrounds & Announcements"
   newsFeedUrl: undefined,
   announcementFeedUrl: undefined,
-  curseforgeApiKey: undefined,
   trustedPublicKeys: [],
   autoRemoveOrphanedMods: false,
   showLiveConsole: false,

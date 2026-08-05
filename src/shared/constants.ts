@@ -21,15 +21,6 @@ export const FILE_INSTALLED_LOCK = 'installed.lock';
 export const MODRINTH_API_BASE = 'https://api.modrinth.com/v2';
 export const MODRINTH_USER_AGENT = `whiteravens20/raven-forge/${APP_VERSION} (https://github.com/whiteravens20/raven-forge)`;
 
-// ── CurseForge API ────────────────────────────────────────
-// Needs a per-developer key the user supplies in Settings — see
-// src/core/mods/curseforge-api.ts for why one cannot be shipped.
-export const CURSEFORGE_API_BASE = 'https://api.curseforge.com/v1';
-/** CurseForge's game id for Minecraft. */
-export const CURSEFORGE_GAME_ID = 432;
-/** Class id for "Mods" — excludes modpacks, worlds, resource packs and shaders. */
-export const CURSEFORGE_CLASS_MODS = 6;
-
 // ── Mod loaders ───────────────────────────────────────────
 /**
  * The loaders this launcher can install, and therefore the only ones worth

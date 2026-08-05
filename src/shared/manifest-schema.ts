@@ -25,8 +25,8 @@ export const modEntrySchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   version: z.string().min(1),
-  source: z.enum(['modrinth', 'curseforge', 'url', 'local']),
-  // Modrinth / CurseForge
+  source: z.enum(['modrinth', 'url', 'local']),
+  // Modrinth
   projectId: z.string().optional(),
   // Direct URL
   url: z.string().url().optional(),

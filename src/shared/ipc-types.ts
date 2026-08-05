@@ -121,7 +121,7 @@ export interface ProfileSyncStatus {
 // Mod Types
 // ---------------------------------------------------------------------------
 
-export type ModSource = 'modrinth' | 'curseforge' | 'url' | 'local';
+export type ModSource = 'modrinth' | 'url' | 'local';
 export type ModSide = 'client' | 'server' | 'both';
 
 export interface InstalledMod {
@@ -146,7 +146,6 @@ export interface ModSearchResult {
   author: string;
   iconUrl?: string;
   downloads: number;
-  source: 'modrinth' | 'curseforge';
   versions: string[];
   categories: string[];
 }
@@ -215,7 +214,6 @@ export interface ModSearchFilters {
    * `canvas`) because Modrinth files loaders under the same facet key.
    */
   categories?: string[];
-  source?: 'modrinth' | 'curseforge';
   offset?: number;
   limit?: number;
 }
@@ -250,7 +248,6 @@ export interface GlobalSettings {
   customBackgroundsPath?: string;
   newsFeedUrl?: string;
   announcementFeedUrl?: string;
-  curseforgeApiKey?: string;
   trustedPublicKeys: TrustedKey[];
   autoRemoveOrphanedMods: boolean;
   showLiveConsole: boolean;
@@ -451,8 +448,6 @@ export interface InvokeChannels {
     enabled: boolean,
   ) => Promise<IpcResult<void>>;
   'mods:search': (filters: ModSearchFilters) => Promise<IpcResult<ModSearchResult[]>>;
-  /** Whether a CurseForge API key is configured — that source is unusable without one. */
-  'mods:has-curseforge-key': () => Promise<IpcResult<boolean>>;
   /** Modrinth's live facet list for a project type, grouped as Modrinth groups it. */
   'mods:get-facets': (projectType: ContentProjectType) => Promise<IpcResult<FacetGroups>>;
 
@@ -628,7 +623,6 @@ export interface RavenForgeAPI {
     uninstall: InvokeChannels['mods:uninstall'];
     toggleEnabled: InvokeChannels['mods:toggle-enabled'];
     search: InvokeChannels['mods:search'];
-    hasCurseForgeKey: InvokeChannels['mods:has-curseforge-key'];
     getFacets: InvokeChannels['mods:get-facets'];
   };
   content: {

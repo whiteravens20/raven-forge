@@ -6,9 +6,9 @@ export interface HashedEntry {
   sha256?: string;
   sha512?: string;
   /**
-   * Only ever populated from CurseForge, which publishes nothing stronger.
-   * Weak against a deliberate collision, but it still pins the file against a
-   * swapped CDN object, and no check at all is strictly worse.
+   * The floor, for a manifest that publishes nothing stronger. Weak against a
+   * deliberate collision, but it still pins the file against a swapped CDN
+   * object, and no check at all is strictly worse.
    */
   sha1?: string;
 }
@@ -29,9 +29,9 @@ export async function sha256File(filePath: string): Promise<string> {
  *
  * Strongest available wins. sha512 comes first because Modrinth's API returns
  * sha1/sha512 and not sha256, so it is the one a pack generator can publish
- * without downloading every jar purely to hash it; sha1 is the floor, and only
- * CurseForge ever lands there. Returns null when an entry carries no integrity
- * data, in which case the download is accepted as-is.
+ * without downloading every jar purely to hash it; sha1 is the floor. Returns
+ * null when an entry carries no integrity data, in which case the download is
+ * accepted as-is.
  */
 export function expectedHash(
   entry: HashedEntry,

@@ -45,7 +45,7 @@ describe('expectedHash', () => {
       algorithm: 'sha256',
       value: SHA256,
     });
-    // Only CurseForge ever lands here — it publishes nothing stronger.
+    // The floor, for a manifest that publishes nothing stronger.
     expect(expectedHash({ sha1: SHA1 })).toEqual({ algorithm: 'sha1', value: SHA1 });
   });
 
