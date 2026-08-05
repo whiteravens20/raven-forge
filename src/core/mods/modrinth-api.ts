@@ -192,17 +192,39 @@ export async function getSearchFacets(projectType: ContentProjectType): Promise<
 
 // ── Version listing ────────────────────────────────────────
 
+/**
+ * A project's builds, newest first, optionally narrowed to a Minecraft version
+ * and a set of loaders.
+ *
+ * `loaders` takes a list because a profile can accept more than one — Quilt runs
+ * Fabric mods — and because asking twice and merging would lose Modrinth's own
+ * ordering. An empty list is treated as no filter rather than as "match
+ * nothing", so a vanilla profile still sees what exists.
+ */
 export async function getModVersions(
   projectId: string,
   gameVersion?: string,
-  loader?: string,
+  loaders?: string | string[],
 ): Promise<ModrinthVersion[]> {
   const params = new URLSearchParams();
   if (gameVersion) params.set('game_versions', JSON.stringify([gameVersion]));
-  if (loader) params.set('loaders', JSON.stringify([loader]));
+  const loaderList = typeof loaders === 'string' ? [loaders] : (loaders ?? []);
+  if (loaderList.length > 0) params.set('loaders', JSON.stringify(loaderList));
 
   const res = await modrinthFetch(`/project/${projectId}/version?${params}`);
   return (await res.json()) as ModrinthVersion[];
+}
+
+/**
+ * One specific build, by id.
+ *
+ * Needed wherever the caller has already decided which build to install and the
+ * filtered listing would not contain it — installing a mod past a compatibility
+ * warning is exactly that case.
+ */
+export async function getVersion(versionId: string): Promise<ModrinthVersion> {
+  const res = await modrinthFetch(`/version/${versionId}`);
+  return (await res.json()) as ModrinthVersion;
 }
 
 /** A project's display title. Version names are build labels, not this. */
@@ -214,9 +236,12 @@ export async function getProjectTitle(projectId: string): Promise<string> {
 // ── Download URL for a version ─────────────────────────────
 
 export async function getVersionDownloadInfo(versionId: string): Promise<ModrinthFile> {
-  const res = await modrinthFetch(`/version/${versionId}`);
-  const version = (await res.json()) as ModrinthVersion;
+  return primaryFile(await getVersion(versionId));
+}
+
+/** The file a version is, out of the extras (sources, javadoc) it may also carry. */
+export function primaryFile(version: ModrinthVersion): ModrinthFile {
   const primary = version.files.find((f) => f.primary) ?? version.files[0];
-  if (!primary) throw new Error(`No files found for version ${versionId}`);
+  if (!primary) throw new Error(`No files found for version ${version.id}`);
   return primary;
 }

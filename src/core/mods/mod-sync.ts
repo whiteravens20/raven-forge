@@ -13,13 +13,22 @@ import {
 import { paths } from '../config/paths';
 import { getSettings } from '../config/settings-manager';
 import { getProfile } from '../profiles/profile-manager';
-import { getVersionDownloadInfo, getModVersions, type ModrinthVersion } from './modrinth-api';
+import {
+  getModVersions,
+  getProjectTitle,
+  getVersion,
+  primaryFile,
+  type ModrinthVersion,
+} from './modrinth-api';
+import { requiredDependencies } from './compatibility';
+import { acceptedLoaders } from '../../shared/constants';
 import { syncContentFromManifest } from './content-manager';
 import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import { getMainWindow } from '../../main/window';
 import { modManifestSchema, type ModEntry, type ModManifest } from '../../shared/manifest-schema';
 import type {
   InstalledMod,
+  ModInstallResult,
   ProfileSyncStatus,
   ModSearchResult,
   ProgressEvent,
@@ -192,8 +201,8 @@ async function resolveModEntry(entry: ModEntry, manifest: ModManifest): Promise<
       if (!entry.projectId) {
         throw new Error(`${entry.name}: source "modrinth" requires projectId or url`);
       }
-      const loader = manifest.modLoader === 'vanilla' ? undefined : manifest.modLoader;
-      const versions = await getModVersions(entry.projectId, manifest.minecraftVersion, loader);
+      const loaders = acceptedLoaders(manifest.modLoader);
+      const versions = await getModVersions(entry.projectId, manifest.minecraftVersion, loaders);
       const match =
         versions.find((v) => v.version_number === entry.version || v.id === entry.version) ??
         versions[0];
@@ -202,7 +211,7 @@ async function resolveModEntry(entry: ModEntry, manifest: ModManifest): Promise<
           `${entry.name}: no Modrinth release for MC ${manifest.minecraftVersion} / ${manifest.modLoader}`,
         );
       }
-      const file = await getVersionDownloadInfo(match.id);
+      const file = primaryFile(match);
       return { url: file.url, fileName: file.filename, version: match.version_number || match.id };
     }
 
@@ -422,8 +431,9 @@ export async function syncManifest(profileId: string): Promise<void> {
       done++;
     }
 
-    await syncContentFromManifest('resourcepacks', profileId, manifest.resourcePacks);
-    await syncContentFromManifest('shaders', profileId, manifest.shaders);
+    const mcVersion = manifest.minecraftVersion;
+    await syncContentFromManifest('resourcepacks', profileId, manifest.resourcePacks, mcVersion);
+    await syncContentFromManifest('shaders', profileId, manifest.shaders, mcVersion);
 
     // Mods that were installed from a previous manifest but are gone from this one.
     const keptIds = new Set(synced.map((m) => m.id));
@@ -485,37 +495,51 @@ export async function syncManifest(profileId: string): Promise<void> {
 }
 
 /**
- * Pick the file to install for a search result, honouring the profile's own
- * Minecraft version and loader.
+ * Pick the build to install for a search result.
  *
- * The version argument is optional on purpose. `ModSearchResult.versions` holds
- * *game* versions — it is what the search endpoint returns — so the renderer
- * has no version id to hand over, and passing `versions[0]` (as it used to)
- * asked Modrinth for a version called "1.21.4". Resolution belongs here, where
- * the profile is in reach.
+ * With a `versionId` the caller has already decided — the compatibility check
+ * resolves one, and the player may have accepted a warning about that exact
+ * build — so it is fetched by id rather than looked for in a filtered list it
+ * would be missing from by definition.
+ *
+ * Without one, the profile decides. The argument is optional because
+ * `ModSearchResult.versions` holds *game* versions, so the renderer has no build
+ * id to hand over; passing `versions[0]` (as it once did) asked Modrinth for a
+ * version called "1.21.4".
  */
-async function resolveSearchDownload(
+async function resolveInstallVersion(
   profileId: string,
   mod: ModSearchResult,
   versionId?: string,
-): Promise<{ url: string; fileName: string; version: string; hashes: HashedEntry }> {
+): Promise<ModrinthVersion> {
+  if (versionId) return getVersion(versionId);
+
   const profile = await getProfile(profileId);
   const gameVersion = profile?.minecraftVersion;
-  const loader = profile && profile.modLoader !== 'vanilla' ? profile.modLoader : undefined;
+  const loaders = profile ? acceptedLoaders(profile.modLoader) : [];
 
-  const versions = await getModVersions(mod.id, gameVersion, loader);
-  const match = versionId ? versions.find((v) => v.id === versionId) : versions[0];
-  if (!match) {
+  const versions = await getModVersions(mod.id, gameVersion, loaders);
+  if (!versions[0]) {
     throw new Error(
-      `No Modrinth release for ${mod.name} on MC ${gameVersion ?? 'any'} / ${loader ?? 'any loader'}`,
+      `No Modrinth release for ${mod.name} on MC ${gameVersion ?? 'any'} / ` +
+        `${loaders.join(' or ') || 'any loader'}`,
     );
   }
+  return versions[0];
+}
 
-  const file = await getVersionDownloadInfo(match.id);
+/** A resolved build, as the download path wants it. */
+function downloadFor(version: ModrinthVersion): {
+  url: string;
+  fileName: string;
+  version: string;
+  hashes: HashedEntry;
+} {
+  const file = primaryFile(version);
   return {
     url: file.url,
     fileName: file.filename,
-    version: match.version_number || match.id,
+    version: version.version_number || version.id,
     hashes: { sha512: file.hashes.sha512 },
   };
 }
@@ -573,17 +597,26 @@ async function installResolvedMod(
   return installed;
 }
 
+/**
+ * Install a mod, and whatever it cannot start without.
+ *
+ * The dependencies are the point. A mod whose required API is missing does not
+ * fail to install — it installs perfectly and then takes the game down during
+ * startup, which is the single most common way a working profile stops working.
+ * Their names come back so the UI can say what arrived unasked.
+ */
 export async function installModFromSearch(
   profileId: string,
   mod: ModSearchResult,
   versionId?: string,
-): Promise<InstalledMod> {
-  const resolved = await resolveSearchDownload(profileId, mod, versionId);
-  return installResolvedMod(
+): Promise<ModInstallResult> {
+  const version = await resolveInstallVersion(profileId, mod, versionId);
+  const installed = await installResolvedMod(
     profileId,
     { id: mod.id, name: mod.name, source: 'modrinth' },
-    resolved,
+    downloadFor(version),
   );
+  return { mod: installed, dependencies: await installRequiredDependencies(profileId, version) };
 }
 
 /**
@@ -597,17 +630,54 @@ export async function installModrinthVersion(
   displayName: string,
   version: ModrinthVersion,
 ): Promise<InstalledMod> {
-  const file = await getVersionDownloadInfo(version.id);
   return installResolvedMod(
     profileId,
     { id: projectId, name: displayName, source: 'modrinth' },
-    {
-      url: file.url,
-      fileName: file.filename,
-      version: version.version_number || version.id,
-      hashes: { sha512: file.hashes.sha512 },
-    },
+    downloadFor(version),
   );
+}
+
+/**
+ * Install a build's missing required dependencies into the profile.
+ *
+ * Resolved against the profile rather than against the pin where the two
+ * disagree: a `version_id` the publisher named is honoured when it fits this
+ * Minecraft version, and the newest build that does fit is used when it does
+ * not. A dependency with no usable build is logged and skipped — the
+ * compatibility check reports that case before anything is downloaded, and
+ * failing here would leave the mod itself installed and the profile half done.
+ *
+ * Returns the names it added, in order.
+ */
+export async function installRequiredDependencies(
+  profileId: string,
+  version: ModrinthVersion,
+): Promise<string[]> {
+  const profile = await getProfile(profileId);
+  if (!profile) return [];
+
+  const loaders = acceptedLoaders(profile.modLoader);
+  const installed = await readLockFile(profileId);
+  const added: string[] = [];
+
+  for (const dep of requiredDependencies(version, installed)) {
+    const candidates = await getModVersions(dep.projectId, profile.minecraftVersion, loaders);
+    const match = dep.versionId
+      ? (candidates.find((v) => v.id === dep.versionId) ?? candidates[0])
+      : candidates[0];
+    if (!match) {
+      log.warn(`Dependency ${dep.projectId} has no build for MC ${profile.minecraftVersion}`);
+      continue;
+    }
+
+    // The project's title, not the build's — `ModrinthVersion.name` is a label
+    // like "[1.21.4] Sodium 0.6.5", which reads badly in a sentence.
+    const name = await getProjectTitle(dep.projectId);
+    await installModrinthVersion(profileId, dep.projectId, name, match);
+    added.push(name);
+  }
+
+  return added;
 }
 
 export async function installModFromFile(

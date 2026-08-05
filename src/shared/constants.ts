@@ -37,6 +37,36 @@ export function isClientModLoader(value: string): value is ClientModLoader {
   return (CLIENT_MOD_LOADERS as readonly string[]).includes(value);
 }
 
+/**
+ * Which loaders' mods a profile can actually run.
+ *
+ * Almost always just itself — a Forge mod does not load on Fabric, and saying
+ * otherwise would let the launcher install a jar the game ignores at best.
+ * Quilt is the one real exception: it ships a Fabric compatibility layer and
+ * loads Fabric mods, which is most of what anyone installs on it, since few
+ * projects publish a separate Quilt build.
+ *
+ * NeoForge deliberately does *not* list `forge`. The two were the same thing on
+ * 1.20.1 and diverged after it, so the rule would have to be version-dependent
+ * to be true — and a rule that is wrong half the time is worse than none. A
+ * Forge-only mod on a NeoForge profile is reported as a mismatch the player can
+ * override, which is the right answer for the 1.20.1 case and for no other.
+ *
+ * Vanilla returns nothing: without a loader there is nothing to load a mod.
+ */
+export function acceptedLoaders(modLoader: string): ClientModLoader[] {
+  switch (modLoader) {
+    case 'quilt':
+      return ['quilt', 'fabric'];
+    case 'fabric':
+    case 'forge':
+    case 'neoforge':
+      return [modLoader];
+    default:
+      return [];
+  }
+}
+
 // ── Minecraft APIs ────────────────────────────────────────
 export const MOJANG_VERSION_MANIFEST =
   'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';

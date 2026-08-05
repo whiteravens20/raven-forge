@@ -221,6 +221,24 @@ export const pl: Translations = {
   'mods.downloads.few': '{count} pobrania',
   'mods.downloads.many': '{count} pobrań',
   'mods.downloads.other': '{count} pobrania',
+  'mods.installedWithDeps': 'Zainstalowano {name}, a wraz z nim to, czego potrzebuje: {deps}',
+
+  // ── Kompatybilność ───────────────────────────────────────
+  'compat.title': 'Czy {name} pasuje do tego profilu?',
+  'compat.wrongLoader': 'Brak buildu pod Twój loader — ten jest wydany pod: {loaders}',
+  'compat.wrongVersion': 'Brak buildu pod Twoją wersję Minecrafta — najnowsze są pod: {versions}',
+  'compat.noBuild': 'Ten projekt nie udostępnia niczego, co dałoby się zainstalować.',
+  'compat.needsLoader':
+    'Ten profil jest waniliowy, więc nie ma loadera — mod nigdy nie zostanie wczytany.',
+  'compat.conflictsWith': 'Zgłoszona niekompatybilność z czymś, co już masz: {names}',
+  'compat.dependencyNoBuild': 'Wymaga czegoś, co nie ma buildu pod ten profil: {names}',
+  'compat.alsoInstalls': 'Zainstaluje też: {deps}',
+  'compat.anywayHint':
+    'Wersję {version} można zainstalować mimo to — te dane wypełnia autor i często są za rzeczywistością.',
+  'compat.nothingToInstall': 'Nie ma tu pliku do zainstalowania.',
+  'compat.installAnyway': 'Instaluj mimo to',
+  'compat.badgeVersion': 'nic pod {version}',
+  'compat.badgeLoader': 'nic pod {loader}',
 
   // ── Accounts ─────────────────────────────────────────────
   'accounts.title': 'Konta',

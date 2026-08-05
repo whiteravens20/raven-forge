@@ -4,7 +4,8 @@ import crypto from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
-import { getVersionDownloadInfo, getModVersions, getProjectTitle } from './modrinth-api';
+import { getVersion, getModVersions, getProjectTitle, primaryFile } from './modrinth-api';
+import { getProfile } from '../profiles/profile-manager';
 import { applyResourcePackOrder } from '../minecraft/options-file';
 import { sha256File, fileMatches, verifyDownload } from './integrity';
 import type { InstalledMod } from '../../shared/ipc-types';
@@ -126,14 +127,19 @@ async function syncResourcePackSelection(profileId: string): Promise<void> {
 
 /**
  * Install shader / resource pack from a source string:
- *   - "modrinth:<projectId>" — fetch latest version from Modrinth
+ *   - "modrinth:<projectId>" — newest build for the profile's Minecraft version
  *   - "url:https://..."       — direct URL to .zip
  *   - "file:/abs/path.zip"    — local file
+ *
+ * `versionId` overrides the choice for the Modrinth case, and is how an install
+ * the player accepted a compatibility warning about gets the build the warning
+ * was about.
  */
 export async function installContent(
   kind: ContentKind,
   profileId: string,
   source: string,
+  versionId?: string,
 ): Promise<InstalledMod> {
   const dir = targetDir(kind, profileId);
   await fs.mkdir(dir, { recursive: true });
@@ -147,17 +153,30 @@ export async function installContent(
   if (source.startsWith('modrinth:')) {
     const projectId = source.slice('modrinth:'.length);
     modrinthProjectId = projectId;
-    const versions = await getModVersions(projectId);
-    if (versions.length === 0) throw new Error(`No versions found on Modrinth for ${projectId}`);
-    const latest = versions[0];
-    const fileInfo = await getVersionDownloadInfo(latest.id);
+
+    // Pinned to the profile's Minecraft version. Taking whatever is newest —
+    // as this did — puts a pack built for 1.21.8 into a 1.20.1 profile, where a
+    // shader fails to compile and a resource pack lands in the game's
+    // "incompatible" list. Both look like a successful install from here.
+    const profile = await getProfile(profileId);
+    const chosen = versionId
+      ? await getVersion(versionId)
+      : (await getModVersions(projectId, profile?.minecraftVersion))[0];
+    if (!chosen) {
+      throw new Error(
+        `No ${kind === 'shaders' ? 'shader' : 'resource pack'} build for MC ` +
+          `${profile?.minecraftVersion ?? 'unknown'} (project ${projectId})`,
+      );
+    }
+
+    const fileInfo = primaryFile(chosen);
     downloadUrl = fileInfo.url;
     fileName = fileInfo.filename;
     // The project's title, not the version's. `ModrinthVersion.name` is a build
     // label — Complementary Reimagined publishes its as `r5.8.1`, so the
     // installed list read "r5.8.1" where a pack name belonged.
     displayName = await getProjectTitle(projectId);
-    version = latest.version_number || latest.id;
+    version = chosen.version_number || chosen.id;
   } else if (source.startsWith('url:')) {
     downloadUrl = source.slice('url:'.length);
     fileName = path.basename(new URL(downloadUrl).pathname) || `${kind}-${Date.now()}.zip`;
@@ -237,6 +256,7 @@ export async function syncContentFromManifest(
   kind: ContentKind,
   profileId: string,
   entries: Array<ResourcePackEntry | ShaderEntry>,
+  mcVersion: string,
 ): Promise<number> {
   const dir = targetDir(kind, profileId);
   await fs.mkdir(dir, { recursive: true });
@@ -259,12 +279,21 @@ export async function syncContentFromManifest(
     } else if (entry.source === 'modrinth') {
       if (!entry.projectId)
         throw new Error(`${entry.name}: source "modrinth" requires projectId or url`);
-      const versions = await getModVersions(entry.projectId);
+      // A pinned version is the pack author's explicit choice and is looked for
+      // across every build; without one, the manifest's Minecraft version
+      // decides, rather than whatever the project published most recently.
+      const versions = await getModVersions(entry.projectId, entry.version ? undefined : mcVersion);
       const match = entry.version
         ? versions.find((v) => v.version_number === entry.version || v.id === entry.version)
         : versions[0];
-      if (!match) throw new Error(`${entry.name}: no Modrinth version matching "${entry.version}"`);
-      const file = await getVersionDownloadInfo(match.id);
+      if (!match) {
+        throw new Error(
+          entry.version
+            ? `${entry.name}: no Modrinth version matching "${entry.version}"`
+            : `${entry.name}: no Modrinth build for MC ${mcVersion}`,
+        );
+      }
+      const file = primaryFile(match);
       downloadUrl = file.url;
       fileName = file.filename;
       version = match.version_number || match.id;

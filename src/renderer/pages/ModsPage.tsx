@@ -12,8 +12,10 @@ import {
   categoriesWithoutLoader,
   type SearchFilterState,
 } from '@components/SearchFilters';
+import { CompatibilityBadge } from '@components/CompatibilityBadge';
+import { CompatibilityDialog } from '@components/CompatibilityDialog';
 import { isClientModLoader } from '@shared/constants';
-import type { FacetGroups, ModSearchResult, InstalledMod } from '@shared/ipc-types';
+import type { FacetGroups, InstallPlan, ModSearchResult, InstalledMod } from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
@@ -35,6 +37,11 @@ export function ModsPage() {
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
   /** Set once a search has run, so the "nothing matched" line waits its turn. */
   const [searched, setSearched] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  /** Non-null while a compatibility warning is waiting on a decision. */
+  const [plan, setPlan] = useState<{ mod: ModSearchResult; plan: InstallPlan } | null>(null);
+  /** Something worth saying that is not a failure — dependencies that arrived. */
+  const [note, setNote] = useState<string | null>(null);
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
@@ -73,14 +80,52 @@ export function ModsPage() {
     }
   };
 
+  /**
+   * Check first, install second.
+   *
+   * The check is what stops a Forge jar landing in a Fabric profile, or a mod
+   * arriving without the API it needs — neither of which fails loudly. It costs
+   * one request when everything fits, which is the common case, and the plan it
+   * returns names the exact build so installing cannot quietly pick another.
+   */
   const handleInstall = async (mod: ModSearchResult) => {
     if (!selectedId) return;
     setError(null);
-    // No version argument: the search endpoints return *game* versions, not
-    // build identifiers. The main process picks the newest build matching this
-    // profile's Minecraft version and loader.
-    const result = await api.mods.installFromSearch(selectedId, mod);
-    if (!result.success) setError(result.error ?? t('mods.installFailed', { name: mod.name }));
+    setNote(null);
+    setBusyId(mod.id);
+    try {
+      const check = await api.mods.checkInstall(selectedId, mod);
+      if (!check.success || !check.data) {
+        setError(check.error ?? t('mods.installFailed', { name: mod.name }));
+        return;
+      }
+      // Nothing to decide when nothing is wrong — a dialog confirming that an
+      // install is fine is a dialog people click through without reading.
+      if (check.data.issues.length > 0) {
+        setPlan({ mod, plan: check.data });
+        return;
+      }
+      await install(mod, check.data.versionId);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** Download a build the profile has already agreed to. */
+  const install = async (mod: ModSearchResult, versionId?: string) => {
+    if (!selectedId) return;
+    const result = await api.mods.installFromSearch(selectedId, mod, versionId);
+    if (!result.success || !result.data) {
+      setError(result.error ?? t('mods.installFailed', { name: mod.name }));
+    } else if (result.data.dependencies.length > 0) {
+      // Files appeared in the profile that nobody asked for. Say which.
+      setNote(
+        t('mods.installedWithDeps', {
+          name: mod.name,
+          deps: result.data.dependencies.join(', '),
+        }),
+      );
+    }
     await loadInstalled();
   };
 
@@ -194,7 +239,26 @@ export function ModsPage() {
           />
 
           {error && <Banner type="urgent">{error}</Banner>}
+          {note && (
+            <Banner type="info" dismissible onDismiss={() => setNote(null)}>
+              {note}
+            </Banner>
+          )}
         </div>
+      )}
+
+      {plan && (
+        <CompatibilityDialog
+          plan={plan.plan}
+          busy={busyId === plan.mod.id}
+          onCancel={() => setPlan(null)}
+          onInstall={() => {
+            const pending = plan;
+            setPlan(null);
+            setBusyId(pending.mod.id);
+            void install(pending.mod, pending.plan.versionId).finally(() => setBusyId(null));
+          }}
+        />
       )}
 
       {tab === 'installed' ? (
@@ -265,12 +329,21 @@ export function ModsPage() {
                     count: mod.downloads.toLocaleString(locale),
                   })}
                 </p>
+                {/* Judged against the profile, not against the filter row: the
+                    filters can be widened to browse, and what matters is where
+                    the mod is about to land. */}
+                <CompatibilityBadge
+                  item={mod}
+                  gameVersion={profileVersion}
+                  modLoader={profileLoader}
+                />
               </div>
               <Button
                 variant="secondary"
                 size="sm"
                 icon={<Download size={14} />}
-                onClick={() => handleInstall(mod)}
+                loading={busyId === mod.id}
+                onClick={() => void handleInstall(mod)}
               >
                 {t('common.install')}
               </Button>

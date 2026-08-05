@@ -230,6 +230,25 @@ export const en = {
   'mods.fromManifest': 'from manifest',
   'mods.downloads.one': '{count} download',
   'mods.downloads.other': '{count} downloads',
+  'mods.installedWithDeps': 'Installed {name}, along with what it needs: {deps}',
+
+  // ── Compatibility ────────────────────────────────────────
+  'compat.title': 'Does {name} fit this profile?',
+  'compat.wrongLoader': 'No build for your mod loader — this one is published for: {loaders}',
+  'compat.wrongVersion':
+    'No build for your Minecraft version — the newest ones are for: {versions}',
+  'compat.noBuild': 'This project publishes nothing that could be installed.',
+  'compat.needsLoader':
+    'This profile is vanilla, so it has no mod loader — a mod would never be read.',
+  'compat.conflictsWith': 'Declared incompatible with something already installed: {names}',
+  'compat.dependencyNoBuild': 'Needs something with no build for this profile: {names}',
+  'compat.alsoInstalls': 'Also installs: {deps}',
+  'compat.anywayHint':
+    'Version {version} can be installed anyway — this data is what the author filled in, and it is often behind reality.',
+  'compat.nothingToInstall': 'There is no file to install here.',
+  'compat.installAnyway': 'Install anyway',
+  'compat.badgeVersion': 'nothing for {version}',
+  'compat.badgeLoader': 'nothing for {loader}',
 
   // ── Accounts ─────────────────────────────────────────────
   'accounts.title': 'Accounts',

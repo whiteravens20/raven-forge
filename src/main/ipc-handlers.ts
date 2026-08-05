@@ -33,6 +33,7 @@ import {
   toggleModEnabled,
 } from '../core/mods/mod-sync';
 import { searchMods, getSearchFacets } from '../core/mods/modrinth-api';
+import { planModInstall, planContentInstall } from '../core/mods/compatibility';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
 import {
   listContent,
@@ -440,6 +441,15 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to install mod: ${reason(err)}`);
     }
   });
+  ipcMain.handle('mods:check-install', async (_event, profileId, mod) => {
+    try {
+      const profile = await getProfile(profileId);
+      if (!profile) return fail(`Profile ${profileId} not found`);
+      return ok(await planModInstall(profile, mod, await getInstalledMods(profileId)));
+    } catch (err) {
+      return fail(`Could not check compatibility: ${reason(err)}`);
+    }
+  });
   ipcMain.handle('mods:install-from-file', async (_event, profileId: string, filePath: string) => {
     try {
       return ok(await installModFromFile(profileId, filePath));
@@ -496,12 +506,24 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to list resource packs: ${reason(err)}`);
     }
   });
-  ipcMain.handle('content:install-shader', async (_event, profileId: string, source: string) => {
+  ipcMain.handle(
+    'content:install-shader',
+    async (_event, profileId: string, source: string, version?: string) => {
+      try {
+        await installContent('shaders', profileId, source, version);
+        return ok(undefined);
+      } catch (err) {
+        return fail(`Failed to install shader: ${reason(err)}`);
+      }
+    },
+  );
+  ipcMain.handle('content:check-install', async (_event, profileId, item) => {
     try {
-      await installContent('shaders', profileId, source);
-      return ok(undefined);
+      const profile = await getProfile(profileId);
+      if (!profile) return fail(`Profile ${profileId} not found`);
+      return ok(await planContentInstall(profile, item));
     } catch (err) {
-      return fail(`Failed to install shader: ${reason(err)}`);
+      return fail(`Could not check compatibility: ${reason(err)}`);
     }
   });
   ipcMain.handle('content:get-shader-loader-state', async (_event, profileId: string) => {
@@ -537,9 +559,9 @@ export function registerAllIpcHandlers(): void {
   );
   ipcMain.handle(
     'content:install-resourcepack',
-    async (_event, profileId: string, source: string) => {
+    async (_event, profileId: string, source: string, version?: string) => {
       try {
-        await installContent('resourcepacks', profileId, source);
+        await installContent('resourcepacks', profileId, source, version);
         return ok(undefined);
       } catch (err) {
         return fail(`Failed to install resource pack: ${reason(err)}`);

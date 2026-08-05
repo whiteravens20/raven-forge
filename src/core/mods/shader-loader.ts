@@ -1,6 +1,7 @@
 import { log } from '../../main/logger';
 import { getModVersions, getProjectTitle, type ModrinthVersion } from './modrinth-api';
-import { getInstalledMods, installModrinthVersion } from './mod-sync';
+import { getInstalledMods, installModrinthVersion, installRequiredDependencies } from './mod-sync';
+import { requiredDependencies } from './compatibility';
 import type {
   ModLoaderType,
   ShaderLoaderOption,
@@ -110,7 +111,7 @@ export async function installShaderLoader(
 
   log.info(`Installing shader loader ${candidate.name} for profile ${profileId}`);
   await installModrinthVersion(profileId, candidate.id, candidate.name, newest);
-  const dependencies = await installRequiredDependencies(profileId, mcVersion, modLoader, newest);
+  const dependencies = await installRequiredDependencies(profileId, newest);
 
   return { status: 'installed', name: candidate.name, dependencies };
 }
@@ -122,55 +123,7 @@ async function requiredDependencyNames(
 ): Promise<string[]> {
   const names: string[] = [];
   for (const dep of requiredDependencies(version, installed)) {
-    names.push(await getProjectTitle(dep.project_id));
+    names.push(await getProjectTitle(dep.projectId));
   }
   return names;
-}
-
-function requiredDependencies(
-  version: ModrinthVersion,
-  installed: Array<{ id: string }>,
-): Array<{ project_id: string; version_id: string | null }> {
-  return version.dependencies
-    .filter((d) => d.dependency_type === 'required' && d.project_id)
-    .filter((d) => !installed.some((m) => m.id === d.project_id))
-    .map((d) => ({ project_id: d.project_id as string, version_id: d.version_id }));
-}
-
-/**
- * Install a version's required dependencies.
- *
- * One level deep on purpose. Iris and Oculus have a single flat requirement
- * each, and a general resolver would be a graph walk built for a case that does
- * not exist. Returns the names it added, so the UI can say what arrived unasked.
- */
-async function installRequiredDependencies(
-  profileId: string,
-  mcVersion: string,
-  modLoader: ModLoaderType,
-  version: ModrinthVersion,
-): Promise<string[]> {
-  const installed = await getInstalledMods(profileId);
-  const added: string[] = [];
-
-  for (const dep of requiredDependencies(version, installed)) {
-    // A pinned `version_id` is the publisher saying *this* build; honour it.
-    // Without one, the newest build for this profile is the right guess.
-    const versions = await getModVersions(dep.project_id, mcVersion, modLoader);
-    const match = dep.version_id
-      ? (versions.find((v) => v.id === dep.version_id) ?? versions[0])
-      : versions[0];
-    if (!match) {
-      log.warn(`Shader loader dependency ${dep.project_id} has no build for ${mcVersion}`);
-      continue;
-    }
-
-    // The project's title, not the version's — `ModrinthVersion.name` is a
-    // build label like "[1.21.4] Sodium 0.6.5", which reads badly in a sentence.
-    const name = await getProjectTitle(dep.project_id);
-    await installModrinthVersion(profileId, dep.project_id, name, match);
-    added.push(name);
-  }
-
-  return added;
 }

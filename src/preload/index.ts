@@ -36,6 +36,7 @@ const api: RavenForgeAPI = {
     syncManifest: (profileId) => ipcRenderer.invoke('mods:sync-manifest', profileId),
     installFromSearch: (profileId, mod, version) =>
       ipcRenderer.invoke('mods:install-from-search', profileId, mod, version),
+    checkInstall: (profileId, mod) => ipcRenderer.invoke('mods:check-install', profileId, mod),
     installFromFile: (profileId, filePath) =>
       ipcRenderer.invoke('mods:install-from-file', profileId, filePath),
     uninstall: (profileId, modId) => ipcRenderer.invoke('mods:uninstall', profileId, modId),
@@ -47,14 +48,15 @@ const api: RavenForgeAPI = {
   content: {
     getShaders: (profileId) => ipcRenderer.invoke('content:get-shaders', profileId),
     getResourcePacks: (profileId) => ipcRenderer.invoke('content:get-resourcepacks', profileId),
-    installShader: (profileId, source) =>
-      ipcRenderer.invoke('content:install-shader', profileId, source),
+    installShader: (profileId, source, version) =>
+      ipcRenderer.invoke('content:install-shader', profileId, source, version),
+    checkInstall: (profileId, item) => ipcRenderer.invoke('content:check-install', profileId, item),
     getShaderLoaderState: (profileId) =>
       ipcRenderer.invoke('content:get-shader-loader-state', profileId),
     installShaderLoader: (profileId, projectId) =>
       ipcRenderer.invoke('content:install-shader-loader', profileId, projectId),
-    installResourcePack: (profileId, source) =>
-      ipcRenderer.invoke('content:install-resourcepack', profileId, source),
+    installResourcePack: (profileId, source, version) =>
+      ipcRenderer.invoke('content:install-resourcepack', profileId, source, version),
     removeShader: (profileId, id) => ipcRenderer.invoke('content:remove-shader', profileId, id),
     removeResourcePack: (profileId, id) =>
       ipcRenderer.invoke('content:remove-resourcepack', profileId, id),

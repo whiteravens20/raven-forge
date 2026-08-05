@@ -13,8 +13,11 @@ import {
   type SearchFilterState,
 } from '@components/SearchFilters';
 import { ShaderLoaderPicker } from '@components/ShaderLoaderPicker';
+import { CompatibilityBadge } from '@components/CompatibilityBadge';
+import { CompatibilityDialog } from '@components/CompatibilityDialog';
 import type {
   FacetGroups,
+  InstallPlan,
   ModSearchResult,
   InstalledMod,
   ShaderLoaderOption,
@@ -58,6 +61,8 @@ export function ContentPage() {
   /** Non-null while the "which shader loader?" dialog is open. */
   const [choosingLoader, setChoosingLoader] = useState<ShaderLoaderOption[] | null>(null);
   const [installingLoader, setInstallingLoader] = useState(false);
+  /** Non-null while a compatibility warning is waiting on a decision. */
+  const [plan, setPlan] = useState<{ item: ModSearchResult; plan: InstallPlan } | null>(null);
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
@@ -130,29 +135,51 @@ export function ContentPage() {
     }
   };
 
+  /**
+   * Check the pack fits this profile's Minecraft version, then install it.
+   *
+   * The check is worth the round trip because neither failure is visible: a
+   * shader built for another version fails to compile inside Iris, and a
+   * resource pack lands in the game's "incompatible" list. From here both look
+   * exactly like a successful install.
+   */
   const handleInstall = async (item: ModSearchResult) => {
     if (!selectedId) return;
     setBusyId(item.id);
     setError(null);
     setLoaderNote(null);
     try {
-      const source = `modrinth:${item.id}`;
-      const result =
-        kind === 'shaders'
-          ? await api.content.installShader(selectedId, source)
-          : await api.content.installResourcePack(selectedId, source);
-      if (!result.success) {
-        setError(result.error ?? t('content.installFailed', { name: item.name }));
+      const check = await api.content.checkInstall(selectedId, item);
+      if (!check.success || !check.data) {
+        setError(check.error ?? t('content.installFailed', { name: item.name }));
         return;
       }
-      await loadInstalled();
-
-      // Only after the pack is on disk. Asking first would be asking about
-      // something that might yet fail to download.
-      if (kind === 'shaders') await checkShaderLoader(selectedId);
+      if (check.data.issues.length > 0) {
+        setPlan({ item, plan: check.data });
+        return;
+      }
+      await install(item, check.data.versionId);
     } finally {
       setBusyId(null);
     }
+  };
+
+  const install = async (item: ModSearchResult, versionId?: string) => {
+    if (!selectedId) return;
+    const source = `modrinth:${item.id}`;
+    const result =
+      kind === 'shaders'
+        ? await api.content.installShader(selectedId, source, versionId)
+        : await api.content.installResourcePack(selectedId, source, versionId);
+    if (!result.success) {
+      setError(result.error ?? t('content.installFailed', { name: item.name }));
+      return;
+    }
+    await loadInstalled();
+
+    // Only after the pack is on disk. Asking first would be asking about
+    // something that might yet fail to download.
+    if (kind === 'shaders') await checkShaderLoader(selectedId);
   };
 
   /**
@@ -295,6 +322,20 @@ export function ContentPage() {
         />
       )}
 
+      {plan && (
+        <CompatibilityDialog
+          plan={plan.plan}
+          busy={busyId === plan.item.id}
+          onCancel={() => setPlan(null)}
+          onInstall={() => {
+            const pending = plan;
+            setPlan(null);
+            setBusyId(pending.item.id);
+            void install(pending.item, pending.plan.versionId).finally(() => setBusyId(null));
+          }}
+        />
+      )}
+
       {tab === 'browse' ? (
         <div className="space-y-2">
           <form
@@ -355,6 +396,9 @@ export function ContentPage() {
                     count: item.downloads.toLocaleString(locale),
                   })}
                 </p>
+                {/* No loader: a resource pack has none, and a shader's loader is
+                    Iris or OptiFine, which the shader loader picker handles. */}
+                <CompatibilityBadge item={item} gameVersion={profileVersion} />
               </div>
               <Button
                 variant="secondary"

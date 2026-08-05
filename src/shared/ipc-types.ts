@@ -202,6 +202,69 @@ export type ShaderLoaderResult =
   | { status: 'no-build'; mcVersion: string; modLoader: ModLoaderType }
   | { status: 'failed'; error: string };
 
+// ---------------------------------------------------------------------------
+// Compatibility
+// ---------------------------------------------------------------------------
+
+/**
+ * One reason a download would not fit the profile it is aimed at.
+ *
+ * None of these block an install on their own. Modrinth's metadata is a
+ * publisher's claim, not a fact — plenty of mods run on a Minecraft version they
+ * never got round to listing — so the launcher's job is to say what it knows and
+ * let the player decide. The one genuine dead end is `no-build`, where there is
+ * no file to install at all.
+ */
+export type CompatibilityIssue =
+  /** Builds exist for this Minecraft version, but not for the profile's loader. */
+  | { kind: 'wrong-loader'; supported: string[] }
+  /** Builds exist for the profile's loader, but not for its Minecraft version. */
+  | { kind: 'wrong-version'; supported: string[] }
+  /** The project publishes nothing this profile could use, on any pairing. */
+  | { kind: 'no-build' }
+  /** A vanilla profile has no loader, so a mod would never be read. */
+  | { kind: 'needs-loader' }
+  /** The build declares itself incompatible with something already installed. */
+  | { kind: 'conflicts-with'; names: string[] }
+  /** A required dependency exists but publishes nothing for this profile. */
+  | { kind: 'dependency-no-build'; names: string[] };
+
+/** A required dependency that is missing and would be installed alongside. */
+export interface PlannedDependency {
+  id: string;
+  name: string;
+  version: string;
+}
+
+/**
+ * What installing something into a profile would actually do, worked out before
+ * anything is downloaded.
+ *
+ * `versionId` is the build the check settled on, and installing quotes it back
+ * so the player gets the file the warning was about rather than whatever is
+ * newest by the time they click through. Its absence means nothing is
+ * installable.
+ */
+export interface InstallPlan {
+  name: string;
+  versionId?: string;
+  versionName?: string;
+  dependencies: PlannedDependency[];
+  issues: CompatibilityIssue[];
+}
+
+/**
+ * The outcome of installing a mod: the mod, plus whatever had to come with it.
+ *
+ * `dependencies` is not decoration. Required dependencies are installed without
+ * being asked for, and a launcher that silently adds files to a profile is a
+ * launcher nobody can debug — so the names come back to be shown.
+ */
+export interface ModInstallResult {
+  mod: InstalledMod;
+  dependencies: string[];
+}
+
 export interface ModSearchFilters {
   query: string;
   /** Defaults to `mod`. Shaders and resource packs live in the same search index. */
@@ -436,7 +499,12 @@ export interface InvokeChannels {
     profileId: string,
     mod: ModSearchResult,
     version?: string,
-  ) => Promise<IpcResult<InstalledMod>>;
+  ) => Promise<IpcResult<ModInstallResult>>;
+  /** What installing this mod would do to the profile, before anything is downloaded. */
+  'mods:check-install': (
+    profileId: string,
+    mod: ModSearchResult,
+  ) => Promise<IpcResult<InstallPlan>>;
   'mods:install-from-file': (
     profileId: string,
     filePath: string,
@@ -454,13 +522,32 @@ export interface InvokeChannels {
   // -- Shaders & Resource Packs --
   'content:get-shaders': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
   'content:get-resourcepacks': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
-  'content:install-shader': (profileId: string, source: string) => Promise<IpcResult<void>>;
+  /** `version` pins a build; omitted, the newest one for the profile's MC version wins. */
+  'content:install-shader': (
+    profileId: string,
+    source: string,
+    version?: string,
+  ) => Promise<IpcResult<void>>;
   'content:get-shader-loader-state': (profileId: string) => Promise<IpcResult<ShaderLoaderState>>;
   'content:install-shader-loader': (
     profileId: string,
     projectId: string,
   ) => Promise<IpcResult<ShaderLoaderResult>>;
-  'content:install-resourcepack': (profileId: string, source: string) => Promise<IpcResult<void>>;
+  'content:install-resourcepack': (
+    profileId: string,
+    source: string,
+    version?: string,
+  ) => Promise<IpcResult<void>>;
+  /**
+   * Whether a pack has a build for this profile's Minecraft version.
+   *
+   * Shaders and resource packs are not distinguished: neither has a mod loader
+   * or dependencies, so the Minecraft version is the whole question for both.
+   */
+  'content:check-install': (
+    profileId: string,
+    item: ModSearchResult,
+  ) => Promise<IpcResult<InstallPlan>>;
   'content:remove-shader': (profileId: string, id: string) => Promise<IpcResult<void>>;
   'content:remove-resourcepack': (profileId: string, id: string) => Promise<IpcResult<void>>;
   'content:reorder-resourcepacks': (
@@ -619,6 +706,7 @@ export interface RavenForgeAPI {
     getInstalled: InvokeChannels['mods:get-installed'];
     syncManifest: InvokeChannels['mods:sync-manifest'];
     installFromSearch: InvokeChannels['mods:install-from-search'];
+    checkInstall: InvokeChannels['mods:check-install'];
     installFromFile: InvokeChannels['mods:install-from-file'];
     uninstall: InvokeChannels['mods:uninstall'];
     toggleEnabled: InvokeChannels['mods:toggle-enabled'];
@@ -632,6 +720,7 @@ export interface RavenForgeAPI {
     getShaderLoaderState: InvokeChannels['content:get-shader-loader-state'];
     installShaderLoader: InvokeChannels['content:install-shader-loader'];
     installResourcePack: InvokeChannels['content:install-resourcepack'];
+    checkInstall: InvokeChannels['content:check-install'];
     removeShader: InvokeChannels['content:remove-shader'];
     removeResourcePack: InvokeChannels['content:remove-resourcepack'];
     reorderResourcePacks: InvokeChannels['content:reorder-resourcepacks'];
