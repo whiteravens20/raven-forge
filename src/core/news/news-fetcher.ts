@@ -30,8 +30,18 @@ const FETCH_TIMEOUT_MS = 10_000;
  * validated individually: one malformed entry drops that entry rather than the
  * whole feed. Returns `null` on any failure — the caller decides what a failed
  * fetch should show.
+ *
+ * `revalidate` is what makes the refresh button mean something. GitHub Pages
+ * serves these feeds with `Cache-Control: max-age=600`, so without it a press
+ * inside ten minutes is answered from the HTTP cache and the freshly published
+ * item does not appear — a button that looks like it worked and did nothing.
  */
-async function fetchFeed<T>(url: string, schema: z.ZodType<T>, label: string): Promise<T[] | null> {
+async function fetchFeed<T>(
+  url: string,
+  schema: z.ZodType<T>,
+  label: string,
+  revalidate: boolean,
+): Promise<T[] | null> {
   if (!/^https?:\/\//i.test(url)) {
     log.warn(`${label} feed URL must be http(s): ${url}`);
     return null;
@@ -40,6 +50,7 @@ async function fetchFeed<T>(url: string, schema: z.ZodType<T>, label: string): P
   try {
     const response = await fetch(url, {
       headers: { 'User-Agent': MODRINTH_USER_AGENT },
+      cache: revalidate ? 'no-cache' : 'default',
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
@@ -92,7 +103,7 @@ async function loadFeed<T>(
   if (!url) return { source: '', items: [] };
   if (cache?.source === url && !forceRefresh) return cache;
 
-  const fetched = await fetchFeed(url, schema, label);
+  const fetched = await fetchFeed(url, schema, label, forceRefresh);
   if (fetched) return { source: url, items: fetched };
   return cache?.source === url ? cache : { source: url, items: [] };
 }

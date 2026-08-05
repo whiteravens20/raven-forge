@@ -87,6 +87,20 @@ describe('feed caching', () => {
     expect((await fetchNews(true)).map((n) => n.id)).toEqual(['b']);
   });
 
+  it('makes a forced refresh revalidate rather than accept a cached body', async () => {
+    // The feeds ship on GitHub Pages behind `max-age=600`, so without this the
+    // refresh button is answered from cache for ten minutes and appears to have
+    // done nothing.
+    settings.newsFeedUrl = freshUrl();
+    fetchMock.mockResolvedValue(jsonResponse([item('a')]));
+
+    await fetchNews();
+    expect(fetchMock.mock.calls[0][1].cache).toBe('default');
+
+    await fetchNews(true);
+    expect(fetchMock.mock.calls[1][1].cache).toBe('no-cache');
+  });
+
   it('refetches when the URL changes, even without a force', async () => {
     settings.newsFeedUrl = freshUrl();
     fetchMock.mockResolvedValue(jsonResponse([item('one')]));
