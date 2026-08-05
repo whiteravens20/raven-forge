@@ -148,6 +148,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
               <SourceCard
                 icon={<Server size={18} />}
                 title={t('packs.wrTitle')}
+                badge={t('packs.whitelist')}
                 body={t('packs.wrBody')}
                 onClick={() => setRoute('white-ravens')}
               />
@@ -168,6 +169,13 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
 
           {route === 'white-ravens' && (
             <>
+              {/* Said before the install, not after it: the pack downloads for
+                  anyone, and finding out at the connect screen that the server
+                  will not have you is the wrong moment to learn it. */}
+              <p className="flex items-start gap-2 text-xs text-rf-text-muted">
+                <WhitelistBadge label={t('packs.whitelist')} />
+                {t('packs.whitelistNote')}
+              </p>
               {packs === null && <p className="text-sm text-rf-text-muted">{t('packs.loading')}</p>}
               {packs?.length === 0 && !error && (
                 <p className="text-sm text-rf-text-muted">{t('packs.none')}</p>
@@ -265,11 +273,14 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
 function SourceCard({
   icon,
   title,
+  badge,
   body,
   onClick,
 }: {
   icon: React.ReactNode;
   title: string;
+  /** A condition on this route, worth seeing before it is chosen. */
+  badge?: string;
   body: string;
   onClick: () => void;
 }) {
@@ -280,9 +291,21 @@ function SourceCard({
     >
       <span className="mt-0.5 shrink-0 text-rf-accent">{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-rf-text">{title}</span>
+        <span className="flex items-center gap-2 text-sm font-medium text-rf-text">
+          {title}
+          {badge && <WhitelistBadge label={badge} />}
+        </span>
         <span className="mt-0.5 block text-xs text-rf-text-muted">{body}</span>
       </span>
     </button>
+  );
+}
+
+/** The pill itself, so the card and the pack list cannot drift apart. */
+function WhitelistBadge({ label }: { label: string }) {
+  return (
+    <span className="shrink-0 rounded border border-rf-warning/30 bg-rf-warning/10 px-1.5 py-0.5 text-xs font-medium text-rf-warning">
+      {label}
+    </span>
   );
 }

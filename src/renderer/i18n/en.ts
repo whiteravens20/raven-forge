@@ -193,6 +193,9 @@ export const en = {
   'packs.wrTitle': 'Play on the White Ravens servers',
   'packs.wrBody':
     'Pick one of our packs. The launcher installs it and keeps it in step with the server.',
+  'packs.whitelist': 'Whitelist',
+  'packs.whitelistNote':
+    'Our servers run a whitelist — the pack installs straight away, but getting on the server has to be asked for.',
   'packs.scratchTitle': 'Build a pack from scratch',
   'packs.scratchBody':
     'An empty profile. Choose the Minecraft version and loader, add mods yourself.',

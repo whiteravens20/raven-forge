@@ -194,6 +194,9 @@ export const pl: Translations = {
   'packs.wrTitle': 'Graj na serwerach White Ravens',
   'packs.wrBody':
     'Wybierz jedną z naszych paczek. Launcher ją zainstaluje i utrzyma zgodną z serwerem.',
+  'packs.whitelist': 'Whitelist',
+  'packs.whitelistNote':
+    'Nasze serwery chodzą na whiteliście — paczkę zainstalujesz od razu, ale o wejście na serwer trzeba poprosić.',
   'packs.scratchTitle': 'Stwórz własną paczkę od zera',
   'packs.scratchBody': 'Pusty profil. Wybierasz wersję Minecrafta i loader, mody dodajesz sam.',
   'packs.importTitle': 'Importuj własną paczkę',
