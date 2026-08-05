@@ -133,7 +133,10 @@ export function HomePage() {
     endPreparing(selectedId);
   };
 
-  const visibleAnnouncements = announcements.filter((a) => !dismissedIds.has(a.id));
+  // One banner at a time, in feed order — the publisher decides what is most
+  // urgent, and a stack of them pushes the launch button off the fold. Dismiss
+  // it and the next one takes its place.
+  const announcement = announcements.find((a) => !dismissedIds.has(a.id));
 
   const customPath = settings?.customBackgroundsPath;
 
@@ -147,36 +150,35 @@ export function HomePage() {
           exists for user-supplied imagery, which is necessarily static. */}
       {customPath ? <BackgroundRotator images={[customPath]} /> : <ForgeBackdrop />}
 
-      {/* Announcements. Only the ones with something more to say are clickable —
+      {/* The announcement. Only one with something more to say is clickable —
           a banner that opens a dialog repeating its own single sentence teaches
           people the click is not worth making. */}
-      {visibleAnnouncements.map((ann) => (
+      {announcement && (
         <Banner
-          key={ann.id}
-          type={ann.type}
-          dismissible={ann.dismissible}
-          onDismiss={() => dismiss(ann.id)}
+          type={announcement.type}
+          dismissible={announcement.dismissible}
+          onDismiss={() => dismiss(announcement.id)}
         >
-          {ann.body || ann.url ? (
+          {announcement.body || announcement.url ? (
             <button
               onClick={() =>
                 setReading({
-                  title: ann.title ?? ann.message,
-                  subtitle: ann.title ? ann.message : undefined,
-                  body: ann.body,
-                  excerpt: ann.message,
-                  url: ann.url,
+                  title: announcement.title ?? announcement.message,
+                  subtitle: announcement.title ? announcement.message : undefined,
+                  body: announcement.body,
+                  excerpt: announcement.message,
+                  url: announcement.url,
                 })
               }
               className="text-left underline decoration-current/40 underline-offset-2 hover:decoration-current"
             >
-              {ann.message}
+              {announcement.message}
             </button>
           ) : (
-            ann.message
+            announcement.message
           )}
         </Banner>
-      ))}
+      )}
 
       {reading && <ArticleReader article={reading} onClose={() => setReading(null)} />}
 
