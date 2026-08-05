@@ -1,0 +1,862 @@
+@import 'tailwindcss';
+
+/* Vite's root is src/renderer, so point Tailwind's scanner at the components
+   explicitly rather than relying on automatic source detection. */
+@source "../**/*.{ts,tsx,html}";
+
+/* ── Design tokens ──────────────────────────────────────────
+   Tailwind v4 takes its tokens from this block — a v3-style
+   tailwind.config.ts is NOT read unless a `@config` directive names it, and
+   silently generates nothing at all.
+
+   Each token points at the `--rf-*` variable below rather than a literal, so
+   the generated utilities resolve through it at use time. That indirection is
+   what makes runtime theme switching work: flipping `data-theme` on <html>
+   restyles the app with no rebuild and no re-render.
+   ───────────────────────────────────────────────────────── */
+
+@theme {
+  --color-rf-bg: var(--rf-bg);
+  --color-rf-bg-secondary: var(--rf-bg-secondary);
+  --color-rf-bg-tertiary: var(--rf-bg-tertiary);
+  --color-rf-surface: var(--rf-surface);
+  --color-rf-border: var(--rf-border);
+  --color-rf-text: var(--rf-text);
+  --color-rf-text-secondary: var(--rf-text-secondary);
+  --color-rf-text-muted: var(--rf-text-muted);
+  --color-rf-accent: var(--rf-accent);
+  --color-rf-accent-hover: var(--rf-accent-hover);
+  --color-rf-danger: var(--rf-danger);
+  --color-rf-warning: var(--rf-warning);
+  --color-rf-success: var(--rf-success);
+
+  --font-display: 'Rajdhani', 'Orbitron', system-ui, sans-serif;
+  --font-body: 'DM Sans', 'Nunito', system-ui, sans-serif;
+  --font-sans: 'DM Sans', 'Nunito', system-ui, sans-serif;
+
+  --animate-fade-in: fadeIn 0.3s ease-out;
+  --animate-slide-up: slideUp 0.3s ease-out;
+  --animate-pulse-glow: pulseGlow 2s ease-in-out infinite;
+
+  @keyframes fadeIn {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulseGlow {
+    0%,
+    100% {
+      box-shadow: 0 0 5px var(--rf-accent);
+    }
+    50% {
+      box-shadow: 0 0 20px var(--rf-accent);
+    }
+  }
+}
+
+/* ── Theme CSS Custom Properties ────────────────────────── */
+
+:root {
+  /* Dark theme (default) */
+  --rf-bg: #0f0f13;
+  --rf-bg-secondary: #16161d;
+  --rf-bg-tertiary: #1c1c26;
+  --rf-surface: #22222e;
+  --rf-border: #2e2e3e;
+  --rf-text: #e8e8f0;
+  --rf-text-secondary: #a8a8be;
+  --rf-text-muted: #6e6e88;
+  --rf-accent: #7c3aed;
+  --rf-accent-hover: #6d28d9;
+  --rf-danger: #ef4444;
+  --rf-warning: #f59e0b;
+  --rf-success: #22c55e;
+}
+
+[data-theme='oled-black'] {
+  --rf-bg: #000000;
+  --rf-bg-secondary: #0a0a0a;
+  --rf-bg-tertiary: #111111;
+  --rf-surface: #1a1a1a;
+  --rf-border: #222222;
+  --rf-text: #f0f0f0;
+  --rf-text-secondary: #aaaaaa;
+  --rf-text-muted: #666666;
+  --rf-accent: #7c3aed;
+  --rf-accent-hover: #6d28d9;
+  --rf-danger: #ef4444;
+  --rf-warning: #f59e0b;
+  --rf-success: #22c55e;
+}
+
+[data-theme='light'] {
+  --rf-bg: #f5f5f7;
+  --rf-bg-secondary: #ebebf0;
+  --rf-bg-tertiary: #e0e0e8;
+  --rf-surface: #ffffff;
+  --rf-border: #d0d0dd;
+  --rf-text: #1a1a2e;
+  --rf-text-secondary: #4a4a6a;
+  --rf-text-muted: #8888aa;
+  --rf-accent: #7c3aed;
+  --rf-accent-hover: #6d28d9;
+  --rf-danger: #dc2626;
+  --rf-warning: #d97706;
+  --rf-success: #16a34a;
+}
+
+/* ── Base ───────────────────────────────────────────────── */
+
+/* NOTE: do not reintroduce a `* { margin: 0; padding: 0; box-sizing: ... }`
+   reset here. Tailwind v4 emits its utilities inside `@layer utilities`, and
+   unlayered rules beat *every* layered rule regardless of specificity — so a
+   bare `*` reset silently zeroes every `p-*`, `m-*` and `gap-*` in the app.
+   Preflight (part of `@import "tailwindcss"`) already does all three, in a
+   layer, correctly. */
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--rf-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--rf-text-muted);
+}
+
+/* ── ForgeBackdrop (animated hero scene) ────────────────────
+   Layer intensities and motion for components/layout/ForgeBackdrop.tsx.
+   The scene is inline SVG, so these variables reach into it; each theme
+   re-balances the light rather than shipping separate artwork. Every
+   keyframe below animates only transform/opacity — keep it that way, the
+   scene runs whenever the home page is visible. */
+
+.rf-backdrop {
+  --bd-aurora-a: 0.4;
+  --bd-aurora-b: 0.26;
+  --bd-aurora-c: 0.14;
+  --bd-grid: 0.17;
+  --bd-ember: 0.85;
+  --bd-noise: 0.055;
+  --bd-terrain-wash: 0;
+}
+
+/* Pure black swallows soft light — push the sources harder. */
+[data-theme='oled-black'] .rf-backdrop {
+  --bd-aurora-a: 0.48;
+  --bd-aurora-b: 0.3;
+  --bd-grid: 0.13;
+  --bd-noise: 0.045;
+}
+
+/* On a light field the glow must whisper, the grid carries more of the
+   depth, and the voxel map gets washed toward pastel. */
+[data-theme='light'] .rf-backdrop {
+  --bd-aurora-a: 0.16;
+  --bd-aurora-b: 0.1;
+  --bd-aurora-c: 0.05;
+  --bd-grid: 0.12;
+  --bd-ember: 0.55;
+  --bd-noise: 0.03;
+  --bd-terrain-wash: 0.32;
+}
+
+.rf-backdrop .rf-bd-aurora-a {
+  animation: rf-bd-drift-a 70s ease-in-out infinite alternate;
+}
+
+.rf-backdrop .rf-bd-aurora-b {
+  animation: rf-bd-drift-b 90s ease-in-out infinite alternate;
+}
+
+.rf-backdrop .rf-bd-aurora-c {
+  animation: rf-bd-drift-c 80s ease-in-out infinite alternate;
+}
+
+/* ── Scene motion ── */
+
+/* Keep the 640px in sync with FLIGHT_PERIOD_PX in voxel-terrain.tsx: the
+   loop is seamless only when it equals one full heightmap period. */
+.rf-backdrop .rf-bd-flight {
+  animation: rf-bd-flight 46s linear infinite;
+  will-change: transform;
+}
+
+/* Slow lateral drift on top of the flight — the drone banking. */
+.rf-backdrop .rf-bd-sway {
+  animation: rf-bd-sway-x 34s ease-in-out infinite alternate;
+}
+
+.rf-backdrop .rf-bd-cloud-a {
+  animation: rf-bd-sway-x 52s ease-in-out infinite alternate;
+}
+.rf-backdrop .rf-bd-cloud-b {
+  animation: rf-bd-sway-x 64s ease-in-out infinite alternate-reverse;
+}
+.rf-backdrop .rf-bd-cloud-c {
+  animation: rf-bd-sway-x 45s ease-in-out infinite alternate;
+}
+
+.rf-backdrop .rf-bd-comet-a {
+  offset-path: path('M -120 320 C 480 140, 1250 100, 2060 280');
+  animation: rf-bd-comet 26s linear infinite;
+}
+
+.rf-backdrop .rf-bd-comet-b {
+  offset-path: path('M 2050 210 C 1300 90, 600 150, -140 340');
+  animation: rf-bd-comet 34s linear infinite;
+  animation-delay: -17s;
+}
+
+/* Lava falls: the dash pattern flowing equals one dasharray period. */
+.rf-backdrop .rf-bd-flow {
+  animation: rf-bd-flow 1.6s linear infinite;
+}
+
+.rf-backdrop .rf-bd-lava {
+  animation: rf-bd-lava-pulse 4s ease-in-out infinite alternate;
+}
+
+/* Gears: duration/direction set inline per gear. */
+.rf-backdrop .rf-bd-spin {
+  animation: rf-bd-spin linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Mine cart rolling through and off the frame; the reset happens offscreen. */
+.rf-backdrop .rf-bd-cart {
+  animation: rf-bd-cart 30s linear infinite;
+}
+
+/* Conveyor cargo advances one full pattern period (the clip width) per
+   loop, so irregular spacing still wraps seamlessly. Same 40px/s speed as
+   the old evenly-spaced belt. */
+.rf-backdrop .rf-bd-belt-item {
+  animation: rf-bd-belt 29.6s linear infinite;
+}
+
+/* fill-box anchors the scale to each puff (bottom-centre, so smoke grows
+   out of the chimney mouth); without it SVG scales about the viewport
+   origin and the puffs drift across the sky. */
+.rf-backdrop .rf-bd-steam {
+  animation: rf-bd-steam ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.rf-backdrop .rf-bd-drip {
+  animation: rf-bd-drip 3.4s cubic-bezier(0.5, 0, 0.9, 1) infinite;
+}
+
+.rf-backdrop .rf-bd-piston {
+  animation: rf-bd-piston 2.6s ease-in-out infinite alternate;
+}
+
+.rf-backdrop .rf-bd-crystal {
+  animation: rf-bd-lava-pulse 3s ease-in-out infinite alternate;
+}
+
+.rf-backdrop .rf-bd-glint {
+  animation: rf-bd-glint 3.2s ease-in-out infinite;
+}
+
+.rf-backdrop .rf-bd-scene-in {
+  animation: rf-bd-scene-in 2.2s ease-in-out both;
+}
+
+.rf-backdrop .rf-bd-ember {
+  animation: rf-bd-rise linear infinite;
+  will-change: transform, opacity;
+}
+
+.rf-backdrop .rf-bd-ember-dot {
+  animation: rf-bd-sway ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes rf-bd-drift-a {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(-80px, 50px) scale(1.1);
+  }
+}
+
+@keyframes rf-bd-drift-b {
+  from {
+    transform: translate(0, 0) scale(1.06);
+  }
+  to {
+    transform: translate(100px, -60px) scale(1);
+  }
+}
+
+@keyframes rf-bd-drift-c {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(60px, 40px) scale(1.14);
+  }
+}
+
+@keyframes rf-bd-flight {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(640px);
+  }
+}
+
+@keyframes rf-bd-sway-x {
+  from {
+    transform: translateX(-26px);
+  }
+  to {
+    transform: translateX(26px);
+  }
+}
+
+@keyframes rf-bd-comet {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  6% {
+    opacity: 0.9;
+  }
+  45% {
+    opacity: 0.9;
+  }
+  60% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes rf-bd-flow {
+  to {
+    stroke-dashoffset: -56;
+  }
+}
+
+@keyframes rf-bd-lava-pulse {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rf-bd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rf-bd-cart {
+  from {
+    transform: translateX(-260px);
+  }
+  to {
+    transform: translateX(2200px);
+  }
+}
+
+@keyframes rf-bd-belt {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    /* Must equal BELT_PERIOD in backdrop-scenes.tsx. */
+    transform: translateX(1184px);
+  }
+}
+
+@keyframes rf-bd-steam {
+  0% {
+    transform: translateY(0) scale(0.55);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.4;
+  }
+  75% {
+    opacity: 0.18;
+  }
+  100% {
+    transform: translateY(-170px) scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes rf-bd-drip {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(230px);
+    opacity: 0;
+  }
+}
+
+@keyframes rf-bd-piston {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(26px);
+  }
+}
+
+@keyframes rf-bd-glint {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes rf-bd-scene-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Full flight crosses the 1080-unit canvas plus margins on both ends. */
+@keyframes rf-bd-rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  6% {
+    opacity: var(--rf-ember-peak, 0.6);
+  }
+  80% {
+    opacity: var(--rf-ember-peak, 0.6);
+  }
+  100% {
+    transform: translateY(-1250px);
+    opacity: 0;
+  }
+}
+
+@keyframes rf-bd-sway {
+  from {
+    transform: translateX(-16px);
+  }
+  to {
+    transform: translateX(16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-backdrop svg * {
+    animation: none !important;
+  }
+
+  /* Frozen mid-air, particles read as dust on the screen — drop them.
+     (Scene cycling also stops; ForgeBackdrop checks the same query.) */
+  .rf-backdrop .rf-bd-ember,
+  .rf-backdrop .rf-bd-comet,
+  .rf-backdrop .rf-bd-steam,
+  .rf-backdrop .rf-bd-drip {
+    display: none;
+  }
+}
+
+/* ── Chronicle (About page easter egg) ──────────────────────
+   Styling for components/ForgeChronicle.tsx. The scroll deliberately ignores
+   the theme and carries its own parchment palette in all three — it is meant
+   to read as an object that was found, not as a panel of this UI (same call
+   as assets/brand/logo.svg's self-contained panel). Only opacity, transform
+   and filter animate, so the unfurl stays on the compositor. */
+
+/* The trigger: an ember over the raven's eye, invisible until hovered.
+   Kept a real <button> so it is reachable by keyboard as well as by poking. */
+.rf-chronicle-spark {
+  position: absolute;
+  left: 39.06%;
+  top: 39.06%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #fbbf24;
+  opacity: 0.12;
+  transition:
+    opacity 260ms ease,
+    filter 260ms ease;
+}
+
+.rf-chronicle-trigger:hover .rf-chronicle-spark,
+.rf-chronicle-trigger:focus-visible .rf-chronicle-spark {
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.9));
+}
+
+.rf-chronicle-veil {
+  animation: rf-chr-veil 320ms ease-out both;
+}
+
+.rf-chronicle-scroll {
+  transform-origin: center;
+  animation: rf-chr-unfurl 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Text would squash flat against the still-rolling scroll, so the ink lands
+   only once most of the unfurl is done. */
+.rf-chronicle-body {
+  animation: rf-chr-ink 420ms ease-out 300ms both;
+}
+
+.rf-chronicle-body::-webkit-scrollbar-thumb {
+  background: rgba(120, 80, 32, 0.45);
+}
+
+.rf-chronicle-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 80, 32, 0.7);
+}
+
+/* The two turned rods the sheet is wound on. */
+.rf-chronicle-rod {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  height: 17px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #6a5539 0%, #4a3a26 42%, #2a2016 100%);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 225, 180, 0.25);
+}
+
+.rf-chronicle-rod::before,
+.rf-chronicle-rod::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  width: 13px;
+  height: 27px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #7b6343, #33271a);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 225, 180, 0.3);
+}
+
+.rf-chronicle-rod::before {
+  left: -7px;
+}
+.rf-chronicle-rod::after {
+  right: -7px;
+}
+
+/* Aged sheet: light pooling top-left, a stain bottom-right, and inset curl
+   shadows where it disappears under each rod. */
+.rf-chronicle-page {
+  overflow: hidden;
+  background-color: #e7d6b2;
+  background-image:
+    radial-gradient(ellipse at 18% 12%, rgba(255, 252, 240, 0.65), transparent 55%),
+    radial-gradient(ellipse at 84% 88%, rgba(140, 96, 44, 0.28), transparent 62%),
+    radial-gradient(ellipse at 50% 45%, rgba(255, 244, 219, 0.45), transparent 70%);
+  box-shadow:
+    inset 0 14px 20px -14px rgba(60, 36, 10, 0.65),
+    inset 0 -14px 20px -14px rgba(60, 36, 10, 0.65),
+    inset 0 0 44px rgba(122, 80, 34, 0.3),
+    inset 0 0 130px rgba(88, 54, 18, 0.16),
+    0 26px 70px rgba(0, 0, 0, 0.6);
+}
+
+/* Static fibre noise. A data-URI SVG is fine here (unlike the theme-aware
+   assets) — it never needs to see a CSS variable or a media query. */
+.rf-chronicle-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.rf-chronicle-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% -8%, rgba(255, 176, 74, 0.3), transparent 62%);
+  animation: rf-chr-flicker 7s ease-in-out infinite;
+}
+
+.rf-chronicle-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+  padding: 4px;
+  color: rgba(92, 58, 18, 0.5);
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.rf-chronicle-close:hover {
+  color: #7a3d12;
+  transform: scale(1.12);
+}
+
+/* The app's violet focus ring would be the one modern thing on the sheet. */
+.rf-chronicle-close:focus-visible {
+  outline: 2px solid rgba(122, 61, 18, 0.55);
+  outline-offset: 2px;
+  border-radius: 4px;
+  color: #7a3d12;
+}
+
+.rf-chronicle-title {
+  font-family: 'Cinzel', ui-serif, Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #3a2411;
+}
+
+.rf-chronicle-sub {
+  margin: 0.4rem auto 0;
+  max-width: 26rem;
+  text-wrap: balance;
+  font-family: 'EB Garamond', ui-serif, Georgia, serif;
+  font-style: italic;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: #7a5a33;
+}
+
+/* Rule with a pressed diamond — the same rotated square as the raven's eye
+   in icon.svg, so the ornament is not a new shape. */
+.rf-chronicle-rule {
+  position: relative;
+  margin: 1.15rem auto 1.4rem;
+  width: 62%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(92, 58, 18, 0.5), transparent);
+}
+
+.rf-chronicle-rule::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  background: #7a3d12;
+  transform: rotate(45deg);
+}
+
+.rf-chronicle-text {
+  font-family: 'EB Garamond', ui-serif, Georgia, serif;
+  font-size: 1.02rem;
+  line-height: 1.75;
+  color: #3f2c15;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.rf-chronicle-text p + p {
+  margin-top: 0.85rem;
+}
+
+.rf-chronicle-text strong {
+  font-weight: 600;
+  color: #5c3a12;
+}
+
+.rf-chronicle-text em {
+  color: #6b4a1e;
+}
+
+.rf-chronicle-lede::first-letter {
+  float: left;
+  margin: 0.05em 0.09em 0 0;
+  font-family: 'Cinzel', ui-serif, Georgia, serif;
+  font-size: 3.1em;
+  line-height: 0.86;
+  color: #7a3d12;
+}
+
+/* Wax, pressed by hand: uneven edge, off-axis, lit from the top left. The
+   highlight is kept small and the body dark — a wide highlight turns the
+   whole thing into a flat plastic disc. */
+.rf-chronicle-seal {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 74px;
+  height: 74px;
+  border-radius: 48% 52% 51% 49% / 50% 49% 51% 50%;
+  transform: rotate(-9deg);
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.2) 0%, transparent 32%),
+    radial-gradient(circle at 52% 58%, #5b2a78 0%, #3d1a55 52%, #240e33 100%);
+  box-shadow:
+    0 5px 12px rgba(20, 5, 32, 0.55),
+    inset 0 -5px 11px rgba(0, 0, 0, 0.55),
+    inset 0 2px 5px rgba(255, 255, 255, 0.1);
+}
+
+/* The ring left by the stamp's shoulder. */
+.rf-chronicle-seal::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+/* Relief, not ink: the die leaves the mark standing proud of the wax, so it
+   catches the light and casts down into it. Cutting it *into* the wax was
+   tried first and the mark simply vanished — too little contrast against the
+   dark pool at that size. */
+.rf-chronicle-seal svg {
+  position: relative;
+  filter: drop-shadow(0 1.5px 1px rgba(0, 0, 0, 0.6));
+}
+
+.rf-chronicle-colophon {
+  margin-top: 1rem;
+  font-family: 'EB Garamond', ui-serif, Georgia, serif;
+  font-style: italic;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  text-align: center;
+  color: rgba(92, 58, 18, 0.72);
+}
+
+@keyframes rf-chr-veil {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rf-chr-unfurl {
+  from {
+    transform: scaleY(0.04);
+    opacity: 0.4;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes rf-chr-ink {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rf-chr-flicker {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  30% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.62;
+  }
+  78% {
+    opacity: 0.92;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-chronicle-veil,
+  .rf-chronicle-scroll,
+  .rf-chronicle-body,
+  .rf-chronicle-glow {
+    animation: none !important;
+  }
+}
+
+/* ── Title bar drag region ──────────────────────────────── */
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}

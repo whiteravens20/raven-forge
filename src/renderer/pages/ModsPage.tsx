@@ -1,0 +1,328 @@
+import { useState, useCallback, useEffect } from 'react';
+import { Search, Download, Package } from 'lucide-react';
+import { useProfileStore } from '@stores/profile-store';
+import { Button } from '@components/ui/Button';
+import { Input } from '@components/ui/Input';
+import { Banner } from '@components/ui/Banner';
+import { EmptyState } from '@components/ui/EmptyState';
+import { useLocale, useT } from '@renderer/i18n';
+import {
+  SearchFilters,
+  EMPTY_FILTERS,
+  categoriesWithoutLoader,
+  type SearchFilterState,
+} from '@components/SearchFilters';
+import { isClientModLoader } from '@shared/constants';
+import type { FacetGroups, ModSearchResult, InstalledMod } from '@shared/ipc-types';
+
+/** The two sources the browse tab can search. `ModSource` also covers url/local. */
+type ModSource = 'modrinth' | 'curseforge';
+
+const api = window.ravenforge;
+
+const NO_FACETS: FacetGroups = { loaders: [], groups: [], gameVersions: [] };
+
+export function ModsPage() {
+  const profiles = useProfileStore((s) => s.profiles);
+  const selectedId = useProfileStore((s) => s.selectedProfileId);
+
+  const t = useT();
+  const locale = useLocale();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<ModSearchResult[]>([]);
+  const [installed, setInstalled] = useState<InstalledMod[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [tab, setTab] = useState<'installed' | 'browse'>('installed');
+  const [source, setSource] = useState<ModSource>('modrinth');
+  const [hasCfKey, setHasCfKey] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [facets, setFacets] = useState<FacetGroups>(NO_FACETS);
+  const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
+  /** Set once a search has run, so the "nothing matched" line waits its turn. */
+  const [searched, setSearched] = useState(false);
+
+  const selectedProfile = profiles.find((p) => p.id === selectedId);
+  const profileVersion = selectedProfile?.minecraftVersion;
+  const profileLoader = selectedProfile?.modLoader;
+  const cfKeyMissing = source === 'curseforge' && !hasCfKey;
+
+  const loadInstalled = useCallback(async () => {
+    if (!selectedId) return;
+    const result = await api.mods.getInstalled(selectedId);
+    if (result.success && result.data) setInstalled(result.data);
+  }, [selectedId]);
+
+  const handleSearch = async () => {
+    if (cfKeyMissing) return;
+    setSearching(true);
+    setError(null);
+    try {
+      const result = await api.mods.search({
+        query: query.trim(),
+        source,
+        // Every constraint comes from the visible filter row. Reading the
+        // version and loader straight off the profile is what made a search for
+        // a mod that exists come back empty with nothing on screen to explain
+        // it — Modrinth ANDs the facets, so "26.2 AND fabric" genuinely has no
+        // Mekanism in it.
+        gameVersion: filters.gameVersion || undefined,
+        // Typed and separate: Modrinth files loaders as categories, but
+        // CurseForge wants a numeric enum, so this cannot just be a tag.
+        loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
+        categories: categoriesWithoutLoader(filters),
+        limit: 20,
+      });
+      if (result.success && result.data) setResults(result.data);
+      else setError(result.error ?? t('mods.searchFailed'));
+      setSearched(true);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleInstall = async (mod: ModSearchResult) => {
+    if (!selectedId) return;
+    setError(null);
+    // No version argument: the search endpoints return *game* versions, not
+    // build identifiers. The main process picks the newest build matching this
+    // profile's Minecraft version and loader.
+    const result = await api.mods.installFromSearch(selectedId, mod);
+    if (!result.success) setError(result.error ?? t('mods.installFailed', { name: mod.name }));
+    await loadInstalled();
+  };
+
+  const handleToggle = async (modId: string, enabled: boolean) => {
+    if (!selectedId) return;
+    await api.mods.toggleEnabled(selectedId, modId, !enabled);
+    await loadInstalled();
+  };
+
+  const handleUninstall = async (modId: string) => {
+    if (!selectedId) return;
+    await api.mods.uninstall(selectedId, modId);
+    await loadInstalled();
+  };
+
+  useEffect(() => {
+    void loadInstalled();
+  }, [loadInstalled]);
+
+  // Re-checked whenever the browse tab opens, so a key added in Settings takes
+  // effect without a restart.
+  useEffect(() => {
+    if (tab !== 'browse') return;
+    void api.mods.hasCurseForgeKey().then((r) => {
+      if (r.success && r.data !== undefined) setHasCfKey(r.data);
+    });
+  }, [tab]);
+
+  // Modrinth's own vocabulary, fetched rather than hardcoded — these lists move,
+  // and a stale entry silently returns nothing for an option still on offer.
+  useEffect(() => {
+    let cancelled = false;
+    void api.mods.getFacets('mod').then((r) => {
+      if (cancelled) return;
+      // A failed lookup costs the filters, not the search.
+      setFacets(r.success && r.data ? r.data : NO_FACETS);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Start where the profile is — the right answer nine times out of ten — but
+  // as a control that can be widened rather than a rule with no visible cause.
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      gameVersion: profileVersion ?? '',
+      loader: profileLoader && profileLoader !== 'vanilla' ? profileLoader : '',
+    }));
+  }, [profileVersion, profileLoader]);
+
+  if (!selectedProfile) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-rf-text-muted">
+        {t('mods.pickProfile')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-4 p-6 overflow-y-auto">
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-display font-semibold text-rf-text">
+          {t('mods.title', { profile: selectedProfile.name })}
+        </h1>
+        <div className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5">
+          <button
+            onClick={() => {
+              setTab('installed');
+              loadInstalled();
+            }}
+            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+              tab === 'installed'
+                ? 'bg-rf-accent text-white'
+                : 'text-rf-text-secondary hover:text-rf-text'
+            }`}
+          >
+            {t('mods.tabInstalled')}
+          </button>
+          <button
+            onClick={() => setTab('browse')}
+            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+              tab === 'browse'
+                ? 'bg-rf-accent text-white'
+                : 'text-rf-text-secondary hover:text-rf-text'
+            }`}
+          >
+            {t('mods.tabBrowse')}
+          </button>
+        </div>
+      </div>
+
+      {tab === 'browse' && (
+        <div className="space-y-2">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearch();
+            }}
+            className="flex gap-2"
+          >
+            <div className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5">
+              {(['modrinth', 'curseforge'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setSource(s);
+                    setResults([]);
+                    setError(null);
+                  }}
+                  className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                    source === s
+                      ? 'bg-rf-accent text-white'
+                      : 'text-rf-text-secondary hover:text-rf-text'
+                  }`}
+                >
+                  {s === 'modrinth' ? 'Modrinth' : 'CurseForge'}
+                </button>
+              ))}
+            </div>
+            <div className="flex-1">
+              <Input
+                placeholder={
+                  source === 'modrinth' ? t('mods.searchModrinth') : t('mods.searchCurseforge')
+                }
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                disabled={cfKeyMissing}
+              />
+            </div>
+            <Button
+              type="submit"
+              icon={<Search size={14} />}
+              loading={searching}
+              disabled={cfKeyMissing}
+            >
+              {t('common.search')}
+            </Button>
+          </form>
+
+          <SearchFilters
+            facets={facets}
+            value={filters}
+            onChange={setFilters}
+            loaderLabel={t('mods.loaderFilter')}
+          />
+
+          {cfKeyMissing && <Banner type="info">{t('mods.curseforgeNoKey')}</Banner>}
+          {error && <Banner type="urgent">{error}</Banner>}
+        </div>
+      )}
+
+      {tab === 'installed' ? (
+        <div className="space-y-2">
+          {installed.length === 0 ? (
+            <EmptyState kind="mods" title={t('mods.empty')} hint={t('mods.emptyHint')} />
+          ) : (
+            installed.map((mod) => (
+              <div
+                key={mod.id}
+                className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"
+              >
+                <Package size={18} className="shrink-0 text-rf-text-muted" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-rf-text truncate">{mod.name}</p>
+                  <p className="text-xs text-rf-text-muted">
+                    {mod.version} • {mod.source}
+                    {mod.fromManifest && ` • ${t('mods.fromManifest')}`}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleToggle(mod.id, mod.enabled)}
+                  >
+                    {mod.enabled ? t('common.disable') : t('common.enable')}
+                  </Button>
+                  {!mod.fromManifest && (
+                    <Button variant="danger" size="sm" onClick={() => handleUninstall(mod.id)}>
+                      {t('common.remove')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {results.length === 0 && !searching && (
+            <p className="py-8 text-center text-sm text-rf-text-muted">
+              {!searched
+                ? t('mods.searchHint')
+                : filters.gameVersion
+                  ? t('search.noResultsFiltered', { version: filters.gameVersion })
+                  : t('search.noResults')}
+            </p>
+          )}
+          {results.map((mod) => (
+            <div
+              key={mod.id}
+              className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"
+            >
+              {mod.iconUrl ? (
+                <img src={mod.iconUrl} alt="" className="h-10 w-10 rounded shrink-0" />
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded bg-rf-bg-tertiary shrink-0">
+                  <Package size={18} className="text-rf-text-muted" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-rf-text">{mod.name}</p>
+                <p className="text-xs text-rf-text-muted truncate">{mod.description}</p>
+                <p className="text-xs text-rf-text-muted">
+                  {mod.author} •{' '}
+                  {t.plural('mods.downloads', mod.downloads, {
+                    count: mod.downloads.toLocaleString(locale),
+                  })}
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Download size={14} />}
+                onClick={() => handleInstall(mod)}
+              >
+                {t('common.install')}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
