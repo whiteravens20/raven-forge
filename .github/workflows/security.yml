@@ -1,0 +1,105 @@
+name: Security
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  schedule:
+    # Weekly on Monday at 09:00 UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # Production deps get a tighter bar (moderate) — these are what ends up
+      # inside the installer on a user's machine. Dev deps (Vite, electron-builder
+      # and their trees) stay at high to keep the noise manageable.
+      #
+      # audit-check.mjs wraps `npm audit` so that advisories with no installable
+      # fix and no reachable code path can be allowlisted individually, with a
+      # justification and an expiry, instead of lowering the threshold for every
+      # package. See .github/scripts/audit-allowlist.json.
+      - name: Audit production dependencies (moderate)
+        run: node .github/scripts/audit-check.mjs --omit=dev --audit-level moderate
+
+      - name: Audit all dependencies (high)
+        run: node .github/scripts/audit-check.mjs --audit-level high
+
+      # Verify every installed tarball has a valid registry signature. Catches
+      # forged tarballs and tampered registry metadata at install time.
+      # Requires a real install since `audit signatures` reads node_modules;
+      # --ignore-scripts avoids the keytar native rebuild and the Electron
+      # binary download, neither of which affects tarball signatures.
+      - name: Install (for signature audit)
+        run: npm ci --ignore-scripts
+
+      - name: Verify package signatures
+        run: npm audit signatures
+
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    # Only runs on pull requests — compares new deps against known vulnerabilities
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/dependency-review-action@v5.0.0
+        with:
+          fail-on-severity: high
+          # Deny licences that would conflict with redistributing the packaged
+          # app. PolyForm-Noncommercial is not a copyleft-compatible licence, so
+          # a strong-copyleft dependency cannot ship inside the installer.
+          deny-licenses: GPL-3.0, AGPL-3.0, SSPL-1.0
+
+  scan:
+    name: Trivy secret & config scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Scanners are limited to secret+misconfig on purpose: dependency
+      # vulnerabilities are already gated by the audit job above, with an
+      # allowlist that has justifications and expiries. Running Trivy's `vuln`
+      # scanner here as well would report the same advisories through a second
+      # channel that has no such allowlist, and the two would disagree.
+      - name: Run Trivy on repository
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-fs.sarif
+          trivyignores: .trivyignore
+          limit-severities-for-sarif: true
+          exit-code: '1'
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs

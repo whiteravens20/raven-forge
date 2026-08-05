@@ -1,0 +1,9 @@
+# Trivy suppressions.
+#
+# The Security workflow runs Trivy with `scanners: secret,misconfig` only —
+# dependency advisories are handled by .github/scripts/audit-check.mjs, which
+# requires a written justification and an expiry per entry. Keep it that way:
+# a CVE suppressed here would be invisible to that review process.
+#
+# Format: one finding ID per line, each with a comment explaining why.
+# Currently empty.

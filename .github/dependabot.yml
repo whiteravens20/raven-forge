@@ -1,0 +1,53 @@
+# ── Dependabot configuration ──────────────────────────────────────────────────
+# Keeps GitHub Actions and npm dependencies up to date automatically.
+# Opens PRs weekly against `dev` — CI must pass before merging.
+#
+# Versioning strategy:
+#   - github-actions: bumps the version tag in `uses:` lines (e.g. @v3 → @v4)
+#   - npm: respects semver ranges in package.json; groups minor+patch into one PR
+
+version: 2
+
+updates:
+  # ── GitHub Actions ───────────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: UTC
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: 'ci'
+
+  # ── npm (single root package) ────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: UTC
+    labels:
+      - dependencies
+    commit-message:
+      prefix: 'chore'
+    # Group non-breaking updates into a single PR to reduce noise.
+    # Security updates are always opened separately regardless.
+    groups:
+      non-breaking:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Electron majors carry Chromium and Node majors with them and regularly
+      # need code changes (BrowserWindow options, sandbox behaviour, native
+      # module ABI). Bump it deliberately, with a smoke test, not on a Monday
+      # morning autopilot PR.
+      - dependency-name: electron
+        update-types: [version-update:semver-major]

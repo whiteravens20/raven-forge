@@ -1,0 +1,110 @@
+name: CI — Packaging
+
+# Packaging is the part of the pipeline that only ever ran at release time,
+# which is the worst moment to discover that fpm changed its postinst handling
+# or that an asarUnpack path stopped matching. This runs the real
+# electron-builder invocation nightly and on demand, so a regression surfaces
+# on a normal weekday instead of during a release.
+#
+# Deliberately not on push or pull_request: a full NSIS + deb + AppImage build
+# takes minutes and adds nothing to a docs change.
+
+on:
+  schedule:
+    # 04:20 UTC — after Dependabot's weekly PRs land, before anyone is awake.
+    - cron: '20 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing says nothing about the other; find out about both.
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux (deb + AppImage)
+            script: dist:linux
+          - os: windows-latest
+            name: windows (nsis)
+            script: dist:win
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # keytar is a native module and `postinstall` rebuilds it with node-gyp,
+      # which needs libsecret's development headers. The runner image has the
+      # runtime library but not the headers, so `npm ci` fails without this.
+      - name: Install libsecret headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
+
+      - run: npm ci
+
+      # `--publish never` matters: without it electron-builder sees the `publish`
+      # block in the config and can try to talk to GitHub Releases from a job
+      # that has no business doing so.
+      - name: Package
+        run: npm run ${{ matrix.script }} -- --publish never
+
+      # electron-builder exits 0 for some partial outcomes, so check that the
+      # files that are supposed to exist actually do.
+      - name: Verify Linux artifacts
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          deb=(out/*.deb); appimage=(out/*.AppImage)
+          [ ${#deb[@]} -eq 1 ] || { echo "::error::expected exactly one .deb, found ${#deb[@]}"; exit 1; }
+          [ ${#appimage[@]} -eq 1 ] || { echo "::error::expected exactly one .AppImage, found ${#appimage[@]}"; exit 1; }
+
+          # The sandbox helper must stay setuid root. electron-builder generates
+          # a postinst that chmods it; a custom --after-install replaces that
+          # script wholesale, and the app then fails to start with a SUID
+          # sandbox error on every Debian install.
+          dpkg-deb --control "${deb[0]}" /tmp/ctrl
+          grep -q 'chmod 4755' /tmp/ctrl/postinst \
+            || { echo "::error::postinst no longer chmods chrome-sandbox to 4755 — see build/postinst.sh"; exit 1; }
+
+          # The .desktop entry must carry StartupWMClass or the desktop
+          # environment cannot match the running window to the installed icon.
+          dpkg-deb --fsys-tarfile "${deb[0]}" | tar -xO ./usr/share/applications/raven-forge-launcher.desktop > /tmp/entry.desktop
+          grep -q '^StartupWMClass=' /tmp/entry.desktop \
+            || { echo "::error::.desktop entry lost StartupWMClass — check linux.syncDesktopName"; exit 1; }
+
+          ls -lh out/*.deb out/*.AppImage
+
+      - name: Verify Windows artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem out/*.exe)
+          if ($installers.Count -lt 1) {
+            Write-Output "::error::electron-builder produced no NSIS installer"
+            exit 1
+          }
+          $installers | Format-Table Name, Length
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v5
+        with:
+          name: package-${{ runner.os }}
+          path: |
+            out/*.deb
+            out/*.AppImage
+            out/*.exe
+          retention-days: 7

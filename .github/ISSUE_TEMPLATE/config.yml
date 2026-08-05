@@ -1,0 +1,22 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: "\U0001F6E1️ Security Vulnerability"
+    url: https://github.com/whiteravens20/raven-forge/security/advisories/new
+    about: >
+      Report a security vulnerability privately via GitHub's built-in private
+      reporting. Do NOT open a public issue for security bugs, and redact any
+      access token from logs before attaching them.
+
+  - name: "\U0001F4AC Question / Discussion"
+    url: https://github.com/whiteravens20/raven-forge/discussions
+    about: >
+      Ask a question, share feedback, or start a general discussion about the
+      launcher.
+
+  - name: "\U0001F9E9 Mod or modpack problem"
+    url: https://github.com/whiteravens20/raven-forge/discussions
+    about: >
+      A crash caused by a specific mod, or a question about a pack's contents,
+      belongs with that mod's or pack's authors. Open a discussion here only if
+      you believe the launcher installed the wrong thing.

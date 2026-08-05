@@ -1,0 +1,59 @@
+# ── Code Owners ───────────────────────────────────────────────────────────────
+# GitHub enforces that at least one owner approves any PR touching these paths.
+# Configure branch protection (Settings → Branches → main → Require review from
+# Code Owners) to make this mandatory.
+#
+# Paths are checked most-specific to least-specific; last matching rule wins.
+
+# Default: all files require owner review
+#* @pavlojs
+
+# ── CI/CD & supply chain ──────────────────────────────────────────────────────
+# Any change to workflow files or Dependabot config is high-risk supply-chain.
+/.github/ @pavlojs
+
+# ── Packaging ─────────────────────────────────────────────────────────────────
+# Controls what ends up inside a signed installer on someone else's machine.
+/electron-builder.config.js @pavlojs
+/package.json @pavlojs
+/package-lock.json @pavlojs
+
+# Maintainer scripts run as **root** during `dpkg -i`, and this one sets the
+# setuid bit on chrome-sandbox. Highest-privilege file in the repository.
+/build/ @pavlojs
+
+# Build-time scripts that rewrite what ships: inject-client-id.mjs edits
+# compiled output in dist/, make-icons.cjs generates the installer artwork.
+/scripts/ @pavlojs
+
+# ── Trust boundary ────────────────────────────────────────────────────────────
+# The preload is the entire bridge between the renderer and Node. Window options
+# decide whether that bridge is the only one.
+/src/preload/ @pavlojs
+/src/main/window.ts @pavlojs
+/src/main/ipc-handlers.ts @pavlojs
+
+# ── Content integrity ─────────────────────────────────────────────────────────
+# Manifest signature verification and file hashing — the two things standing
+# between a user and a backdoored jar.
+/src/core/updater/manifest-verify.ts @pavlojs
+/src/core/mods/integrity.ts @pavlojs
+/src/shared/manifest-schema.ts @pavlojs
+
+# ── Credentials ───────────────────────────────────────────────────────────────
+# OAuth chain and the keychain-backed token store.
+/src/core/auth/ @pavlojs
+
+# ── Code execution ────────────────────────────────────────────────────────────
+# Builds the argv the JVM is spawned with, and unpacks archives to disk.
+/src/core/minecraft/game-launcher.ts @pavlojs
+/src/core/minecraft/asset-downloader.ts @pavlojs
+
+# ── Egress ────────────────────────────────────────────────────────────────────
+# Sets the global undici dispatcher and the Chromium session proxy, so it
+# decides where every request in the app actually goes.
+/src/core/net/ @pavlojs
+
+# ── Security & legal docs ─────────────────────────────────────────────────────
+/SECURITY.md @pavlojs
+/LICENSE @pavlojs

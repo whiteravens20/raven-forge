@@ -1,0 +1,93 @@
+name: CI — Build & Lint
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # keytar is a native module and `postinstall` rebuilds it with node-gyp,
+      # which needs libsecret's development headers. The runner image has the
+      # runtime library but not the headers, so `npm ci` fails without this.
+      - name: Install libsecret headers
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Test
+        run: npm test
+
+  build-linux:
+    needs: lint-and-typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # keytar is a native module and `postinstall` rebuilds it with node-gyp,
+      # which needs libsecret's development headers. The runner image has the
+      # runtime library but not the headers, so `npm ci` fails without this.
+      - name: Install libsecret headers
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-linux
+          path: dist/
+          retention-days: 7
+
+  build-windows:
+    needs: lint-and-typecheck
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-windows
+          path: dist/
+          retention-days: 7

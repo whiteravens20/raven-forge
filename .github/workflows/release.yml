@@ -1,0 +1,341 @@
+# ── Raven Forge Launcher — Release ────────────────────────────────────────────
+#
+# Triggered by a semver tag (v1.2.3) pushed from the main branch.
+# Tags created on any other branch are refused by the guard job.
+#
+# Produces, for one tag:
+#   Raven Forge Launcher Setup <ver>.exe   NSIS installer, Authenticode-signed
+#   raven-forge-launcher_<ver>_amd64.deb   Debian 11+ / Ubuntu 20.04+
+#   Raven Forge Launcher-<ver>.AppImage    any x64 glibc >= 2.25
+#   latest.yml / latest-linux.yml + .blockmap   electron-updater feeds
+#   SHA256SUMS.txt                         checksums over every artefact
+#   sbom.cdx.json                          CycloneDX SBOM of the shipped deps
+#
+# The release is created as a DRAFT. electron-updater ignores drafts, so nothing
+# reaches users until the draft is published by hand — which is the point: check
+# the signature and the checksums first.
+#
+# ── Required repository configuration ─────────────────────────────────────────
+#
+# Secrets
+#   RAVENFORGE_CLIENT_ID     Azure application (client) ID. WITHOUT THIS the
+#                            installers ship the placeholder and Microsoft login
+#                            is dead for every user — the build fails rather than
+#                            publish that. See docs/AZURE-SETUP.md.
+#   WIN_CSC_LINK             base64 of the code-signing .pfx  (optional)
+#   WIN_CSC_KEY_PASSWORD     its password                     (optional)
+#
+# With the two signing secrets absent the Windows installer is built UNSIGNED and
+# the job says so loudly in the summary. With them present, the signature is
+# verified after the build and the job fails if it is not valid — a silently
+# unsigned release is the failure mode this is written to prevent.
+# See docs/SIGNING.md for what certificate to buy and why EV needs a cloud HSM.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Release — Build, Sign & Publish
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+# A second tag pushed while one is building must not race it onto the same draft.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  # ── Job 0: guard — the tag must point at a commit on main ───────────────────
+  # github.event.base_ref is not reliable for tags pushed with `git push origin
+  # <tag>`, so check reachability from origin/main directly.
+  check-branch:
+    name: Verify tag is on main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      on-main: ${{ steps.check.outputs.on-main }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history needed for the containment check
+
+      - name: Check branch containment
+        id: check
+        run: |
+          if git branch -r --contains "${{ github.sha }}" | grep -q 'origin/main'; then
+            echo "on-main=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "on-main=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Tag ${{ github.ref_name }} does not point to a commit on main. Release skipped."
+            exit 1
+          fi
+
+  # ── Job 1: the tag must match package.json ─────────────────────────────────
+  # electron-builder names every artefact and writes latest.yml from
+  # package.json's version. A tag that disagrees produces a release whose files
+  # and whose updater feed both claim a different version than the release does.
+  check-version:
+    name: Verify tag matches package.json
+    needs: check-branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "package.json=$PKG  tag=$TAG"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::package.json is $PKG but the tag is $TAG. Bump the version first."
+            exit 1
+          fi
+
+  # ── Job 2: build the installers ────────────────────────────────────────────
+  build:
+    name: Build ${{ matrix.label }}
+    needs: [check-branch, check-version]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux (.deb + AppImage)
+            target: linux
+          - os: windows-latest
+            label: Windows (NSIS)
+            target: win
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # keytar is a native module; `postinstall` rebuilds it against Electron's
+      # headers and node-gyp needs libsecret's development headers to do that.
+      # The GitHub runner image does not ship them.
+      - name: Install libsecret headers
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
+
+      - run: npm ci
+
+      # Refuse to build an installer that cannot log anybody in. `build:main`
+      # bakes the id into dist/ via scripts/inject-client-id.mjs; with the secret
+      # unset it would quietly leave the placeholder in place.
+      - name: Require an Azure client ID
+        shell: bash
+        env:
+          RAVENFORGE_CLIENT_ID: ${{ secrets.RAVENFORGE_CLIENT_ID }}
+        run: |
+          if [ -z "$RAVENFORGE_CLIENT_ID" ]; then
+            echo "::error::secrets.RAVENFORGE_CLIENT_ID is not set. A release built without it ships a placeholder client id and Microsoft login fails for every user. See docs/AZURE-SETUP.md."
+            exit 1
+          fi
+
+      - name: Build & package
+        shell: bash
+        env:
+          RAVENFORGE_CLIENT_ID: ${{ secrets.RAVENFORGE_CLIENT_ID }}
+          # electron-builder reads these two names. Empty => unsigned build.
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # Publishing happens once, in the release job, from the collected
+          # artefacts. Letting electron-builder publish too would race it.
+          GH_TOKEN: ''
+        run: npm run dist:${{ matrix.target }} -- --publish never
+
+      - name: Verify the client ID was baked in
+        shell: bash
+        run: |
+          if grep -q 'REPLACE_WITH_YOUR_AZURE_CLIENT_ID' dist/core/auth/build-config.js; then
+            echo "::error::build-config.js still contains the placeholder after the build."
+            exit 1
+          fi
+          echo "Client ID injected."
+
+      # A build that was supposed to be signed and is not must fail here rather
+      # than become a release nobody notices is unsigned.
+      - name: Verify Authenticode signature
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem out/*.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error 'No .exe produced.'; exit 1 }
+
+          if ([string]::IsNullOrEmpty($env:CSC_LINK)) {
+            Write-Warning 'No signing certificate configured — this installer is UNSIGNED and will trigger SmartScreen.'
+            'UNSIGNED — no certificate configured (see docs/SIGNING.md)' |
+              Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+            exit 0
+          }
+
+          $sig = Get-AuthenticodeSignature $exe.FullName
+          Write-Host "Status: $($sig.Status)"
+          Write-Host "Signer: $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') {
+            Write-Error "Expected a valid signature, got $($sig.Status)."
+            exit 1
+          }
+          "Signed by ``$($sig.SignerCertificate.Subject)``" |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+
+      # Checksums are computed on the machine that produced the file, before it
+      # is ever uploaded, so they cover the artefact end to end.
+      - name: Checksums
+        shell: bash
+        working-directory: out
+        run: |
+          shopt -s nullglob
+          files=(*.exe *.deb *.AppImage *.blockmap *.yml)
+          [ ${#files[@]} -gt 0 ] || { echo "::error::no artefacts in out/"; exit 1; }
+          sha256sum "${files[@]}" > "SHA256SUMS-${{ matrix.target }}.txt"
+          cat "SHA256SUMS-${{ matrix.target }}.txt"
+
+      - name: Upload artefacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            out/*.exe
+            out/*.deb
+            out/*.AppImage
+            out/*.blockmap
+            out/*.yml
+            out/SHA256SUMS-*.txt
+
+  # ── Job 3: SBOM of what actually ships ─────────────────────────────────────
+  # Only production dependencies — devDependencies are bundled into the renderer
+  # by Vite and are not resolvable packages inside the installer.
+  sbom:
+    name: Generate SBOM
+    needs: [check-branch, check-version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: CycloneDX SBOM
+        run: npm sbom --omit=dev --sbom-format cyclonedx > sbom.cdx.json
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: sbom
+          path: sbom.cdx.json
+          if-no-files-found: error
+
+  # ── Job 4: publish one draft release with everything attached ──────────────
+  release:
+    name: Publish draft release
+    needs: [check-branch, build, sbom]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+      id-token: write # sign the provenance attestation
+      attestations: write # record it
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tag message + release-note diffing
+
+      - name: Download every artefact
+        uses: actions/download-artifact@v6
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # One SHA256SUMS.txt for the whole release, assembled from the per-OS
+      # files each runner produced. The per-OS files are not published.
+      - name: Assemble checksums
+        working-directory: artifacts
+        run: |
+          cat SHA256SUMS-*.txt | sort -k2 > SHA256SUMS.txt
+          rm -f SHA256SUMS-*.txt
+          echo '### Artefacts' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat SHA256SUMS.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      # SLSA build provenance: cryptographic proof these exact bytes came out of
+      # this workflow, at this commit. Verify with:
+      #   gh attestation verify <file> --repo whiteravens20/raven-forge
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            artifacts/*.exe
+            artifacts/*.deb
+            artifacts/*.AppImage
+
+      - name: Extract tag message
+        id: tag-msg
+        run: |
+          MSG=$(git tag -l --format='%(contents)' "${{ github.ref_name }}" \
+            | sed '/-----BEGIN SSH SIGNATURE-----/,/-----END SSH SIGNATURE-----/d' | head -100)
+          {
+            echo "message<<GH_EOF"
+            echo "$MSG"
+            echo "GH_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          generate_release_notes: true
+          append_body: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/*.exe
+            artifacts/*.deb
+            artifacts/*.AppImage
+            artifacts/*.blockmap
+            artifacts/*.yml
+            artifacts/SHA256SUMS.txt
+            artifacts/sbom.cdx.json
+          body: |
+            ${{ steps.tag-msg.outputs.message }}
+
+            ---
+            ## Downloads
+
+            | Platform | File | Notes |
+            |---|---|---|
+            | Windows 10 1809+ / 11 | `Raven Forge Launcher Setup ${{ github.ref_name }}.exe` | NSIS installer |
+            | Debian 11+ / Ubuntu 20.04+ | `raven-forge-launcher_*_amd64.deb` | recommended on Ubuntu 23.10+ |
+            | Any x64 Linux, glibc ≥ 2.25 | `Raven Forge Launcher-*.AppImage` | blocked by AppArmor on Ubuntu 23.10+ |
+
+            ## Verifying what you downloaded
+
+            ```bash
+            sha256sum -c SHA256SUMS.txt --ignore-missing
+            gh attestation verify <file> --repo ${{ github.repository }}
+            ```
+
+            `sbom.cdx.json` lists every production dependency inside the installer.
+
+            The `.yml` and `.blockmap` files are the electron-updater feed. Leave
+            them attached — removing them breaks in-app updates for existing users.
