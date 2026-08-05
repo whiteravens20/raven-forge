@@ -1,0 +1,93 @@
+{
+  "name": "raven-forge-launcher",
+  "productName": "Raven Forge Launcher",
+  "version": "0.1.0",
+  "description": "Custom Minecraft: Java Edition launcher with mod management, auto-sync, and server profiles",
+  "author": {
+    "name": "White Ravens",
+    "email": "pavlojs@gmail.com",
+    "url": "https://whiteravens.net"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whiteravens20/raven-forge.git"
+  },
+  "main": "dist/main/index.js",
+  "desktopName": "raven-forge-launcher.desktop",
+  "scripts": {
+    "dev": "concurrently -k -n vite,tsc,electron -c green,gray,blue \"npm run dev:renderer\" \"npm run dev:main\" \"npm run dev:electron\"",
+    "dev:main": "tsc -p tsconfig.main.json --watch",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on tcp:127.0.0.1:5173 dist/main/index.js dist/preload/index.js && node scripts/dev-electron.mjs",
+    "build": "npm run build:renderer && npm run build:main",
+    "build:main": "tsc -p tsconfig.main.json && node scripts/inject-client-id.mjs",
+    "build:renderer": "vite build",
+    "dist": "npm run build && electron-builder -c electron-builder.config.js",
+    "dist:win": "npm run build && electron-builder -c electron-builder.config.js --win",
+    "dist:linux": "npm run build && electron-builder -c electron-builder.config.js --linux",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
+    "typecheck:main": "tsc --noEmit -p tsconfig.main.json",
+    "typecheck:renderer": "tsc --noEmit -p tsconfig.renderer.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
+    "icons": "electron scripts/make-icons.cjs",
+    "clean": "rimraf dist out",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.8.3",
+    "keytar": "^7.9.0",
+    "socks": "^2.8.9",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1",
+    "undici": "^8.10.0",
+    "yauzl": "^3.4.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/yauzl": "^3.4.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.27",
+    "concurrently": "^9.2.1",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^0.577.0",
+    "postcss": "^8.5.8",
+    "prettier": "^3.8.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router": "^8.3.0",
+    "rimraf": "^6.1.3",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.1",
+    "vite": "^7.3.1",
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.1.10",
+    "wait-on": "^9.0.4",
+    "zustand": "^5.0.12"
+  },
+  "overrides": {
+    "brace-expansion@^5.0.0": "^5.0.9"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

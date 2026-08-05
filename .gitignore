@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+
+# Vite
+.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/settings.json
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+electron-debug.log*
+
+# Coverage
+coverage/
+
+# Electron
+*.asar
+
+# Certificates (never commit)
+*.pfx
+*.p12
+*.cer
+*.pem
+!build/entitlements.mac.plist
+
+# Internal planning — roadmaps, session notes, working docs. Published
+# documentation lives in README.md and docs/; the plan does not ship.
+PLAN.md
+ROADMAP.md
+TODO.md
+NOTES.md
+*.plan.md
