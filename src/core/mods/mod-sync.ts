@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createWriteStream } from 'node:fs';
 import { log } from '../../main/logger';
 import {
   beginJob,
@@ -22,6 +21,7 @@ import {
 } from './modrinth-api';
 import { requiredDependencies } from './compatibility';
 import { acceptedLoaders } from '../../shared/constants';
+import { downloadToFile } from '../net/download';
 import { syncContentFromManifest } from './content-manager';
 import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import { getMainWindow } from '../../main/window';
@@ -115,35 +115,6 @@ async function writeCachedManifest(profileId: string, manifest: ModManifest): Pr
 
 // Hashing helpers live in ./integrity so content-manager can share them
 // without importing this module back.
-
-async function downloadToFile(url: string, dest: string, signal?: AbortSignal): Promise<void> {
-  await fs.mkdir(path.dirname(dest), { recursive: true });
-
-  const res = await fetch(url, {
-    redirect: 'follow',
-    signal: withTimeout(signal, 60000),
-  });
-  if (!res.ok || !res.body) {
-    throw new Error(`Download failed (${res.status}): ${new URL(url).host}`);
-  }
-
-  const writable = createWriteStream(dest);
-  const reader = res.body.getReader();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const canContinue = writable.write(value);
-    if (!canContinue) {
-      await new Promise<void>((r) => writable.once('drain', r));
-    }
-  }
-  writable.end();
-  await new Promise<void>((resolve, reject) => {
-    writable.on('finish', resolve);
-    writable.on('error', reject);
-  });
-}
 
 // ── Public API ─────────────────────────────────────────────
 
