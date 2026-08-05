@@ -14,6 +14,7 @@ import {
 } from '@components/SearchFilters';
 import { CompatibilityBadge } from '@components/CompatibilityBadge';
 import { CompatibilityDialog } from '@components/CompatibilityDialog';
+import { InstalledMark } from '@components/InstalledMark';
 import { isClientModLoader } from '@shared/constants';
 import type { FacetGroups, InstallPlan, ModSearchResult, InstalledMod } from '@shared/ipc-types';
 
@@ -46,6 +47,13 @@ export function ModsPage() {
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
   const profileLoader = selectedProfile?.modLoader;
+  // What a browse row is matched against. Installed entries are keyed by
+  // whatever named them: a project id when the launcher installed them, a slug
+  // when a pack manifest did. A search result carries both, so both are asked —
+  // checking the id alone leaves half a pack's mods offered a second time.
+  const installedIds = new Set(installed.map((mod) => mod.id));
+  const isInstalled = (mod: ModSearchResult) =>
+    installedIds.has(mod.id) || installedIds.has(mod.slug);
 
   const loadInstalled = useCallback(async () => {
     if (!selectedId) return;
@@ -338,15 +346,19 @@ export function ModsPage() {
                   modLoader={profileLoader}
                 />
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<Download size={14} />}
-                loading={busyId === mod.id}
-                onClick={() => void handleInstall(mod)}
-              >
-                {t('common.install')}
-              </Button>
+              {isInstalled(mod) ? (
+                <InstalledMark />
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Download size={14} />}
+                  loading={busyId === mod.id}
+                  onClick={() => void handleInstall(mod)}
+                >
+                  {t('common.install')}
+                </Button>
+              )}
             </div>
           ))}
         </div>

@@ -103,6 +103,7 @@ export const pl: Translations = {
   'common.download': 'Pobierz',
   'common.search': 'Szukaj',
   'common.install': 'Instaluj',
+  'common.installed': 'Zainstalowano',
   'common.enable': 'Włącz',
   'common.disable': 'Wyłącz',
   'common.show': 'Pokaż',

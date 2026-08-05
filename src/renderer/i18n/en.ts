@@ -114,6 +114,7 @@ export const en = {
   'common.download': 'Download',
   'common.search': 'Search',
   'common.install': 'Install',
+  'common.installed': 'Installed',
   'common.enable': 'Enable',
   'common.disable': 'Disable',
   'common.show': 'Show',
