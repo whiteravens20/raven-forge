@@ -1,0 +1,413 @@
+/**
+ * English dictionary — the reference locale.
+ *
+ * This file defines the *shape* every other locale must match: `TranslationKey`
+ * is derived from its keys, so a missing or misspelled entry in another
+ * dictionary is a type error rather than a string that silently renders as its
+ * own key at runtime.
+ *
+ * Conventions:
+ * - Keys are flat and dotted, `area.thing` or `area.thing.detail`.
+ * - `{name}` placeholders are substituted by `translate()`; keep every one of
+ *   them intact when translating.
+ * - Count-dependent strings come in `.one` / `.few` / `.many` / `.other`
+ *   variants, picked through `Intl.PluralRules` — see `plural()` in `index.ts`.
+ *   English only ever needs `.one` and `.other`; Polish uses all four.
+ * - `*emphasis*` and `**strong**` are only interpreted by `useRichT()`, which
+ *   exists for the chronicle's prose. Everywhere else the string is rendered
+ *   verbatim, asterisks included.
+ */
+export const en = {
+  // ── Navigation ───────────────────────────────────────────
+  'nav.label': 'Launcher navigation',
+  'nav.home.short': 'Home',
+  'nav.home.title': 'Home',
+  'nav.profiles.short': 'Profiles',
+  'nav.profiles.title': 'Profiles',
+  'nav.mods.short': 'Mods',
+  'nav.mods.title': 'Mods',
+  'nav.content.short': 'Looks',
+  'nav.content.title': 'Shaders and resource packs',
+  'content.title': 'Shaders & resource packs — {profile}',
+  'content.pickProfile': 'Pick a profile first.',
+  'content.kindLabel': 'Content type',
+  'content.shaders': 'Shaders',
+  'content.resourcePacks': 'Resource packs',
+  'content.tabInstalled': 'Installed',
+  'content.tabBrowse': 'Browse',
+  'content.searchShaders': 'Search Modrinth for shaders…',
+  'content.searchPacks': 'Search Modrinth for resource packs…',
+  'content.searchFailed': 'Search failed.',
+  'content.installFailed': 'Could not install {name}.',
+  'content.removeFailed': 'Could not remove that.',
+  'content.reorderFailed': 'Could not save the new order.',
+  'content.emptyShaders': 'No shaders installed',
+  'content.emptyPacks': 'No resource packs installed',
+  'content.emptyHint': 'Browse to add one, or let a manifest sync bring it in.',
+  'content.orderHint':
+    'Top of the list wins. A pack only changes what the ones below it left alone.',
+  'content.moveUp': 'Move {name} up',
+  'content.moveDown': 'Move {name} down',
+  'content.loaderFilter': 'Shader loader',
+  'content.facet.resolutions': 'Resolution',
+  'content.facet.features': 'Includes',
+  'content.facet.categories': 'Category',
+  'content.facet.performanceImpact': 'Performance',
+  'content.browseHint': 'Narrow with the filters or type a name — either works on its own.',
+  'content.filterAny': 'Any',
+  'content.shadersNeedIris':
+    'Shaders need a shader loader. The first time you install a shader, the launcher will offer the ones that run on this profile.',
+  'content.loaderInstalled': 'Installed {name} — this profile can now load shader packs.',
+  'content.loaderInstalledWithDeps':
+    'Installed {name}, along with {deps} which it needs. This profile can now load shader packs.',
+  'content.loaderNoBuild':
+    'No shader loader publishes a build for {loader} on Minecraft {version}, so this pack will not load yet.',
+  'content.loaderUnsupported':
+    'This profile is vanilla. Shaders need a mod loader — switch the profile to Fabric, Quilt, Forge or NeoForge first.',
+  'content.loaderFailed': 'The shader pack installed, but the shader loader did not: {error}',
+
+  // ── Shader loader picker ─────────────────────────────────
+  'shaderLoader.title': 'Which shader loader?',
+  'shaderLoader.why':
+    'A shader pack needs a mod to read it. Pick one and the launcher will add it to this profile.',
+  'shaderLoader.alsoInstalls': 'Also installs: {deps}',
+  'shaderLoader.skip': 'Not now',
+
+  // ── Search filters (mods, shaders, resource packs) ───────
+  'search.gameVersion': 'Minecraft version',
+  'search.noResults': 'Nothing matched.',
+  'search.noResultsFiltered':
+    'Nothing matched. The filters above are ANDed together, so a project with no build for {version} will not appear — widen one of them.',
+  'nav.accounts.short': 'Accounts',
+  'nav.accounts.title': 'Accounts',
+  'nav.settings.short': 'Options',
+  'nav.settings.title': 'Settings',
+  'nav.about.short': 'About',
+  'nav.about.title': 'About',
+
+  // ── Window controls ──────────────────────────────────────
+  'window.minimize': 'Minimise',
+  'window.maximize': 'Maximise',
+  'window.restore': 'Restore',
+  'window.close': 'Close',
+
+  // ── Shared vocabulary ────────────────────────────────────
+  'common.save': 'Save',
+  'common.cancel': 'Cancel',
+  'common.add': 'Add',
+  'common.remove': 'Remove',
+  'common.delete': 'Delete',
+  'common.edit': 'Edit',
+  'common.duplicate': 'Duplicate',
+  'common.export': 'Export',
+  'common.import': 'Import',
+  'common.close': 'Close',
+  'common.dismiss': 'Dismiss',
+  'common.refresh': 'Refresh',
+  'common.openFolder': 'Open folder',
+  'common.choose': 'Choose…',
+  'common.copy': 'Copy',
+  'common.copied': 'Copied',
+  'common.restart': 'Restart',
+  'common.later': 'Later',
+  'common.download': 'Download',
+  'common.search': 'Search',
+  'common.install': 'Install',
+  'common.enable': 'Enable',
+  'common.disable': 'Disable',
+  'common.show': 'Show',
+  'common.hide': 'Hide',
+
+  // ── Home ─────────────────────────────────────────────────
+  'home.signedInAs': 'Signed in as',
+  'home.notSignedIn': 'Not signed in — go to the Accounts tab',
+  'home.noProfiles': 'No profiles — create one in the Profiles tab',
+  'home.play': 'PLAY',
+  'home.running': 'Running…',
+  'home.preparing': 'Starting…',
+  'home.cancelLaunch': 'Cancel',
+  'home.authUnreachable':
+    'Could not reach the Microsoft sign-in servers. You can play offline — singleplayer and LAN only, and online-mode servers will refuse the connection.',
+  'home.launchOffline': 'Play offline',
+  'home.updatingLauncher': 'Updating launcher…',
+  'home.updateBeforePlay': 'Launcher {version} will be installed before the game starts.',
+  'home.updateFailedPlayAnyway':
+    'The launcher update could not be downloaded — the game will start anyway.',
+  'home.launchFailed': 'Could not start the game',
+  'home.launchError': 'Error while starting the game',
+  'home.showConsole': 'Show console',
+  'home.hideConsole': 'Hide console',
+  'home.news': 'News',
+  'home.refreshNews': 'Refresh news and announcements',
+  'home.newsOlder': 'Older news',
+  'home.newsNewer': 'Newer news',
+  'news.openInBrowser': 'Open in browser',
+  'news.noBody': 'This entry carries no further text.',
+  'home.ram': '{mb} MB RAM',
+
+  // ── Live console ─────────────────────────────────────────
+  'console.title': 'Game console',
+  'console.close': 'Close console',
+  'console.waiting': 'Waiting for game logs…',
+
+  // ── Crash reporter ───────────────────────────────────────
+  'crash.title': 'The game crashed',
+  'crash.body': 'Profile {profile} exited with code {code}.',
+  'crash.bodyWithTime': 'Profile {profile} exited with code {code} after {minutes} min.',
+  'crash.showLogs': 'Show logs',
+  'crash.hideLogs': 'Hide logs',
+
+  // ── Profiles ─────────────────────────────────────────────
+  'profiles.title': 'Profiles',
+  'profiles.new': 'New profile',
+  'profiles.import': 'Import profile',
+  'profiles.empty': 'No profiles',
+  'profiles.emptyHint': 'Add your first profile with the + button',
+  'profiles.pickOrCreate': 'Select a profile, or create a new one',
+  'profiles.confirmDelete': 'Delete profile "{name}"?',
+  'profiles.fieldMinecraft': 'Minecraft',
+  'profiles.fieldLoader': 'Mod loader',
+  'profiles.fieldRam': 'RAM',
+  'profiles.fieldServer': 'Server',
+  'profiles.manifestUrl': 'Manifest URL',
+  'profiles.sync': 'Sync',
+  'profiles.quickConnect': 'Quick connect: {address}',
+  'profiles.notes': 'Notes',
+  'profiles.lastPlayed': 'Last played: {date}',
+  'profiles.totalPlayTime': '{hours} h total',
+  'profiles.syncStatus.synced': 'In sync',
+  'profiles.syncStatus.updates': 'Updates available ({count})',
+  'profiles.syncStatus.error': 'Sync error',
+  'profiles.syncStatus.never': 'Never synced',
+  'profiles.verify.unsigned': 'Unsigned',
+  'profiles.verify.valid': 'Verified: {signer}',
+  'profiles.verify.invalid': 'Invalid signature',
+
+  // ── Profile form ─────────────────────────────────────────
+  'profileForm.createTitle': 'New profile',
+  'profileForm.editTitle': 'Edit: {name}',
+  'profileForm.iconAfterSave': 'You can set the profile icon once it is saved.',
+  'profileForm.name': 'Profile name',
+  'profileForm.namePlaceholder': 'e.g. Survival Server',
+  'profileForm.mcVersion': 'Minecraft version',
+  'profileForm.loader': 'Mod loader',
+  'profileForm.versionsLoading': 'Loading versions…',
+  'profileForm.versionsFailed': 'Could not load the version list — type it manually',
+  'profileForm.noLoaderBuilds':
+    '{loader} has no builds for Minecraft {mcVersion} — pick another version or loader',
+  'profileForm.loaderUnstable': 'unstable',
+  'profileForm.loaderVersionLatest': 'Latest',
+  'profileForm.loaderVersion': 'Loader version (optional)',
+  'profileForm.ram': 'RAM (MB)',
+  'profileForm.manifestUrl': 'Manifest URL (optional)',
+  'profileForm.serverIp': 'Server IP',
+  'profileForm.serverPort': 'Port',
+  'profileForm.javaArgs': 'Java arguments (optional)',
+  'profileForm.notes': 'Notes',
+  'profileForm.notesPlaceholder': 'Any notes about this profile',
+
+  // ── Profile icon picker ──────────────────────────────────
+  'profileIcon.label': 'Profile icon',
+  'profileIcon.change': 'Change',
+  'profileIcon.pick': 'Choose image',
+  'profileIcon.formats': 'PNG, JPG, GIF, WebP or SVG — max 2 MB.',
+  'profileIcon.presets': '…or pick one of the built-in ones:',
+  'profileIcon.failed': 'Could not set the icon',
+  'profileIcon.fileFilter': 'Images',
+
+  // ── Mods ─────────────────────────────────────────────────
+  'mods.title': 'Mods — {profile}',
+  'mods.pickProfile': 'Select a profile in the Profiles tab to manage mods',
+  'mods.tabInstalled': 'Installed',
+  'mods.tabBrowse': 'Browse',
+  'mods.searchModrinth': 'Search mods on Modrinth…',
+  'mods.searchCurseforge': 'Search mods on CurseForge…',
+  'mods.searchHint': 'Type a name or just press Search — the filters work on their own.',
+  'mods.loaderFilter': 'Loader',
+  'mods.searchFailed': 'Search failed',
+  'mods.installFailed': 'Could not install {name}',
+  'mods.curseforgeNoKey': 'CurseForge needs your own API key — add one in Settings.',
+  'mods.empty': 'No mods installed',
+  'mods.emptyHint': 'Search for mods in the Browse tab, or sync the profile with a manifest',
+  'mods.fromManifest': 'from manifest',
+  'mods.downloads.one': '{count} download',
+  'mods.downloads.other': '{count} downloads',
+
+  // ── Accounts ─────────────────────────────────────────────
+  'accounts.title': 'Accounts',
+  'accounts.loginMicrosoft': 'Sign in with Microsoft',
+  'accounts.offlineMode': 'Offline mode',
+  'accounts.playerName': 'Player name',
+  'accounts.empty': 'No accounts — sign in above',
+  'accounts.active': '• active',
+  'accounts.setActive': 'Set active',
+  'accounts.logout': 'Sign out',
+  'accounts.loginFailed': 'Sign-in failed',
+
+  // ── Settings ─────────────────────────────────────────────
+  'settings.title': 'Settings',
+  'settings.loading': 'Loading settings…',
+  'settings.section.appearance': 'Appearance',
+  'settings.section.behavior': 'Behaviour',
+  'settings.section.network': 'Network and downloads',
+  'settings.section.sources': 'Content sources',
+  'settings.section.trustedKeys': 'Trusted keys (Ed25519)',
+  'settings.section.updates': 'Updates',
+  'settings.installedVersion': 'Installed version: {version}',
+  'settings.checkUpdates': 'Check for updates',
+  'settings.downloadUpdate': 'Download update',
+  'settings.restartToUpdate': 'Restart to install',
+  'settings.updateUpToDate': 'You are on the newest release.',
+  'settings.updateAvailable': 'Version {version} is available.',
+  'settings.updateDevBuild': 'Running from source — there is no installed build to replace.',
+  'settings.updateSystemPackage':
+    'Installed from a system package. Update it with your package manager (apt, dnf), not from here.',
+  'settings.updateUnsignedPlatform':
+    'Self-update is not available on this platform yet. Download the newest release from GitHub.',
+  'settings.updateCheckFailed': 'Could not check for updates.',
+  'settings.updateCheckFailedWith': 'Could not check for updates: {error}',
+  'settings.updateDownloadFailed': 'Could not download the update.',
+  'settings.section.data': 'Data',
+  'settings.theme': 'Theme',
+  'settings.theme.dark': 'Dark',
+  'settings.theme.oled': 'OLED black',
+  'settings.theme.light': 'Light',
+  'settings.language': 'Language',
+  'settings.backgroundsFolder': 'Backgrounds folder (local)',
+  'settings.backgroundsPlaceholder': 'Leave empty to use the built-in scenes',
+  'settings.onLaunch': 'When the game starts',
+  'settings.onLaunch.minimize': 'Minimise',
+  'settings.onLaunch.close': 'Close',
+  'settings.onLaunch.keepOpen': 'Stay open',
+  'settings.showConsole': 'Show the game console',
+  'settings.offlineMode': 'Always launch offline',
+  'settings.offlineModeHint':
+    'Never contacts the sign-in servers. Singleplayer and LAN only — online-mode servers refuse an offline session.',
+  'settings.autoRemoveOrphans': 'Automatically remove orphaned mods',
+  'settings.concurrency': 'Concurrent downloads (1–8)',
+  'settings.proxy': 'Proxy URL (optional)',
+  'settings.proxyPlaceholder': 'http:// or socks5://user:pass@host:port',
+  'settings.proxyHint':
+    'HTTP, HTTPS and SOCKS4/5 are supported. With SOCKS, hostnames are resolved at the proxy, so nothing leaks to your local resolver.',
+  'settings.feedPlaceholder': 'https://your-server.com/api/{feed}.json',
+  'settings.newsFeed': 'News feed URL',
+  'settings.announcementFeed': 'Announcement feed URL',
+  'settings.curseforgeKey': 'CurseForge API key (optional)',
+  'settings.curseforgeKeyPlaceholder': 'Only needed for CurseForge sources',
+  'settings.curseforgeKeyHint':
+    'Without a key the CurseForge search is disabled — Modrinth always works. Generate your own at',
+  'settings.trustedKeysHint':
+    'Server manifests can be signed. Add the admin’s public key to trust only signed manifests.',
+  'settings.trustedKeysEmpty': 'No trusted keys',
+  'settings.trustedKeyAdded': 'Added: {date}',
+  'settings.trustedKeyName': 'Key name',
+  'settings.trustedKeyNamePlaceholder': 'e.g. Raven SMP Admin',
+  'settings.trustedKeyValue': 'Public key (base64)',
+  'settings.trustedKeyAdd': 'Add key',
+  'settings.trustedKeyFailed': 'Could not add the key',
+  'settings.dataFolder': 'Data folder',
+  'settings.logs': 'Logs',
+  'settings.showLogs': 'Show logs',
+  'settings.reset': 'Reset settings',
+  'settings.confirmReset': 'Reset all settings to their defaults?',
+
+  // ── Log viewer ───────────────────────────────────────────
+  'logs.title': 'Launcher logs',
+  'logs.filterAll': 'Everything',
+  'logs.filterWarn': 'Warnings',
+  'logs.filterError': 'Errors',
+  'logs.loading': 'Loading log…',
+  'logs.readFailed': 'Could not read the log',
+  'logs.empty': 'The log is empty — nothing has been written yet.',
+  'logs.noMatches': 'No entries match the filter.',
+  'logs.shown': '{visible} of {total} lines',
+  'logs.paused': '• scrolling paused',
+  'logs.errorCount.one': '{count} error',
+  'logs.errorCount.other': '{count} errors',
+  'logs.warnCount.one': '{count} warning',
+  'logs.warnCount.other': '{count} warnings',
+
+  // ── Progress overlay ─────────────────────────────────────
+  'progress.title': 'Install progress',
+  'progress.modSync': 'Syncing mods',
+  'progress.modDownload': 'Downloading mods',
+  'progress.loaderInstall': 'Installing mod loader',
+  'progress.javaDownload': 'Downloading Java',
+  'progress.gameAssets': 'Downloading game assets',
+  'progress.launcherUpdate': 'Updating the launcher',
+  'progress.files.one': '{done}/{total} file',
+  'progress.files.other': '{done}/{total} files',
+
+  // ── Updater ──────────────────────────────────────────────
+  'update.ready': 'Update ready',
+  'update.available': 'Update available: v{version}',
+  'update.willInstall': 'v{version} will be installed after a restart.',
+  'update.pending': 'A new launcher version is ready to download.',
+  'update.downloading': 'Downloading… {percent}%',
+  'update.downloadFailed': 'Downloading the update failed',
+  'update.installFailed': 'Installing the update failed',
+  'update.hide': 'Hide notification',
+
+  // ── Error boundary ───────────────────────────────────────
+  'error.title': 'Something went wrong',
+  'error.body': 'The launcher hit an unexpected error. Click below to try again.',
+  'error.restart': 'Restart',
+
+  // ── About ────────────────────────────────────────────────
+  'about.tagline':
+    'A custom Minecraft: Java Edition launcher with mod management, auto-sync from server manifests, and profiles.',
+  'about.authorship':
+    'Written from scratch by one person — {author} — under the {org} banner, for a server of his own and the players on it.',
+  'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
+  'about.secret': 'Secret of the forge',
+
+  // ── Bedrock card ─────────────────────────────────────────
+  'bedrock.title': 'Looking for Minecraft: Bedrock Edition?',
+  'bedrock.body':
+    'Raven Forge supports Java Edition only. Bedrock Edition is available from minecraft.net or the Microsoft Store.',
+  'bedrock.bundle':
+    'If you own the Java & Bedrock bundle you already have it — you just need to install it from the Store.',
+  'bedrock.open': 'Open minecraft.net',
+  'bedrock.dismiss': 'Hide this notice',
+
+  // ── Chronicle (About page easter egg) ────────────────────
+  // Original prose written for this project. Emphasis markers are interpreted;
+  // move them wherever the target language needs them.
+  'chronicle.title': 'Chronicle of the Raven Forge',
+  'chronicle.subtitle': 'scroll the seventh',
+  'chronicle.subtitle2': 'on how the launcher was forged in a fire nobody remembers any more',
+  'chronicle.close': 'Roll up the scroll',
+  'chronicle.p1':
+    'When the first worlds began to go dark and the gates between them grew over with silence, one furnace still burned in the belly of a dead mountain. It was fed neither coal nor wood — it burned on the stubbornness of those who refused to forget.',
+  'chronicle.p2':
+    'At the anvil stood the smith-priests of the Raven Order. They had no names, only rite-numbers and ash worked in under their fingernails. They held that every machine has a soul that must be woken — not by command, but by a request repeated until the metal answers.',
+  'chronicle.p3':
+    'For nine nights they quenched the core in a river of molten obsidian. For nine nights they sang a litany with not one human word in it — a plainchant of zeroes and ones, whispered so as not to wake what sleeps deeper.',
+  'chronicle.p4':
+    'On the tenth night the hammer fell for the last time. And the thing on the anvil opened an eye — amber, calm, older than the fire that forged it. The smiths swore afterwards that there was no gratitude in that look. There was *readiness*.',
+  'chronicle.p5':
+    'They named it the Raven Forge, because a raven finds its way home even when home is gone. They gave it one task and one promise: **to open gates to worlds, and to see that those who return have somewhere to return to.**',
+  'chronicle.p6':
+    'The Order long since crumbled to dust, the furnace went cold, the mountain fell in on itself. But under the glass and the light you are sitting in front of, that same spark is still smouldering. It is only waiting for someone to say: *play*.',
+  'chronicle.colophon1': 'Whoever found this scroll found it by chance.',
+  'chronicle.colophon2': 'Scrolls do not let themselves be found by chance.',
+} as const;
+
+export type TranslationKey = keyof typeof en;
+
+type PluralBaseOf<K> = K extends `${infer Base}.other` ? Base : never;
+
+/** Keys that exist in `.other` form — the ones `plural()` accepts as a base. */
+export type PluralKey = PluralBaseOf<TranslationKey>;
+
+/** CLDR categories. Which ones a language actually uses is up to the language. */
+type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
+
+/**
+ * Every locale must supply every key English defines — that is the whole point
+ * of this type — *plus* whatever extra plural categories its own grammar needs.
+ * English gets by on `.one`/`.other`; Polish also uses `.few` and `.many`, and
+ * those cannot be required of every locale.
+ */
+export type Translations = Record<TranslationKey, string> &
+  Partial<Record<`${PluralKey}.${PluralCategory}`, string>>;
