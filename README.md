@@ -13,8 +13,10 @@ Built with **Electron + TypeScript + React + Vite + Tailwind CSS**.
 ## Features
 
 - **Server Profiles** — per-server instance configs with pinned MC version, mod loader, and remote manifest
+- **Pack Install** — start a profile from a White Ravens pack, a `.mrpack` file, a manifest URL, or an empty form
 - **Mod Auto-Sync** — fetch server manifest → diff → parallel download → SHA-256 verify → install
 - **Mod Browser** — search Modrinth from the launcher, filtered to your profile
+- **Compatibility Checks** — warns before an install that does not fit the profile, and pulls in required dependencies
 - **Bilingual UI** — Polish and English, switchable in Settings
 - **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla
 - **Microsoft Auth** — full OAuth 2.0 → Xbox Live → Minecraft JWT chain + offline mode
@@ -111,9 +113,10 @@ src/
 │   ├── java/       # Adoptium JRE management
 │   ├── minecraft/  # Version manifest, assets, game launcher
 │   ├── modloader/  # Fabric/Quilt/Forge/NeoForge installers
-│   ├── mods/       # Manifest fetch, sync, Modrinth API, integrity
-│   ├── net/        # Proxy dispatcher — every outbound request goes through it
+│   ├── mods/       # Manifest fetch, sync, Modrinth API, integrity, compatibility
+│   ├── net/        # Proxy dispatcher + the shared download helper
 │   ├── news/       # News + announcement feeds
+│   ├── packs/      # .mrpack reader, pack catalogue, profile-from-pack install
 │   ├── profiles/   # Profile CRUD + import/export
 │   └── updater/    # electron-updater + Ed25519 manifest verification
 └── shared/         # Types shared between main + renderer
@@ -223,6 +226,29 @@ public binary nor be expected from a player. Since **16 July 2026** CurseForge's
 CDN also rejects unauthenticated downloads (`401 A valid api-key is required`),
 which closes the last route that did not need one. A CurseForge-only mod has to
 be downloaded by hand and added as a local file.
+
+---
+
+## Pack Formats
+
+A new profile can start from a whole pack rather than an empty form.
+
+| Route | Format | Keeps updating? |
+|---|---|---|
+| **White Ravens packs** | The catalogue at [`raven-packs`](https://github.com/whiteravens20/raven-packs), which publishes a `packs.json` index beside each pack's manifest | Yes — the profile stores the manifest URL and every sync reconciles against it |
+| **Manifest URL** | A Raven Forge manifest v2, from any address you paste | Yes, same mechanism |
+| **`.mrpack` file** | [Modrinth's modpack format](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack) — a zip holding `modrinth.index.json` and `overrides/` | No — an import is a snapshot of one version |
+
+`.mrpack` is the only open, cross-launcher pack format the launcher reads; Prism,
+ATLauncher, MultiMC and the Modrinth app produce and consume the same files. An
+import is converted into a manifest and installed through the ordinary sync path,
+so it gets the same hash verification, orphan handling and resource-pack ordering
+as a server pack. CurseForge's pack zip is not read, for the reason above: its
+files cannot be fetched without a key.
+
+Paths inside a pack are checked before anything is written. An entry that tries
+to leave the game directory is refused outright rather than trimmed and installed
+somewhere else.
 
 ---
 
