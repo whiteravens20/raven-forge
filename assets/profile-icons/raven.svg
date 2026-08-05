@@ -1,0 +1,6 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>Profile icon: Raven</title>
+  <desc>Default profile avatar — the brand raven mark, pale on dark ground with its violet accent.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#1c1c26"/>
+  <g transform="translate(64,64) scale(0.24242424242424243) translate(-256,-256)"><polygon points="140,172 229,148 278,207 421,256 303,290 254,266 234,320 150,364 91,286" fill="#e8e8f0"/><polygon points="200,189 211,200 200,211 189,200" fill="#7c3aed"/></g>
+</svg>

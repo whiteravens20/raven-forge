@@ -1,0 +1,32 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <title>Forge spinner</title>
+  <desc>Loading indicator shown while the launcher downloads Minecraft, mod loaders and mods. A static raven mark with three ember accents that breathe in a slow, staggered, eased wave. Falls back to a fixed composed frame under prefers-reduced-motion.</desc>
+  <style>
+    .rf-dot { opacity: 0.3; transform-origin: center; transform-box: fill-box; }
+    .rf-dot-a { animation: rf-breathe 1.8s cubic-bezier(0.4,0,0.2,1) infinite; }
+    .rf-dot-b { animation: rf-breathe 1.8s cubic-bezier(0.4,0,0.2,1) infinite; animation-delay: 0.4s; }
+    .rf-dot-c { animation: rf-breathe 1.8s cubic-bezier(0.4,0,0.2,1) infinite; animation-delay: 0.8s; }
+    @keyframes rf-breathe {
+      0%   { opacity: 0.25; transform: scale(0.85); }
+      50%  { opacity: 1;    transform: scale(1); }
+      100% { opacity: 0.25; transform: scale(0.85); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rf-dot-a, .rf-dot-b, .rf-dot-c { animation: none; transform: none; }
+      .rf-dot-a { opacity: 0.9; }
+      .rf-dot-b { opacity: 0.55; }
+      .rf-dot-c { opacity: 0.3; }
+    }
+  </style>
+
+  <!-- static raven mark, the calm center the embers work around -->
+  <g transform="translate(50,50) scale(0.12121212121212122) translate(-256,-256)">
+    <polygon points="140,172 229,148 278,207 421,256 303,290 254,266 234,320 150,364 91,286" fill="currentColor"/>
+    <polygon points="200,189 211,200 200,211 189,200" fill="#7c3aed"/>
+  </g>
+
+  <!-- three ember accents -->
+  <circle class="rf-dot rf-dot-a" cx="50" cy="12" r="5" fill="#7c3aed"/>
+  <circle class="rf-dot rf-dot-b" cx="21" cy="68" r="5" fill="#7c3aed"/>
+  <circle class="rf-dot rf-dot-c" cx="79" cy="68" r="5" fill="#7c3aed"/>
+</svg>

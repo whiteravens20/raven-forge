@@ -1,0 +1,11 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>Profile icon: Compass</title>
+  <desc>Default profile avatar — a two-tone compass needle on bronze ground.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#7c5e10"/>
+  
+    <circle cx="64" cy="64" r="34" fill="none" stroke="#e8e8f0" stroke-width="8"/>
+    <polygon points="64,30 72,64 56,64" fill="#e8e8f0"/>
+    <polygon points="64,98 72,64 56,64" fill="#a8a8be"/>
+    <circle cx="64" cy="64" r="5" fill="#e8e8f0"/>
+  
+</svg>

@@ -1,0 +1,10 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>Profile icon: Diamond</title>
+  <desc>Default profile avatar — a cut gem on emerald ground.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#0f766e"/>
+  <g transform="translate(64,64) scale(1.1111111111111112) translate(-50,-56)">
+    <polygon points="30,20 70,20 86,34 50,92 14,34" fill="#e8e8f0"/>
+    <line x1="50" y1="20" x2="50" y2="92" stroke="#0f766e" stroke-width="3"/>
+    <line x1="14" y1="34" x2="86" y2="34" stroke="#0f766e" stroke-width="3"/>
+  </g>
+</svg>

@@ -1,0 +1,62 @@
+<svg viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Raven Forge — Minecraft: Java Edition launcher">
+  <title>Raven Forge logo</title>
+  <desc>Horizontal lockup on a self-contained dark panel (renders identically on GitHub light and dark): gradient raven mark with an ember eye at left, RAVEN FORGE set in a bold condensed stack with FORGE in a violet gradient, tagline and accent rule underneath. Letterforms are live text with a system fallback stack, not hand-drawn paths.</desc>
+  <defs>
+    <linearGradient id="rflg-panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17121f"/>
+      <stop offset="1" stop-color="#0e0c14"/>
+    </linearGradient>
+    <radialGradient id="rflg-aurora" cx="0.86" cy="0" r="0.9">
+      <stop offset="0" stop-color="#7c3aed" stop-opacity="0.4"/>
+      <stop offset="0.55" stop-color="#7c3aed" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rflg-hearth" cx="0.04" cy="1.05" r="0.38">
+      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rflg-raven" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#b9a8f0"/>
+    </linearGradient>
+    <radialGradient id="rflg-eye">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </radialGradient>
+    <radialGradient id="rflg-eye-glow">
+      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rflg-forge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b79cff"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <pattern id="rflg-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 H 0 V 40" fill="none" stroke="#8b86a8" stroke-width="1" opacity="0.07"/>
+    </pattern>
+    <clipPath id="rflg-clip"><rect width="1200" height="300" rx="28"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#rflg-clip)">
+    <rect width="1200" height="300" fill="url(#rflg-panel)"/>
+    <rect width="1200" height="300" fill="url(#rflg-grid)"/>
+    <rect width="1200" height="300" fill="url(#rflg-aurora)"/>
+    <rect width="1200" height="300" fill="url(#rflg-hearth)"/>
+  </g>
+  <rect x="1.5" y="1.5" width="1197" height="297" rx="27" fill="none" stroke="#332e44" stroke-width="3"/>
+
+  <!-- the raven -->
+  <g transform="translate(168,148) scale(0.56) translate(-256,-256)">
+    <g transform="translate(258,270)" opacity="0.45">
+      <polygon points="-116,-84 -27,-108 22,-49 165,0 47,34 -2,10 -22,64 -106,108 -165,30" fill="#07050d"/>
+    </g>
+    <polygon points="140,172 229,148 278,207 421,256 303,290 254,266 234,320 150,364 91,286" fill="url(#rflg-raven)"/>
+    <circle cx="200" cy="200" r="34" fill="url(#rflg-eye-glow)"/>
+    <polygon points="200,187 213,200 200,213 187,200" fill="url(#rflg-eye)"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="336" y="172" font-family="'Rajdhani','Bahnschrift','Segoe UI',system-ui,sans-serif" font-size="100" font-weight="700" letter-spacing="6" fill="#f5f3ff">RAVEN<tspan fill="url(#rflg-forge)" dx="22">FORGE</tspan></text>
+  <text x="340" y="224" font-family="'Rajdhani','Bahnschrift','Segoe UI',system-ui,sans-serif" font-size="25" font-weight="600" letter-spacing="9" fill="#8a86a3">MINECRAFT: JAVA EDITION LAUNCHER</text>
+  <rect x="340" y="246" width="214" height="4" rx="2" fill="#7c3aed"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>Profile icon: Ember</title>
+  <desc>Default profile avatar — a faceted ember/flame kite on burnt-orange ground.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#9a3412"/>
+  <g transform="translate(64,64) scale(0.8695652173913043) translate(-52,-50)">
+    <polygon points="50,4 74,40 58,96 30,50" fill="#e8e8f0"/>
+  </g>
+</svg>

@@ -1,0 +1,8 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>Profile icon: Shield</title>
+  <desc>Default profile avatar — a flat geometric shield on deep navy ground.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#1e3a5f"/>
+  <g transform="translate(64,64) scale(0.975609756097561) translate(-50,-55)">
+    <polygon points="20,14 80,14 84,50 50,96 16,50" fill="#e8e8f0"/>
+  </g>
+</svg>

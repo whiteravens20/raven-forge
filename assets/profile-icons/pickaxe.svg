@@ -1,0 +1,9 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>Profile icon: Pickaxe</title>
+  <desc>Default profile avatar — a flat geometric pickaxe on steel-blue ground.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#3b4a6b"/>
+  <g transform="translate(64,64) scale(0.9523809523809523) translate(-62,-46)">
+    <line x1="20" y1="88" x2="84" y2="24" stroke="#e8e8f0" stroke-width="14" stroke-linecap="round"/>
+    <polygon points="84,4 104,24 84,44 64,24" fill="#e8e8f0"/>
+  </g>
+</svg>

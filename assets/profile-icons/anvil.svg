@@ -1,0 +1,11 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>Profile icon: Anvil</title>
+  <desc>Default profile avatar — a flat geometric anvil on copper ground.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#92400e"/>
+  <g transform="translate(64,64) scale(1.15) translate(-45,-37)">
+    <rect x="26" y="8" width="64" height="14" fill="#e8e8f0"/>
+    <polygon points="26,10 26,20 0,15" fill="#e8e8f0"/>
+    <polygon points="40,22 76,22 70,54 46,54" fill="#e8e8f0"/>
+    <rect x="30" y="54" width="56" height="12" fill="#e8e8f0"/>
+  </g>
+</svg>

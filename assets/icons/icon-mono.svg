@@ -1,0 +1,7 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <title>Raven Forge mark (monochrome)</title>
+  <desc>Single-color raven head silhouette for title bars and the About page. Inherits currentColor.</desc>
+  <polygon
+    points="140,172 229,148 278,207 421,256 303,290 254,266 234,320 150,364 91,286"
+    fill="currentColor"/>
+</svg>

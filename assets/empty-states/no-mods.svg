@@ -1,0 +1,35 @@
+<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <title>No mods</title>
+  <desc>Quiet line illustration for an empty mods list: three empty dashed inventory slots on a faint shelf line, with a solid add badge. The dashes crawl slowly and the badge breathes; both stand still under prefers-reduced-motion. Sits above explanatory text.</desc>
+  <style>
+    .rf-esm-slot { animation: rf-esm-crawl 9s linear infinite; }
+    .rf-esm-badge {
+      animation: rf-esm-pulse 2.6s ease-in-out infinite alternate;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    @keyframes rf-esm-crawl { to { stroke-dashoffset: -16; } }
+    @keyframes rf-esm-pulse {
+      from { opacity: 0.7; transform: scale(1); }
+      to { opacity: 1; transform: scale(1.06); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rf-esm-slot, .rf-esm-badge { animation: none; }
+    }
+  </style>
+
+  <!-- shelf the slots rest on -->
+  <line x1="40" y1="195" x2="360" y2="195" stroke-width="2" opacity="0.35"/>
+
+  <!-- three empty mod slots -->
+  <rect class="rf-esm-slot" x="60" y="100" width="80" height="80" rx="14" stroke-width="3" stroke-dasharray="6 10" opacity="0.8"/>
+  <rect class="rf-esm-slot" x="160" y="100" width="80" height="80" rx="14" stroke-width="3" stroke-dasharray="6 10" opacity="0.8"/>
+  <rect class="rf-esm-slot" x="260" y="100" width="80" height="80" rx="14" stroke-width="3" stroke-dasharray="6 10" opacity="0.8"/>
+
+  <!-- add-mod affordance -->
+  <g class="rf-esm-badge">
+    <circle cx="326" cy="196" r="24" stroke-width="3"/>
+    <line x1="326" y1="184" x2="326" y2="208" stroke-width="3"/>
+    <line x1="314" y1="196" x2="338" y2="196" stroke-width="3"/>
+  </g>
+</svg>

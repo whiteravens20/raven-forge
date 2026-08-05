@@ -1,0 +1,10 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>Profile icon: Potion</title>
+  <desc>Default profile avatar — a flat geometric flask on plum ground.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#86198f"/>
+  <g transform="translate(64,64) scale(0.8695652173913043) translate(-64,-50)">
+    <rect x="52" y="4" width="24" height="10" fill="#e8e8f0"/>
+    <rect x="56" y="10" width="16" height="18" fill="#e8e8f0"/>
+    <polygon points="40,28 88,28 96,60 90,96 38,96 32,60" fill="#e8e8f0"/>
+  </g>
+</svg>

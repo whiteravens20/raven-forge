@@ -1,0 +1,49 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <title>Raven Forge app icon</title>
+  <desc>Modern gradient app icon: deep-violet squircle lit from the top right, the geometric raven mark in a white-to-lavender gradient with a soft drop shadow, and an ember-amber eye with a warm glow. Source of truth for OS icon exports.</desc>
+  <defs>
+    <linearGradient id="rfic-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b1a55"/>
+      <stop offset="0.55" stop-color="#170f2e"/>
+      <stop offset="1" stop-color="#0d0916"/>
+    </linearGradient>
+    <radialGradient id="rfic-glow" cx="0.78" cy="0.16" r="0.9">
+      <stop offset="0" stop-color="#7c3aed" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#7c3aed" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rfic-raven" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#b9a8f0"/>
+    </linearGradient>
+    <radialGradient id="rfic-eye">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </radialGradient>
+    <radialGradient id="rfic-eye-glow">
+      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="rfic-clip"><rect width="512" height="512" rx="115"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#rfic-clip)">
+    <rect width="512" height="512" fill="url(#rfic-bg)"/>
+    <rect width="512" height="512" fill="url(#rfic-glow)"/>
+
+    <!-- soft drop shadow under the mark -->
+    <g transform="translate(256,272) scale(0.85) translate(-256,-256)" opacity="0.45">
+      <polygon points="140,172 229,148 278,207 421,256 303,290 254,266 234,320 150,364 91,286" fill="#08050f"/>
+    </g>
+
+    <!-- the raven -->
+    <g transform="translate(256,254) scale(0.85) translate(-256,-256)">
+      <polygon points="140,172 229,148 278,207 421,256 303,290 254,266 234,320 150,364 91,286" fill="url(#rfic-raven)"/>
+      <circle cx="200" cy="200" r="34" fill="url(#rfic-eye-glow)"/>
+      <polygon points="200,187 213,200 200,213 187,200" fill="url(#rfic-eye)"/>
+    </g>
+  </g>
+
+  <!-- hairline inner ring for definition on any dock -->
+  <rect x="6" y="6" width="500" height="500" rx="110" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+</svg>

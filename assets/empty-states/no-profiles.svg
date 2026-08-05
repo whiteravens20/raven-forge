@@ -1,0 +1,37 @@
+<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <title>No profiles</title>
+  <desc>Quiet line illustration for an empty profiles list: a faint second card behind an empty profile card with a placeholder bust, and a solid add badge. The dashes crawl slowly and the badge breathes; both stand still under prefers-reduced-motion. Sits above explanatory text.</desc>
+  <style>
+    .rf-esp-dash { animation: rf-esp-crawl 9s linear infinite; }
+    .rf-esp-badge {
+      animation: rf-esp-pulse 2.6s ease-in-out infinite alternate;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    @keyframes rf-esp-crawl { to { stroke-dashoffset: -16; } }
+    @keyframes rf-esp-pulse {
+      from { opacity: 0.7; transform: scale(1); }
+      to { opacity: 1; transform: scale(1.06); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rf-esp-dash, .rf-esp-badge { animation: none; }
+    }
+  </style>
+
+  <!-- ghost card: hints more profiles could sit here -->
+  <rect x="70" y="55" width="200" height="220" rx="18" stroke-width="2" opacity="0.35"/>
+
+  <!-- main empty profile card -->
+  <rect class="rf-esp-dash" x="100" y="40" width="200" height="220" rx="18" stroke-width="3" stroke-dasharray="6 10" opacity="0.8"/>
+
+  <!-- placeholder bust -->
+  <circle class="rf-esp-dash" cx="200" cy="118" r="32" stroke-width="3" stroke-dasharray="6 10" opacity="0.8"/>
+  <path class="rf-esp-dash" d="M144,214 Q144,158 200,158 Q256,158 256,214" stroke-width="3" stroke-dasharray="6 10" opacity="0.8"/>
+
+  <!-- add-profile affordance -->
+  <g class="rf-esp-badge">
+    <circle cx="270" cy="234" r="24" stroke-width="3"/>
+    <line x1="270" y1="222" x2="270" y2="246" stroke-width="3"/>
+    <line x1="258" y1="234" x2="282" y2="234" stroke-width="3"/>
+  </g>
+</svg>
