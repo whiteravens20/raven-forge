@@ -114,7 +114,9 @@ async function downloadToFile(url: string, dest: string, signal?: AbortSignal): 
     redirect: 'follow',
     signal: withTimeout(signal, 60000),
   });
-  if (!res.ok || !res.body) throw new Error(`Download failed: ${res.status}`);
+  if (!res.ok || !res.body) {
+    throw new Error(`Download failed (${res.status}): ${new URL(url).host}`);
+  }
 
   const writable = createWriteStream(dest);
   const reader = res.body.getReader();

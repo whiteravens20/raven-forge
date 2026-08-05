@@ -68,7 +68,9 @@ async function downloadToFile(url: string, dest: string): Promise<void> {
 
   try {
     const res = await fetch(url, { redirect: 'follow', signal: controller.signal });
-    if (!res.ok || !res.body) throw new Error(`Download failed: ${res.status}`);
+    if (!res.ok || !res.body) {
+      throw new Error(`Download failed (${res.status}): ${new URL(url).host}`);
+    }
 
     const writable = createWriteStream(dest);
     const reader = res.body.getReader();
