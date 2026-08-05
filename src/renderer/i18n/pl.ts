@@ -153,7 +153,47 @@ export const pl: Translations = {
   'profiles.empty': 'Brak profili',
   'profiles.emptyHint': 'Dodaj pierwszy profil przyciskiem +',
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
-  'profiles.confirmDelete': 'Usunąć profil „{name}”?',
+  // ── Usuwanie profilu ─────────────────────────────────────
+  'delete.title': 'Usuń profil „{name}”',
+  'delete.intro':
+    'Profil zniknie z launchera tak czy inaczej. To, co stanie się z jego plikami, zależy od Ciebie.',
+  'delete.alsoFiles': 'Usuń również pliki',
+  'delete.counting': 'Sprawdzam, co tam jest…',
+  'delete.nothingInstalled': 'Nic nie zainstalowano • {size}',
+  'delete.mods.one': '{count} mod',
+  'delete.mods.few': '{count} mody',
+  'delete.mods.many': '{count} modów',
+  'delete.mods.other': '{count} moda',
+  'delete.resourcePacks.one': '{count} paczka zasobów',
+  'delete.resourcePacks.few': '{count} paczki zasobów',
+  'delete.resourcePacks.many': '{count} paczek zasobów',
+  'delete.resourcePacks.other': '{count} paczki zasobów',
+  'delete.shaders.one': '{count} paczka shaderów',
+  'delete.shaders.few': '{count} paczki shaderów',
+  'delete.shaders.many': '{count} paczek shaderów',
+  'delete.shaders.other': '{count} paczki shaderów',
+  'delete.worlds.one': '{count} świat',
+  'delete.worlds.few': '{count} światy',
+  'delete.worlds.many': '{count} światów',
+  'delete.worlds.other': '{count} świata',
+  'delete.worldsWarning.one': 'Ten profil ma zapisany świat. Później nie da się go odzyskać.',
+  'delete.worldsWarning.few':
+    'Ten profil ma {count} zapisane światy. Później nie da się ich odzyskać.',
+  'delete.worldsWarning.many':
+    'Ten profil ma {count} zapisanych światów. Później nie da się ich odzyskać.',
+  'delete.worldsWarning.other':
+    'Ten profil ma {count} zapisanego świata. Później nie da się go odzyskać.',
+  'delete.keptAt': 'Pliki zostaną w {path} — launcher po prostu przestanie je pokazywać.',
+  'delete.confirmWithFiles': 'Usuń z plikami',
+  'delete.confirmKeepFiles': 'Usuń, zostaw pliki',
+
+  // ── Pliki pozostawione po usunięciu ──────────────────────
+  'orphans.title': 'Pozostawione pliki',
+  'orphans.hint':
+    'Profile, które usunąłeś, zostawiając pliki. Przywrócenie stawia profil dokładnie tak, jak był.',
+  'orphans.restore': 'Przywróć',
+  'orphans.discard': 'Usuń trwale',
+
   'profiles.fieldMinecraft': 'Minecraft',
   'profiles.fieldLoader': 'Mod Loader',
   'profiles.fieldRam': 'RAM',

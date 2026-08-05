@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Plus,
   Trash2,
@@ -20,9 +20,12 @@ import { Select } from '@components/ui/Select';
 import { EmptyState } from '@components/ui/EmptyState';
 import { ProfileAvatar } from '@components/ProfileAvatar';
 import { ProfileIconPicker } from '@components/ProfileIconPicker';
+import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
+import { formatBytes } from '@renderer/format';
 import { useLocale, useT } from '@renderer/i18n';
 import type {
   ModLoaderType,
+  OrphanedProfile,
   Profile,
   ProfileSyncStatus,
   ManifestVerification,
@@ -82,6 +85,33 @@ export function ProfilesPage() {
   const [draft, setDraft] = useState<DraftProfile>(emptyDraft);
   const [syncStatus, setSyncStatus] = useState<ProfileSyncStatus | null>(null);
   const [verification, setVerification] = useState<ManifestVerification | null>(null);
+  /** The profile whose delete confirmation is open. */
+  const [deleting, setDeleting] = useState<Profile | null>(null);
+  /** Profile files left on disk by a "delete, keep files". */
+  const [orphans, setOrphans] = useState<OrphanedProfile[]>([]);
+
+  const refreshOrphans = useCallback(async () => {
+    const result = await api.profiles.listOrphaned();
+    setOrphans(result.success && result.data ? result.data : []);
+  }, []);
+
+  useEffect(() => {
+    void refreshOrphans();
+  }, [refreshOrphans, profiles.length]);
+
+  const adopt = async (profileId: string) => {
+    const result = await api.profiles.adoptOrphaned(profileId);
+    if (result.success) {
+      await reload();
+      select(profileId);
+    }
+    await refreshOrphans();
+  };
+
+  const discard = async (profileId: string) => {
+    await api.profiles.discardOrphaned(profileId);
+    await refreshOrphans();
+  };
   const [syncing, setSyncing] = useState(false);
 
   const beginPreparing = useGameStore((s) => s.beginPreparing);
@@ -237,13 +267,46 @@ export function ProfilesPage() {
               </span>
             </button>
           ))}
-          {profiles.length === 0 && (
+          {profiles.length === 0 && orphans.length === 0 && (
             <EmptyState
               kind="profiles"
               title={t('profiles.empty')}
               hint={t('profiles.emptyHint')}
               className="p-4"
             />
+          )}
+
+          {/* Files kept behind by a delete. Directories are keyed by id, so
+              nothing else in the launcher would ever lead back to them — without
+              this list, "keep the files" is an offer with no way to collect. */}
+          {orphans.length > 0 && (
+            <div className="border-t border-rf-border p-3">
+              <h3 className="text-xs font-display font-semibold uppercase tracking-wider text-rf-text-secondary">
+                {t('orphans.title')}
+              </h3>
+              <p className="mt-1 text-xs text-rf-text-muted">{t('orphans.hint')}</p>
+              {orphans.map(({ profile, files }) => (
+                <div key={profile.id} className="mt-2 rounded-lg border border-rf-border p-2">
+                  <p className="truncate text-sm font-medium text-rf-text">{profile.name}</p>
+                  <p className="text-xs text-rf-text-muted">
+                    MC {profile.minecraftVersion} • {profile.modLoader} • {formatBytes(files.bytes)}
+                  </p>
+                  {files.worlds > 0 && (
+                    <p className="text-xs text-rf-warning">
+                      {t.plural('delete.worlds', files.worlds)}
+                    </p>
+                  )}
+                  <div className="mt-1.5 flex gap-1">
+                    <Button size="sm" variant="secondary" onClick={() => void adopt(profile.id)}>
+                      {t('orphans.restore')}
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => void discard(profile.id)}>
+                      {t('orphans.discard')}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -268,11 +331,7 @@ export function ProfilesPage() {
             onCancelSync={handleCancelSync}
             onEdit={startEdit}
             onDuplicate={() => duplicateProfile(selectedProfile.id)}
-            onDelete={() => {
-              if (confirm(t('profiles.confirmDelete', { name: selectedProfile.name }))) {
-                void removeProfile(selectedProfile.id);
-              }
-            }}
+            onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
             onSync={handleSync}
             onQuickConnect={handleQuickConnect}
@@ -285,6 +344,19 @@ export function ProfilesPage() {
           </div>
         )}
       </div>
+
+      {deleting && (
+        <ProfileDeleteDialog
+          profileId={deleting.id}
+          profileName={deleting.name}
+          onCancel={() => setDeleting(null)}
+          onConfirm={(deleteFiles) => {
+            const id = deleting.id;
+            setDeleting(null);
+            void removeProfile(id, deleteFiles);
+          }}
+        />
+      )}
     </div>
   );
 }

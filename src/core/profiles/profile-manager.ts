@@ -1,10 +1,12 @@
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import crypto from 'node:crypto';
+import type { Dirent } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { profileSchema } from '../../shared/validators';
 import { DEFAULT_RAM_MB } from '../../shared/constants';
-import type { Profile } from '../../shared/ipc-types';
+import type { OrphanedProfile, Profile, ProfileFileSummary } from '../../shared/ipc-types';
 
 // ── Profiles index persistence ─────────────────────────────
 
@@ -90,23 +92,167 @@ export async function updateProfile(
   return merged;
 }
 
-export async function deleteProfile(profileId: string): Promise<void> {
+/** Entries of one directory, or nothing when it was never created. */
+async function listDir(dir: string): Promise<Dirent[]> {
+  try {
+    return await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
+/** Total size of everything under a directory, following no symlinks. */
+async function directorySize(dir: string): Promise<number> {
+  let total = 0;
+  for (const entry of await listDir(dir)) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      total += await directorySize(full);
+    } else if (entry.isFile()) {
+      try {
+        total += (await fs.stat(full)).size;
+      } catch {
+        /* vanished mid-walk — it is not going to be deleted either */
+      }
+    }
+  }
+  return total;
+}
+
+/**
+ * What a profile has on disk, for the delete confirmation to quote back.
+ *
+ * Counted from the directories rather than from the lock files: a jar dropped
+ * into `mods/` by hand is in none of the indexes and is deleted all the same,
+ * so counting the indexes would understate what is about to be lost. Worlds are
+ * the reason this exists at all — they are the one thing in a profile that
+ * cannot be reinstalled from anywhere.
+ */
+export async function summarizeProfileFiles(profileId: string): Promise<ProfileFileSummary> {
+  const dir = paths.profileDir(profileId);
+  const [mods, shaders, resourcePacks, saves] = await Promise.all([
+    listDir(paths.profileModsDir(profileId)),
+    listDir(paths.profileShadersDir(profileId)),
+    listDir(paths.profileResourcePacksDir(profileId)),
+    listDir(path.join(paths.profileGameDir(profileId), 'saves')),
+  ]);
+
+  return {
+    mods: mods.filter((e) => e.isFile()).length,
+    shaders: shaders.filter((e) => !e.name.startsWith('.')).length,
+    resourcePacks: resourcePacks.filter((e) => !e.name.startsWith('.')).length,
+    // A world is a directory; `saves/` holds nothing else worth counting.
+    worlds: saves.filter((e) => e.isDirectory()).length,
+    bytes: await directorySize(dir),
+    path: dir,
+  };
+}
+
+/**
+ * Remove a profile from the launcher, and optionally everything it installed.
+ *
+ * The two are separate because they are not equally reversible. The profile
+ * entry is a few lines of JSON that take a minute to retype; the directory holds
+ * world saves, which are gone for good. Keeping the files leaves them at
+ * `profiles/<id>/` — unreachable from the UI, but recoverable by hand, which is
+ * the entire point of offering the choice.
+ */
+export async function deleteProfile(profileId: string, deleteFiles = true): Promise<void> {
   const profiles = await readProfilesIndex();
   const idx = profiles.findIndex((p) => p.id === profileId);
   if (idx < 0) throw new Error(`Profile ${profileId} not found`);
 
-  const name = profiles[idx].name;
+  const removed = profiles[idx];
+  const name = removed.name;
   profiles.splice(idx, 1);
   await writeProfilesIndex(profiles);
 
-  // Remove profile directory
-  try {
-    await fs.rm(paths.profileDir(profileId), { recursive: true, force: true });
-  } catch (err) {
-    log.warn(`Failed to delete profile directory for ${profileId}: ${err}`);
+  if (deleteFiles) {
+    try {
+      await fs.rm(paths.profileDir(profileId), { recursive: true, force: true });
+    } catch (err) {
+      log.warn(`Failed to delete profile directory for ${profileId}: ${err}`);
+    }
+  } else {
+    // Leave the profile's own record beside its files. Directories are named by
+    // id, so without this the folder is an opaque UUID full of jars that nothing
+    // — not the launcher, not the person who kept them — can identify later.
+    await fs.writeFile(orphanRecordPath(profileId), JSON.stringify(removed, null, 2), 'utf-8');
+    log.info(`Kept the files of profile ${name} at ${paths.profileDir(profileId)}`);
   }
 
   log.info(`Deleted profile: ${name} (${profileId})`);
+}
+
+/** Where a kept-behind profile leaves its identity. */
+function orphanRecordPath(profileId: string): string {
+  return path.join(paths.profileDir(profileId), 'profile.json');
+}
+
+/**
+ * Profile data left on disk that no profile in the index points at.
+ *
+ * The counterpart to "delete, keep files". Directories are keyed by id, never by
+ * name, so keeping the files and then making a new profile called the same thing
+ * collides with nothing — the new one gets a new id and an empty directory of its
+ * own. That is safe, and it is also the problem: the kept files become
+ * unreachable, and the only place their path was ever shown was a dialog that has
+ * since closed. Listing them is what makes keeping them a real offer.
+ */
+export async function listOrphanedProfiles(): Promise<OrphanedProfile[]> {
+  const known = new Set((await readProfilesIndex()).map((p) => p.id));
+  const orphans: OrphanedProfile[] = [];
+
+  for (const entry of await listDir(paths.profilesDir)) {
+    if (!entry.isDirectory() || known.has(entry.name)) continue;
+    try {
+      const raw = await fs.readFile(orphanRecordPath(entry.name), 'utf-8');
+      const profile = profileSchema.parse(JSON.parse(raw));
+      orphans.push({ profile, files: await summarizeProfileFiles(entry.name) });
+    } catch {
+      // No record, or an unreadable one. A directory the launcher cannot
+      // identify is not something to offer restoring — leave it alone rather
+      // than inviting anyone to act on a guess about what it holds.
+    }
+  }
+
+  return orphans;
+}
+
+/**
+ * Put kept-behind data back on the profile list, under its original id.
+ *
+ * The id is the whole point: it is what ties a profile to its directory, so
+ * restoring under a fresh one would produce an empty profile beside the files it
+ * was supposed to recover.
+ */
+export async function adoptOrphanedProfile(profileId: string): Promise<Profile> {
+  const profiles = await readProfilesIndex();
+  if (profiles.some((p) => p.id === profileId)) {
+    throw new Error(`Profile ${profileId} is already on the list`);
+  }
+
+  const raw = await fs.readFile(orphanRecordPath(profileId), 'utf-8');
+  const restored: Profile = {
+    ...profileSchema.parse(JSON.parse(raw)),
+    id: profileId,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await writeProfilesIndex([...profiles, restored]);
+  await fs.rm(orphanRecordPath(profileId), { force: true });
+  log.info(`Restored profile ${restored.name} (${profileId}) from kept files`);
+  return restored;
+}
+
+/** Delete kept-behind data for good. */
+export async function discardOrphanedProfile(profileId: string): Promise<void> {
+  const profiles = await readProfilesIndex();
+  if (profiles.some((p) => p.id === profileId)) {
+    throw new Error(`${profileId} belongs to a live profile, not to kept files`);
+  }
+  await fs.rm(paths.profileDir(profileId), { recursive: true, force: true });
+  log.info(`Discarded kept files for ${profileId}`);
 }
 
 /**

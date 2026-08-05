@@ -202,6 +202,35 @@ export type ShaderLoaderResult =
   | { status: 'no-build'; mcVersion: string; modLoader: ModLoaderType }
   | { status: 'failed'; error: string };
 
+/**
+ * What a profile owns on disk, so deleting it can say what that costs.
+ *
+ * Counted from the directories, so hand-added files are included. `worlds` is
+ * the number that matters — mods and packs download again, saves do not.
+ */
+export interface ProfileFileSummary {
+  mods: number;
+  shaders: number;
+  resourcePacks: number;
+  worlds: number;
+  bytes: number;
+  /** Where the files are, so keeping them is an offer with an address. */
+  path: string;
+}
+
+/**
+ * A profile's files, still on disk, with no profile pointing at them.
+ *
+ * Produced by "delete, keep files". Profile directories are keyed by id, so a
+ * later profile of the same name never collides with these — it gets its own id
+ * and its own empty directory. Which is exactly why they need listing: nothing
+ * else would ever lead back to them.
+ */
+export interface OrphanedProfile {
+  profile: Profile;
+  files: ProfileFileSummary;
+}
+
 // ---------------------------------------------------------------------------
 // Compatibility
 // ---------------------------------------------------------------------------
@@ -478,7 +507,16 @@ export interface InvokeChannels {
     profile: Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>,
   ) => Promise<IpcResult<Profile>>;
   'profiles:update': (profileId: string, updates: Partial<Profile>) => Promise<IpcResult<Profile>>;
-  'profiles:delete': (profileId: string) => Promise<IpcResult<void>>;
+  /** `deleteFiles: false` unlists the profile but leaves its directory, worlds and all. */
+  'profiles:delete': (profileId: string, deleteFiles: boolean) => Promise<IpcResult<void>>;
+  /** What the profile has on disk, for the delete confirmation to quote. */
+  'profiles:get-file-summary': (profileId: string) => Promise<IpcResult<ProfileFileSummary>>;
+  /** Profile data kept on disk that nothing on the list points at. */
+  'profiles:list-orphaned': () => Promise<IpcResult<OrphanedProfile[]>>;
+  /** Put kept files back on the list, under their original id. */
+  'profiles:adopt-orphaned': (profileId: string) => Promise<IpcResult<Profile>>;
+  /** Delete kept files for good. */
+  'profiles:discard-orphaned': (profileId: string) => Promise<IpcResult<void>>;
   'profiles:duplicate': (profileId: string) => Promise<IpcResult<Profile>>;
   'profiles:export': (profileId: string) => Promise<IpcResult<string>>; // returns JSON string
   'profiles:import': (json: string) => Promise<IpcResult<Profile>>;
@@ -695,6 +733,10 @@ export interface RavenForgeAPI {
     create: InvokeChannels['profiles:create'];
     update: InvokeChannels['profiles:update'];
     delete: InvokeChannels['profiles:delete'];
+    getFileSummary: InvokeChannels['profiles:get-file-summary'];
+    listOrphaned: InvokeChannels['profiles:list-orphaned'];
+    adoptOrphaned: InvokeChannels['profiles:adopt-orphaned'];
+    discardOrphaned: InvokeChannels['profiles:discard-orphaned'];
     duplicate: InvokeChannels['profiles:duplicate'];
     export: InvokeChannels['profiles:export'];
     import: InvokeChannels['profiles:import'];

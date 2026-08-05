@@ -164,7 +164,35 @@ export const en = {
   'profiles.empty': 'No profiles',
   'profiles.emptyHint': 'Add your first profile with the + button',
   'profiles.pickOrCreate': 'Select a profile, or create a new one',
-  'profiles.confirmDelete': 'Delete profile "{name}"?',
+  // ── Deleting a profile ───────────────────────────────────
+  'delete.title': 'Delete profile "{name}"',
+  'delete.intro':
+    'The profile disappears from the launcher either way. What happens to its files is up to you.',
+  'delete.alsoFiles': 'Delete the files too',
+  'delete.counting': 'Checking what is there…',
+  'delete.nothingInstalled': 'Nothing installed • {size}',
+  'delete.mods.one': '{count} mod',
+  'delete.mods.other': '{count} mods',
+  'delete.resourcePacks.one': '{count} resource pack',
+  'delete.resourcePacks.other': '{count} resource packs',
+  'delete.shaders.one': '{count} shader pack',
+  'delete.shaders.other': '{count} shader packs',
+  'delete.worlds.one': '{count} world',
+  'delete.worlds.other': '{count} worlds',
+  'delete.worldsWarning.one': 'This profile has a world save. It cannot be recovered afterwards.',
+  'delete.worldsWarning.other':
+    'This profile has {count} world saves. They cannot be recovered afterwards.',
+  'delete.keptAt': 'The files stay at {path} — the launcher will simply stop listing them.',
+  'delete.confirmWithFiles': 'Delete with files',
+  'delete.confirmKeepFiles': 'Delete, keep files',
+
+  // ── Files left behind by a delete ────────────────────────
+  'orphans.title': 'Leftover files',
+  'orphans.hint':
+    'Profiles you deleted but kept the files of. Restoring one puts it back exactly as it was.',
+  'orphans.restore': 'Restore',
+  'orphans.discard': 'Delete for good',
+
   'profiles.fieldMinecraft': 'Minecraft',
   'profiles.fieldLoader': 'Mod loader',
   'profiles.fieldRam': 'RAM',

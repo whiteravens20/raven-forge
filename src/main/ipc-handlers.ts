@@ -17,6 +17,10 @@ import {
   duplicateProfile,
   exportProfile,
   importProfile,
+  summarizeProfileFiles,
+  listOrphanedProfiles,
+  adoptOrphanedProfile,
+  discardOrphanedProfile,
 } from '../core/profiles/profile-manager';
 import {
   setProfileIcon,
@@ -361,12 +365,41 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to update profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:delete', async (_event, profileId: string) => {
+  ipcMain.handle('profiles:delete', async (_event, profileId: string, deleteFiles: boolean) => {
     try {
-      await deleteProfile(profileId);
+      await deleteProfile(profileId, deleteFiles);
       return ok(undefined);
     } catch (err) {
       return fail(`Failed to delete profile: ${reason(err)}`);
+    }
+  });
+  ipcMain.handle('profiles:get-file-summary', async (_event, profileId: string) => {
+    try {
+      return ok(await summarizeProfileFiles(profileId));
+    } catch (err) {
+      return fail(`Failed to inspect profile files: ${reason(err)}`);
+    }
+  });
+  ipcMain.handle('profiles:list-orphaned', async () => {
+    try {
+      return ok(await listOrphanedProfiles());
+    } catch (err) {
+      return fail(`Failed to list kept profile files: ${reason(err)}`);
+    }
+  });
+  ipcMain.handle('profiles:adopt-orphaned', async (_event, profileId: string) => {
+    try {
+      return ok(await adoptOrphanedProfile(profileId));
+    } catch (err) {
+      return fail(`Failed to restore that profile: ${reason(err)}`);
+    }
+  });
+  ipcMain.handle('profiles:discard-orphaned', async (_event, profileId: string) => {
+    try {
+      await discardOrphanedProfile(profileId);
+      return ok(undefined);
+    } catch (err) {
+      return fail(`Failed to delete those files: ${reason(err)}`);
     }
   });
   ipcMain.handle('profiles:duplicate', async (_event, profileId: string) => {

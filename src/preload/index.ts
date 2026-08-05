@@ -22,7 +22,12 @@ const api: RavenForgeAPI = {
     get: (profileId) => ipcRenderer.invoke('profiles:get', profileId),
     create: (profile) => ipcRenderer.invoke('profiles:create', profile),
     update: (profileId, updates) => ipcRenderer.invoke('profiles:update', profileId, updates),
-    delete: (profileId) => ipcRenderer.invoke('profiles:delete', profileId),
+    delete: (profileId, deleteFiles) =>
+      ipcRenderer.invoke('profiles:delete', profileId, deleteFiles),
+    getFileSummary: (profileId) => ipcRenderer.invoke('profiles:get-file-summary', profileId),
+    listOrphaned: () => ipcRenderer.invoke('profiles:list-orphaned'),
+    adoptOrphaned: (profileId) => ipcRenderer.invoke('profiles:adopt-orphaned', profileId),
+    discardOrphaned: (profileId) => ipcRenderer.invoke('profiles:discard-orphaned', profileId),
     duplicate: (profileId) => ipcRenderer.invoke('profiles:duplicate', profileId),
     export: (profileId) => ipcRenderer.invoke('profiles:export', profileId),
     import: (json) => ipcRenderer.invoke('profiles:import', json),
