@@ -206,7 +206,7 @@ jobs:
           cat "SHA256SUMS-${{ matrix.target }}.txt"
 
       - name: Upload artefacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.target }}
           if-no-files-found: error
@@ -241,7 +241,7 @@ jobs:
       - name: CycloneDX SBOM
         run: npm sbom --omit=dev --sbom-format cyclonedx > sbom.cdx.json
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: sbom.cdx.json
@@ -262,7 +262,7 @@ jobs:
           fetch-depth: 0 # tag message + release-note diffing
 
       - name: Download every artefact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
@@ -283,7 +283,7 @@ jobs:
       # this workflow, at this commit. Verify with:
       #   gh attestation verify <file> --repo whiteravens20/raven-forge
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             artifacts/*.exe
