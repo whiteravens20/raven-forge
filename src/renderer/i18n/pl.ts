@@ -90,6 +90,7 @@ export const pl: Translations = {
   'common.duplicate': 'Duplikuj',
   'common.export': 'Eksportuj',
   'common.import': 'Importuj',
+  'common.back': 'Wstecz',
   'common.close': 'Zamknij',
   'common.dismiss': 'Odrzuć',
   'common.refresh': 'Odśwież',
@@ -186,6 +187,33 @@ export const pl: Translations = {
   'delete.keptAt': 'Pliki zostaną w {path} — launcher po prostu przestanie je pokazywać.',
   'delete.confirmWithFiles': 'Usuń z plikami',
   'delete.confirmKeepFiles': 'Usuń, zostaw pliki',
+
+  // ── Skąd bierze się nowy profil ──────────────────────────
+  'packs.title': 'Skąd bierzemy ten profil?',
+  'packs.wrTitle': 'Graj na serwerach White Ravens',
+  'packs.wrBody':
+    'Wybierz jedną z naszych paczek. Launcher ją zainstaluje i utrzyma zgodną z serwerem.',
+  'packs.scratchTitle': 'Stwórz własną paczkę od zera',
+  'packs.scratchBody': 'Pusty profil. Wybierasz wersję Minecrafta i loader, mody dodajesz sam.',
+  'packs.importTitle': 'Importuj własną paczkę',
+  'packs.importBody': 'Plik .mrpack, który już masz, albo link do manifestu.',
+  'packs.loading': 'Wczytuję listę paczek…',
+  'packs.none': 'Nie opublikowano jeszcze żadnej paczki.',
+  'packs.listFailed': 'Nie udało się wczytać listy paczek.',
+  'packs.installFailed': 'Nie udało się zainstalować {name}.',
+  'packs.importFailed': 'Nie udało się zaimportować tej paczki.',
+  'packs.manifestFailed': 'Ten adres nie zwrócił użytecznego manifestu.',
+  'packs.wrSyncNote': 'Te profile trzymają się serwera: każda synchronizacja przynosi zmiany.',
+  'packs.mods.one': '{count} mod',
+  'packs.mods.few': '{count} mody',
+  'packs.mods.many': '{count} modów',
+  'packs.mods.other': '{count} moda',
+  'packs.fileTitle': 'Plik .mrpack',
+  'packs.fileBody':
+    'Format paczek Modrintha, który czytają też Prism, ATLauncher i aplikacja Modrintha. Instalowany jako migawka — sam się nie zaktualizuje.',
+  'packs.chooseFile': 'Wybierz plik…',
+  'packs.urlTitle': 'Link do manifestu',
+  'packs.urlBody': 'Profil utworzony w ten sposób aktualizuje się z tego adresu.',
 
   // ── Pliki pozostawione po usunięciu ──────────────────────
   'orphans.title': 'Pozostawione pliki',

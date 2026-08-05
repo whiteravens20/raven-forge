@@ -101,6 +101,7 @@ export const en = {
   'common.duplicate': 'Duplicate',
   'common.export': 'Export',
   'common.import': 'Import',
+  'common.back': 'Back',
   'common.close': 'Close',
   'common.dismiss': 'Dismiss',
   'common.refresh': 'Refresh',
@@ -185,6 +186,32 @@ export const en = {
   'delete.keptAt': 'The files stay at {path} — the launcher will simply stop listing them.',
   'delete.confirmWithFiles': 'Delete with files',
   'delete.confirmKeepFiles': 'Delete, keep files',
+
+  // ── Where a new profile comes from ───────────────────────
+  'packs.title': 'Where does this profile come from?',
+  'packs.wrTitle': 'Play on the White Ravens servers',
+  'packs.wrBody':
+    'Pick one of our packs. The launcher installs it and keeps it in step with the server.',
+  'packs.scratchTitle': 'Build a pack from scratch',
+  'packs.scratchBody':
+    'An empty profile. Choose the Minecraft version and loader, add mods yourself.',
+  'packs.importTitle': 'Import your own pack',
+  'packs.importBody': 'A .mrpack file you already have, or a link to a manifest.',
+  'packs.loading': 'Loading the pack list…',
+  'packs.none': 'No packs are published yet.',
+  'packs.listFailed': 'Could not load the pack list.',
+  'packs.installFailed': 'Could not install {name}.',
+  'packs.importFailed': 'Could not import that pack.',
+  'packs.manifestFailed': 'That address did not give a usable manifest.',
+  'packs.wrSyncNote': 'These profiles follow the server: every sync brings whatever changed.',
+  'packs.mods.one': '{count} mod',
+  'packs.mods.other': '{count} mods',
+  'packs.fileTitle': 'A .mrpack file',
+  'packs.fileBody':
+    'The Modrinth pack format, which Prism, ATLauncher and the Modrinth app also read. Installed as a snapshot — it will not update itself.',
+  'packs.chooseFile': 'Choose a file…',
+  'packs.urlTitle': 'A manifest link',
+  'packs.urlBody': 'A profile created this way keeps updating from that address.',
 
   // ── Files left behind by a delete ────────────────────────
   'orphans.title': 'Leftover files',

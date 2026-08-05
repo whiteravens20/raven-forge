@@ -36,6 +36,11 @@ const api: RavenForgeAPI = {
       ipcRenderer.invoke('profiles:set-icon', profileId, sourcePath),
     getIcon: (profileId) => ipcRenderer.invoke('profiles:get-icon', profileId),
   },
+  packs: {
+    listCatalogue: () => ipcRenderer.invoke('packs:list-catalogue'),
+    createFromManifest: (url) => ipcRenderer.invoke('packs:create-from-manifest', url),
+    importMrpack: (filePath) => ipcRenderer.invoke('packs:import-mrpack', filePath),
+  },
   mods: {
     getInstalled: (profileId) => ipcRenderer.invoke('mods:get-installed', profileId),
     syncManifest: (profileId) => ipcRenderer.invoke('mods:sync-manifest', profileId),

@@ -38,6 +38,8 @@ import {
 } from '../core/mods/mod-sync';
 import { searchMods, getSearchFacets } from '../core/mods/modrinth-api';
 import { planModInstall, planContentInstall } from '../core/mods/compatibility';
+import { listCataloguePacks } from '../core/packs/catalogue';
+import { importMrpack, createProfileFromManifest } from '../core/packs/pack-installer';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
 import {
   listContent,
@@ -448,6 +450,29 @@ export function registerAllIpcHandlers(): void {
       return ok(await getProfileIconDataUrl(profileId));
     } catch (err) {
       return fail(`Failed to read icon: ${reason(err)}`);
+    }
+  });
+
+  // ── Packs ────────────────────────────────────────────────
+  ipcMain.handle('packs:list-catalogue', async () => {
+    try {
+      return ok(await listCataloguePacks());
+    } catch (err) {
+      return fail(`Could not load the pack list: ${reason(err)}`);
+    }
+  });
+  ipcMain.handle('packs:create-from-manifest', async (_event, url: string) => {
+    try {
+      return ok(await createProfileFromManifest(url));
+    } catch (err) {
+      return fail(`Could not create a profile from that manifest: ${reason(err)}`);
+    }
+  });
+  ipcMain.handle('packs:import-mrpack', async (_event, filePath: string) => {
+    try {
+      return ok(await importMrpack(filePath));
+    } catch (err) {
+      return fail(`Could not import that pack: ${reason(err)}`);
     }
   });
 

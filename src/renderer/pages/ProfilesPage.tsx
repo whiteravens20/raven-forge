@@ -21,6 +21,7 @@ import { EmptyState } from '@components/ui/EmptyState';
 import { ProfileAvatar } from '@components/ProfileAvatar';
 import { ProfileIconPicker } from '@components/ProfileIconPicker';
 import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
+import { ProfileSourcePicker } from '@components/ProfileSourcePicker';
 import { formatBytes } from '@renderer/format';
 import { useLocale, useT } from '@renderer/i18n';
 import type {
@@ -87,6 +88,8 @@ export function ProfilesPage() {
   const [verification, setVerification] = useState<ManifestVerification | null>(null);
   /** The profile whose delete confirmation is open. */
   const [deleting, setDeleting] = useState<Profile | null>(null);
+  /** True while the "where does this profile come from?" dialog is open. */
+  const [choosingSource, setChoosingSource] = useState(false);
   /** Profile files left on disk by a "delete, keep files". */
   const [orphans, setOrphans] = useState<OrphanedProfile[]>([]);
 
@@ -143,7 +146,11 @@ export function ProfilesPage() {
     }
   }, [selectedId, selectedProfile?.manifestUrl]);
 
-  const startCreate = () => {
+  const startCreate = () => setChoosingSource(true);
+
+  /** The by-hand route, reached from the source picker. */
+  const startFromScratch = () => {
+    setChoosingSource(false);
     setDraft(emptyDraft());
     setMode('create');
   };
@@ -344,6 +351,17 @@ export function ProfilesPage() {
           </div>
         )}
       </div>
+
+      {choosingSource && (
+        <ProfileSourcePicker
+          onCancel={() => setChoosingSource(false)}
+          onScratch={startFromScratch}
+          onCreated={(profileId) => {
+            setChoosingSource(false);
+            void reload().then(() => select(profileId));
+          }}
+        />
+      )}
 
       {deleting && (
         <ProfileDeleteDialog

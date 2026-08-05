@@ -290,25 +290,46 @@ async function obtainManifest(
   return { manifest, etag: res.headers.get('etag') ?? knownEtag };
 }
 
-export async function syncManifest(profileId: string): Promise<void> {
+/**
+ * Bring a profile's files in line with a manifest.
+ *
+ * `supplied` is for a manifest that came from somewhere other than a URL — an
+ * imported `.mrpack` is a list of files with URLs and hashes, which is what a
+ * manifest is, so it is converted and handed straight in. That reuses this
+ * whole path rather than growing a second one: progress reporting,
+ * cancellation, hash verification, orphan removal, the resource-pack order
+ * written into `options.txt`, and a lock file the mods page can read. A supplied
+ * manifest is cached like a fetched one, so syncing an imported pack again later
+ * repairs anything deleted by hand.
+ */
+export async function syncManifest(profileId: string, supplied?: ModManifest): Promise<void> {
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
-  if (!profile.manifestUrl) throw new Error('Profile has no manifest URL configured');
+  if (!profile.manifestUrl && !supplied) {
+    throw new Error('Profile has no manifest URL configured');
+  }
 
-  log.info(`Syncing manifest for profile ${profile.name}: ${profile.manifestUrl}`);
+  log.info(`Syncing manifest for profile ${profile.name}: ${profile.manifestUrl ?? 'imported'}`);
 
   // A modpack sync is a long download; let the user call it off.
   const signal = beginJob(profileId);
   const previousState = await readSyncState(profileId);
 
   try {
-    const { manifest, etag } = await obtainManifest(
-      profileId,
-      profile.name,
-      profile.manifestUrl,
-      previousState.manifestEtag,
-      signal,
-    );
+    let manifest: ModManifest;
+    let etag: string | undefined;
+    if (supplied) {
+      manifest = supplied;
+      await writeCachedManifest(profileId, supplied);
+    } else {
+      ({ manifest, etag } = await obtainManifest(
+        profileId,
+        profile.name,
+        profile.manifestUrl!,
+        previousState.manifestEtag,
+        signal,
+      ));
+    }
 
     if (manifest.minecraftVersion !== profile.minecraftVersion) {
       log.warn(

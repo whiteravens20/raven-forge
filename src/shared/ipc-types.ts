@@ -231,6 +231,27 @@ export interface OrphanedProfile {
   files: ProfileFileSummary;
 }
 
+/**
+ * One pack in the White Ravens catalogue, as the picker needs it.
+ *
+ * `manifestUrl` is the whole point — a profile created from this follows that
+ * URL and keeps updating, rather than being a snapshot. Entries without one are
+ * dropped before they reach here.
+ */
+export interface CataloguePack {
+  slug: string;
+  name: string;
+  version: string;
+  summary: string;
+  minecraftVersion: string;
+  modLoader: string;
+  recommendedRamMb?: number;
+  serverIp?: string;
+  modCount: number;
+  totalDownloadBytes: number;
+  manifestUrl: string;
+}
+
 // ---------------------------------------------------------------------------
 // Compatibility
 // ---------------------------------------------------------------------------
@@ -529,6 +550,14 @@ export interface InvokeChannels {
   /** The profile's icon as a `data:` URL, or `null` if it has none. */
   'profiles:get-icon': (profileId: string) => Promise<IpcResult<string | null>>;
 
+  // -- Packs --
+  /** The White Ravens catalogue, from the address compiled into the launcher. */
+  'packs:list-catalogue': () => Promise<IpcResult<CataloguePack[]>>;
+  /** Create a profile that follows a manifest URL and keeps updating from it. */
+  'packs:create-from-manifest': (url: string) => Promise<IpcResult<Profile>>;
+  /** Import a Modrinth `.mrpack` as a new profile — a snapshot, not a subscription. */
+  'packs:import-mrpack': (filePath: string) => Promise<IpcResult<Profile>>;
+
   // -- Mods --
   'mods:get-installed': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
   'mods:sync-manifest': (profileId: string) => Promise<IpcResult<void>>;
@@ -743,6 +772,11 @@ export interface RavenForgeAPI {
     getSyncStatus: InvokeChannels['profiles:get-sync-status'];
     setIcon: InvokeChannels['profiles:set-icon'];
     getIcon: InvokeChannels['profiles:get-icon'];
+  };
+  packs: {
+    listCatalogue: InvokeChannels['packs:list-catalogue'];
+    createFromManifest: InvokeChannels['packs:create-from-manifest'];
+    importMrpack: InvokeChannels['packs:import-mrpack'];
   };
   mods: {
     getInstalled: InvokeChannels['mods:get-installed'];
