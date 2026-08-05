@@ -310,8 +310,8 @@ export const pl: Translations = {
     'Wersję {version} można zainstalować mimo to — te dane wypełnia autor i często są za rzeczywistością.',
   'compat.nothingToInstall': 'Nie ma tu pliku do zainstalowania.',
   'compat.installAnyway': 'Instaluj mimo to',
-  'compat.badgeVersion': 'nic pod {version}',
-  'compat.badgeLoader': 'nic pod {loader}',
+  'compat.badgeVersion': 'brak na {version}',
+  'compat.badgeLoader': 'brak na {loader}',
 
   // ── Accounts ─────────────────────────────────────────────
   'accounts.title': 'Konta',
