@@ -220,9 +220,6 @@ fixed and hides the ones that were not.
 - **The launcher has never updated itself from a published release.** The update
   check, platform matrix and install-before-play path are covered by tests, but
   there is no tagged release to update *from*.
-- **Resource-pack order is index-only.** `reorderResourcePacks` rewrites the
-  launcher's own index; it does not write Minecraft's `options.txt`
-  `resourcePacks` line, which is what the game actually reads.
 - No Mica/acrylic backdrop on Windows 11; no one-click rollback to the previous
   launcher version; no warning when a user-installed mod collides with a manifest
   mod.

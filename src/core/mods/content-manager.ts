@@ -5,6 +5,7 @@ import { createWriteStream } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { getVersionDownloadInfo, getModVersions, getProjectTitle } from './modrinth-api';
+import { applyResourcePackOrder } from '../minecraft/options-file';
 import { sha256File, fileMatches, verifyDownload } from './integrity';
 import type { InstalledMod } from '../../shared/ipc-types';
 import type { ResourcePackEntry, ShaderEntry } from '../../shared/manifest-schema';
@@ -108,6 +109,22 @@ export async function listContent(kind: ContentKind, profileId: string): Promise
 }
 
 /**
+ * Push the resource-pack index into the profile's `options.txt`.
+ *
+ * Run after anything that changes which packs exist or in what order. Dropping
+ * a zip into `resourcepacks/` does not switch it on — the game loads what
+ * `options.txt` names, and nothing else. Shaders need no equivalent: Iris and
+ * OptiFine read their own config, not this file.
+ */
+async function syncResourcePackSelection(profileId: string): Promise<void> {
+  const items = await readIndex('resourcepacks', profileId);
+  await applyResourcePackOrder(
+    paths.profileGameDir(profileId),
+    items.filter((p) => p.enabled !== false).map((p) => p.fileName),
+  );
+}
+
+/**
  * Install shader / resource pack from a source string:
  *   - "modrinth:<projectId>" — fetch latest version from Modrinth
  *   - "url:https://..."       — direct URL to .zip
@@ -167,6 +184,7 @@ export async function installContent(
     const items = await readIndex(kind, profileId);
     items.push(installed);
     await writeIndex(kind, profileId, items);
+    if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
     log.info(`Installed ${kind.slice(0, -1)} from file: ${fileName}`);
     return installed;
   } else {
@@ -204,6 +222,7 @@ export async function installContent(
     items.push(installed);
   }
   await writeIndex(kind, profileId, items);
+  if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
   return installed;
 }
 
@@ -292,6 +311,7 @@ export async function syncContentFromManifest(
   }
 
   await writeIndex(kind, profileId, [...fromManifest, ...userInstalled]);
+  if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
   return fromManifest.length;
 }
 
@@ -315,14 +335,17 @@ export async function removeContent(
     profileId,
     items.filter((m) => m.id !== id),
   );
+  if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
   log.info(`Removed ${kind.slice(0, -1)} ${item.name} from profile ${profileId}`);
 }
 
 /**
- * Reorder resource packs by writing the order to options.txt-style index.
- * Minecraft reads resourcepacks in the order listed in options.txt's
- * `resourcePacks` line, but our launcher only manages the index — actual
- * priority is applied via filename prefixing for now (best-effort).
+ * Reorder resource packs — in the launcher's index *and* in the game's own
+ * `options.txt`, which is the only one Minecraft actually reads.
+ *
+ * `orderedIds` is highest priority first, matching the UI's promise that the top
+ * of the list wins. See `applyResourcePackOrder` for why that is reversed on the
+ * way into the file.
  */
 export async function reorderResourcePacks(profileId: string, orderedIds: string[]): Promise<void> {
   const items = await readIndex('resourcepacks', profileId);
@@ -335,5 +358,6 @@ export async function reorderResourcePacks(profileId: string, orderedIds: string
     if (!orderedIds.includes(item.id)) reordered.push(item);
   }
   await writeIndex('resourcepacks', profileId, reordered);
+  await syncResourcePackSelection(profileId);
   log.info(`Reordered ${reordered.length} resource packs for profile ${profileId}`);
 }
