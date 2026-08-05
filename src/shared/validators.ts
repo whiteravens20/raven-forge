@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_NEWS_FEED_URL, DEFAULT_ANNOUNCEMENT_FEED_URL } from './branding';
 
 // ── Runtime validators for IPC payloads ───────────────────
 // These schemas validate data at IPC boundaries.
@@ -52,8 +53,12 @@ export const globalSettingsSchema = z.object({
     ),
   downloadConcurrency: z.number().min(1).max(8).default(4),
   customBackgroundsPath: z.string().optional(),
-  newsFeedUrl: z.string().url().optional().or(z.literal('')),
-  announcementFeedUrl: z.string().url().optional().or(z.literal('')),
+  // Defaulted here as well as in DEFAULT_SETTINGS, because that one only covers
+  // a first launch: an install predating the feeds has a settings.json with the
+  // keys absent, and without a default it would stay newsless forever. An empty
+  // string is a stored, deliberate "off" and survives the parse untouched.
+  newsFeedUrl: z.string().url().or(z.literal('')).default(DEFAULT_NEWS_FEED_URL),
+  announcementFeedUrl: z.string().url().or(z.literal('')).default(DEFAULT_ANNOUNCEMENT_FEED_URL),
   trustedPublicKeys: z.array(trustedKeySchema).default([]),
   autoRemoveOrphanedMods: z.boolean().default(false),
   showLiveConsole: z.boolean().default(false),

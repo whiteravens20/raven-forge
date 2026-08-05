@@ -129,7 +129,7 @@ test/               # Vitest suites (pure logic) + Electron/keytar stubs
 
 ## Configuration: News Feed, Backgrounds & Announcements
 
-The launcher ships with **mock data** for development. To connect to real endpoints, configure these URLs in Settings or via the settings JSON file at `<userData>/settings.json`:
+A fresh install points at White Ravens' published feeds (listed under [Live endpoints](#live-endpoints)). Both are yours to change — under Settings, or in the settings JSON file at `<userData>/settings.json`. Clearing a field switches that section off rather than restoring the default.
 
 ### News Feed
 ```json
@@ -194,6 +194,22 @@ doubles as a working reference for each format:
 Manifests published there are Ed25519-signed; add the public key under
 **Settings → Trusted Keys** to get the verified badge and reject a tampered one.
 
+### Forking
+
+Every address the launcher ships pointing at White Ravens lives in one file,
+[`src/shared/branding.ts`](src/shared/branding.ts): the two feed defaults and
+the pack catalogue behind *Play on the White Ravens servers*. Change those three
+constants and a fork inherits none of our infrastructure. Nothing else in the
+codebase hardcodes a `whiteravens20` URL.
+
+The two feed values are only *defaults* — they seed a first launch and an
+install that predates them, and any player can point them elsewhere. The
+catalogue URL is deliberately not settable: its entries become manifest URLs
+that profiles get created from, so a settable address would turn a screen badged
+White Ravens into a way to serve somebody arbitrary manifests. The manifest-URL
+and `.mrpack` import routes exist for everything else, and there the address is
+plainly the player's own.
+
 ### UI Language
 
 Polish and English ship in `src/renderer/i18n/`; switch under Settings → Appearance. Adding a language is copying `en.ts`, translating the values, and registering it — TypeScript names any key you miss. See [CONTRIBUTING.md](CONTRIBUTING.md#translations).
@@ -207,7 +223,7 @@ Place `.jpg` / `.png` files in a local folder and set:
 ```
 Or leave empty to use the built-in default backgrounds.
 
-> **Tip:** When `newsFeedUrl` and `announcementFeedUrl` are not set (or empty), the launcher displays built-in mock data with placeholder content. This is the default for development.
+> **Note:** An empty `newsFeedUrl` or `announcementFeedUrl` shows an empty section — the launcher has no placeholder copy to fall back on, because demo text presented as a server's announcements is worse than nothing.
 
 ---
 

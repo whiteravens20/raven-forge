@@ -8,7 +8,6 @@ vi.mock('../src/core/config/settings-manager', () => ({
 }));
 
 const { fetchNews, fetchAnnouncements } = await import('../src/core/news/news-fetcher');
-const { MOCK_NEWS } = await import('../src/core/news/mock-data');
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return {
@@ -48,18 +47,21 @@ afterEach(() => {
 /**
  * The cache is keyed on the URL it was filled from.
  *
- * Keying it on nothing is what produced the bug this covers: the placeholders
+ * Keying it on nothing is what produced the bug this covers: the empty result
  * cached at startup — when no feed URL was set — outlived the URL being entered,
  * so a newly configured feed did nothing at all until the launcher restarted.
  */
 describe('feed caching', () => {
-  it('shows placeholders and asks for nothing when no URL is configured', async () => {
-    expect(await fetchNews()).toEqual(MOCK_NEWS);
+  it('shows nothing and asks for nothing when the URL has been cleared', async () => {
+    // A fresh install has White Ravens' feed set, so this is somebody who
+    // emptied the field — a decision, not a state to paper over.
+    settings.newsFeedUrl = '';
+    expect(await fetchNews()).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('fetches as soon as a URL appears, without a restart', async () => {
-    await fetchNews(); // caches the placeholders
+    await fetchNews(); // caches the empty result
     settings.newsFeedUrl = freshUrl();
     fetchMock.mockResolvedValue(jsonResponse([item('live')]));
 
@@ -104,8 +106,7 @@ describe('feed caching', () => {
     expect((await fetchNews(true)).map((n) => n.id)).toEqual(['good']);
   });
 
-  it('never falls back to placeholders once a URL is configured', async () => {
-    // Presenting demo copy as the server's news is worse than an empty section.
+  it('shows an empty section rather than anything invented when the first fetch fails', async () => {
     settings.newsFeedUrl = freshUrl();
     fetchMock.mockRejectedValue(new Error('offline'));
     expect(await fetchNews()).toEqual([]);
@@ -124,7 +125,7 @@ describe('feed caching', () => {
   });
 
   it('gives announcements the same treatment — the bug was only ever on this side', async () => {
-    await fetchAnnouncements(); // caches the placeholders
+    await fetchAnnouncements(); // caches the empty result
     settings.announcementFeedUrl = freshUrl();
     fetchMock.mockResolvedValue(jsonResponse([announcement('live')]));
 

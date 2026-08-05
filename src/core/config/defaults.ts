@@ -1,4 +1,5 @@
 import type { GlobalSettings } from '../../shared/ipc-types';
+import { DEFAULT_NEWS_FEED_URL, DEFAULT_ANNOUNCEMENT_FEED_URL } from '../../shared/branding';
 
 /**
  * Default global settings — used on first launch or after settings reset.
@@ -12,11 +13,11 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   proxyUrl: undefined,
   downloadConcurrency: 4,
   customBackgroundsPath: undefined,
-  // When empty/undefined, the launcher uses built-in mock data.
-  // Set these to a real URL to pull live news and announcements.
-  // See README.md → "Configuration: News Feed, Backgrounds & Announcements"
-  newsFeedUrl: undefined,
-  announcementFeedUrl: undefined,
+  // Point at White Ravens' published feeds; both are replaceable in Settings,
+  // and an empty string means "no feed" rather than "back to the default".
+  // Fork these in src/shared/branding.ts, not here.
+  newsFeedUrl: DEFAULT_NEWS_FEED_URL,
+  announcementFeedUrl: DEFAULT_ANNOUNCEMENT_FEED_URL,
   trustedPublicKeys: [],
   autoRemoveOrphanedMods: false,
   showLiveConsole: false,

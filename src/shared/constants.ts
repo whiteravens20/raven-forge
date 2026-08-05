@@ -67,17 +67,8 @@ export function acceptedLoaders(modLoader: string): ClientModLoader[] {
   }
 }
 
-// ── White Ravens packs ────────────────────────────────────
-/**
- * The catalogue behind "play on the White Ravens servers".
- *
- * Compiled in rather than configurable. Its entries become manifest URLs the
- * launcher creates profiles from, so a settable address would turn a screen
- * badged White Ravens into a way to serve somebody arbitrary manifests. The
- * manifest-URL and `.mrpack` routes exist for anything else, and there it is
- * plainly the player's own address.
- */
-export const WHITE_RAVENS_PACKS_URL = 'https://whiteravens20.github.io/raven-packs/packs.json';
+// White Ravens' own addresses live in `branding.ts`, so a fork has one file to
+// change. Nothing here should name whiteravens20.
 
 // ── Minecraft APIs ────────────────────────────────────────
 export const MOJANG_VERSION_MANIFEST =

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { log } from '../../main/logger';
-import { WHITE_RAVENS_PACKS_URL } from '../../shared/constants';
+import { WHITE_RAVENS_PACKS_URL } from '../../shared/branding';
 import type { CataloguePack } from '../../shared/ipc-types';
 
 /**

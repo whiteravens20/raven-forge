@@ -170,14 +170,14 @@ export function SettingsPage() {
         <Input
           label={t('settings.newsFeed')}
           value={settings.newsFeedUrl ?? ''}
-          onChange={(e) => update({ newsFeedUrl: e.target.value || undefined })}
+          onChange={(e) => update({ newsFeedUrl: e.target.value })}
           onBlur={() => void refreshFeeds()}
           placeholder={t('settings.feedPlaceholder', { feed: 'news' })}
         />
         <Input
           label={t('settings.announcementFeed')}
           value={settings.announcementFeedUrl ?? ''}
-          onChange={(e) => update({ announcementFeedUrl: e.target.value || undefined })}
+          onChange={(e) => update({ announcementFeedUrl: e.target.value })}
           onBlur={() => void refreshFeeds()}
           placeholder={t('settings.feedPlaceholder', { feed: 'announcements' })}
         />

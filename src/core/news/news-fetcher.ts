@@ -2,7 +2,6 @@ import type { z } from 'zod';
 import type { NewsItem, Announcement } from '../../shared/ipc-types';
 import { newsItemSchema, announcementSchema } from '../../shared/validators';
 import { getSettings } from '../config/settings-manager';
-import { MOCK_NEWS, MOCK_ANNOUNCEMENTS } from './mock-data';
 import { MODRINTH_USER_AGENT } from '../../shared/constants';
 import { log } from '../../main/logger';
 
@@ -14,7 +13,7 @@ import { log } from '../../main/logger';
  * set — stayed cached, so a URL entered afterwards did nothing until restart.
  */
 interface FeedCache<T> {
-  /** Empty string means these are the built-in placeholders, not a fetch. */
+  /** Empty string means no feed is configured, so nothing was fetched. */
   source: string;
   items: T[];
 }
@@ -30,7 +29,7 @@ const FETCH_TIMEOUT_MS = 10_000;
  * A feed is untrusted input from a URL the user pasted, so every item is
  * validated individually: one malformed entry drops that entry rather than the
  * whole feed. Returns `null` on any failure — the caller decides what a failed
- * fetch should show, which is deliberately *not* mock data (see below).
+ * fetch should show.
  */
 async function fetchFeed<T>(url: string, schema: z.ZodType<T>, label: string): Promise<T[] | null> {
   if (!/^https?:\/\//i.test(url)) {
@@ -76,20 +75,21 @@ async function fetchFeed<T>(url: string, schema: z.ZodType<T>, label: string): P
 /**
  * Resolve a feed, reusing the cache only when it belongs to the same URL.
  *
- * With no URL configured the launcher shows built-in placeholder copy. Once a
- * URL *is* configured, a failed fetch shows the last good result for that URL
- * or nothing at all — never the placeholders, because silently presenting demo
- * text as the server's announcements is worse than an empty section.
+ * Every outcome that is not a successful fetch shows the last good result for
+ * that URL, or an empty section. There is deliberately no placeholder copy to
+ * fall back to: presenting demo text as the server's announcements is worse
+ * than showing nothing, and an emptied feed URL is a decision, not a gap to
+ * fill in. A fresh install has White Ravens' feeds set (see `branding.ts`), so
+ * the no-URL case only arises when somebody cleared the field on purpose.
  */
 async function loadFeed<T>(
   cache: FeedCache<T> | null,
   url: string | undefined,
   schema: z.ZodType<T>,
   label: string,
-  placeholders: T[],
   forceRefresh: boolean,
 ): Promise<FeedCache<T>> {
-  if (!url) return { source: '', items: placeholders };
+  if (!url) return { source: '', items: [] };
   if (cache?.source === url && !forceRefresh) return cache;
 
   const fetched = await fetchFeed(url, schema, label);
@@ -100,14 +100,7 @@ async function loadFeed<T>(
 /** News for the home page. */
 export async function fetchNews(forceRefresh = false): Promise<NewsItem[]> {
   const { newsFeedUrl } = await getSettings();
-  newsCache = await loadFeed(
-    newsCache,
-    newsFeedUrl,
-    newsItemSchema,
-    'News',
-    MOCK_NEWS,
-    forceRefresh,
-  );
+  newsCache = await loadFeed(newsCache, newsFeedUrl, newsItemSchema, 'News', forceRefresh);
   return newsCache.items;
 }
 
@@ -119,7 +112,6 @@ export async function fetchAnnouncements(forceRefresh = false): Promise<Announce
     announcementFeedUrl,
     announcementSchema,
     'Announcements',
-    MOCK_ANNOUNCEMENTS,
     forceRefresh,
   );
   return announcementsCache.items;
