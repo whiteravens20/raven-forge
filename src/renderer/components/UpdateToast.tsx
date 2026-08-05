@@ -1,17 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Download, RotateCw, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { formatBytes } from '@renderer/format';
 import { useT } from '@renderer/i18n';
 import type { ProgressEvent, UpdateInfo } from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
 type Stage = 'available' | 'downloading' | 'downloaded';
-
-function formatSize(bytes?: number): string | null {
-  if (!bytes) return null;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 /**
  * Non-blocking launcher-update prompt.
@@ -76,7 +72,7 @@ export function UpdateToast() {
     }
   };
 
-  const size = formatSize(info.downloadSize);
+  const size = info.downloadSize ? formatBytes(info.downloadSize) : null;
 
   return (
     <div

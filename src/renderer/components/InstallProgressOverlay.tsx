@@ -1,18 +1,7 @@
 import { useEffect } from 'react';
 import { useProgressStore } from '@stores/progress-store';
+import { formatBytes } from '@renderer/format';
 import { useT, type TranslationKey } from '@renderer/i18n';
-
-function formatBytes(bytes?: number): string {
-  if (bytes === undefined) return '';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let value = bytes;
-  let unitIdx = 0;
-  while (value >= 1024 && unitIdx < units.length - 1) {
-    value /= 1024;
-    unitIdx++;
-  }
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unitIdx]}`;
-}
 
 const CHANNEL_LABELS: Record<string, TranslationKey> = {
   'progress:mod-sync': 'progress.modSync',
