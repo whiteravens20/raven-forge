@@ -155,6 +155,7 @@ export const pl: Translations = {
   'profiles.empty': 'Brak profili',
   'profiles.emptyHint': 'Dodaj pierwszy profil przyciskiem +',
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
+  'profiles.copyName': '{name} (kopia)',
   // ── Usuwanie profilu ─────────────────────────────────────
   'delete.title': 'Usuń profil „{name}”',
   'delete.intro':
@@ -423,6 +424,28 @@ export const pl: Translations = {
   'progress.files.few': '{done}/{total} pliki',
   'progress.files.many': '{done}/{total} plików',
   'progress.files.other': '{done}/{total} pliku',
+
+  // Komunikaty postępu nazywane przez proces główny — zob. `ProgressKey`.
+  'progress.msg.downloading': 'Pobieranie…',
+  'progress.msg.downloadComplete': 'Pobieranie zakończone',
+  'progress.msg.libraries': 'Biblioteki Minecraft {version}',
+  'progress.msg.assets': 'Zasoby gry',
+  'progress.msg.javaDownloading': 'Pobieranie Javy {version}…',
+  'progress.msg.javaReady': 'Pobrano Javę {version}',
+  'progress.msg.syncing': 'Synchronizacja {name}…',
+  'progress.msg.synced.one': 'Zsynchronizowano {count} mod',
+  'progress.msg.synced.few': 'Zsynchronizowano {count} mody',
+  'progress.msg.synced.many': 'Zsynchronizowano {count} modów',
+  'progress.msg.synced.other': 'Zsynchronizowano {count} moda',
+  'progress.msg.loaderProfile': 'Pobieranie profilu {loader}…',
+  'progress.msg.loaderInstalled': 'Zainstalowano {loader}',
+  'progress.msg.installerDownloading': 'Pobieranie instalatora {loader}…',
+  'progress.msg.preparingGameFiles': 'Przygotowywanie plików Minecraft…',
+  'progress.msg.preparingJava': 'Przygotowywanie środowiska Java…',
+  'progress.msg.runningInstaller':
+    'Uruchamianie instalatora {loader} — to może potrwać kilka minut…',
+  'progress.msg.savingProfile': 'Zapisywanie profilu…',
+  'progress.msg.updateDownloading': 'Pobieranie aktualizacji… {percent}%',
 
   // ── Updater ──────────────────────────────────────────────
   'update.ready': 'Aktualizacja gotowa',

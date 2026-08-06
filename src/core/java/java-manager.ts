@@ -231,7 +231,7 @@ async function downloadAdoptium(majorVersion: number): Promise<string> {
   emitJavaProgress({
     operationId: `java-${majorVersion}`,
     progress: 0,
-    message: `Pobieranie Javy ${majorVersion}...`,
+    message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
   });
 
   const res = await fetch(url, { redirect: 'follow' });
@@ -269,7 +269,7 @@ async function downloadAdoptium(majorVersion: number): Promise<string> {
         emitJavaProgress({
           operationId: `java-${majorVersion}`,
           progress: Math.min(0.95, pct),
-          message: `Pobieranie Javy ${majorVersion}...`,
+          message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
           bytesDownloaded,
           bytesTotal: contentLength > 0 ? contentLength : undefined,
         });
@@ -293,7 +293,7 @@ async function downloadAdoptium(majorVersion: number): Promise<string> {
   emitJavaProgress({
     operationId: `java-${majorVersion}`,
     progress: 1,
-    message: `JRE ${majorVersion} pobrano`,
+    message: { key: 'progress.msg.javaReady', vars: { version: majorVersion } },
     bytesDownloaded,
     bytesTotal: contentLength > 0 ? contentLength : bytesDownloaded,
   });

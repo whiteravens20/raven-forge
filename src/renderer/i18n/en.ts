@@ -166,6 +166,7 @@ export const en = {
   'profiles.empty': 'No profiles',
   'profiles.emptyHint': 'Add your first profile with the + button',
   'profiles.pickOrCreate': 'Select a profile, or create a new one',
+  'profiles.copyName': '{name} (copy)',
   // ── Deleting a profile ───────────────────────────────────
   'delete.title': 'Delete profile "{name}"',
   'delete.intro':
@@ -414,6 +415,25 @@ export const en = {
   'progress.launcherUpdate': 'Updating the launcher',
   'progress.files.one': '{done}/{total} file',
   'progress.files.other': '{done}/{total} files',
+
+  // Progress lines named by the main process — see `ProgressKey` in ipc-types.
+  'progress.msg.downloading': 'Downloading…',
+  'progress.msg.downloadComplete': 'Download complete',
+  'progress.msg.libraries': 'Minecraft libraries {version}',
+  'progress.msg.assets': 'Game assets',
+  'progress.msg.javaDownloading': 'Downloading Java {version}…',
+  'progress.msg.javaReady': 'Java {version} downloaded',
+  'progress.msg.syncing': 'Syncing {name}…',
+  'progress.msg.synced.one': 'Synced {count} mod',
+  'progress.msg.synced.other': 'Synced {count} mods',
+  'progress.msg.loaderProfile': 'Downloading the {loader} profile…',
+  'progress.msg.loaderInstalled': 'Installed {loader}',
+  'progress.msg.installerDownloading': 'Downloading the {loader} installer…',
+  'progress.msg.preparingGameFiles': 'Preparing the Minecraft files…',
+  'progress.msg.preparingJava': 'Preparing the Java runtime…',
+  'progress.msg.runningInstaller': 'Running the {loader} installer — this can take a few minutes…',
+  'progress.msg.savingProfile': 'Saving the profile…',
+  'progress.msg.updateDownloading': 'Downloading update… {percent}%',
 
   // ── Updater ──────────────────────────────────────────────
   'update.ready': 'Update ready',

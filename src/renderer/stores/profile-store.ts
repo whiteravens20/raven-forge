@@ -14,7 +14,7 @@ interface ProfileStore {
   update: (profileId: string, updates: Partial<Profile>) => Promise<void>;
   /** `deleteFiles: false` unlists the profile but leaves its directory intact. */
   remove: (profileId: string, deleteFiles: boolean) => Promise<void>;
-  duplicate: (profileId: string) => Promise<void>;
+  duplicate: (profileId: string, name?: string) => Promise<void>;
 }
 
 export const useProfileStore = create<ProfileStore>((set, get) => ({
@@ -64,8 +64,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     await get().load();
   },
 
-  duplicate: async (profileId) => {
-    const result = await api.profiles.duplicate(profileId);
+  duplicate: async (profileId, name) => {
+    const result = await api.profiles.duplicate(profileId, name);
     if (result.success && result.data) {
       await get().load();
       set({ selectedProfileId: result.data.id });

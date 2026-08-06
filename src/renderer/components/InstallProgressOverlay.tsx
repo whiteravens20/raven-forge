@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { useProgressStore } from '@stores/progress-store';
 import { formatBytes } from '@renderer/format';
-import { useT, type TranslationKey } from '@renderer/i18n';
+import { useT, type TFunction, type TranslationKey } from '@renderer/i18n';
+import type { ProgressMessage } from '@shared/ipc-types';
 
 const CHANNEL_LABELS: Record<string, TranslationKey> = {
   'progress:mod-sync': 'progress.modSync',
@@ -11,6 +12,20 @@ const CHANNEL_LABELS: Record<string, TranslationKey> = {
   'progress:game-assets': 'progress.gameAssets',
   'progress:launcher-update': 'progress.launcherUpdate',
 };
+
+/**
+ * Say a progress line in the user's language.
+ *
+ * The main process names a key; the dictionary supplies the sentence. That
+ * split is the whole point — `src/core/` has no locale, and these lines used to
+ * be written there in Polish, so an English user watched their install narrate
+ * itself in a language they never chose.
+ */
+function progressText(t: TFunction, message: ProgressMessage): string {
+  if ('text' in message) return message.text;
+  if ('pluralKey' in message) return t.plural(message.pluralKey, message.count, message.vars);
+  return t(message.key, message.vars);
+}
 
 export function InstallProgressOverlay() {
   const t = useT();
@@ -55,7 +70,7 @@ export function InstallProgressOverlay() {
             </div>
             {(item.currentFile || item.message) && (
               <p className="truncate text-[10px] text-rf-text-muted">
-                {item.currentFile ?? item.message}
+                {item.currentFile ?? progressText(t, item.message)}
                 {item.bytesTotal !== undefined && (
                   <>
                     {' '}

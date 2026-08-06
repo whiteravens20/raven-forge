@@ -470,9 +470,9 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to delete those files: ${reason(err)}`);
     }
   });
-  handle('profiles:duplicate', async (_event, profileId: string) => {
+  handle('profiles:duplicate', async (_event, profileId: string, name?: string) => {
     try {
-      return ok(await duplicateProfile(profileId));
+      return ok(await duplicateProfile(profileId, name));
     } catch (err) {
       return fail(`Failed to duplicate profile: ${reason(err)}`);
     }

@@ -38,7 +38,11 @@ async function installFabric(loaderVersion: string, mcVersion: string): Promise<
   const profileJsonUrl = `${FABRIC_META_API}/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
   const opId = `loader-fabric-${mcVersion}-${loaderVersion}`;
 
-  emitLoaderProgress({ operationId: opId, progress: 0, message: 'Pobieranie profilu Fabric...' });
+  emitLoaderProgress({
+    operationId: opId,
+    progress: 0,
+    message: { key: 'progress.msg.loaderProfile', vars: { loader: 'Fabric' } },
+  });
 
   log.info(`Fetching Fabric profile JSON for MC ${mcVersion} / loader ${loaderVersion}`);
   const res = await fetch(profileJsonUrl, { signal: AbortSignal.timeout(15000) });
@@ -53,7 +57,11 @@ async function installFabric(loaderVersion: string, mcVersion: string): Promise<
     'utf-8',
   );
 
-  emitLoaderProgress({ operationId: opId, progress: 1, message: 'Zainstalowano Fabric' });
+  emitLoaderProgress({
+    operationId: opId,
+    progress: 1,
+    message: { key: 'progress.msg.loaderInstalled', vars: { loader: 'Fabric' } },
+  });
   log.info(`Installed Fabric loader ${loaderVersion} for MC ${mcVersion}`);
 }
 
@@ -92,7 +100,11 @@ async function installQuilt(loaderVersion: string, mcVersion: string): Promise<v
   const profileJsonUrl = `${QUILT_META_API}/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
   const opId = `loader-quilt-${mcVersion}-${loaderVersion}`;
 
-  emitLoaderProgress({ operationId: opId, progress: 0, message: 'Pobieranie profilu Quilt...' });
+  emitLoaderProgress({
+    operationId: opId,
+    progress: 0,
+    message: { key: 'progress.msg.loaderProfile', vars: { loader: 'Quilt' } },
+  });
 
   log.info(`Fetching Quilt profile JSON for MC ${mcVersion} / loader ${loaderVersion}`);
   const res = await fetch(profileJsonUrl, { signal: AbortSignal.timeout(15000) });
@@ -107,7 +119,11 @@ async function installQuilt(loaderVersion: string, mcVersion: string): Promise<v
     'utf-8',
   );
 
-  emitLoaderProgress({ operationId: opId, progress: 1, message: 'Zainstalowano Quilt' });
+  emitLoaderProgress({
+    operationId: opId,
+    progress: 1,
+    message: { key: 'progress.msg.loaderInstalled', vars: { loader: 'Quilt' } },
+  });
   log.info(`Installed Quilt loader ${loaderVersion} for MC ${mcVersion}`);
 }
 

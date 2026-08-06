@@ -43,6 +43,7 @@ import type {
   ProfileSyncStatus,
   ModSearchResult,
   ProgressEvent,
+  ProgressMessage,
   TrustedKey,
 } from '../../shared/ipc-types';
 
@@ -429,7 +430,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     const total = entries.length + manifest.configFiles.length;
     let done = 0;
 
-    const report = (message: string, currentFile?: string) =>
+    const report = (message: ProgressMessage, currentFile?: string) =>
       emitProgress('progress:mod-sync', {
         operationId: profileId,
         progress: total > 0 ? done / total : 1,
@@ -439,11 +440,11 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         filesTotal: total,
       });
 
-    report(`Synchronizacja ${profile.name}…`);
+    report({ key: 'progress.msg.syncing', vars: { name: profile.name } });
 
     for (const entry of entries) {
       throwIfCancelled(signal, 'Sync');
-      report(entry.name);
+      report({ text: entry.name });
 
       const previous = existing.find((m) => m.id === entry.id);
       const resolved = await resolveModEntry(entry, manifest);
@@ -486,7 +487,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
 
     // Config overrides, resolved relative to the profile's .minecraft directory.
     for (const config of manifest.configFiles) {
-      report(config.path, config.path);
+      report({ text: config.path }, config.path);
 
       const dest = path.join(paths.profileGameDir(profileId), config.path);
       const relative = path.relative(paths.profileGameDir(profileId), dest);
@@ -538,7 +539,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     emitProgress('progress:mod-sync', {
       operationId: profileId,
       progress: 1,
-      message: `Zsynchronizowano ${synced.length} modów`,
+      message: { pluralKey: 'progress.msg.synced', count: synced.length },
       filesCompleted: total,
       filesTotal: total,
     });

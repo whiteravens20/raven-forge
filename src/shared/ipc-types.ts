@@ -29,13 +29,59 @@ export interface IpcResult<T> {
  */
 export type IpcErrorCode = 'AUTH_UNREACHABLE';
 
+/**
+ * Translation keys the main process is allowed to name in a progress event.
+ *
+ * Listed here rather than left as free text because these lines are written in
+ * `src/core/`, which has no locale and no business having one — and they used
+ * to be hardcoded Polish, so an English user watched their install narrate
+ * itself in a language they had not chosen, past a fully working i18n layer.
+ *
+ * Every member must exist in the dictionaries: the renderer passes them
+ * straight to `t()`, so a key that is not a `TranslationKey` is a type error
+ * where it is resolved.
+ */
+export type ProgressKey =
+  | 'progress.msg.downloading'
+  | 'progress.msg.downloadComplete'
+  | 'progress.msg.libraries'
+  | 'progress.msg.assets'
+  | 'progress.msg.javaDownloading'
+  | 'progress.msg.javaReady'
+  | 'progress.msg.syncing'
+  | 'progress.msg.loaderProfile'
+  | 'progress.msg.loaderInstalled'
+  | 'progress.msg.installerDownloading'
+  | 'progress.msg.preparingGameFiles'
+  | 'progress.msg.preparingJava'
+  | 'progress.msg.runningInstaller'
+  | 'progress.msg.savingProfile'
+  | 'progress.msg.updateDownloading';
+
+/** Counted keys, which need a plural variant chosen for them. */
+export type ProgressPluralKey = 'progress.msg.synced';
+
+export type ProgressVars = Record<string, string | number>;
+
+/**
+ * One line of status, in a form the renderer can say in the user's language.
+ *
+ * `text` is the exception and not a loophole: a mod's name and a config file's
+ * path read the same in every language, and routing them through a dictionary
+ * would mean inventing a key per mod.
+ */
+export type ProgressMessage =
+  | { key: ProgressKey; vars?: ProgressVars }
+  | { pluralKey: ProgressPluralKey; count: number; vars?: ProgressVars }
+  | { text: string };
+
 export interface ProgressEvent {
   /** Unique ID for the operation (e.g. profile ID or download batch ID) */
   operationId: string;
   /** 0.0 – 1.0 */
   progress: number;
-  /** Human-readable status message */
-  message: string;
+  /** What is happening, as a key the renderer resolves — see {@link ProgressMessage}. */
+  message: ProgressMessage;
   /** Current file being processed (if applicable) */
   currentFile?: string;
   /** Bytes downloaded so far */
@@ -569,7 +615,7 @@ export interface InvokeChannels {
   'profiles:adopt-orphaned': (profileId: string) => Promise<IpcResult<Profile>>;
   /** Delete kept files for good. */
   'profiles:discard-orphaned': (profileId: string) => Promise<IpcResult<void>>;
-  'profiles:duplicate': (profileId: string) => Promise<IpcResult<Profile>>;
+  'profiles:duplicate': (profileId: string, name?: string) => Promise<IpcResult<Profile>>;
   'profiles:export': (profileId: string) => Promise<IpcResult<string>>; // returns JSON string
   'profiles:import': (json: string) => Promise<IpcResult<Profile>>;
   'profiles:get-sync-status': (profileId: string) => Promise<IpcResult<ProfileSyncStatus>>;

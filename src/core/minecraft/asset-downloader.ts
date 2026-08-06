@@ -16,7 +16,7 @@ import { getSettings } from '../config/settings-manager';
 import { getMainWindow } from '../../main/window';
 import { getMojangOsName } from './launch-args';
 import type { AssetIndex, DownloadInfo, Library, VersionMeta } from './types';
-import type { ProgressEvent } from '../../shared/ipc-types';
+import type { ProgressEvent, ProgressMessage } from '../../shared/ipc-types';
 
 // ── Hash verification ──────────────────────────────────────
 
@@ -148,16 +148,16 @@ async function forEachConcurrently<T>(
 async function downloadBatch(
   tasks: DownloadTask[],
   concurrency: number,
-  opts?: { operationId: string; label?: string; signal?: AbortSignal },
+  opts?: { operationId: string; label?: ProgressMessage; signal?: AbortSignal },
 ): Promise<void> {
   const total = tasks.length;
 
-  const report = (completed: number, message?: string) => {
+  const report = (completed: number, message?: ProgressMessage) => {
     if (!opts) return;
     emitAssetProgress({
       operationId: opts.operationId,
       progress: total > 0 ? completed / total : 1,
-      message: message ?? opts.label ?? 'Pobieranie...',
+      message: message ?? opts.label ?? { key: 'progress.msg.downloading' },
       filesCompleted: completed,
       filesTotal: total,
     });
@@ -180,7 +180,7 @@ async function downloadBatch(
     report(completed);
   });
 
-  report(total, 'Pobieranie zakończone');
+  report(total, { key: 'progress.msg.downloadComplete' });
 }
 
 // ── Download client JAR ────────────────────────────────────
@@ -365,7 +365,7 @@ export async function ensureLibraries(
   log.info(`Ensuring ${tasks.length} libraries...`);
   await downloadBatch(tasks, concurrency, {
     operationId: `libraries-${meta.id}`,
-    label: `Biblioteki Minecraft ${meta.id}`,
+    label: { key: 'progress.msg.libraries', vars: { version: meta.id } },
     signal,
   });
 
@@ -417,7 +417,7 @@ export async function ensureAssets(
   log.info(`Ensuring ${tasks.length} assets...`);
   await downloadBatch(tasks, settings.downloadConcurrency, {
     operationId: `assets-${meta.id}`,
-    label: 'Zasoby gry',
+    label: { key: 'progress.msg.assets' },
     signal,
   });
 }

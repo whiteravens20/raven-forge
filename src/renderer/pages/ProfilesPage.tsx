@@ -339,7 +339,12 @@ export function ProfilesPage() {
             syncing={syncing}
             onCancelSync={handleCancelSync}
             onEdit={startEdit}
-            onDuplicate={() => duplicateProfile(selectedProfile.id)}
+            onDuplicate={() =>
+              duplicateProfile(
+                selectedProfile.id,
+                t('profiles.copyName', { name: selectedProfile.name }),
+              )
+            }
             onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
             onSync={handleSync}

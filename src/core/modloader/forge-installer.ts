@@ -31,7 +31,7 @@ import { getVersionMeta } from '../minecraft/version-manifest';
 import { verifyDownload, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion } from '../java/java-manager';
 import { requiredJavaFor } from '../minecraft/java-requirement';
-import type { LoaderVersion } from '../../shared/ipc-types';
+import type { LoaderVersion, ProgressMessage } from '../../shared/ipc-types';
 import type { VersionMeta } from '../minecraft/types';
 
 const execFileAsync = promisify(execFile);
@@ -354,7 +354,7 @@ export async function installForgeLike(
   loader: ForgeLikeLoader,
   loaderVersion: string,
   mcVersion: string,
-  onProgress: (fraction: number, message: string) => void,
+  onProgress: (fraction: number, message: ProgressMessage) => void,
 ): Promise<void> {
   const label = loader === 'forge' ? 'Forge' : 'NeoForge';
   const destDir = loaderInstallDir(loader, loaderVersion, mcVersion);
@@ -364,7 +364,7 @@ export async function installForgeLike(
 
   await fs.mkdir(destDir, { recursive: true });
 
-  onProgress(0.05, `Pobieranie instalatora ${label}...`);
+  onProgress(0.05, { key: 'progress.msg.installerDownloading', vars: { loader: label } });
   const installerPath = path.join(destDir, 'installer.jar');
   await downloadInstaller(installerUrl(loader, loaderVersion, mcVersion), installerPath, label);
 
@@ -380,17 +380,17 @@ export async function installForgeLike(
   const versionId = embeddedProfile.id;
   if (!versionId) throw new Error(`${label} installer's version.json has no id`);
 
-  onProgress(0.15, 'Przygotowywanie plików Minecraft...');
+  onProgress(0.15, { key: 'progress.msg.preparingGameFiles' });
   const vanillaMeta = await getVersionMeta(mcVersion);
   await ensureVanillaClientForInstaller(installRoot, mcVersion, vanillaMeta);
   await ensureLauncherProfilesStub(installRoot);
 
   // The installer is a modern Java application in its own right; the JRE the
   // *game* needs is the right floor for it too.
-  onProgress(0.25, 'Przygotowywanie środowiska Java...');
+  onProgress(0.25, { key: 'progress.msg.preparingJava' });
   const java = await ensureJavaVersion(requiredJavaFor(mcVersion, vanillaMeta));
 
-  onProgress(0.35, `Uruchamianie instalatora ${label} (to może potrwać kilka minut)...`);
+  onProgress(0.35, { key: 'progress.msg.runningInstaller', vars: { loader: label } });
   log.info(`Running ${label} installer: ${installerPath} --installClient ${installRoot}`);
 
   try {
@@ -417,7 +417,7 @@ export async function installForgeLike(
     );
   }
 
-  onProgress(0.9, 'Zapisywanie profilu...');
+  onProgress(0.9, { key: 'progress.msg.savingProfile' });
 
   // Prefer what the installer actually wrote — it can differ from the embedded
   // copy — and fall back to the embedded profile only if it is missing.
@@ -437,7 +437,10 @@ export async function installForgeLike(
   // The installer jar is 4–8 MB and has done its job.
   await fs.rm(installerPath, { force: true });
 
-  onProgress(1, `Zainstalowano ${label} ${loaderVersion}`);
+  onProgress(1, {
+    key: 'progress.msg.loaderInstalled',
+    vars: { loader: `${label} ${loaderVersion}` },
+  });
   log.info(`Installed ${label} ${loaderVersion} for MC ${mcVersion} (version id ${versionId})`);
 }
 

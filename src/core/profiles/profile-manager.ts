@@ -311,14 +311,23 @@ export async function recordPlaySession(profileId: string, playTimeMinutes: numb
   });
 }
 
-export async function duplicateProfile(profileId: string): Promise<Profile> {
+/**
+ * Copy a profile, under a name the caller chooses.
+ *
+ * The name is a parameter because it is *persisted*. It used to be built here
+ * as `${name} (kopia)` — Polish, baked into `profiles.json`, where switching
+ * the launcher to English would never fix it, because by then it is the
+ * profile's actual name. The renderer knows the language and supplies it; the
+ * English fallback is for a programmatic call with nothing to say.
+ */
+export async function duplicateProfile(profileId: string, name?: string): Promise<Profile> {
   const source = await getProfile(profileId);
   if (!source) throw new Error(`Profile ${profileId} not found`);
 
   const { id: _id, createdAt: _ca, updatedAt: _ua, ...data } = source;
   return createProfile({
     ...data,
-    name: `${source.name} (kopia)`,
+    name: name?.trim() || `${source.name} (copy)`,
     lastPlayed: undefined,
     totalPlayTimeMinutes: undefined,
   });

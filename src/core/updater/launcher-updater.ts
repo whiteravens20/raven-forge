@@ -34,7 +34,10 @@ export function initUpdater(): void {
     getMainWindow()?.webContents.send('progress:launcher-update', {
       operationId: 'launcher-update',
       progress: progress.percent / 100,
-      message: `Downloading update… ${progress.percent.toFixed(0)}%`,
+      message: {
+        key: 'progress.msg.updateDownloading',
+        vars: { percent: progress.percent.toFixed(0) },
+      },
       bytesDownloaded: progress.transferred,
       bytesTotal: progress.total,
     });
