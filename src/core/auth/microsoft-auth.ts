@@ -36,7 +36,47 @@ const MS_SCOPES = 'XboxLive.signin offline_access';
 
 // ── Microsoft OAuth ────────────────────────────────────────
 
-async function getMsAuthCode(): Promise<string> {
+/**
+ * PKCE parameters for one authorization attempt (RFC 7636).
+ *
+ * This is a native public client: it ships with no secret, so possession of an
+ * authorization code is otherwise all anyone needs to redeem it. The challenge
+ * binds the code to this attempt, so a code intercepted anywhere between the
+ * browser window and here is useless without the verifier, which never leaves
+ * the process. Microsoft asks for exactly this on clients of this shape.
+ */
+function createPkce(): { verifier: string; challenge: string } {
+  const verifier = crypto.randomBytes(32).toString('base64url');
+  return {
+    verifier,
+    challenge: crypto.createHash('sha256').update(verifier).digest('base64url'),
+  };
+}
+
+/**
+ * Whether a URL is the redirect this flow is waiting for.
+ *
+ * Compared as origin plus path rather than by looking for a `code` parameter on
+ * whatever the window happens to navigate to. Any hop in an authorization chain
+ * may carry a `?code=`, and treating the first one seen as the authorization
+ * response means accepting a code the launcher never asked for.
+ */
+function isAuthRedirect(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const expected = new URL(MS_REDIRECT_URI);
+    return parsed.origin === expected.origin && parsed.pathname === expected.pathname;
+  } catch {
+    return false;
+  }
+}
+
+async function getMsAuthCode(): Promise<{ code: string; verifier: string }> {
+  const { verifier, challenge } = createPkce();
+  // Binds the response to this request, so a code arriving from anywhere else
+  // is recognisable as one.
+  const state = crypto.randomBytes(16).toString('base64url');
+
   return new Promise((resolve, reject) => {
     const authWindow = new BrowserWindow({
       width: 520,
@@ -46,8 +86,16 @@ async function getMsAuthCode(): Promise<string> {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        // This is the only window in the launcher that loads someone else's
+        // page, which makes it the one that most needs the renderer locked down.
+        sandbox: true,
+        webSecurity: true,
+        allowRunningInsecureContent: false,
       },
     });
+
+    // A login page has no business opening one.
+    authWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
     const authUrl = new URL(`${MS_AUTH_BASE}/authorize`);
     authUrl.searchParams.set('client_id', MS_CLIENT_ID);
@@ -55,23 +103,48 @@ async function getMsAuthCode(): Promise<string> {
     authUrl.searchParams.set('redirect_uri', MS_REDIRECT_URI);
     authUrl.searchParams.set('scope', MS_SCOPES);
     authUrl.searchParams.set('prompt', 'select_account');
+    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('code_challenge', challenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
 
-    authWindow.loadURL(authUrl.toString());
+    void authWindow.loadURL(authUrl.toString());
 
-    authWindow.webContents.on('will-redirect', (_event, url) => {
+    const settle = (fn: () => void) => {
+      authWindow.close();
+      fn();
+    };
+
+    // Both events, because whether the redirect arrives as a redirect or as a
+    // navigation is Microsoft's choice and has changed before.
+    const onNavigate = (_event: Electron.Event, url: string) => {
+      if (!isAuthRedirect(url)) return;
+
       const parsed = new URL(url);
-      const code = parsed.searchParams.get('code');
       const error = parsed.searchParams.get('error');
-      if (code) {
-        authWindow.close();
-        resolve(code);
-      } else if (error) {
-        authWindow.close();
-        reject(
-          new Error(`MS Auth error: ${error} — ${parsed.searchParams.get('error_description')}`),
+      if (error) {
+        settle(() =>
+          reject(
+            new Error(`MS Auth error: ${error} — ${parsed.searchParams.get('error_description')}`),
+          ),
         );
+        return;
       }
-    });
+
+      if (parsed.searchParams.get('state') !== state) {
+        settle(() => reject(new Error('Authorization response did not match the request')));
+        return;
+      }
+
+      const code = parsed.searchParams.get('code');
+      if (!code) {
+        settle(() => reject(new Error('Authorization response carried no code')));
+        return;
+      }
+      settle(() => resolve({ code, verifier }));
+    };
+
+    authWindow.webContents.on('will-redirect', onNavigate);
+    authWindow.webContents.on('will-navigate', onNavigate);
 
     authWindow.on('closed', () => {
       reject(new Error('Authentication window was closed'));
@@ -85,13 +158,14 @@ interface MsTokenResponse {
   expires_in: number;
 }
 
-async function exchangeMsCodeForTokens(code: string): Promise<MsTokenResponse> {
+async function exchangeMsCodeForTokens(code: string, verifier: string): Promise<MsTokenResponse> {
   const body = new URLSearchParams({
     client_id: MS_CLIENT_ID,
     code,
     grant_type: 'authorization_code',
     redirect_uri: MS_REDIRECT_URI,
     scope: MS_SCOPES,
+    code_verifier: verifier,
   });
 
   const res = await fetch(`${MS_AUTH_BASE}/token`, {
@@ -302,8 +376,8 @@ export async function loginMicrosoft(): Promise<MinecraftAccount> {
   }
 
   log.info('Starting Microsoft OAuth flow...');
-  const code = await getMsAuthCode();
-  const tokens = await exchangeMsCodeForTokens(code);
+  const { code, verifier } = await getMsAuthCode();
+  const tokens = await exchangeMsCodeForTokens(code, verifier);
   const account = await fullMicrosoftAuthChain(tokens.access_token, tokens.refresh_token);
   pushAuthState();
   return account;
