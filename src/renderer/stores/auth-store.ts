@@ -31,6 +31,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({
         accounts: result.data.accounts,
         activeAccountId: result.data.activeAccountId,
+        credentialsInPlaintext: result.data.credentialsInPlaintext,
+        credentialsFile: result.data.credentialsFile,
       });
     }
   },

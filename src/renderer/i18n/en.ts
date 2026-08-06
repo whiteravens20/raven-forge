@@ -321,6 +321,9 @@ export const en = {
   'accounts.setActive': 'Set active',
   'accounts.logout': 'Sign out',
   'accounts.loginFailed': 'Sign-in failed',
+  'accounts.plaintextTitle': 'Credentials are not in the system keychain',
+  'accounts.plaintextBody':
+    'The OS keychain could not be used, so your Microsoft sign-in is stored unencrypted in {file} (readable only by your user). On Linux this usually means no keyring daemon — gnome-keyring or kwallet — is running. Start one and sign in again to move it back.',
 
   // ── Settings ─────────────────────────────────────────────
   'settings.title': 'Settings',

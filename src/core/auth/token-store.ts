@@ -127,12 +127,31 @@ async function readStore(): Promise<AuthStoreData> {
   return readRaw();
 }
 
+/**
+ * True when a secret is currently sitting in `auth.json` instead of the keychain.
+ *
+ * Read from what is actually on disk rather than from whether `warnFallback`
+ * happened to fire this session, so it is right on a launch that only reads.
+ */
+function hasPlaintextSecrets(store: AuthStoreData): boolean {
+  if (Object.keys(store.refreshTokens).length > 0) return true;
+  return Object.values(store.mcSessions ?? {}).some((session) => Boolean(session.accessToken));
+}
+
 export async function getAuthState(): Promise<AuthState> {
   const store = await readStore();
+  const plaintext = hasPlaintextSecrets(store);
   return {
     accounts: store.accounts,
     activeAccountId: store.activeAccountId,
     isAuthenticating: false,
+    // Surfaced, not only logged. The fallback is the right behaviour — better
+    // than refusing to log in on a machine with no keyring daemon — but the
+    // person whose Microsoft refresh token is in a plaintext file is the one
+    // who should get to decide whether that is acceptable, and a `log.warn`
+    // they will never open does not tell them.
+    credentialsInPlaintext: plaintext,
+    ...(plaintext ? { credentialsFile: getAuthPath() } : {}),
   };
 }
 

@@ -324,6 +324,9 @@ export const pl: Translations = {
   'accounts.setActive': 'Ustaw aktywne',
   'accounts.logout': 'Wyloguj',
   'accounts.loginFailed': 'Logowanie nie powiodło się',
+  'accounts.plaintextTitle': 'Dane logowania poza pęcherzem kluczy',
+  'accounts.plaintextBody':
+    'Nie udało się użyć pęku kluczy systemu, więc logowanie Microsoft jest zapisane niezaszyfrowane w {file} (do odczytu tylko dla Twojego użytkownika). Na Linuksie zwykle znaczy to, że nie działa żaden demon pęku kluczy — gnome-keyring lub kwallet. Uruchom go i zaloguj się ponownie, aby przenieść dane z powrotem.',
 
   // ── Settings ─────────────────────────────────────────────
   'settings.title': 'Ustawienia',

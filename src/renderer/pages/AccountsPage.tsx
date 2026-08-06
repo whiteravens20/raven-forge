@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, UserPlus, Shield } from 'lucide-react';
+import { LogOut, UserPlus, Shield, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '@stores/auth-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
@@ -13,6 +13,8 @@ export function AccountsPage() {
   const loginOffline = useAuthStore((s) => s.loginOffline);
   const logout = useAuthStore((s) => s.logout);
   const setActive = useAuthStore((s) => s.setActive);
+  const credentialsInPlaintext = useAuthStore((s) => s.credentialsInPlaintext);
+  const credentialsFile = useAuthStore((s) => s.credentialsFile);
 
   const t = useT();
   const [offlineUsername, setOfflineUsername] = useState('');
@@ -65,6 +67,17 @@ export function AccountsPage() {
         >
           {error}
         </p>
+      )}
+
+      {credentialsInPlaintext && (
+        <div className="rounded-lg border border-rf-warning/30 bg-rf-warning/10 px-3 py-2 text-sm text-rf-warning">
+          <p className="flex items-center gap-2 font-medium">
+            <ShieldAlert size={16} /> {t('accounts.plaintextTitle')}
+          </p>
+          <p className="mt-1 text-rf-text-secondary">
+            {t('accounts.plaintextBody', { file: credentialsFile ?? 'auth.json' })}
+          </p>
+        </div>
       )}
 
       {/* Offline login form */}
