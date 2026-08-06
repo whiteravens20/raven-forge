@@ -17,6 +17,14 @@ const AUTHOR_URL = 'https://github.com/pavlojs';
 const ORG_URL = 'https://whiteravens.net';
 
 /**
+ * Mojang's brand guidelines prescribe this sentence word for word, so it is not
+ * a translation key — a localised paraphrase would no longer be the notice they
+ * ask for. It stays in English in every UI language.
+ */
+const MOJANG_DISCLAIMER =
+  'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.';
+
+/**
  * Opens in the user's browser, not in a launcher window — inherits its colour
  * from context (body text vs. footnote) and only picks up the accent on hover.
  */
@@ -101,6 +109,10 @@ export function AboutPage() {
           © 2026 <ExtLink href={ORG_URL}>White Ravens</ExtLink>
         </span>
       </div>
+
+      <p className="max-w-md text-center text-[11px] leading-relaxed tracking-wide text-rf-text-muted">
+        {MOJANG_DISCLAIMER}
+      </p>
 
       {chronicleOpen && <ForgeChronicle onClose={() => setChronicleOpen(false)} />}
     </div>

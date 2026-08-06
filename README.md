@@ -8,6 +8,8 @@ Custom Minecraft: Java Edition launcher with mod management, auto-sync from serv
 
 Built with **Electron + TypeScript + React + Vite + Tailwind CSS**.
 
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+
 ---
 
 ## Features
@@ -413,6 +415,8 @@ Contributions are welcome — bug fixes, macOS support, accessibility and transl
 PolyForm Noncommercial 1.0.0 — see [LICENSE](LICENSE) for details.
 
 You are free to use, modify, and share this software for **non-commercial purposes only**. Commercial use (selling, monetizing, offering as a paid service, etc.) is not permitted without explicit written permission from the author.
+
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 
 ---
 
