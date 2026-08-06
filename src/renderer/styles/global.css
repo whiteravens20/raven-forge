@@ -509,6 +509,17 @@ body {
   }
 }
 
+/* Nobody is watching, so stop drawing.
+
+   The default `launcherBehaviorOnLaunch` is `minimize`, so the usual state of
+   this window during a play session is "not on screen" — and a large animated
+   SVG kept compositing for the whole session, taking GPU time away from the
+   game the launcher exists to start. `ForgeBackdrop` sets `data-idle` when the
+   document is hidden or the window loses focus. */
+.rf-backdrop[data-idle='true'] svg * {
+  animation-play-state: paused !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rf-backdrop svg * {
     animation: none !important;

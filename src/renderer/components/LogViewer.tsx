@@ -8,6 +8,9 @@ const api = window.ravenforge;
 /** How often the tail re-reads while the viewer is open. */
 const POLL_MS = 2000;
 
+/** Matches the main process's own cap; a longer scrollback is not readable anyway. */
+const MAX_LINES = 5000;
+
 type LevelFilter = 'all' | 'warn' | 'error';
 
 /**
@@ -65,15 +68,34 @@ export function LogViewer({ onClose }: LogViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Where the last read stopped, so the next one asks only for what came after.
+   *
+   * Kept in a ref rather than in state: it must not itself cause a render, and
+   * the poll has to see the value from the read immediately before it.
+   */
+  const cursor = useRef<number | undefined>(undefined);
+
   const refresh = useCallback(async () => {
-    const result = await api.system.readLog();
-    if (result.success && result.data) {
-      setLines(result.data.map(parseLine));
-      setError(null);
-    } else {
+    const result = await api.system.readLog(undefined, cursor.current);
+    if (!result.success || !result.data) {
       setError(result.error ?? t('logs.readFailed'));
+      setLoading(false);
+      return;
     }
+
+    const { lines: incoming, size, reset } = result.data;
+    cursor.current = size;
+    setError(null);
     setLoading(false);
+
+    // Nothing new is the ordinary case for an idle launcher, and re-rendering a
+    // five-thousand-row list to show the same five thousand rows is the reason
+    // this poll used to cost anything at all.
+    if (!reset && incoming.length === 0) return;
+
+    const parsed = incoming.map(parseLine);
+    setLines((previous) => (reset ? parsed : [...previous, ...parsed].slice(-MAX_LINES)));
   }, [t]);
 
   useEffect(() => {

@@ -150,7 +150,7 @@ const api: RavenForgeAPI = {
     selectDirectory: () => ipcRenderer.invoke('system:select-directory'),
     selectFile: (filters) => ipcRenderer.invoke('system:select-file', filters),
     getLogsPath: () => ipcRenderer.invoke('system:get-logs-path'),
-    readLog: (lines) => ipcRenderer.invoke('system:read-log', lines),
+    readLog: (lines, since) => ipcRenderer.invoke('system:read-log', lines, since),
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

@@ -254,7 +254,12 @@ async function downloadAdoptium(majorVersion: number): Promise<string> {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      writable.write(value);
+      // Both other download paths do this and this one did not: without waiting
+      // for `drain` the whole archive — around 45 MB compressed — buffers in
+      // memory whenever the link outruns the disk.
+      if (!writable.write(value)) {
+        await new Promise<void>((resolve) => writable.once('drain', resolve));
+      }
       bytesDownloaded += value.length;
 
       // Throttle progress updates to every 5%

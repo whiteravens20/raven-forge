@@ -1,4 +1,6 @@
 import fs from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import crypto from 'node:crypto';
 
 /** Integrity fields as they appear on any downloadable manifest entry. */
@@ -15,9 +17,19 @@ export interface HashedEntry {
 
 export type HashAlgorithm = 'sha1' | 'sha256' | 'sha512';
 
+/**
+ * Digest a file without holding it in memory.
+ *
+ * `fs.readFile` was doing this, which means a 90 MB resource pack — or the
+ * client jar, or a 180 MB JRE archive — was fully resident just to produce
+ * thirty-two bytes. Streaming costs nothing extra and bounds the memory at one
+ * chunk, which matters most on the launch path, where every library and every
+ * asset goes through here.
+ */
 export async function hashFile(filePath: string, algorithm: HashAlgorithm): Promise<string> {
-  const data = await fs.readFile(filePath);
-  return crypto.createHash(algorithm).update(data).digest('hex');
+  const hash = crypto.createHash(algorithm);
+  await pipeline(createReadStream(filePath), hash);
+  return hash.digest('hex');
 }
 
 export async function sha256File(filePath: string): Promise<string> {

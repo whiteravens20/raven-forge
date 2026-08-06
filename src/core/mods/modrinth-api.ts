@@ -227,16 +227,33 @@ export async function getVersion(versionId: string): Promise<ModrinthVersion> {
   return (await res.json()) as ModrinthVersion;
 }
 
-/** A project's display title. Version names are build labels, not this. */
+/**
+ * A project's display title. Version names are build labels, not this.
+ *
+ * Memoised for the life of the process. Titles are the one thing Modrinth
+ * publishes that effectively never changes, and this is called once per
+ * dependency — so installing several mods that share Fabric API and Sodium
+ * re-asked for the same two projects on every one of them.
+ */
+const projectTitles = new Map<string, Promise<string>>();
+
 export async function getProjectTitle(projectId: string): Promise<string> {
-  const res = await modrinthFetch(`/project/${projectId}`);
-  return ((await res.json()) as { title: string }).title;
-}
+  const cached = projectTitles.get(projectId);
+  if (cached) return cached;
 
-// ── Download URL for a version ─────────────────────────────
+  // The promise is cached, not the result, so concurrent callers share one
+  // request instead of racing to make the same one.
+  const pending = modrinthFetch(`/project/${projectId}`)
+    .then(async (res) => ((await res.json()) as { title: string }).title)
+    .catch((err: unknown) => {
+      // A failure must not be remembered, or one flaky request would poison the
+      // name of that project until the launcher restarts.
+      projectTitles.delete(projectId);
+      throw err;
+    });
 
-export async function getVersionDownloadInfo(versionId: string): Promise<ModrinthFile> {
-  return primaryFile(await getVersion(versionId));
+  projectTitles.set(projectId, pending);
+  return pending;
 }
 
 /** The file a version is, out of the extras (sources, javadoc) it may also carry. */

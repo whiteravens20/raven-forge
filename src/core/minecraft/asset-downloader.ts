@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import yauzl from 'yauzl';
@@ -12,6 +11,7 @@ import {
   withTimeout,
 } from '../util/cancellation';
 import { MOJANG_RESOURCES } from '../../shared/constants';
+import { hashFile } from '../mods/integrity';
 import { getSettings } from '../config/settings-manager';
 import { getMainWindow } from '../../main/window';
 import { getMojangOsName } from './launch-args';
@@ -21,8 +21,7 @@ import type { ProgressEvent } from '../../shared/ipc-types';
 // ── Hash verification ──────────────────────────────────────
 
 async function sha1File(filePath: string): Promise<string> {
-  const data = await fs.readFile(filePath);
-  return crypto.createHash('sha1').update(data).digest('hex');
+  return hashFile(filePath, 'sha1');
 }
 
 async function fileExistsAndValid(
@@ -116,82 +115,72 @@ interface DownloadTask {
   size?: number;
 }
 
+/** Run `work` over every item, with at most `concurrency` in flight. */
+async function forEachConcurrently<T>(
+  items: T[],
+  concurrency: number,
+  work: (item: T) => Promise<void>,
+): Promise<void> {
+  const queue = [...items];
+  const workers: Promise<void>[] = [];
+  for (let i = 0; i < Math.max(1, concurrency); i++) {
+    workers.push(
+      (async () => {
+        while (queue.length > 0) {
+          await work(queue.shift()!);
+        }
+      })(),
+    );
+  }
+  await Promise.all(workers);
+}
+
+/**
+ * Fetch whatever is missing or wrong, and leave the rest alone.
+ *
+ * Which files are already correct is decided **once**. This used to ask twice
+ * per task — a serial pass to seed the progress counter, then again inside each
+ * worker — so a launch with the game fully installed did two complete SHA-1
+ * passes over roughly four thousand assets plus every library and the client
+ * jar, purely to conclude that nothing needed doing. The check itself is also
+ * run at the download concurrency now rather than one file at a time.
+ */
 async function downloadBatch(
   tasks: DownloadTask[],
   concurrency: number,
   opts?: { operationId: string; label?: string; signal?: AbortSignal },
 ): Promise<void> {
-  const queue = [...tasks];
   const total = tasks.length;
-  let completed = 0;
 
-  const reportProgress = () => {
+  const report = (completed: number, message?: string) => {
     if (!opts) return;
-    completed++;
-    const progress = total > 0 ? completed / total : 1;
     emitAssetProgress({
       operationId: opts.operationId,
-      progress,
-      message: opts.label ?? 'Pobieranie...',
+      progress: total > 0 ? completed / total : 1,
+      message: message ?? opts.label ?? 'Pobieranie...',
       filesCompleted: completed,
       filesTotal: total,
     });
   };
 
-  // Initial state
-  if (opts) {
-    emitAssetProgress({
-      operationId: opts.operationId,
-      progress: 0,
-      message: opts.label ?? 'Pobieranie...',
-      filesCompleted: 0,
-      filesTotal: total,
-    });
-  }
+  report(0);
 
-  // Count already-valid files at start
-  for (const task of tasks) {
-    if (await fileExistsAndValid(task.dest, task.sha1, task.size)) {
-      completed++;
-    }
-  }
-  if (opts && completed > 0) {
-    const progress = total > 0 ? completed / total : 0;
-    emitAssetProgress({
-      operationId: opts.operationId,
-      progress,
-      message: opts.label ?? 'Pobieranie...',
-      filesCompleted: completed,
-      filesTotal: total,
-    });
-  }
+  const pending: DownloadTask[] = [];
+  await forEachConcurrently(tasks, concurrency, async (task) => {
+    throwIfCancelled(opts?.signal, 'Download');
+    if (!(await fileExistsAndValid(task.dest, task.sha1, task.size))) pending.push(task);
+  });
 
-  const workers: Promise<void>[] = [];
-  for (let i = 0; i < concurrency; i++) {
-    workers.push(
-      (async () => {
-        while (queue.length > 0) {
-          const task = queue.shift()!;
-          if (await fileExistsAndValid(task.dest, task.sha1, task.size)) continue;
-          await downloadFile(task.url, task.dest, task.sha1, 3, opts?.signal);
-          reportProgress();
-        }
-      })(),
-    );
-  }
+  let completed = total - pending.length;
+  if (completed > 0) report(completed);
 
-  await Promise.all(workers);
+  await forEachConcurrently(pending, concurrency, async (task) => {
+    await downloadFile(task.url, task.dest, task.sha1, 3, opts?.signal);
+    completed++;
+    report(completed);
+  });
 
-  // Final
-  if (opts) {
-    emitAssetProgress({
-      operationId: opts.operationId,
-      progress: 1,
-      message: 'Pobieranie zakończone',
-      filesCompleted: total,
-      filesTotal: total,
-    });
-  }
+  report(total, 'Pobieranie zakończone');
 }
 
 // ── Download client JAR ────────────────────────────────────

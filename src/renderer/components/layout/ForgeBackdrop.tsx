@@ -42,14 +42,31 @@ export function ForgeBackdrop({ ambient = false }: ForgeBackdropProps) {
   // every animation, and a scene swap is itself motion.
   const [reduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
+  // Stop animating when nothing can be seen. The default launch behaviour
+  // minimises this window, so its normal state during a play session is
+  // off-screen — and a full-viewport animated SVG that keeps compositing there
+  // is spending the GPU on nobody, while the game it just started wants it.
+  const [idle, setIdle] = useState(() => document.hidden);
   useEffect(() => {
-    if (reduced || ambient) return;
+    const update = () => setIdle(document.hidden || !document.hasFocus());
+    document.addEventListener('visibilitychange', update);
+    window.addEventListener('focus', update);
+    window.addEventListener('blur', update);
+    return () => {
+      document.removeEventListener('visibilitychange', update);
+      window.removeEventListener('focus', update);
+      window.removeEventListener('blur', update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduced || ambient || idle) return;
     const t = setInterval(
       () => setBackIdx((b) => b ?? (frontRef.current + 1) % SCENES.length),
       HOLD_MS,
     );
     return () => clearInterval(t);
-  }, [reduced, ambient]);
+  }, [reduced, ambient, idle]);
 
   useEffect(() => {
     if (backIdx === null) return;
@@ -66,6 +83,7 @@ export function ForgeBackdrop({ ambient = false }: ForgeBackdropProps) {
   return (
     <div
       className="rf-backdrop pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      data-idle={idle}
       aria-hidden
     >
       <svg

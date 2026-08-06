@@ -452,6 +452,20 @@ export interface GameExitInfo {
  * The outcome of checking a manifest's signature — always about the manifest a
  * profile last *installed*, never about one fetched to answer the question.
  */
+/**
+ * A window onto the launcher log, and a cursor for asking what came next.
+ *
+ * `size` is the file size at the moment of the read. Passing it back as `since`
+ * returns only the bytes appended after it, so following a live log does not
+ * mean re-reading and re-marshalling the whole tail every couple of seconds.
+ */
+export interface LogTail {
+  lines: string[];
+  size: number;
+  /** The cursor was not usable — the file rotated, or this is the first read — so `lines` replaces whatever the caller had. */
+  reset: boolean;
+}
+
 export interface ManifestVerification {
   signed: boolean;
   valid: boolean;
@@ -708,7 +722,7 @@ export interface InvokeChannels {
   ) => Promise<IpcResult<string | null>>;
   'system:get-logs-path': () => Promise<IpcResult<string>>;
   /** Tail the launcher's own log. Returns oldest-first lines, newest last. */
-  'system:read-log': (lines?: number) => Promise<IpcResult<string[]>>;
+  'system:read-log': (lines?: number, since?: number) => Promise<IpcResult<LogTail>>;
 
   // -- Window Controls --
   'window:minimize': () => Promise<void>;

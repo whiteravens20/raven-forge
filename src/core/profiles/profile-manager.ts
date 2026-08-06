@@ -131,22 +131,30 @@ async function listDir(dir: string): Promise<Dirent[]> {
   }
 }
 
-/** Total size of everything under a directory, following no symlinks. */
+/**
+ * Total size of everything under a directory, following no symlinks.
+ *
+ * Every entry is walked at once rather than one `stat` at a time. A profile
+ * with a few worlds in it holds tens of thousands of region and chunk files,
+ * and the delete confirmation cannot open until this finishes — serially that
+ * is a dialog that visibly hangs on exactly the profiles whose deletion is
+ * worth thinking about.
+ */
 async function directorySize(dir: string): Promise<number> {
-  let total = 0;
-  for (const entry of await listDir(dir)) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      total += await directorySize(full);
-    } else if (entry.isFile()) {
+  const sizes = await Promise.all(
+    (await listDir(dir)).map(async (entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return directorySize(full);
+      if (!entry.isFile()) return 0;
       try {
-        total += (await fs.stat(full)).size;
+        return (await fs.stat(full)).size;
       } catch {
         /* vanished mid-walk — it is not going to be deleted either */
+        return 0;
       }
-    }
-  }
-  return total;
+    }),
+  );
+  return sizes.reduce((total, size) => total + size, 0);
 }
 
 /**

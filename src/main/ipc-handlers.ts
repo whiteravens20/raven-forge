@@ -222,29 +222,52 @@ export function registerAllIpcHandlers(): void {
   handle('system:get-logs-path', () => {
     return ok(paths.logsDir);
   });
-  handle('system:read-log', async (_event, lines?: number) => {
+  /**
+   * The tail of the launcher log, or only what has been written since last time.
+   *
+   * `since` is the `size` from a previous call. With one, this reads just the
+   * bytes appended after it — which is what makes the log viewer's two-second
+   * poll cost a few hundred bytes instead of re-reading a megabyte, re-splitting
+   * it and marshalling five thousand strings across the boundary to arrive at
+   * the same list it already had.
+   */
+  handle('system:read-log', async (_event, lines?: number, since?: number) => {
     const wanted = Math.min(Math.max(lines ?? LOG_TAIL_DEFAULT_LINES, 1), LOG_TAIL_MAX_LINES);
     const file = path.join(paths.logsDir, 'main.log');
     let handle;
     try {
       handle = await fs.open(file, 'r');
       const { size } = await handle.stat();
-      // electron-log rotates at 5 MB; only the tail is ever interesting, so
-      // read a bounded window from the end rather than the whole file.
-      const start = Math.max(0, size - LOG_TAIL_MAX_BYTES);
+
+      // A file that has shrunk was rotated by electron-log (it does so at 5 MB),
+      // so the caller's cursor points into a file that no longer exists and the
+      // only correct answer is a fresh tail.
+      const canResume = typeof since === 'number' && since > 0 && since <= size;
+      const follow = canResume && size - since! <= LOG_TAIL_MAX_BYTES;
+
+      if (follow && size === since) return ok({ lines: [], size, reset: false });
+
+      // Only the tail is ever interesting; read a bounded window from the end.
+      const start = follow ? since! : Math.max(0, size - LOG_TAIL_MAX_BYTES);
       const buffer = Buffer.alloc(size - start);
-      // `read` is allowed to return fewer bytes than asked for; decoding the whole
-      // buffer regardless appended the NUL padding it was allocated with to the
-      // end of the log tail.
+      // `read` may return fewer bytes than asked for; decoding the whole buffer
+      // regardless appended its NUL padding to the end of the tail.
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, start);
 
-      const text = buffer.subarray(0, bytesRead).toString('utf-8');
-      const all = text.split(/\r?\n/);
-      // A non-zero offset almost certainly lands mid-line; drop that fragment.
-      if (start > 0) all.shift();
-      return ok(all.filter((l) => l.length > 0).slice(-wanted));
+      const all = buffer.subarray(0, bytesRead).toString('utf-8').split(/\r?\n/);
+      // A window that does not start at byte zero almost certainly begins
+      // mid-line. Resuming from a cursor does start on a boundary.
+      if (start > 0 && !follow) all.shift();
+
+      return ok({
+        lines: all.filter((l) => l.length > 0).slice(-wanted),
+        size,
+        reset: !follow,
+      });
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return ok([]);
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        return ok({ lines: [], size: 0, reset: true });
+      }
       return fail(`Failed to read log: ${reason(err)}`);
     } finally {
       await handle?.close();
