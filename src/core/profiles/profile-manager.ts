@@ -45,16 +45,16 @@ export async function createProfile(
   data: Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>,
 ): Promise<Profile> {
   const now = new Date().toISOString();
-  const profile: Profile = {
+  // The schema's output is what gets stored, not the caller's object: parsing
+  // and then discarding the result would let unknown fields — from an import,
+  // or from a newer build's profile — persist into profiles.json unexamined.
+  const profile: Profile = profileSchema.parse({
     ...data,
     id: crypto.randomUUID(),
     allocatedRamMb: data.allocatedRamMb ?? DEFAULT_RAM_MB,
     createdAt: now,
     updatedAt: now,
-  };
-
-  // Validate
-  profileSchema.parse(profile);
+  });
 
   const profiles = await readProfilesIndex();
   profiles.push(profile);
@@ -293,17 +293,75 @@ export async function exportProfile(profileId: string): Promise<string> {
   return JSON.stringify(profile, null, 2);
 }
 
-export async function importProfile(json: string): Promise<Profile> {
-  const parsed = JSON.parse(json) as Profile;
+/**
+ * Fields an imported profile never keeps.
+ *
+ * A profile export is a file that gets passed around — posted in a Discord
+ * channel, attached to a forum reply — and `preLaunchCommand` is handed to a
+ * *shell* at the next launch while `customJavaPath` is handed to `spawn`. That
+ * makes an innocuous-looking "here's my profile" attachment a way to run
+ * whatever the sender likes on the machine that opens it, with no step at which
+ * anyone is asked.
+ *
+ * Both stay available as features; they are simply set by the person at the
+ * keyboard, in the profile editor, rather than arriving inside a file. That is
+ * the difference between configuring a hook and receiving one.
+ */
+export const NOT_IMPORTED = ['preLaunchCommand', 'customJavaPath'] as const;
 
-  // Create as new profile (new ID, timestamps)
+/** A profile export, reduced to what may safely be turned into a new profile. */
+export interface ImportedProfile {
+  data: Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>;
+  /** Executable fields the file carried and that were discarded. */
+  dropped: string[];
+}
+
+/**
+ * Read a profile export into something `createProfile` may be given.
+ *
+ * Pure, so the rule above can be pinned by a test without a filesystem.
+ */
+export function readImportedProfile(json: string): ImportedProfile {
+  const raw: unknown = JSON.parse(json);
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error('That file does not contain a profile');
+  }
+
+  const dropped = NOT_IMPORTED.filter((field) => (raw as Record<string, unknown>)[field]);
+
+  // Validated against the schema before anything is built from it, and the
+  // schema's *output* is what is used — parsing and then keeping the original
+  // object would let fields nothing knows about ride along into profiles.json.
+  // The three the launcher assigns itself are optional here: an export carries
+  // them, and a profile pasted together by hand need not.
+  const parsed = profileSchema
+    .partial({ id: true, createdAt: true, updatedAt: true })
+    .safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      'That file is not a valid profile — ' +
+        parsed.error.issues.map((i) => `${i.path.join('.') || 'root'}: ${i.message}`).join('; '),
+    );
+  }
+
   const {
     id: _id,
     createdAt: _ca,
     updatedAt: _ua,
     lastPlayed: _lp,
     totalPlayTimeMinutes: _tp,
+    preLaunchCommand: _pre,
+    customJavaPath: _java,
     ...data
-  } = parsed;
+  } = parsed.data;
+
+  return { data, dropped };
+}
+
+export async function importProfile(json: string): Promise<Profile> {
+  const { data, dropped } = readImportedProfile(json);
+  if (dropped.length > 0) {
+    log.warn(`Dropped ${dropped.join(' and ')} while importing profile ${data.name}`);
+  }
   return createProfile(data);
 }
