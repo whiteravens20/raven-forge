@@ -1,9 +1,10 @@
-import { app, ipcMain, dialog, shell } from 'electron';
+import { app, ipcMain, dialog, shell, type IpcMainInvokeEvent } from 'electron';
 import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { log } from './logger';
 import { getMainWindow } from './window';
+import { assertTrustedSender } from './security';
 import { getSettings, updateSettings, resetSettings } from '../core/config/settings-manager';
 import { applyProxySettings } from '../core/net/proxy';
 import { paths } from '../core/config/paths';
@@ -105,6 +106,23 @@ function reason(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * `ipcMain.handle`, with the caller checked first.
+ *
+ * Every channel goes through this rather than through `ipcMain.handle`
+ * directly, so the guard is a property of the registration function instead of
+ * something each of the eighty handlers has to remember.
+ */
+function handle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: never[]) => unknown,
+): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedSender(event, channel);
+    return listener(event, ...(args as never[]));
+  });
+}
+
 /** True when `target` is one of the launcher's own directories, or inside one. */
 function isInsideLauncherData(target: string): boolean {
   if (typeof target !== 'string' || target === '') return false;
@@ -120,10 +138,10 @@ function isInsideLauncherData(target: string): boolean {
  */
 export function registerAllIpcHandlers(): void {
   // ── Window Controls ──────────────────────────────────────
-  ipcMain.handle('window:minimize', () => {
+  handle('window:minimize', () => {
     getMainWindow()?.minimize();
   });
-  ipcMain.handle('window:maximize', () => {
+  handle('window:maximize', () => {
     const win = getMainWindow();
     if (win?.isMaximized()) {
       win.unmaximize();
@@ -131,15 +149,15 @@ export function registerAllIpcHandlers(): void {
       win?.maximize();
     }
   });
-  ipcMain.handle('window:close', () => {
+  handle('window:close', () => {
     getMainWindow()?.close();
   });
-  ipcMain.handle('window:is-maximized', () => {
+  handle('window:is-maximized', () => {
     return getMainWindow()?.isMaximized() ?? false;
   });
 
   // ── System ───────────────────────────────────────────────
-  ipcMain.handle('system:get-info', async () => {
+  handle('system:get-info', async () => {
     const info: SystemInfo = {
       launcherVersion: app.getVersion(),
       platform: process.platform as SystemInfo['platform'],
@@ -150,7 +168,7 @@ export function registerAllIpcHandlers(): void {
     };
     return ok(info);
   });
-  ipcMain.handle('system:open-path', async (_event, targetPath: string) => {
+  handle('system:open-path', async (_event, targetPath: string) => {
     // `shell.openPath` runs whatever the OS associates with the target — an
     // `.exe` or `.bat` on Windows, a `.desktop` entry on Linux — so an
     // unrestricted one is a way to execute an arbitrary file by asking the
@@ -167,7 +185,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to open path: ${reason(err)}`);
     }
   });
-  ipcMain.handle('system:open-url', async (_event, url: string) => {
+  handle('system:open-url', async (_event, url: string) => {
     // Only allow https:// and http:// URLs for security
     if (!url.startsWith('https://') && !url.startsWith('http://')) {
       return fail('Only HTTP/HTTPS URLs are allowed');
@@ -179,7 +197,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to open URL: ${reason(err)}`);
     }
   });
-  ipcMain.handle('system:select-directory', async () => {
+  handle('system:select-directory', async () => {
     const win = getMainWindow();
     if (!win) return fail('No window available');
     const result = await dialog.showOpenDialog(win, {
@@ -188,7 +206,7 @@ export function registerAllIpcHandlers(): void {
     if (result.canceled || result.filePaths.length === 0) return ok(null);
     return ok(result.filePaths[0]);
   });
-  ipcMain.handle(
+  handle(
     'system:select-file',
     async (_event, filters?: { name: string; extensions: string[] }[]) => {
       const win = getMainWindow();
@@ -201,10 +219,10 @@ export function registerAllIpcHandlers(): void {
       return ok(result.filePaths[0]);
     },
   );
-  ipcMain.handle('system:get-logs-path', () => {
+  handle('system:get-logs-path', () => {
     return ok(paths.logsDir);
   });
-  ipcMain.handle('system:read-log', async (_event, lines?: number) => {
+  handle('system:read-log', async (_event, lines?: number) => {
     const wanted = Math.min(Math.max(lines ?? LOG_TAIL_DEFAULT_LINES, 1), LOG_TAIL_MAX_LINES);
     const file = path.join(paths.logsDir, 'main.log');
     let handle;
@@ -231,14 +249,14 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Settings ─────────────────────────────────────────────
-  ipcMain.handle('settings:get', async () => {
+  handle('settings:get', async () => {
     try {
       return ok(await getSettings());
     } catch (err) {
       return fail(`Failed to load settings: ${reason(err)}`);
     }
   });
-  ipcMain.handle('settings:update', async (_event, updates: Partial<GlobalSettings>) => {
+  handle('settings:update', async (_event, updates: Partial<GlobalSettings>) => {
     try {
       const settings = await updateSettings(updates);
       await applyProxySettings(settings);
@@ -247,14 +265,14 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to update settings: ${reason(err)}`);
     }
   });
-  ipcMain.handle('settings:reset', async () => {
+  handle('settings:reset', async () => {
     try {
       return ok(await resetSettings());
     } catch (err) {
       return fail(`Failed to reset settings: ${reason(err)}`);
     }
   });
-  ipcMain.handle('settings:add-trusted-key', async (_event, key: TrustedKey) => {
+  handle('settings:add-trusted-key', async (_event, key: TrustedKey) => {
     try {
       const settings = await getSettings();
       const exists = settings.trustedPublicKeys.some((k) => k.publicKey === key.publicKey);
@@ -267,7 +285,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to add trusted key: ${reason(err)}`);
     }
   });
-  ipcMain.handle('settings:remove-trusted-key', async (_event, publicKey: string) => {
+  handle('settings:remove-trusted-key', async (_event, publicKey: string) => {
     try {
       const settings = await getSettings();
       await updateSettings({
@@ -280,41 +298,41 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── News & Announcements ────────────────────────────────
-  ipcMain.handle('news:get', async () => {
+  handle('news:get', async () => {
     try {
       return ok(await fetchNews());
     } catch (err) {
       return fail(`Failed to fetch news: ${reason(err)}`);
     }
   });
-  ipcMain.handle('news:refresh', async () => {
+  handle('news:refresh', async () => {
     try {
       return ok(await fetchNews(true));
     } catch (err) {
       return fail(`Failed to refresh news: ${reason(err)}`);
     }
   });
-  ipcMain.handle('announcements:get', async () => {
+  handle('announcements:get', async () => {
     try {
       return ok(await fetchAnnouncements());
     } catch (err) {
       return fail(`Failed to fetch announcements: ${reason(err)}`);
     }
   });
-  ipcMain.handle('announcements:refresh', async () => {
+  handle('announcements:refresh', async () => {
     try {
       return ok(await fetchAnnouncements(true));
     } catch (err) {
       return fail(`Failed to refresh announcements: ${reason(err)}`);
     }
   });
-  ipcMain.handle('announcements:dismiss', async (_event, _id: string) => {
+  handle('announcements:dismiss', async (_event, _id: string) => {
     // Dismissal is handled client-side (stored in localStorage / zustand)
     return ok(undefined);
   });
 
   // ── Auth ─────────────────────────────────────────────────
-  ipcMain.handle('auth:login-microsoft', async () => {
+  handle('auth:login-microsoft', async () => {
     try {
       return ok(await loginMicrosoft());
     } catch (err) {
@@ -322,14 +340,14 @@ export function registerAllIpcHandlers(): void {
       return fail(`Login failed: ${reason(err)}`);
     }
   });
-  ipcMain.handle('auth:login-offline', async (_event, username: string) => {
+  handle('auth:login-offline', async (_event, username: string) => {
     try {
       return ok(await loginOffline(username));
     } catch (err) {
       return fail(`Offline login failed: ${reason(err)}`);
     }
   });
-  ipcMain.handle('auth:logout', async (_event, accountId: string) => {
+  handle('auth:logout', async (_event, accountId: string) => {
     try {
       await logoutAccount(accountId);
       return ok(undefined);
@@ -337,14 +355,14 @@ export function registerAllIpcHandlers(): void {
       return fail(`Logout failed: ${reason(err)}`);
     }
   });
-  ipcMain.handle('auth:get-state', async () => {
+  handle('auth:get-state', async () => {
     try {
       return ok(await getAuthState());
     } catch (err) {
       return fail(`Failed to get auth state: ${reason(err)}`);
     }
   });
-  ipcMain.handle('auth:set-active', async (_event, accountId: string) => {
+  handle('auth:set-active', async (_event, accountId: string) => {
     try {
       await setActiveAccount(accountId);
       return ok(undefined);
@@ -352,7 +370,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to set active account: ${reason(err)}`);
     }
   });
-  ipcMain.handle('auth:refresh', async (_event, accountId: string) => {
+  handle('auth:refresh', async (_event, accountId: string) => {
     try {
       return ok(await refreshAccount(accountId));
     } catch (err) {
@@ -361,35 +379,35 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Profiles ─────────────────────────────────────────────
-  ipcMain.handle('profiles:get-all', async () => {
+  handle('profiles:get-all', async () => {
     try {
       return ok(await getAllProfiles());
     } catch (err) {
       return fail(`Failed to get profiles: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:get', async (_event, profileId: string) => {
+  handle('profiles:get', async (_event, profileId: string) => {
     try {
       return ok(await getProfile(profileId));
     } catch (err) {
       return fail(`Failed to get profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:create', async (_event, profile) => {
+  handle('profiles:create', async (_event, profile) => {
     try {
       return ok(await createProfile(profile));
     } catch (err) {
       return fail(`Failed to create profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:update', async (_event, profileId: string, updates) => {
+  handle('profiles:update', async (_event, profileId: string, updates) => {
     try {
       return ok(await updateProfile(profileId, updates));
     } catch (err) {
       return fail(`Failed to update profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:delete', async (_event, profileId: string, deleteFiles: boolean) => {
+  handle('profiles:delete', async (_event, profileId: string, deleteFiles: boolean) => {
     try {
       await deleteProfile(profileId, deleteFiles);
       return ok(undefined);
@@ -397,28 +415,28 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to delete profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:get-file-summary', async (_event, profileId: string) => {
+  handle('profiles:get-file-summary', async (_event, profileId: string) => {
     try {
       return ok(await summarizeProfileFiles(profileId));
     } catch (err) {
       return fail(`Failed to inspect profile files: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:list-orphaned', async () => {
+  handle('profiles:list-orphaned', async () => {
     try {
       return ok(await listOrphanedProfiles());
     } catch (err) {
       return fail(`Failed to list kept profile files: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:adopt-orphaned', async (_event, profileId: string) => {
+  handle('profiles:adopt-orphaned', async (_event, profileId: string) => {
     try {
       return ok(await adoptOrphanedProfile(profileId));
     } catch (err) {
       return fail(`Failed to restore that profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:discard-orphaned', async (_event, profileId: string) => {
+  handle('profiles:discard-orphaned', async (_event, profileId: string) => {
     try {
       await discardOrphanedProfile(profileId);
       return ok(undefined);
@@ -426,48 +444,45 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to delete those files: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:duplicate', async (_event, profileId: string) => {
+  handle('profiles:duplicate', async (_event, profileId: string) => {
     try {
       return ok(await duplicateProfile(profileId));
     } catch (err) {
       return fail(`Failed to duplicate profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:export', async (_event, profileId: string) => {
+  handle('profiles:export', async (_event, profileId: string) => {
     try {
       return ok(await exportProfile(profileId));
     } catch (err) {
       return fail(`Failed to export profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:import', async (_event, json: string) => {
+  handle('profiles:import', async (_event, json: string) => {
     try {
       return ok(await importProfile(json));
     } catch (err) {
       return fail(`Failed to import profile: ${reason(err)}`);
     }
   });
-  ipcMain.handle('profiles:get-sync-status', async (_event, profileId: string) => {
+  handle('profiles:get-sync-status', async (_event, profileId: string) => {
     try {
       return ok(await getProfileSyncStatus(profileId));
     } catch (err) {
       return fail(`Failed to get sync status: ${reason(err)}`);
     }
   });
-  ipcMain.handle(
-    'profiles:set-icon',
-    async (_event, profileId: string, sourcePath: string | null) => {
-      try {
-        const profile = sourcePath
-          ? await setProfileIcon(profileId, sourcePath)
-          : await clearProfileIcon(profileId);
-        return ok(profile);
-      } catch (err) {
-        return fail(`Failed to set icon: ${reason(err)}`);
-      }
-    },
-  );
-  ipcMain.handle('profiles:get-icon', async (_event, profileId: string) => {
+  handle('profiles:set-icon', async (_event, profileId: string, sourcePath: string | null) => {
+    try {
+      const profile = sourcePath
+        ? await setProfileIcon(profileId, sourcePath)
+        : await clearProfileIcon(profileId);
+      return ok(profile);
+    } catch (err) {
+      return fail(`Failed to set icon: ${reason(err)}`);
+    }
+  });
+  handle('profiles:get-icon', async (_event, profileId: string) => {
     try {
       return ok(await getProfileIconDataUrl(profileId));
     } catch (err) {
@@ -476,28 +491,28 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Packs ────────────────────────────────────────────────
-  ipcMain.handle('packs:list-catalogue', async () => {
+  handle('packs:list-catalogue', async () => {
     try {
       return ok(await listCataloguePacks());
     } catch (err) {
       return fail(`Could not load the pack list: ${reason(err)}`);
     }
   });
-  ipcMain.handle('packs:create-from-manifest', async (_event, url: string) => {
+  handle('packs:create-from-manifest', async (_event, url: string) => {
     try {
       return ok(await createProfileFromManifest(url));
     } catch (err) {
       return fail(`Could not create a profile from that manifest: ${reason(err)}`);
     }
   });
-  ipcMain.handle('packs:create-from-url', async (_event, url: string) => {
+  handle('packs:create-from-url', async (_event, url: string) => {
     try {
       return ok(await createProfileFromUrl(url));
     } catch (err) {
       return fail(`Could not create a profile from that link: ${reason(err)}`);
     }
   });
-  ipcMain.handle('packs:import-mrpack', async (_event, filePath: string) => {
+  handle('packs:import-mrpack', async (_event, filePath: string) => {
     try {
       return ok(await importMrpack(filePath));
     } catch (err) {
@@ -506,14 +521,14 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Mods ─────────────────────────────────────────────────
-  ipcMain.handle('mods:get-installed', async (_event, profileId: string) => {
+  handle('mods:get-installed', async (_event, profileId: string) => {
     try {
       return ok(await getInstalledMods(profileId));
     } catch (err) {
       return fail(`Failed to get installed mods: ${reason(err)}`);
     }
   });
-  ipcMain.handle('mods:sync-manifest', async (_event, profileId: string) => {
+  handle('mods:sync-manifest', async (_event, profileId: string) => {
     try {
       await syncManifest(profileId);
       return ok(undefined);
@@ -521,14 +536,14 @@ export function registerAllIpcHandlers(): void {
       return fail(`Mod sync failed: ${reason(err)}`);
     }
   });
-  ipcMain.handle('mods:install-from-search', async (_event, profileId, mod, version) => {
+  handle('mods:install-from-search', async (_event, profileId, mod, version) => {
     try {
       return ok(await installModFromSearch(profileId, mod, version));
     } catch (err) {
       return fail(`Failed to install mod: ${reason(err)}`);
     }
   });
-  ipcMain.handle('mods:check-install', async (_event, profileId, mod) => {
+  handle('mods:check-install', async (_event, profileId, mod) => {
     try {
       const profile = await getProfile(profileId);
       if (!profile) return fail(`Profile ${profileId} not found`);
@@ -537,14 +552,14 @@ export function registerAllIpcHandlers(): void {
       return fail(`Could not check compatibility: ${reason(err)}`);
     }
   });
-  ipcMain.handle('mods:install-from-file', async (_event, profileId: string, filePath: string) => {
+  handle('mods:install-from-file', async (_event, profileId: string, filePath: string) => {
     try {
       return ok(await installModFromFile(profileId, filePath));
     } catch (err) {
       return fail(`Failed to install mod from file: ${reason(err)}`);
     }
   });
-  ipcMain.handle('mods:uninstall', async (_event, profileId: string, modId: string) => {
+  handle('mods:uninstall', async (_event, profileId: string, modId: string) => {
     try {
       await uninstallMod(profileId, modId);
       return ok(undefined);
@@ -552,7 +567,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to uninstall mod: ${reason(err)}`);
     }
   });
-  ipcMain.handle(
+  handle(
     'mods:toggle-enabled',
     async (_event, profileId: string, modId: string, enabled: boolean) => {
       try {
@@ -563,14 +578,14 @@ export function registerAllIpcHandlers(): void {
       }
     },
   );
-  ipcMain.handle('mods:search', async (_event, filters) => {
+  handle('mods:search', async (_event, filters) => {
     try {
       return ok(await searchMods(filters));
     } catch (err) {
       return fail(`Mod search failed: ${reason(err)}`);
     }
   });
-  ipcMain.handle('mods:get-facets', async (_event, projectType) => {
+  handle('mods:get-facets', async (_event, projectType) => {
     try {
       return ok(await getSearchFacets(projectType));
     } catch (err) {
@@ -579,21 +594,21 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Shaders & Resource Packs ─────────────────────────────
-  ipcMain.handle('content:get-shaders', async (_event, profileId: string) => {
+  handle('content:get-shaders', async (_event, profileId: string) => {
     try {
       return ok(await listContent('shaders', profileId));
     } catch (err) {
       return fail(`Failed to list shaders: ${reason(err)}`);
     }
   });
-  ipcMain.handle('content:get-resourcepacks', async (_event, profileId: string) => {
+  handle('content:get-resourcepacks', async (_event, profileId: string) => {
     try {
       return ok(await listContent('resourcepacks', profileId));
     } catch (err) {
       return fail(`Failed to list resource packs: ${reason(err)}`);
     }
   });
-  ipcMain.handle(
+  handle(
     'content:install-shader',
     async (_event, profileId: string, source: string, version?: string) => {
       try {
@@ -604,7 +619,7 @@ export function registerAllIpcHandlers(): void {
       }
     },
   );
-  ipcMain.handle('content:check-install', async (_event, profileId, item) => {
+  handle('content:check-install', async (_event, profileId, item) => {
     try {
       const profile = await getProfile(profileId);
       if (!profile) return fail(`Profile ${profileId} not found`);
@@ -613,7 +628,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Could not check compatibility: ${reason(err)}`);
     }
   });
-  ipcMain.handle('content:get-shader-loader-state', async (_event, profileId: string) => {
+  handle('content:get-shader-loader-state', async (_event, profileId: string) => {
     try {
       const profile = await getProfile(profileId);
       if (!profile) return fail(`Profile ${profileId} not found`);
@@ -622,29 +637,26 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to check the shader loader: ${reason(err)}`);
     }
   });
-  ipcMain.handle(
-    'content:install-shader-loader',
-    async (_event, profileId: string, projectId: string) => {
-      try {
-        const profile = await getProfile(profileId);
-        if (!profile) return fail(`Profile ${profileId} not found`);
-        return ok(
-          await installShaderLoader(
-            profileId,
-            projectId,
-            profile.minecraftVersion,
-            profile.modLoader,
-          ),
-        );
-      } catch (err) {
-        // Reported, not thrown: the shader pack itself is already installed, and
-        // a network hiccup fetching Iris is not a reason to call that a failure.
-        log.warn('Shader loader install failed:', err);
-        return ok<ShaderLoaderResult>({ status: 'failed', error: reason(err) });
-      }
-    },
-  );
-  ipcMain.handle(
+  handle('content:install-shader-loader', async (_event, profileId: string, projectId: string) => {
+    try {
+      const profile = await getProfile(profileId);
+      if (!profile) return fail(`Profile ${profileId} not found`);
+      return ok(
+        await installShaderLoader(
+          profileId,
+          projectId,
+          profile.minecraftVersion,
+          profile.modLoader,
+        ),
+      );
+    } catch (err) {
+      // Reported, not thrown: the shader pack itself is already installed, and
+      // a network hiccup fetching Iris is not a reason to call that a failure.
+      log.warn('Shader loader install failed:', err);
+      return ok<ShaderLoaderResult>({ status: 'failed', error: reason(err) });
+    }
+  });
+  handle(
     'content:install-resourcepack',
     async (_event, profileId: string, source: string, version?: string) => {
       try {
@@ -655,7 +667,7 @@ export function registerAllIpcHandlers(): void {
       }
     },
   );
-  ipcMain.handle('content:remove-shader', async (_event, profileId: string, id: string) => {
+  handle('content:remove-shader', async (_event, profileId: string, id: string) => {
     try {
       await removeContent('shaders', profileId, id);
       return ok(undefined);
@@ -663,7 +675,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to remove shader: ${reason(err)}`);
     }
   });
-  ipcMain.handle('content:remove-resourcepack', async (_event, profileId: string, id: string) => {
+  handle('content:remove-resourcepack', async (_event, profileId: string, id: string) => {
     try {
       await removeContent('resourcepacks', profileId, id);
       return ok(undefined);
@@ -671,7 +683,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to remove resource pack: ${reason(err)}`);
     }
   });
-  ipcMain.handle(
+  handle(
     'content:reorder-resourcepacks',
     async (_event, profileId: string, orderedIds: string[]) => {
       try {
@@ -684,21 +696,21 @@ export function registerAllIpcHandlers(): void {
   );
 
   // ── Java ─────────────────────────────────────────────────
-  ipcMain.handle('java:get-installations', async () => {
+  handle('java:get-installations', async () => {
     try {
       return ok(await getJavaInstallations());
     } catch (err) {
       return fail(`Failed to get Java installations: ${reason(err)}`);
     }
   });
-  ipcMain.handle('java:ensure-version', async (_event, majorVersion: number) => {
+  handle('java:ensure-version', async (_event, majorVersion: number) => {
     try {
       return ok(await ensureJavaVersion(majorVersion));
     } catch (err) {
       return fail(`Failed to ensure Java version: ${reason(err)}`);
     }
   });
-  ipcMain.handle('java:detect-system', async () => {
+  handle('java:detect-system', async () => {
     try {
       return ok(await detectSystemJava());
     } catch (err) {
@@ -707,7 +719,7 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Mod Loaders ──────────────────────────────────────────
-  ipcMain.handle('loaders:install', async (_event, loader, loaderVersion, mcVersion) => {
+  handle('loaders:install', async (_event, loader, loaderVersion, mcVersion) => {
     try {
       await installLoader(loader, loaderVersion, mcVersion);
       return ok(undefined);
@@ -715,14 +727,14 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to install loader: ${reason(err)}`);
     }
   });
-  ipcMain.handle('loaders:get-versions', async (_event, loader, mcVersion) => {
+  handle('loaders:get-versions', async (_event, loader, mcVersion) => {
     try {
       return ok(await getLoaderVersions(loader, mcVersion));
     } catch (err) {
       return fail(`Failed to get loader versions: ${reason(err)}`);
     }
   });
-  ipcMain.handle('loaders:is-installed', async (_event, loader, loaderVersion, mcVersion) => {
+  handle('loaders:is-installed', async (_event, loader, loaderVersion, mcVersion) => {
     try {
       return ok(await isLoaderInstalled(loader, loaderVersion, mcVersion));
     } catch (err) {
@@ -731,7 +743,7 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Game Launch ──────────────────────────────────────────
-  ipcMain.handle('game:launch', async (_event, options) => {
+  handle('game:launch', async (_event, options) => {
     try {
       await launchGame(options);
       return ok(undefined);
@@ -745,7 +757,7 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to launch game: ${reason(err)}`);
     }
   });
-  ipcMain.handle('game:kill', async (_event, profileId: string) => {
+  handle('game:kill', async (_event, profileId: string) => {
     try {
       await killGame(profileId);
       return ok(undefined);
@@ -753,28 +765,28 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to kill game: ${reason(err)}`);
     }
   });
-  ipcMain.handle('game:is-running', async (_event, profileId: string) => {
+  handle('game:is-running', async (_event, profileId: string) => {
     try {
       return ok(await isGameRunning(profileId));
     } catch (err) {
       return fail(`Failed to check game status: ${reason(err)}`);
     }
   });
-  ipcMain.handle('game:get-log-tail', async (_event, profileId: string, lines?: number) => {
+  handle('game:get-log-tail', async (_event, profileId: string, lines?: number) => {
     try {
       return ok(getLogTail(profileId, lines));
     } catch (err) {
       return fail(`Failed to read game log: ${reason(err)}`);
     }
   });
-  ipcMain.handle('game:cancel', async (_event, profileId: string) => {
+  handle('game:cancel', async (_event, profileId: string) => {
     try {
       return ok(cancelJob(profileId));
     } catch (err) {
       return fail(`Failed to cancel: ${reason(err)}`);
     }
   });
-  ipcMain.handle('game:get-versions', async (_event, includeSnapshots?: boolean) => {
+  handle('game:get-versions', async (_event, includeSnapshots?: boolean) => {
     try {
       const manifest = await getVersionManifest();
       const wanted = includeSnapshots ? ['release', 'snapshot'] : ['release'];
@@ -787,14 +799,14 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Updater ──────────────────────────────────────────────
-  ipcMain.handle('updater:check', async () => {
+  handle('updater:check', async () => {
     try {
       return ok(await checkForUpdates());
     } catch (err) {
       return fail(`Update check failed: ${reason(err)}`);
     }
   });
-  ipcMain.handle('updater:download', async () => {
+  handle('updater:download', async () => {
     try {
       await downloadUpdate();
       return ok(undefined);
@@ -802,13 +814,13 @@ export function registerAllIpcHandlers(): void {
       return fail(`Update download failed: ${reason(err)}`);
     }
   });
-  ipcMain.handle('updater:install', async () => {
+  handle('updater:install', async () => {
     quitAndInstall();
     return ok(undefined);
   });
 
   // ── Manifest Verification ────────────────────────────────
-  ipcMain.handle('manifest:verify', async (_event, profileId: string) => {
+  handle('manifest:verify', async (_event, profileId: string) => {
     try {
       return ok(await getLastManifestVerification(profileId));
     } catch (err) {

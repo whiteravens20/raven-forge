@@ -48,6 +48,20 @@ export function createMainWindow(): BrowserWindow {
     return { action: 'deny' };
   });
 
+  // `setWindowOpenHandler` only covers `window.open`. A top-level navigation —
+  // an `<a href>` without a target, a `location =` — replaces the launcher's own
+  // page, preload and all, with whatever it points at. This window loads exactly
+  // one document for its lifetime, so anything that tries to change it is either
+  // a bug or an attack, and either way belongs in the system browser.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const current = mainWindow?.webContents.getURL();
+    if (current && url === current) return;
+    event.preventDefault();
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      void shell.openExternal(url);
+    }
+  });
+
   // Emit maximize state changes to renderer
   mainWindow.on('maximize', () => {
     mainWindow?.webContents.send('window:maximized-changed', true);

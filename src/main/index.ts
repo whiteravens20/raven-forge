@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import { initLogger, log } from './logger';
 import { createMainWindow } from './window';
+import { installContentSecurityPolicy } from './security';
 import { registerAllIpcHandlers } from './ipc-handlers';
 import { loadSettings } from '../core/config/settings-manager';
 import { ensureDataDirectories } from './init';
@@ -31,6 +32,9 @@ app.whenReady().then(async () => {
   } catch (err) {
     log.error('Failed to initialize:', err);
   }
+
+  // Before the window exists, so the very first document is already covered.
+  installContentSecurityPolicy();
 
   registerAllIpcHandlers();
   createMainWindow();
