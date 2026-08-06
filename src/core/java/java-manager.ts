@@ -301,10 +301,17 @@ async function extractArchive(archivePath: string, destDir: string): Promise<voi
   await fs.rm(destDir, { recursive: true, force: true });
   await fs.mkdir(destDir, { recursive: true });
 
+  // `tar` handles the zip too: Windows 10 1803 and later ship bsdtar, which
+  // reads zip archives. The `else` is not decoration — without it an extension
+  // this does not recognise made the whole function a silent no-op, and the
+  // failure surfaced several steps later as "installed JRE but failed to
+  // verify", which points at the wrong thing entirely.
   if (archivePath.endsWith('.tar.gz')) {
     await execFileAsync('tar', ['-xzf', archivePath, '-C', destDir, '--strip-components=1']);
   } else if (archivePath.endsWith('.zip')) {
     await execFileAsync('tar', ['-xf', archivePath, '-C', destDir, '--strip-components=1']);
+  } else {
+    throw new Error(`Cannot extract ${path.basename(archivePath)}: unrecognised archive type`);
   }
 
   // Ensure bin/java is executable

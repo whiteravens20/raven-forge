@@ -1,4 +1,5 @@
 import { log } from '../../main/logger';
+import { acceptedLoaders } from '../../shared/constants';
 import { getModVersions, getProjectTitle, type ModrinthVersion } from './modrinth-api';
 import { getInstalledMods, installModrinthVersion, installRequiredDependencies } from './mod-sync';
 import { requiredDependencies } from './compatibility';
@@ -70,7 +71,7 @@ export async function getShaderLoaderState(
 
   const options: ShaderLoaderOption[] = [];
   for (const candidate of candidates) {
-    const newest = (await getModVersions(candidate.id, mcVersion, modLoader))[0];
+    const newest = (await getModVersions(candidate.id, mcVersion, acceptedLoaders(modLoader)))[0];
     if (!newest) continue;
 
     options.push({
@@ -106,7 +107,7 @@ export async function installShaderLoader(
     return { status: 'failed', error: `${projectId} is not a shader loader for ${modLoader}` };
   }
 
-  const newest = (await getModVersions(candidate.id, mcVersion, modLoader))[0];
+  const newest = (await getModVersions(candidate.id, mcVersion, acceptedLoaders(modLoader)))[0];
   if (!newest) return { status: 'no-build', mcVersion, modLoader };
 
   log.info(`Installing shader loader ${candidate.name} for profile ${profileId}`);

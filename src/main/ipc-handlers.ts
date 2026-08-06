@@ -233,9 +233,12 @@ export function registerAllIpcHandlers(): void {
       // read a bounded window from the end rather than the whole file.
       const start = Math.max(0, size - LOG_TAIL_MAX_BYTES);
       const buffer = Buffer.alloc(size - start);
-      await handle.read(buffer, 0, buffer.length, start);
+      // `read` is allowed to return fewer bytes than asked for; decoding the whole
+      // buffer regardless appended the NUL padding it was allocated with to the
+      // end of the log tail.
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, start);
 
-      const text = buffer.toString('utf-8');
+      const text = buffer.subarray(0, bytesRead).toString('utf-8');
       const all = text.split(/\r?\n/);
       // A non-zero offset almost certainly lands mid-line; drop that fragment.
       if (start > 0) all.shift();

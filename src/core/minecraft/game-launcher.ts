@@ -42,13 +42,31 @@ export function getLogTail(profileId: string, n = 100): string[] {
   return buf.slice(-n);
 }
 
+/**
+ * The severity Minecraft itself put on a log line.
+ *
+ * Matched on the bracketed level the game's log format actually emits — the
+ * usual shape is `[15:04:22] [Render thread/ERROR] [minecraft/…]` — rather than
+ * on the line merely containing the word somewhere. Substring matching made an
+ * error out of every mod whose name contains "error", every class path with
+ * `ErrorHandler` in it, and the phrase "no errors found"; the log filter reads
+ * this, so a startup that went perfectly showed as full of failures.
+ */
+const LOG_LEVEL_PATTERN = /\[[^\]]*\/(FATAL|ERROR|WARN|INFO|DEBUG|TRACE)\]|\[(ERROR|WARN|INFO)\]/i;
+
+export function detectLogLevel(line: string): GameLogLine['level'] {
+  const match = LOG_LEVEL_PATTERN.exec(line);
+  const level = (match?.[1] ?? match?.[2])?.toUpperCase();
+  if (level === 'ERROR' || level === 'FATAL') return 'error';
+  if (level === 'WARN') return 'warn';
+  return 'info';
+}
+
 function emitLogLine(profileId: string, rawLine: string): void {
   const trimmed = rawLine.trimEnd();
   pushLog(profileId, trimmed);
 
-  let level: GameLogLine['level'] = 'info';
-  if (trimmed.includes('[ERROR]') || trimmed.toLowerCase().includes('error')) level = 'error';
-  else if (trimmed.includes('[WARN]') || trimmed.toLowerCase().includes('warn')) level = 'warn';
+  const level = detectLogLevel(trimmed);
 
   const line: GameLogLine = {
     timestamp: new Date().toISOString(),
@@ -394,10 +412,40 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   });
 }
 
+/** How long a JVM gets to shut down politely before it is killed outright. */
+const KILL_GRACE_MS = 10_000;
+
+/**
+ * Stop the game, and do not report success until it has actually stopped.
+ *
+ * This used to drop the process from the map the instant `SIGTERM` was sent. A
+ * JVM that ignores the signal — which is what a hung shutdown *is* — stayed
+ * alive while `isGameRunning` said no, so the launcher would happily start a
+ * second instance against the same game directory and the two would fight over
+ * the same world saves.
+ */
 export async function killGame(profileId: string): Promise<void> {
   const child = runningProcesses.get(profileId);
   if (!child) throw new Error('Game is not running');
+
+  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
   child.kill('SIGTERM');
+
+  const timer = setTimeout(() => {
+    if (!child.killed || runningProcesses.has(profileId)) {
+      log.warn(`Game for ${profileId} ignored SIGTERM after ${KILL_GRACE_MS}ms — sending SIGKILL`);
+      child.kill('SIGKILL');
+    }
+  }, KILL_GRACE_MS);
+
+  try {
+    await exited;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  // The `exit` handler installed at launch is what removes it from the map; this
+  // only guarantees the entry is gone even if that handler was never attached.
   runningProcesses.delete(profileId);
   log.info(`Killed game for profile ${profileId}`);
 }
