@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './fonts.css';
 
 /* Vite's root is src/renderer, so point Tailwind's scanner at the components
    explicitly rather than relying on automatic source detection. */
