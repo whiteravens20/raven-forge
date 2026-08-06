@@ -22,12 +22,16 @@ function entry(over: Record<string, unknown> = {}) {
 }
 
 function respondWith(body: unknown, ok = true, status = 200) {
+  const text = JSON.stringify(body);
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({
       ok,
       status,
       statusText: ok ? 'OK' : 'Not Found',
+      // The catalogue is read as text and size-checked before parsing.
+      headers: new Headers({ 'content-length': String(text.length) }),
+      text: () => Promise.resolve(text),
       json: () => Promise.resolve(body),
     }),
   );

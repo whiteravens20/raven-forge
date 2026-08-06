@@ -10,9 +10,14 @@ vi.mock('../src/core/config/settings-manager', () => ({
 const { fetchNews, fetchAnnouncements } = await import('../src/core/news/news-fetcher');
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
+  const text = JSON.stringify(body);
   return {
     ok,
     status,
+    // The fetcher reads the body as text and checks its length before parsing,
+    // so the size cap has something to measure.
+    headers: new Headers({ 'content-length': String(text.length) }),
+    text: () => Promise.resolve(text),
     json: () => Promise.resolve(body),
   } as Response;
 }

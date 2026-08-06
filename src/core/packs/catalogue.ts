@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { log } from '../../main/logger';
 import { WHITE_RAVENS_PACKS_URL } from '../../shared/branding';
+import { readJsonCapped } from '../net/json';
 import type { CataloguePack } from '../../shared/ipc-types';
 
 /**
@@ -51,7 +52,7 @@ export async function listCataloguePacks(): Promise<CataloguePack[]> {
     throw new Error(`the server answered ${res.status} ${res.statusText}`);
   }
 
-  const parsed = catalogueSchema.safeParse(await res.json());
+  const parsed = catalogueSchema.safeParse(await readJsonCapped(res, 'The pack catalogue'));
   if (!parsed.success) {
     throw new Error(
       'it is malformed — ' +

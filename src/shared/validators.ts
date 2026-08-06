@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DEFAULT_NEWS_FEED_URL, DEFAULT_ANNOUNCEMENT_FEED_URL } from './branding';
+import { isSafeFileName } from './manifest-schema';
 
 // ── Runtime validators for IPC payloads ───────────────────
 // These schemas validate data at IPC boundaries.
@@ -76,7 +77,14 @@ export const profileSchema = z.object({
   iconPath: z.string().optional(),
   iconUrl: z.string().url().optional(),
   iconPreset: z.string().optional(),
-  minecraftVersion: z.string().min(1),
+  // Not free text: this becomes a directory name under `cache/natives/`, a
+  // cache file name and part of the assets path, all before the Mojang lookup
+  // that would reject an id nobody publishes. Anything Mojang has ever released
+  // passes — including the joke snapshots with spaces in them — while a value
+  // that would mean something to a path does not.
+  minecraftVersion: z.string().refine(isSafeFileName, {
+    message: 'minecraftVersion must be a plain version id',
+  }),
   modLoader: z.enum(['vanilla', 'forge', 'neoforge', 'fabric', 'quilt']),
   modLoaderVersion: z.string().optional(),
   manifestUrl: z.string().url().optional(),

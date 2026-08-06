@@ -3,6 +3,7 @@ import type { NewsItem, Announcement } from '../../shared/ipc-types';
 import { newsItemSchema, announcementSchema } from '../../shared/validators';
 import { getSettings } from '../config/settings-manager';
 import { MODRINTH_USER_AGENT } from '../../shared/constants';
+import { readJsonCapped } from '../net/json';
 import { log } from '../../main/logger';
 
 /**
@@ -59,7 +60,7 @@ async function fetchFeed<T>(
       return null;
     }
 
-    const raw: unknown = await response.json();
+    const raw = await readJsonCapped(response, `The ${label.toLowerCase()} feed`);
     if (!Array.isArray(raw)) {
       log.warn(`${label} feed is not a JSON array`);
       return null;

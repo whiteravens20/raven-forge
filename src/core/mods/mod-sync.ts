@@ -22,6 +22,7 @@ import {
 import { requiredDependencies } from './compatibility';
 import { acceptedLoaders } from '../../shared/constants';
 import { downloadToFile } from '../net/download';
+import { readJsonCapped } from '../net/json';
 import { syncContentFromManifest } from './content-manager';
 import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import { getMainWindow } from '../../main/window';
@@ -295,27 +296,6 @@ function parseManifest(body: unknown, profileName: string): ModManifest {
 }
 
 /**
- * Read a response body as JSON, refusing one that is implausibly large.
- *
- * `res.json()` on its own will buffer whatever a host chooses to send, and a
- * manifest is a list of URLs and hashes — kilobytes, not megabytes. The cap is
- * what stops a hostile or broken host from exhausting the main process.
- */
-async function readJsonCapped(res: Response, limit: number, label: string): Promise<unknown> {
-  const declared = Number(res.headers.get('content-length'));
-  if (declared > limit) throw new Error(`${label} is implausibly large — refusing to parse it`);
-
-  const text = await res.text();
-  // Checked after the fact as well: `Content-Length` is absent on a chunked
-  // response, which is exactly how a host would avoid declaring the size.
-  if (text.length > limit) throw new Error(`${label} is implausibly large — refusing to parse it`);
-  return JSON.parse(text);
-}
-
-/** A manifest is a list of references. Anything past this is not one. */
-const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
-
-/**
  * Get the manifest to reconcile against, and the ETag to remember.
  *
  * Three ways in, in order of preference: a fresh 200, the cached copy when the
@@ -379,7 +359,7 @@ async function obtainManifest(
 
   if (!res.ok) throw new Error(`Failed to fetch manifest: ${res.status} ${res.statusText}`);
 
-  const raw = await readJsonCapped(res, MAX_MANIFEST_BYTES, 'The manifest');
+  const raw = await readJsonCapped(res, 'The manifest');
   const loaded: LoadedManifest = { raw, manifest: parseManifest(raw, profileName) };
 
   // Approved before it is cached: a manifest the policy rejects must not become

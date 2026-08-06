@@ -123,7 +123,10 @@ export const configFileEntrySchema = z.object({
 export const modManifestSchema = z.object({
   manifestVersion: z.literal(2),
   serverName: z.string().min(1),
-  minecraftVersion: z.string().min(1),
+  // Same rule as the profile's: it reaches the filesystem as a path component.
+  minecraftVersion: z.string().refine(isSafeFileName, {
+    message: 'minecraftVersion must be a plain version id',
+  }),
   modLoader: z.enum(['vanilla', 'forge', 'neoforge', 'fabric', 'quilt']),
   modLoaderVersion: z.string().optional(),
   mods: z.array(modEntrySchema).default([]),
