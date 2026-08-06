@@ -28,6 +28,7 @@ import {
   NEOFORGE_MAVEN_ROOT,
 } from '../../shared/constants';
 import { getVersionMeta } from '../minecraft/version-manifest';
+import { verifyDownload, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion } from '../java/java-manager';
 import { requiredJavaFor } from '../minecraft/java-requirement';
 import type { LoaderVersion } from '../../shared/ipc-types';
@@ -239,13 +240,55 @@ function readZipEntry(jarPath: string, wanted: string): Promise<Buffer | null> {
   });
 }
 
-async function downloadInstaller(url: string, dest: string): Promise<void> {
+/** The checksum sidecars a Maven repository publishes, strongest first. */
+const MAVEN_CHECKSUMS: Array<{ ext: string; algorithm: HashAlgorithm }> = [
+  { ext: '.sha512', algorithm: 'sha512' },
+  { ext: '.sha256', algorithm: 'sha256' },
+  { ext: '.sha1', algorithm: 'sha1' },
+];
+
+/**
+ * The published checksum for a Maven artifact, if the repository has one.
+ *
+ * Maven writes these beside every artifact, so the launcher can check what it
+ * is about to *execute* rather than trusting that nothing went wrong between
+ * the repository and here. Returns null when none of the sidecars exist, which
+ * is a real possibility for an old artifact and not a reason to refuse the
+ * install — HTTPS is still underneath.
+ */
+async function mavenChecksum(url: string): Promise<HashedEntry | null> {
+  for (const { ext, algorithm } of MAVEN_CHECKSUMS) {
+    try {
+      const res = await fetch(`${url}${ext}`, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) continue;
+      // The file is the hex digest, sometimes followed by the filename.
+      const value = (await res.text()).trim().split(/\s+/)[0]?.toLowerCase();
+      if (value && /^[0-9a-f]{32,128}$/.test(value)) return { [algorithm]: value };
+    } catch {
+      /* sidecar unreachable — try the next, then go without */
+    }
+  }
+  return null;
+}
+
+async function downloadInstaller(url: string, dest: string, label: string): Promise<void> {
+  // Asked for first, so a repository serving a good checksum and a bad jar
+  // cannot be answered in the other order.
+  const expected = await mavenChecksum(url);
+
   const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
   if (!res.ok) {
     throw new Error(`Installer download failed: ${res.status} ${res.statusText} (${url})`);
   }
   await fs.mkdir(path.dirname(dest), { recursive: true });
   await fs.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+
+  if (expected) {
+    // Deletes the file and throws on mismatch — this jar is about to be run.
+    await verifyDownload(dest, expected, `${label} installer`);
+  } else {
+    log.warn(`${label} publishes no checksum for ${url} — the installer was not verified`);
+  }
 }
 
 /**
@@ -291,6 +334,12 @@ async function ensureVanillaClientForInstaller(
   const res = await fetch(meta.downloads.client.url, { signal: AbortSignal.timeout(300_000) });
   if (!res.ok) throw new Error(`Could not download the vanilla client jar: ${res.status}`);
   await fs.writeFile(jarPath, Buffer.from(await res.arrayBuffer()));
+
+  // Mojang's own sha1 is already in hand, and the normal launch path checks the
+  // very same file against it. This copy is the one a Java installer is about
+  // to patch and the game is then going to run, so there is no argument for
+  // being the one place that skips the check.
+  await verifyDownload(jarPath, { sha1: meta.downloads.client.sha1 }, `client jar ${mcVersion}`);
 }
 
 /**
@@ -317,7 +366,7 @@ export async function installForgeLike(
 
   onProgress(0.05, `Pobieranie instalatora ${label}...`);
   const installerPath = path.join(destDir, 'installer.jar');
-  await downloadInstaller(installerUrl(loader, loaderVersion, mcVersion), installerPath);
+  await downloadInstaller(installerUrl(loader, loaderVersion, mcVersion), installerPath, label);
 
   // Read the profile out of the installer before running it: it names the
   // version id the installer is about to produce, so nothing below has to guess.

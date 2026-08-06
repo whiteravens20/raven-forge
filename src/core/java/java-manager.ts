@@ -7,6 +7,7 @@ import { createWriteStream } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { ADOPTIUM_API } from '../../shared/constants';
+import { verifyDownload } from '../mods/integrity';
 import { getMainWindow } from '../../main/window';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
 
@@ -166,12 +167,64 @@ function emitJavaProgress(event: ProgressEvent): void {
 
 // ── Download & install from Adoptium ───────────────────────
 
+/** The one field of Adoptium's assets response this needs. */
+interface AdoptiumAsset {
+  binary?: { package?: { link?: string; checksum?: string } };
+}
+
+/**
+ * Where to get a JRE, and what it should hash to.
+ *
+ * Resolved through `/assets/latest` rather than through `/binary/latest`,
+ * because the assets response carries the sha256 alongside the link and the
+ * binary endpoint carries only a redirect. Everything downloaded here is
+ * extracted and then executed on every launch from that point on, so "what
+ * should this hash to" is not a question to leave unanswered.
+ *
+ * A resolve failure is not fatal: the binary endpoint still works and is still
+ * HTTPS, so the install falls back to it unverified rather than leaving someone
+ * unable to get a JVM at all.
+ */
+async function resolveAdoptiumBinary(
+  majorVersion: number,
+  platform: string,
+  arch: string,
+): Promise<{ url: string; sha256?: string }> {
+  const fallback = `${ADOPTIUM_API}/binary/latest/${majorVersion}/ga/${platform}/${arch}/jre/hotspot/normal/eclipse?project=jdk`;
+
+  try {
+    const query = new URLSearchParams({
+      architecture: arch,
+      image_type: 'jre',
+      os: platform,
+      vendor: 'eclipse',
+    });
+    const res = await fetch(`${ADOPTIUM_API}/assets/latest/${majorVersion}/hotspot?${query}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const assets = (await res.json()) as AdoptiumAsset[];
+    const pkg = assets.find((a) => a.binary?.package?.link)?.binary?.package;
+    if (!pkg?.link) throw new Error('no binary package in the response');
+    if (!pkg.checksum) log.warn(`Adoptium listed JRE ${majorVersion} with no checksum`);
+
+    return { url: pkg.link, sha256: pkg.checksum };
+  } catch (err) {
+    log.warn(
+      `Could not resolve a checksum for JRE ${majorVersion} (${String(err)}) — ` +
+        'falling back to the unverified binary endpoint',
+    );
+    return { url: fallback };
+  }
+}
+
 async function downloadAdoptium(majorVersion: number): Promise<string> {
   const platform = getPlatformForAdoptium();
   const arch = getArchForAdoptium();
   const ext = platform === 'windows' ? 'zip' : 'tar.gz';
 
-  const url = `${ADOPTIUM_API}/binary/latest/${majorVersion}/ga/${platform}/${arch}/jre/hotspot/normal/eclipse?project=jdk`;
+  const { url, sha256 } = await resolveAdoptiumBinary(majorVersion, platform, arch);
 
   log.info(`Downloading Adoptium JRE ${majorVersion} from ${url}`);
 
@@ -227,6 +280,10 @@ async function downloadAdoptium(majorVersion: number): Promise<string> {
     await fs.rm(tmpFile, { force: true });
     throw err;
   }
+
+  // Deletes the archive and throws on mismatch. Everything inside it is about
+  // to be extracted and then run as the JVM for every launch.
+  if (sha256) await verifyDownload(tmpFile, { sha256 }, `JRE ${majorVersion}`);
 
   emitJavaProgress({
     operationId: `java-${majorVersion}`,
