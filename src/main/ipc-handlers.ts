@@ -105,6 +105,16 @@ function reason(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** True when `target` is one of the launcher's own directories, or inside one. */
+function isInsideLauncherData(target: string): boolean {
+  if (typeof target !== 'string' || target === '') return false;
+  const resolved = path.resolve(target);
+  return [paths.root, paths.logsDir].some((root) => {
+    const relative = path.relative(root, resolved);
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  });
+}
+
 /**
  * Register all IPC handlers. Called once during app startup.
  */
@@ -141,6 +151,15 @@ export function registerAllIpcHandlers(): void {
     return ok(info);
   });
   ipcMain.handle('system:open-path', async (_event, targetPath: string) => {
+    // `shell.openPath` runs whatever the OS associates with the target — an
+    // `.exe` or `.bat` on Windows, a `.desktop` entry on Linux — so an
+    // unrestricted one is a way to execute an arbitrary file by asking the
+    // renderer nicely. Every real caller passes a directory the main process
+    // itself produced, so confining it to those costs nothing.
+    if (!isInsideLauncherData(targetPath)) {
+      log.warn(`Refused to open a path outside the launcher's data directory: ${targetPath}`);
+      return fail("That path is outside the launcher's data directory");
+    }
     try {
       await shell.openPath(targetPath);
       return ok(undefined);
