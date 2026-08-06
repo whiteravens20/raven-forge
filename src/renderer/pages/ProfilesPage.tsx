@@ -573,10 +573,11 @@ function SyncBadge({ status }: { status: ProfileSyncStatus }) {
 function VerificationBadge({ verification }: { verification: ManifestVerification }) {
   const t = useT();
 
-  if (!verification.signed) {
+  if (verification.neverSynced || !verification.signed) {
     return (
       <span className="inline-flex items-center gap-1 rounded border border-rf-border bg-rf-bg-tertiary px-2 py-0.5 text-xs text-rf-text-muted">
-        <ShieldAlert size={12} /> {t('profiles.verify.unsigned')}
+        <ShieldAlert size={12} />{' '}
+        {t(verification.neverSynced ? 'profiles.verify.notSynced' : 'profiles.verify.unsigned')}
       </span>
     );
   }

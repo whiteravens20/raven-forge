@@ -240,6 +240,7 @@ export const en = {
   'profiles.syncStatus.error': 'Sync error',
   'profiles.syncStatus.never': 'Never synced',
   'profiles.verify.unsigned': 'Unsigned',
+  'profiles.verify.notSynced': 'Not checked yet',
   'profiles.verify.valid': 'Verified: {signer}',
   'profiles.verify.invalid': 'Invalid signature',
 

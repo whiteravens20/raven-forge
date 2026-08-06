@@ -25,13 +25,17 @@ import { downloadToFile } from '../net/download';
 import { syncContentFromManifest } from './content-manager';
 import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import { getMainWindow } from '../../main/window';
+import { verifyManifestSignature, assertManifestTrusted } from '../updater/manifest-verify';
+import type { SignedManifest } from '../updater/canonical';
 import { modManifestSchema, type ModEntry, type ModManifest } from '../../shared/manifest-schema';
 import type {
   InstalledMod,
+  ManifestVerification,
   ModInstallResult,
   ProfileSyncStatus,
   ModSearchResult,
   ProgressEvent,
+  TrustedKey,
 } from '../../shared/ipc-types';
 
 function emitProgress(
@@ -68,6 +72,15 @@ interface SyncState {
   pendingUpdates: number;
   status: ProfileSyncStatus['status'];
   errorMessage?: string;
+  /**
+   * What the signature check said about the manifest that was last installed.
+   *
+   * Recorded rather than recomputed on demand, because the only honest answer
+   * to "is this profile's manifest signed?" is one about the bytes that were
+   * actually reconciled. Asking the server again would report on a different
+   * response.
+   */
+  verification?: ManifestVerification;
 }
 
 async function readSyncState(profileId: string): Promise<SyncState> {
@@ -94,21 +107,34 @@ async function writeSyncState(profileId: string, state: SyncState): Promise<void
 // against, so the sync used to return early and report success while a jar the
 // player deleted by hand stayed missing. Caching the last body that validated
 // fixes that, and is also what makes a sync possible with no network at all.
+//
+// What is cached is the *raw* document, not the schema's output. Zod drops keys
+// it does not know about, so caching its result would canonicalize to different
+// bytes than the ones the publisher signed and every cached manifest would fail
+// verification on the offline path.
 
-async function readCachedManifest(profileId: string): Promise<ModManifest | null> {
+/** A manifest as fetched, alongside the validated view of it. */
+interface LoadedManifest {
+  /** Raw parsed JSON — the form the signature covers. */
+  raw: unknown;
+  manifest: ModManifest;
+}
+
+async function readCachedManifest(profileId: string): Promise<LoadedManifest | null> {
   try {
-    const raw = await fs.readFile(paths.profileManifestCacheFile(profileId), 'utf-8');
-    const parsed = modManifestSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
+    const text = await fs.readFile(paths.profileManifestCacheFile(profileId), 'utf-8');
+    const raw: unknown = JSON.parse(text);
+    const parsed = modManifestSchema.safeParse(raw);
+    return parsed.success ? { raw, manifest: parsed.data } : null;
   } catch {
     return null;
   }
 }
 
-async function writeCachedManifest(profileId: string, manifest: ModManifest): Promise<void> {
+async function writeCachedManifest(profileId: string, raw: unknown): Promise<void> {
   const file = paths.profileManifestCacheFile(profileId);
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(manifest, null, 2), 'utf-8');
+  await fs.writeFile(file, JSON.stringify(raw, null, 2), 'utf-8');
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -132,6 +158,27 @@ export async function getProfileSyncStatus(profileId: string): Promise<ProfileSy
   }
 
   return { profileId, ...(await readSyncState(profileId)) };
+}
+
+/**
+ * What the signature check said about the manifest this profile is running.
+ *
+ * Reports the recorded outcome of the last sync rather than asking the server
+ * again. Re-fetching would answer a different question — "would a manifest
+ * downloaded right now verify?" — and present the answer as though it were
+ * about the jars already sitting in `mods/`.
+ */
+export async function getLastManifestVerification(
+  profileId: string,
+): Promise<ManifestVerification> {
+  const profile = await getProfile(profileId);
+  if (!profile) return { signed: false, valid: false, error: 'Profile not found' };
+  if (!profile.manifestUrl) {
+    return { signed: false, valid: false, error: 'Profile has no manifest URL' };
+  }
+
+  const { verification } = await readSyncState(profileId);
+  return verification ?? { signed: false, valid: false, neverSynced: true };
 }
 
 // ── Manifest entry resolution ──────────────────────────────
@@ -239,22 +286,60 @@ function parseManifest(body: unknown, profileName: string): ModManifest {
 }
 
 /**
+ * Read a response body as JSON, refusing one that is implausibly large.
+ *
+ * `res.json()` on its own will buffer whatever a host chooses to send, and a
+ * manifest is a list of URLs and hashes — kilobytes, not megabytes. The cap is
+ * what stops a hostile or broken host from exhausting the main process.
+ */
+async function readJsonCapped(res: Response, limit: number, label: string): Promise<unknown> {
+  const declared = Number(res.headers.get('content-length'));
+  if (declared > limit) throw new Error(`${label} is implausibly large — refusing to parse it`);
+
+  const text = await res.text();
+  // Checked after the fact as well: `Content-Length` is absent on a chunked
+  // response, which is exactly how a host would avoid declaring the size.
+  if (text.length > limit) throw new Error(`${label} is implausibly large — refusing to parse it`);
+  return JSON.parse(text);
+}
+
+/** A manifest is a list of references. Anything past this is not one. */
+const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
+
+/**
  * Get the manifest to reconcile against, and the ETag to remember.
  *
  * Three ways in, in order of preference: a fresh 200, the cached copy when the
  * server says 304, and the cached copy again when the network is gone entirely.
  * Only the first can change what is installed; the other two exist so that a
  * sync still checks the profile against the mod list it is supposed to match.
+ *
+ * Every one of the three is signature-checked, on the raw document about to be
+ * used, before this returns. That is the whole point of doing it here rather
+ * than beside the UI badge: there is no window between the bytes being approved
+ * and the bytes being installed, because they are the same bytes.
  */
 async function obtainManifest(
   profileId: string,
   profileName: string,
   manifestUrl: string,
   knownEtag: string | undefined,
+  trustedKeys: TrustedKey[],
   signal: AbortSignal,
-): Promise<{ manifest: ModManifest; etag: string | undefined }> {
+): Promise<{
+  manifest: ModManifest;
+  etag: string | undefined;
+  verification: ManifestVerification;
+}> {
   const headers: Record<string, string> = {};
   if (knownEtag) headers['If-None-Match'] = knownEtag;
+
+  /** Apply the trust policy, then hand back what the caller may install. */
+  const approve = (loaded: LoadedManifest, etag: string | undefined) => {
+    const verification = verifyManifestSignature(loaded.raw as SignedManifest, trustedKeys);
+    assertManifestTrusted(verification, trustedKeys, profileName);
+    return { manifest: loaded.manifest, etag, verification };
+  };
 
   let res: Response;
   try {
@@ -267,7 +352,7 @@ async function obtainManifest(
     const cached = await readCachedManifest(profileId);
     if (!cached) throw err;
     log.warn(`Manifest fetch failed for ${profileName} — using the cached manifest`);
-    return { manifest: cached, etag: knownEtag };
+    return approve(cached, knownEtag);
   }
 
   if (res.status === 304) {
@@ -277,7 +362,7 @@ async function obtainManifest(
     const cached = await readCachedManifest(profileId);
     if (cached) {
       log.info(`Manifest unchanged (304) for ${profileName} — reconciling local files`);
-      return { manifest: cached, etag: knownEtag };
+      return approve(cached, knownEtag);
     }
     log.info(`Manifest unchanged (304) for ${profileName} but nothing cached — refetching`);
     res = await fetch(manifestUrl, { signal: withTimeout(signal, 15000) });
@@ -285,9 +370,14 @@ async function obtainManifest(
 
   if (!res.ok) throw new Error(`Failed to fetch manifest: ${res.status} ${res.statusText}`);
 
-  const manifest = parseManifest(await res.json(), profileName);
-  await writeCachedManifest(profileId, manifest);
-  return { manifest, etag: res.headers.get('etag') ?? knownEtag };
+  const raw = await readJsonCapped(res, MAX_MANIFEST_BYTES, 'The manifest');
+  const loaded: LoadedManifest = { raw, manifest: parseManifest(raw, profileName) };
+
+  // Approved before it is cached: a manifest the policy rejects must not become
+  // the copy a later offline sync falls back to.
+  const approved = approve(loaded, res.headers.get('etag') ?? knownEtag);
+  await writeCachedManifest(profileId, raw);
+  return approved;
 }
 
 /**
@@ -316,17 +406,23 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
   const previousState = await readSyncState(profileId);
 
   try {
+    const settings = await getSettings();
+
     let manifest: ModManifest;
     let etag: string | undefined;
+    // A supplied manifest was built here from a file the user chose, so there is
+    // no publisher to have signed it and nothing for the badge to claim.
+    let verification: ManifestVerification | undefined;
     if (supplied) {
       manifest = supplied;
       await writeCachedManifest(profileId, supplied);
     } else {
-      ({ manifest, etag } = await obtainManifest(
+      ({ manifest, etag, verification } = await obtainManifest(
         profileId,
         profile.name,
         profile.manifestUrl!,
         previousState.manifestEtag,
+        settings.trustedPublicKeys,
         signal,
       ));
     }
@@ -337,7 +433,6 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       );
     }
 
-    const settings = await getSettings();
     const modsDir = paths.profileModsDir(profileId);
     await fs.mkdir(modsDir, { recursive: true });
 
@@ -453,6 +548,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       manifestEtag: etag ?? undefined,
       pendingUpdates,
       status: pendingUpdates > 0 ? 'updates-available' : 'synced',
+      verification,
     });
 
     emitProgress('progress:mod-sync', {

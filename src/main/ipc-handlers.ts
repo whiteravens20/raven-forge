@@ -27,7 +27,7 @@ import {
   clearProfileIcon,
   getProfileIconDataUrl,
 } from '../core/profiles/profile-icon';
-import { getProfileSyncStatus } from '../core/mods/mod-sync';
+import { getProfileSyncStatus, getLastManifestVerification } from '../core/mods/mod-sync';
 import {
   getInstalledMods,
   syncManifest,
@@ -52,7 +52,6 @@ import {
   reorderResourcePacks,
 } from '../core/mods/content-manager';
 import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater/launcher-updater';
-import { verifyProfileManifest } from '../core/updater/manifest-verify';
 import {
   getJavaInstallations,
   ensureJavaVersion,
@@ -792,7 +791,7 @@ export function registerAllIpcHandlers(): void {
   // ── Manifest Verification ────────────────────────────────
   ipcMain.handle('manifest:verify', async (_event, profileId: string) => {
     try {
-      return ok(await verifyProfileManifest(profileId));
+      return ok(await getLastManifestVerification(profileId));
     } catch (err) {
       return fail(`Manifest verification failed: ${reason(err)}`);
     }

@@ -440,11 +440,20 @@ export interface GameExitInfo {
 // Manifest Verification Types
 // ---------------------------------------------------------------------------
 
+/**
+ * The outcome of checking a manifest's signature — always about the manifest a
+ * profile last *installed*, never about one fetched to answer the question.
+ */
 export interface ManifestVerification {
   signed: boolean;
   valid: boolean;
   signerName?: string;
   error?: string;
+  /**
+   * No sync has run, so there is nothing to report on yet. Distinct from
+   * `signed: false`, which is a finding about a manifest that was installed.
+   */
+  neverSynced?: boolean;
 }
 
 // ---------------------------------------------------------------------------

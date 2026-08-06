@@ -242,6 +242,7 @@ export const pl: Translations = {
   'profiles.syncStatus.error': 'Błąd synchronizacji',
   'profiles.syncStatus.never': 'Nigdy nie zsynchronizowano',
   'profiles.verify.unsigned': 'Niepodpisany',
+  'profiles.verify.notSynced': 'Jeszcze niesprawdzony',
   'profiles.verify.valid': 'Zweryfikowano: {signer}',
   'profiles.verify.invalid': 'Nieprawidłowy podpis',
 
