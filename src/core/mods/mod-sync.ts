@@ -27,7 +27,13 @@ import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './int
 import { getMainWindow } from '../../main/window';
 import { verifyManifestSignature, assertManifestTrusted } from '../updater/manifest-verify';
 import type { SignedManifest } from '../updater/canonical';
-import { modManifestSchema, type ModEntry, type ModManifest } from '../../shared/manifest-schema';
+import {
+  fileNameFromUrl,
+  isSafeFileName,
+  modManifestSchema,
+  type ModEntry,
+  type ModManifest,
+} from '../../shared/manifest-schema';
 import type {
   InstalledMod,
   ManifestVerification,
@@ -209,8 +215,9 @@ async function resolveModEntry(entry: ModEntry, manifest: ModManifest): Promise<
   // API lookup at all. Pack generators emit this, so syncing a 100-mod pack
   // costs zero Modrinth requests and stays resolvable even if the API is down.
   if (entry.url && entry.source !== 'local') {
-    const fileName =
-      entry.fileName ?? path.basename(new URL(entry.url).pathname) ?? `${entry.id}.jar`;
+    // The schema has already rejected a `fileName` that is anything but a bare
+    // filename, so this cannot leave the mods directory.
+    const fileName = entry.fileName ?? fileNameFromUrl(entry.url, entry.id, '.jar');
     return { url: entry.url, fileName, version: entry.version };
   }
 
@@ -239,11 +246,13 @@ async function resolveModEntry(entry: ModEntry, manifest: ModManifest): Promise<
 
     case 'local': {
       if (!entry.localPath) throw new Error(`${entry.name}: source "local" requires localPath`);
-      return {
-        localPath: entry.localPath,
-        fileName: path.basename(entry.localPath),
-        version: entry.version,
-      };
+      const fileName = path.basename(entry.localPath);
+      // `basename` of a path ending in `..` is `..`, which would resolve to the
+      // parent of the mods directory rather than to a file inside it.
+      if (!isSafeFileName(fileName)) {
+        throw new Error(`${entry.name}: localPath does not name a file`);
+      }
+      return { localPath: entry.localPath, fileName, version: entry.version };
     }
   }
 }

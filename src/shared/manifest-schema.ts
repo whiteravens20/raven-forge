@@ -21,6 +21,60 @@ const integrityFields = {
     .optional(),
 };
 
+/**
+ * True when a string names a file and nothing else about where it goes.
+ *
+ * A manifest entry says *what* to fetch; the launcher decides *where* it lands.
+ * Without this, `fileName: "../../../../.bashrc"` reached `path.join(modsDir,
+ * …)` and a manifest could write attacker-controlled bytes anywhere the
+ * launcher can reach. Both separators are rejected on every platform, not just
+ * the one the check is running on: `path.join` treats `\` as a separator on
+ * Windows, and a manifest is not authored per-platform.
+ *
+ * Rejected rather than sanitized, on the same reasoning as `safeRelativePath`
+ * in the `.mrpack` reader — stripping the `../` turns an escape attempt into a
+ * silent write somewhere else, which is a worse outcome than refusing.
+ */
+export function isSafeFileName(value: string): boolean {
+  if (value === '' || value === '.' || value === '..') return false;
+  return !/[/\\\0]/.test(value);
+}
+
+/**
+ * The name to save an entry under when it did not supply one.
+ *
+ * Taken from the URL, and only if what comes out is a bare filename; otherwise
+ * the entry's id, reduced to characters that cannot mean anything to a path.
+ *
+ * `path.basename(new URL(url).pathname)` was doing this job and has two faults.
+ * It returns `''` for a URL ending in a slash — and `path.join(dir, '')` is the
+ * directory itself, so such a URL silently targeted `mods/` rather than a file
+ * in it. And the `?? \`${id}.jar\`` guard behind it could never fire, because
+ * `path.basename` returns a string and never null or undefined.
+ */
+export function fileNameFromUrl(url: string, fallbackId: string, extension: string): string {
+  const last = new URL(url).pathname.split('/').pop() ?? '';
+  let decoded = last;
+  try {
+    // A percent-encoded separator decodes to a real one, which the check below
+    // then rejects — which is the point of decoding before checking.
+    decoded = decodeURIComponent(last);
+  } catch {
+    /* malformed escape — judge the raw form */
+  }
+  if (isSafeFileName(decoded)) return decoded;
+
+  return `${fallbackId.replace(/[^a-zA-Z0-9._-]/g, '_')}${extension}`;
+}
+
+/** Exact file to fetch — lets a manifest pin a build without an API lookup. */
+const fileNameField = z
+  .string()
+  .refine(isSafeFileName, {
+    message: 'fileName must be a bare filename, with no path separators',
+  })
+  .optional();
+
 export const modEntrySchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -32,8 +86,7 @@ export const modEntrySchema = z.object({
   url: z.string().url().optional(),
   // Local file path
   localPath: z.string().optional(),
-  /** Exact file to fetch — lets a manifest pin a build without an API lookup. */
-  fileName: z.string().optional(),
+  fileName: fileNameField,
   ...integrityFields,
   required: z.boolean().default(true),
   side: z.enum(['client', 'server', 'both']).default('client'),
@@ -46,7 +99,7 @@ export const resourcePackEntrySchema = z.object({
   source: z.enum(['modrinth', 'url', 'local']),
   projectId: z.string().optional(),
   url: z.string().url().optional(),
-  fileName: z.string().optional(),
+  fileName: fileNameField,
   ...integrityFields,
 });
 
@@ -57,7 +110,7 @@ export const shaderEntrySchema = z.object({
   source: z.enum(['modrinth', 'url', 'local']),
   projectId: z.string().optional(),
   url: z.string().url().optional(),
-  fileName: z.string().optional(),
+  fileName: fileNameField,
   ...integrityFields,
 });
 

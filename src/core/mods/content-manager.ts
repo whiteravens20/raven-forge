@@ -9,7 +9,11 @@ import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
 import { sha256File, fileMatches, verifyDownload } from './integrity';
 import type { InstalledMod } from '../../shared/ipc-types';
-import type { ResourcePackEntry, ShaderEntry } from '../../shared/manifest-schema';
+import {
+  fileNameFromUrl,
+  type ResourcePackEntry,
+  type ShaderEntry,
+} from '../../shared/manifest-schema';
 
 type ContentKind = 'shaders' | 'resourcepacks';
 
@@ -117,7 +121,7 @@ export async function installContent(
     version = chosen.version_number || chosen.id;
   } else if (source.startsWith('url:')) {
     downloadUrl = source.slice('url:'.length);
-    fileName = path.basename(new URL(downloadUrl).pathname) || `${kind}-${Date.now()}.zip`;
+    fileName = fileNameFromUrl(downloadUrl, `${kind}-${Date.now()}`, '.zip');
     displayName = fileName.replace(/\.zip$/i, '');
   } else if (source.startsWith('file:')) {
     const localPath = source.slice('file:'.length);
@@ -212,8 +216,10 @@ export async function syncContentFromManifest(
 
     if (entry.url) {
       // Direct URL — no API lookup needed, whatever the declared source is.
+      // The schema has already rejected a `fileName` carrying a path, so this
+      // cannot leave the shaders / resource-packs directory.
       downloadUrl = entry.url;
-      fileName = entry.fileName ?? path.basename(new URL(entry.url).pathname) ?? `${entry.id}.zip`;
+      fileName = entry.fileName ?? fileNameFromUrl(entry.url, entry.id, '.zip');
     } else if (entry.source === 'modrinth') {
       if (!entry.projectId)
         throw new Error(`${entry.name}: source "modrinth" requires projectId or url`);
