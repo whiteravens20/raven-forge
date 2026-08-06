@@ -1,4 +1,5 @@
-import { MODRINTH_API_BASE, MODRINTH_USER_AGENT, isClientModLoader } from '../../shared/constants';
+import { MODRINTH_API_BASE, isClientModLoader } from '../../shared/constants';
+import { modrinthUserAgent } from '../net/user-agent';
 import type {
   ContentProjectType,
   FacetGroups,
@@ -11,7 +12,7 @@ import type {
 async function modrinthFetch(endpoint: string): Promise<Response> {
   const res = await fetch(`${MODRINTH_API_BASE}${endpoint}`, {
     headers: {
-      'User-Agent': MODRINTH_USER_AGENT,
+      'User-Agent': modrinthUserAgent(),
       Accept: 'application/json',
     },
     signal: AbortSignal.timeout(15000),

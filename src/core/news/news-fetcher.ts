@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { NewsItem, Announcement } from '../../shared/ipc-types';
 import { newsItemSchema, announcementSchema } from '../../shared/validators';
 import { getSettings } from '../config/settings-manager';
-import { MODRINTH_USER_AGENT } from '../../shared/constants';
+import { modrinthUserAgent } from '../net/user-agent';
 import { readJsonCapped } from '../net/json';
 import { log } from '../../main/logger';
 
@@ -50,7 +50,7 @@ async function fetchFeed<T>(
 
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': MODRINTH_USER_AGENT },
+      headers: { 'User-Agent': modrinthUserAgent() },
       cache: revalidate ? 'no-cache' : 'default',
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });

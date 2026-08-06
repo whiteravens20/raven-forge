@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { APP_NAME, APP_VERSION } from '@shared/constants';
+import { APP_NAME } from '@shared/constants';
 import iconMono from '@assets/icons/icon-mono.svg?raw';
 import { InlineSvg } from '@components/ui/InlineSvg';
 import { BedrockInfoCard } from '@components/BedrockInfoCard';
@@ -36,6 +36,15 @@ export function AboutPage() {
   const t = useT();
   const [chronicleOpen, setChronicleOpen] = useState(false);
 
+  // Asked for rather than read from a constant: the main process answers with
+  // `app.getVersion()`, which is the version of the build actually running.
+  const [version, setVersion] = useState('');
+  useEffect(() => {
+    void api.system.getInfo().then((r) => {
+      if (r.success && r.data) setVersion(r.data.launcherVersion);
+    });
+  }, []);
+
   return (
     // `isolate` is load-bearing — see HomePage for why the backdrop's -z-10
     // otherwise paints under the app shell's background.
@@ -64,7 +73,7 @@ export function AboutPage() {
             {APP_NAME}
           </h1>
         </div>
-        <p className="mt-2 text-sm text-rf-text-muted">v{APP_VERSION}</p>
+        <p className="mt-2 text-sm text-rf-text-muted">{version ? `v${version}` : ''}</p>
       </div>
 
       <div className="max-w-md space-y-3 text-center text-sm text-rf-text-secondary">

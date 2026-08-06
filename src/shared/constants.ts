@@ -2,7 +2,6 @@
 
 export const APP_NAME = 'Raven Forge Launcher';
 export const APP_ID = 'com.ravenforge.launcher';
-export const APP_VERSION = '0.1.0';
 
 // ── Data directory names ──────────────────────────────────
 export const DIR_PROFILES = 'profiles';
@@ -15,11 +14,9 @@ export const DIR_BACKGROUNDS = 'backgrounds';
 // ── File names ────────────────────────────────────────────
 export const FILE_SETTINGS = 'settings.json';
 export const FILE_PROFILES = 'profiles.json';
-export const FILE_INSTALLED_LOCK = 'installed.lock';
 
 // ── Modrinth API ──────────────────────────────────────────
 export const MODRINTH_API_BASE = 'https://api.modrinth.com/v2';
-export const MODRINTH_USER_AGENT = `whiteravens20/raven-forge/${APP_VERSION} (https://github.com/whiteravens20/raven-forge)`;
 
 // ── Mod loaders ───────────────────────────────────────────
 /**
@@ -81,7 +78,6 @@ export const MS_AUTH_BASE = 'https://login.microsoftonline.com/consumers/oauth2/
 export const XBOX_AUTH_URL = 'https://user.auth.xboxlive.com/user/authenticate';
 export const XSTS_AUTH_URL = 'https://xsts.auth.xboxlive.com/xsts/authorize';
 export const MC_AUTH_URL = `${MC_SERVICES_API}/authentication/login_with_xbox`;
-export const MC_ENTITLEMENTS_URL = `${MC_SERVICES_API}/entitlements/mcstore`;
 export const MC_PROFILE_URL = `${MC_SERVICES_API}/minecraft/profile`;
 
 // ── Mod loader APIs ───────────────────────────────────────
@@ -128,11 +124,6 @@ export const JAVA_VERSION_MAP: Record<string, number> = {
   '1.23': 21,
 };
 
-// ── Download defaults ─────────────────────────────────────
-export const DEFAULT_DOWNLOAD_CONCURRENCY = 4;
-export const MAX_DOWNLOAD_CONCURRENCY = 8;
-export const HASH_VERIFY_RETRIES = 3;
-
 // ── Window defaults ───────────────────────────────────────
 export const DEFAULT_WINDOW_WIDTH = 1280;
 export const DEFAULT_WINDOW_HEIGHT = 800;
@@ -141,5 +132,3 @@ export const MIN_WINDOW_HEIGHT = 600;
 
 // ── Default RAM ───────────────────────────────────────────
 export const DEFAULT_RAM_MB = 4096;
-export const MIN_RAM_MB = 512;
-export const MAX_RAM_MB = 32768;

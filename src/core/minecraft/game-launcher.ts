@@ -1,3 +1,4 @@
+import { app } from 'electron';
 import { spawn, exec, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
@@ -230,7 +231,9 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     version_type: meta.type,
     natives_directory: nativesDir,
     launcher_name: 'raven-forge',
-    launcher_version: '0.1.0',
+    // The build's own version, not a literal that stops being true the first
+    // time package.json is bumped without this line.
+    launcher_version: app.getVersion(),
     classpath: classpath,
     // Forge and NeoForge assemble an absolute `--module-path` from these two.
     // Leaving them out substitutes the empty string and the game dies with a

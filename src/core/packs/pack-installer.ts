@@ -59,9 +59,10 @@ function entryName(file: MrpackFile): string {
  * anything else becomes a config file, which is the manifest's term for "a
  * fetched file at an exact path".
  *
- * `sha512` is the hash carried across. The manifest schema knows sha256 and
- * sha512, an `.mrpack` publishes sha1 and sha512, and so sha512 is the pair's
- * only overlap — which is fine, because Modrinth supplies it for every file.
+ * Both hashes the format publishes are carried across. sha512 is what Modrinth
+ * supplies for every file and is what actually gets checked; sha1 comes along
+ * because it costs nothing and is the only thing left to verify against for a
+ * pack that, unusually, omits the sha512.
  */
 export function mrpackToManifest(pack: MrpackContents): ModManifest {
   const manifest: ModManifest = {
@@ -78,8 +79,8 @@ export function mrpackToManifest(pack: MrpackContents): ModManifest {
 
   for (const file of pack.files) {
     const url = file.downloads[0];
-    const sha512 = file.hashes.sha512;
-    const shared = { id: entryId(file), name: entryName(file), url, sha512 };
+    const { sha1, sha512 } = file.hashes;
+    const shared = { id: entryId(file), name: entryName(file), url, sha512, sha1 };
 
     if (file.path.startsWith(MODS_DIR)) {
       manifest.mods.push({
@@ -110,7 +111,7 @@ export function mrpackToManifest(pack: MrpackContents): ModManifest {
       // Everything else keeps its exact path. Packs put real things here —
       // `config/`, datapacks, a `journeymap/` layout — and dropping them would
       // produce a pack that installs and then does not behave like the pack.
-      manifest.configFiles.push({ path: file.path, url, sha512 });
+      manifest.configFiles.push({ path: file.path, url, sha512, sha1 });
     }
   }
 

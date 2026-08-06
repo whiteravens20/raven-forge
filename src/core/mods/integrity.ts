@@ -8,9 +8,10 @@ export interface HashedEntry {
   sha256?: string;
   sha512?: string;
   /**
-   * The floor, for a manifest that publishes nothing stronger. Weak against a
-   * deliberate collision, but it still pins the file against a swapped CDN
-   * object, and no check at all is strictly worse.
+   * The floor, for a manifest that publishes nothing stronger — an imported
+   * `.mrpack`, or a Maven artifact whose repository only writes a `.sha1`
+   * sidecar. Weak against a deliberate collision, but it still pins the file
+   * against a swapped CDN object, and no check at all is strictly worse.
    */
   sha1?: string;
 }

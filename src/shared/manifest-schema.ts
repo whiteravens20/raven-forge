@@ -6,10 +6,16 @@ import { z } from 'zod';
 
 // Integrity fields shared by every downloadable entry.
 //
-// Both are optional but at least one should be present. sha512 exists because
-// Modrinth's API returns sha1/sha512 for every file and *not* sha256 — a pack
-// generator that can emit sha512 never has to download a jar just to hash it,
-// which is what keeps large packs cheap to build.
+// All three are optional but at least one should be present. sha512 exists
+// because Modrinth's API returns sha1/sha512 for every file and *not* sha256 —
+// a pack generator that can emit sha512 never has to download a jar just to
+// hash it, which is what keeps large packs cheap to build.
+//
+// sha1 is the floor, and it is here because `.mrpack` publishes it: a pack
+// imported from Modrinth carries a sha1 for every file, and dropping it on the
+// way in left those entries with the weaker claim of "no hash at all". Weak
+// against a deliberate collision, but it still pins the file against a swapped
+// CDN object. `expectedHash` always prefers the strongest one present.
 const integrityFields = {
   sha256: z
     .string()
@@ -18,6 +24,10 @@ const integrityFields = {
   sha512: z
     .string()
     .regex(/^[0-9a-f]{128}$/i)
+    .optional(),
+  sha1: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/i)
     .optional(),
 };
 
