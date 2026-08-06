@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import type { Dirent } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
+import { writeJsonAtomic } from '../util/atomic-file';
 import { profileSchema } from '../../shared/validators';
 import { DEFAULT_RAM_MB } from '../../shared/constants';
 import type { OrphanedProfile, Profile, ProfileFileSummary } from '../../shared/ipc-types';
@@ -27,7 +28,39 @@ async function readProfilesIndex(): Promise<Profile[]> {
 
 async function writeProfilesIndex(profiles: Profile[]): Promise<void> {
   cachedProfiles = profiles;
-  await fs.writeFile(paths.profilesIndex, JSON.stringify(profiles, null, 2), 'utf-8');
+  await writeJsonAtomic(paths.profilesIndex, profiles);
+}
+
+/** The tail of the chain of in-flight mutations. */
+let mutations: Promise<unknown> = Promise.resolve();
+
+/**
+ * Read `profiles.json`, change it, and write it back with nothing in between.
+ *
+ * Every mutation is a read-modify-write with `await`s inside it, and they were
+ * running concurrently: a game exiting calls `recordPlaySession` at whatever
+ * moment it exits, which is as likely as not to be while the user has an edit
+ * in flight. Both read the same array, both write, and the second one to finish
+ * wins — so the play time landed and the edit vanished, or the other way round,
+ * with nothing to show that anything had been lost.
+ *
+ * Serializing them is enough because this process is the only writer. The queue
+ * survives a rejected mutation: the next one still runs.
+ */
+async function mutateProfiles<T>(mutate: (profiles: Profile[]) => T | Promise<T>): Promise<T> {
+  const run = async (): Promise<T> => {
+    const profiles = [...(await readProfilesIndex())];
+    const result = await mutate(profiles);
+    await writeProfilesIndex(profiles);
+    return result;
+  };
+
+  const started = mutations.then(run, run);
+  mutations = started.then(
+    () => undefined,
+    () => undefined,
+  );
+  return started;
 }
 
 // ── Public API ─────────────────────────────────────────────
@@ -56,9 +89,7 @@ export async function createProfile(
     updatedAt: now,
   });
 
-  const profiles = await readProfilesIndex();
-  profiles.push(profile);
-  await writeProfilesIndex(profiles);
+  await mutateProfiles((profiles) => profiles.push(profile));
 
   // Create profile directory
   await fs.mkdir(paths.profileDir(profile.id), { recursive: true });
@@ -72,21 +103,20 @@ export async function updateProfile(
   profileId: string,
   updates: Partial<Profile>,
 ): Promise<Profile> {
-  const profiles = await readProfilesIndex();
-  const idx = profiles.findIndex((p) => p.id === profileId);
-  if (idx < 0) throw new Error(`Profile ${profileId} not found`);
+  const merged = await mutateProfiles((profiles) => {
+    const idx = profiles.findIndex((p) => p.id === profileId);
+    if (idx < 0) throw new Error(`Profile ${profileId} not found`);
 
-  const merged: Profile = {
-    ...profiles[idx],
-    ...updates,
-    id: profileId, // prevent id overwrite
-    createdAt: profiles[idx].createdAt, // prevent createdAt overwrite
-    updatedAt: new Date().toISOString(),
-  };
-
-  profileSchema.parse(merged);
-  profiles[idx] = merged;
-  await writeProfilesIndex(profiles);
+    const next: Profile = profileSchema.parse({
+      ...profiles[idx],
+      ...updates,
+      id: profileId, // prevent id overwrite
+      createdAt: profiles[idx].createdAt, // prevent createdAt overwrite
+      updatedAt: new Date().toISOString(),
+    });
+    profiles[idx] = next;
+    return next;
+  });
 
   log.info(`Updated profile: ${merged.name} (${profileId})`);
   return merged;
@@ -158,14 +188,12 @@ export async function summarizeProfileFiles(profileId: string): Promise<ProfileF
  * the entire point of offering the choice.
  */
 export async function deleteProfile(profileId: string, deleteFiles = true): Promise<void> {
-  const profiles = await readProfilesIndex();
-  const idx = profiles.findIndex((p) => p.id === profileId);
-  if (idx < 0) throw new Error(`Profile ${profileId} not found`);
-
-  const removed = profiles[idx];
+  const removed = await mutateProfiles((profiles) => {
+    const idx = profiles.findIndex((p) => p.id === profileId);
+    if (idx < 0) throw new Error(`Profile ${profileId} not found`);
+    return profiles.splice(idx, 1)[0];
+  });
   const name = removed.name;
-  profiles.splice(idx, 1);
-  await writeProfilesIndex(profiles);
 
   if (deleteFiles) {
     try {
@@ -177,7 +205,7 @@ export async function deleteProfile(profileId: string, deleteFiles = true): Prom
     // Leave the profile's own record beside its files. Directories are named by
     // id, so without this the folder is an opaque UUID full of jars that nothing
     // — not the launcher, not the person who kept them — can identify later.
-    await fs.writeFile(orphanRecordPath(profileId), JSON.stringify(removed, null, 2), 'utf-8');
+    await writeJsonAtomic(orphanRecordPath(profileId), removed);
     log.info(`Kept the files of profile ${name} at ${paths.profileDir(profileId)}`);
   }
 
@@ -227,11 +255,6 @@ export async function listOrphanedProfiles(): Promise<OrphanedProfile[]> {
  * was supposed to recover.
  */
 export async function adoptOrphanedProfile(profileId: string): Promise<Profile> {
-  const profiles = await readProfilesIndex();
-  if (profiles.some((p) => p.id === profileId)) {
-    throw new Error(`Profile ${profileId} is already on the list`);
-  }
-
   const raw = await fs.readFile(orphanRecordPath(profileId), 'utf-8');
   const restored: Profile = {
     ...profileSchema.parse(JSON.parse(raw)),
@@ -239,7 +262,12 @@ export async function adoptOrphanedProfile(profileId: string): Promise<Profile> 
     updatedAt: new Date().toISOString(),
   };
 
-  await writeProfilesIndex([...profiles, restored]);
+  await mutateProfiles((profiles) => {
+    if (profiles.some((p) => p.id === profileId)) {
+      throw new Error(`Profile ${profileId} is already on the list`);
+    }
+    profiles.push(restored);
+  });
   await fs.rm(orphanRecordPath(profileId), { force: true });
   log.info(`Restored profile ${restored.name} (${profileId}) from kept files`);
   return restored;
@@ -262,16 +290,17 @@ export async function discardOrphanedProfile(profileId: string): Promise<void> {
  * reads as "you edited this profile". Playing is not editing.
  */
 export async function recordPlaySession(profileId: string, playTimeMinutes: number): Promise<void> {
-  const profiles = await readProfilesIndex();
-  const idx = profiles.findIndex((p) => p.id === profileId);
-  if (idx < 0) return;
+  await mutateProfiles((profiles) => {
+    const idx = profiles.findIndex((p) => p.id === profileId);
+    if (idx < 0) return;
 
-  profiles[idx] = {
-    ...profiles[idx],
-    lastPlayed: new Date().toISOString(),
-    totalPlayTimeMinutes: (profiles[idx].totalPlayTimeMinutes ?? 0) + Math.max(0, playTimeMinutes),
-  };
-  await writeProfilesIndex(profiles);
+    profiles[idx] = {
+      ...profiles[idx],
+      lastPlayed: new Date().toISOString(),
+      totalPlayTimeMinutes:
+        (profiles[idx].totalPlayTimeMinutes ?? 0) + Math.max(0, playTimeMinutes),
+    };
+  });
 }
 
 export async function duplicateProfile(profileId: string): Promise<Profile> {

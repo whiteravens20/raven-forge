@@ -23,6 +23,7 @@ import { requiredDependencies } from './compatibility';
 import { acceptedLoaders } from '../../shared/constants';
 import { downloadToFile } from '../net/download';
 import { readJsonCapped } from '../net/json';
+import { writeJsonAtomic } from '../util/atomic-file';
 import { syncContentFromManifest } from './content-manager';
 import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import { getMainWindow } from '../../main/window';
@@ -66,9 +67,7 @@ async function readLockFile(profileId: string): Promise<InstalledMod[]> {
 }
 
 async function writeLockFile(profileId: string, mods: InstalledMod[]): Promise<void> {
-  const lockPath = paths.profileLockFile(profileId);
-  await fs.mkdir(path.dirname(lockPath), { recursive: true });
-  await fs.writeFile(lockPath, JSON.stringify(mods, null, 2), 'utf-8');
+  await writeJsonAtomic(paths.profileLockFile(profileId), mods);
 }
 
 // ── Sync state (ETag + last result), persisted per profile ─
@@ -100,9 +99,7 @@ async function readSyncState(profileId: string): Promise<SyncState> {
 }
 
 async function writeSyncState(profileId: string, state: SyncState): Promise<void> {
-  const file = paths.profileSyncStateFile(profileId);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(state, null, 2), 'utf-8');
+  await writeJsonAtomic(paths.profileSyncStateFile(profileId), state);
 
   const status: ProfileSyncStatus = { profileId, ...state };
   getMainWindow()?.webContents.send('profiles:sync-status-changed', status);
@@ -139,9 +136,7 @@ async function readCachedManifest(profileId: string): Promise<LoadedManifest | n
 }
 
 async function writeCachedManifest(profileId: string, raw: unknown): Promise<void> {
-  const file = paths.profileManifestCacheFile(profileId);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(raw, null, 2), 'utf-8');
+  await writeJsonAtomic(paths.profileManifestCacheFile(profileId), raw);
 }
 
 // ── Helpers ────────────────────────────────────────────────

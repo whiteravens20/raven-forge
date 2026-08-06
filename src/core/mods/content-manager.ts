@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
+import { writeJsonAtomic } from '../util/atomic-file';
 import { getVersion, getModVersions, getProjectTitle, primaryFile } from './modrinth-api';
 import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
@@ -42,9 +43,7 @@ async function writeIndex(
   profileId: string,
   items: InstalledMod[],
 ): Promise<void> {
-  const file = indexPath(kind, profileId);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(items, null, 2), 'utf-8');
+  await writeJsonAtomic(indexPath(kind, profileId), items);
 }
 
 export async function listContent(kind: ContentKind, profileId: string): Promise<InstalledMod[]> {

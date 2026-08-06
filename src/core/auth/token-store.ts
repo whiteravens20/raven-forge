@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { paths } from '../config/paths';
+import { writeJsonAtomic } from '../util/atomic-file';
 import { log } from '../../main/logger';
 import { setSecret, getSecret, deleteSecret } from './secret-store';
 import type { MinecraftAccount, AuthState } from '../../shared/ipc-types';
@@ -77,13 +78,9 @@ async function readRaw(): Promise<AuthStoreData> {
 
 async function writeStore(data: AuthStoreData): Promise<void> {
   const file = getAuthPath();
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(data, null, 2), {
-    encoding: 'utf-8',
-    mode: AUTH_FILE_MODE,
-  });
-  // writeFile only applies `mode` when it creates the file, so an auth.json
-  // written by an older build keeps its old permissions without this.
+  await writeJsonAtomic(file, data, AUTH_FILE_MODE);
+  // The rename preserves the temporary file's mode, but an auth.json written by
+  // an older build keeps its own until something re-applies it.
   await fs.chmod(file, AUTH_FILE_MODE).catch(() => undefined);
 }
 
