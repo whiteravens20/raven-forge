@@ -14,7 +14,7 @@ Built with **Electron + TypeScript + React + Vite + Tailwind CSS**.
 
 - **Server Profiles** — per-server instance configs with pinned MC version, mod loader, and remote manifest
 - **Pack Install** — start a profile from a White Ravens pack, a `.mrpack` file, a manifest URL, or an empty form
-- **Mod Auto-Sync** — fetch server manifest → diff → parallel download → SHA-256 verify → install
+- **Mod Auto-Sync** — fetch server manifest → check its signature → diff → parallel download → verify each hash → install
 - **Mod Browser** — search Modrinth from the launcher, filtered to your profile
 - **Compatibility Checks** — warns before an install that does not fit the profile, and pulls in required dependencies
 - **Bilingual UI** — Polish and English, switchable in Settings
@@ -120,7 +120,8 @@ src/
 │   ├── profiles/   # Profile CRUD + import/export
 │   └── updater/    # electron-updater + Ed25519 manifest verification
 └── shared/         # Types shared between main + renderer
-    └── ipc-types.ts
+    ├── ipc-types.ts    # the channel contract
+    └── ipc/            # payload shapes, one file per domain
 
 test/               # Vitest suites (pure logic) + Electron/keytar stubs
 ```
@@ -191,8 +192,12 @@ doubles as a working reference for each format:
 | Announcement feed | `https://whiteravens20.github.io/raven-packs/raven-forge/announcements.json` |
 | Profile manifest (Raven MC) | `https://whiteravens20.github.io/raven-packs/ravenmc/manifest.json` |
 
-Manifests published there are Ed25519-signed; add the public key under
-**Settings → Trusted Keys** to get the verified badge and reject a tampered one.
+Manifests published there are Ed25519-signed. Adding the public key under
+**Settings → Trusted Keys** does two things: the profile gets a verified badge,
+and — more importantly — the launcher will from then on refuse to install a
+manifest that is not signed by a key you trust. Until you add one, signatures
+are reported but not enforced, which is what keeps unsigned packs from anywhere
+else installable.
 
 ### Forking
 

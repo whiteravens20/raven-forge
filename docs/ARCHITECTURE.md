@@ -59,6 +59,7 @@ raven-forge/
     │   └── config/               # paths.ts, settings-manager.ts, defaults.ts
     └── shared/                   # types + validators consumed by both processes
         ├── ipc-types.ts          # InvokeChannels, EventChannels, RavenForgeAPI
+        ├── ipc/                  # payload shapes, one file per domain
         ├── validators.ts         # Zod schemas for settings + profiles
         ├── manifest-schema.ts    # Zod schema for remote manifests
         └── constants.ts          # endpoints, defaults, MC→Java mapping
@@ -88,13 +89,13 @@ sequenceDiagram
     Main->>Manifest: GET manifest.json (If-None-Match)
     Manifest-->>Main: 200 manifest JSON | 304 not modified
     Main->>Main: Zod-validate modManifestSchema
-    Main->>Main: Verify Ed25519 signature (if signed)
+    Main->>Main: Verify Ed25519 signature; refuse if trusted keys are set and it does not
     Main->>FS: Read installed.lock
     Main->>Main: Diff manifest vs lock
     par Parallel downloads (concurrency limit)
         Main->>Modrinth: GET mod jar
         Modrinth-->>Main: bytes
-        Main->>Main: SHA-256 verify (3 retries)
+        Main->>Main: Verify the hash the manifest published
         Main->>FS: write .minecraft/mods/<file>.jar
     end
     Main->>FS: Write installed.lock
@@ -189,13 +190,18 @@ sequenceDiagram
 
 ## Security posture
 
-- `contextIsolation: true`, `nodeIntegration: false`. `sandbox` is currently `false`; the original reason (keytar in the preload) was never true — keytar is main-process only and the preload imports nothing but `electron`. Flip it to `true` during the Phase 11 smoke test, where a broken preload is immediately visible.
+- `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` — on the main window and on the Microsoft sign-in window, which is the only one that loads someone else's page.
 - Credentials are stored in the OS keychain, not in `auth.json` — see [the auth flow](#where-credentials-live) for the fallback and its trade-off.
 - The preload script is the only bridge — every renderer-callable function goes through `ipcRenderer.invoke` against a known channel name.
 - `system:open-url` rejects anything that isn't `http://` / `https://`.
-- `setWindowOpenHandler` denies in-app navigation and routes external links to the OS browser.
-- All remote downloads SHA-256-verified against either the manifest entry or, for Modrinth installs, the API response hash. Mismatches retry up to 3 times then fail loudly.
-- Manifest Ed25519 signatures are verified against the user's trusted-keys list before any mod is downloaded for a signed manifest.
+- `setWindowOpenHandler` denies `window.open`, and a `will-navigate` handler denies top-level navigation; both route external links to the OS browser.
+- `system:open-path` is confined to the launcher's own data and log directories. It runs whatever the OS associates with the target, so an unrestricted one is a way to execute an arbitrary file.
+- The Content-Security-Policy is served as a response header (`src/main/security.ts`) as well as in a `<meta>` tag. Only the header cannot be outrun by markup injected ahead of the tag.
+- Every `ipcMain.handle` goes through a sender check, so a handler added later cannot be the first one to forget it.
+- The Microsoft OAuth flow uses PKCE (S256) and a `state` value, and accepts a code only from the exact redirect URI it asked for.
+- Every download is verified against the strongest hash its source published — sha512, sha256 or sha1, in that order (`expectedHash` in `core/mods/integrity.ts`). Modrinth supplies sha512 for every file; a `.mrpack` supplies sha512 and sha1; a manifest entry may publish any of them. **An entry that publishes no hash at all is installed unverified** — the launcher does not invent one. Mojang's own assets and libraries are the exception that does retry: `asset-downloader.ts` retries a failed or mismatched download three times, because it is fetching thousands of files. `downloadToFile`, which fetches mods, does not retry.
+- The Forge/NeoForge installer jar, the Adoptium JRE and the vanilla client jar are all executed or extracted after download, and all three are checked against a published checksum where the publisher provides one (Maven `.sha512`/`.sha256`/`.sha1` sidecars, Adoptium's `/assets` response, Mojang's version metadata). Where none exists the download proceeds over HTTPS and says so in the log.
+- Manifest Ed25519 signatures are checked inside the sync, on the exact document about to be installed, before anything is downloaded. **With no trusted keys configured nothing is enforced** — that is the default install, and refusing every unsigned manifest out of the box would refuse every pack that exists. **Adding a trusted key switches enforcement on**: from then on a manifest for that profile must carry a signature that verifies, and an unsigned one is refused rather than waved through, because otherwise stripping the signature would be a way past the check. The badge on the profile reports what the last sync found, not what a fresh fetch would find.
 
 ## Build pipeline
 

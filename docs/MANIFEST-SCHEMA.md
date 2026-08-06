@@ -1,6 +1,6 @@
 # Server Mod Manifest — Schema v2
 
-Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher fetches it, validates it against the [Zod schema](../src/shared/manifest-schema.ts), optionally verifies its Ed25519 signature, and reconciles the listed mods/shaders/resource packs against the per-profile `installed.lock`.
+Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher fetches it, validates it against the [Zod schema](../src/shared/manifest-schema.ts), checks its Ed25519 signature, and reconciles the listed mods/shaders/resource packs against the per-profile `installed.lock`.
 
 ## Top-level shape
 
@@ -28,7 +28,7 @@ Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher f
 | `version` | string | yes | Free-form version label, recorded in `installed.lock`. |
 | `source` | `"modrinth" \| "url" \| "local"` | yes | Provenance. Also selects the resolver when no `url` is given. |
 | `url` | string (URL) | recommended | Direct download URL. **When present the launcher skips resolution entirely** — see below. |
-| `fileName` | string | no | Exact filename to write. Defaults to the last path segment of `url`. |
+| `fileName` | string | no | Exact filename to write — a bare name, with no `/`, `\\` or path segments. Defaults to the last path segment of `url`. A value carrying a path is rejected outright, and the whole manifest with it. |
 | `projectId` | string | when source = modrinth and no `url` | Modrinth project identifier, resolved against `version` at sync time. |
 | `localPath` | string | when source = local | Absolute path on the player's machine — niche, used for LAN / offline. |
 | `sha512` | string (128 hex) | recommended | Preferred integrity check. |
@@ -38,11 +38,14 @@ Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher f
 
 ### Integrity
 
-At least one of `sha512` / `sha256` should be present; **`sha512` wins when both
-are.** The asymmetry is deliberate: Modrinth's API returns `sha1` and `sha512`
-but never `sha256`, so a manifest generator that can publish `sha512` never has
-to download a jar purely to hash it. That is what makes large packs cheap to
-build. An entry with neither hash is accepted without verification.
+At least one of `sha512` / `sha256` / `sha1` should be present; the **strongest
+one present wins**, in that order. The asymmetry is deliberate: Modrinth's API
+returns `sha1` and `sha512` but never `sha256`, so a manifest generator that can
+publish `sha512` never has to download a jar purely to hash it. That is what
+makes large packs cheap to build. `sha1` is the floor, and exists because a
+`.mrpack` publishes it for every file. An entry with none of the three is
+accepted **without verification** — the launcher does not invent a hash to check
+against.
 
 `installed.lock` always records `sha256` locally, whichever algorithm the
 manifest used.
@@ -69,7 +72,7 @@ install.
 
 ## `resourcePacks[]` and `shaders[]` entries
 
-Same shape — `id`, `name`, optional `version`, `source` (`modrinth | url | local`), optional `projectId` / `url` / `fileName`, optional `sha512` / `sha256`. Side is always client. The `url` fast path applies here too.
+Same shape — `id`, `name`, optional `version`, `source` (`modrinth | url | local`), optional `projectId` / `url` / `fileName`, optional `sha512` / `sha256` / `sha1`. Side is always client. The `url` fast path applies here too.
 
 ## `configFiles[]` entries
 
@@ -85,7 +88,22 @@ Paths are resolved relative to the profile's `.minecraft` directory. The launche
 
 ## Signing
 
-The optional `signature` is the base64-encoded Ed25519 signature of the **canonicalized** manifest. The launcher verifies it against the user's `Settings → Trusted Keys` list. Unsigned manifests are accepted but flagged "Unverified" in the UI.
+The optional `signature` is the base64-encoded Ed25519 signature of the
+**canonicalized** manifest. It is checked against the user's
+`Settings → Trusted Keys` list inside the sync, on the exact document that is
+about to be installed and before anything is downloaded — not in a separate
+fetch, which would only ever report on bytes nobody installed.
+
+What happens next depends on whether the user trusts any key:
+
+| Trusted keys | Signed and valid | Signed but invalid | Unsigned |
+|---|---|---|---|
+| none configured | installs, badge "Verified" is not claimed | installs, flagged | installs, flagged "Unsigned" |
+| one or more | installs, badge "Verified" | **refused** | **refused** |
+
+Refusing the unsigned case once keys exist is the point of the scheme: if
+deleting the `signature` field were enough to skip the check, anyone able to
+rewrite the manifest would simply delete it.
 
 ### Canonical form
 
@@ -102,7 +120,9 @@ argument makes it a property *allowlist* applied at every level, so every entry
 in `mods[]` serialized as `{}` and the signature covered only top-level scalars
 plus array lengths — a tampered manifest that swapped every mod for a backdoored
 jar still verified. See `canonicalize()` in
-[`src/core/updater/manifest-verify.ts`](../src/core/updater/manifest-verify.ts).
+[`src/core/updater/canonical.ts`](../src/core/updater/canonical.ts), which is kept
+free of the verification plumbing around it precisely so it can be tested
+directly against the signing half in raven-packs.
 
 ### Producing a signature
 
