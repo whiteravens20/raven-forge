@@ -9,6 +9,7 @@ import { ContentPage } from '@renderer/pages/ContentPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AboutPage } from './pages/AboutPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 import { useAuthStore } from './stores/auth-store';
 import { useProfileStore } from './stores/profile-store';
 import { useSettingsStore } from './stores/settings-store';
@@ -41,6 +42,9 @@ export function App() {
                 <Route path="/accounts" element={<AccountsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/about" element={<AboutPage />} />
+                {/* No sidebar tile — reached from About and from Accounts, which
+                    is where someone is deciding to hand over a Microsoft login. */}
+                <Route path="/privacy" element={<PrivacyPage />} />
               </Routes>
             </main>
           </div>

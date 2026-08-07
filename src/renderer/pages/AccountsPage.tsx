@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { LogOut, UserPlus, Shield, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '@stores/auth-store';
 import { Button } from '@components/ui/Button';
@@ -59,6 +60,15 @@ export function AccountsPage() {
           {t('accounts.offlineMode')}
         </Button>
       </div>
+
+      {/* Next to the button that hands over a Microsoft account, not buried in
+          About — this is the moment the question actually occurs to someone. */}
+      <Link
+        to="/privacy"
+        className="-mt-3 self-start text-xs text-rf-text-muted underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent"
+      >
+        {t('accounts.privacyLink')}
+      </Link>
 
       {error && (
         <p

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import { APP_NAME } from '@shared/constants';
 import { REPO_URL, ORG_URL } from '@shared/branding';
 import iconMono from '@assets/icons/icon-mono.svg?raw';
@@ -100,6 +101,15 @@ export function AboutPage() {
       <BedrockInfoCard />
 
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-rf-text-muted">
+        {/* In-app rather than a link out: the answer to "what do you do with my
+            data" should not itself require opening a browser. */}
+        <Link
+          to="/privacy"
+          className="underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent hover:decoration-rf-accent/60"
+        >
+          {t('about.privacy')}
+        </Link>
+        <span aria-hidden>•</span>
         <ExtLink href={REPO_URL}>GitHub</ExtLink>
         <span aria-hidden>•</span>
         <ExtLink href={LICENSE_URL}>PolyForm Noncommercial 1.0.0</ExtLink>

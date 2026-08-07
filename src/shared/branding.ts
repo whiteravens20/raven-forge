@@ -11,6 +11,8 @@
  * a default but a constant — see its own note.
  */
 
+import type { Locale } from './ipc/settings';
+
 /** Where the published feeds and pack manifests live. */
 const PACKS_SITE = 'https://whiteravens20.github.io/raven-packs';
 
@@ -50,6 +52,32 @@ export const REPO_URL = 'https://github.com/whiteravens20/raven-forge';
 
 /** The organisation behind it, for anyone who would rather not open a GitHub account. */
 export const ORG_URL = 'https://whiteravens.net';
+
+/**
+ * The published privacy policy, one file per UI language.
+ *
+ * Two files rather than one because the launcher opens in Polish, and a policy
+ * a Polish player cannot read has not informed anyone of anything.
+ *
+ * A `Record<Locale, …>` rather than a ternary on purpose: adding a language to
+ * `Locale` without publishing its policy then fails to compile, instead of
+ * quietly handing that language the English file. `Translations` is kept honest
+ * the same way — see `LOCALES` in `renderer/i18n`.
+ */
+const PRIVACY_POLICY_FILES: Record<Locale, string> = {
+  pl: 'PRIVACY.pl.md',
+  en: 'PRIVACY.md',
+};
+
+/**
+ * The full policy, in the language the launcher is currently speaking.
+ *
+ * The in-app privacy page answers the same question for the install actually
+ * running; this is the whole text, for whoever wants all of it.
+ */
+export function privacyPolicyUrl(locale: Locale): string {
+  return `${REPO_URL}/blob/main/docs/${PRIVACY_POLICY_FILES[locale]}`;
+}
 
 /**
  * The crash-report issue form, pre-selected.

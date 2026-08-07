@@ -319,6 +319,7 @@ export const en = {
   'accounts.title': 'Accounts',
   'accounts.loginMicrosoft': 'Sign in with Microsoft',
   'accounts.offlineMode': 'Offline mode',
+  'accounts.privacyLink': 'What does Raven Forge do with my data?',
   'accounts.playerName': 'Player name',
   'accounts.empty': 'No accounts — sign in above',
   'accounts.active': '• active',
@@ -463,6 +464,75 @@ export const en = {
     'Written from scratch by one person — {author} — under the {org} banner, for a server of his own and the players on it.',
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Secret of the forge',
+  'about.privacy': 'Privacy',
+
+  // ── Privacy ──────────────────────────────────────────────
+  // The full policy is docs/PRIVACY.md; this describes the running install.
+  'privacy.title': 'Privacy',
+  'privacy.lead': 'Raven Forge collects nothing about you.',
+  'privacy.leadBody':
+    'No analytics, no usage statistics, no install identifier. White Ravens runs no server that receives your data — there is no account with us and no database with your name in it.',
+
+  'privacy.never.title': 'What never happens',
+  'privacy.never.telemetry':
+    'Nothing is measured or reported. There is no reporting endpoint in the code, which is why there is no switch to turn one off.',
+  'privacy.never.identifier': 'No unique identifier for your installation is generated or sent.',
+  'privacy.never.upload':
+    'Crash reports are written to a file on this computer. Nothing uploads them — you decide whether to attach one to a bug report.',
+  'privacy.never.account':
+    'You do not create an account with White Ravens. Your Minecraft account belongs to Microsoft, and your password is typed into their page, never into this launcher.',
+
+  'privacy.local.title': 'What stays on this computer',
+  'privacy.local.body': 'All of it lives in one folder, which you can open and delete at any time.',
+  'privacy.local.profiles':
+    'Your profiles and their game directories — worlds, screenshots, settings, mods.',
+  'privacy.local.settings': 'Your preferences: theme, language, proxy, feed addresses, keys.',
+  'privacy.local.accounts':
+    'The account list: player name, UUID, account type and when it was last signed in.',
+  'privacy.local.logs':
+    'The launcher log, which echoes the game’s output verbatim — redact it before sharing it.',
+  'privacy.local.crashes': 'Crash reports, already stripped of tokens and account details.',
+  'privacy.local.keychain':
+    'Sign-in tokens are not in these files. They go into the operating system’s credential store — Credential Manager, Keychain, or libsecret/kwallet. On a machine with no working keyring the launcher falls back to a file with 0600 permissions and says so on the Accounts page.',
+
+  'privacy.dest.title': 'Where the launcher connects',
+  'privacy.dest.body':
+    'Every request below tells the server receiving it your IP address and that you use Raven Forge — that is what making a network request means. All of it goes through the proxy configured in Settings.',
+  'privacy.dest.nothing': 'Nothing but the request itself.',
+  'privacy.dest.auth.when': 'only when you sign in with Microsoft',
+  'privacy.dest.auth.sends':
+    'Microsoft’s own sign-in page, in a separate window. The launcher receives an authorization code, exchanges it for tokens, and gets back your UUID, player name and skin address. Offline mode never contacts any of these.',
+  'privacy.dest.mojang.when': 'installing or launching a version',
+  'privacy.dest.java.when': 'installing a Java runtime',
+  'privacy.dest.java.sends': 'The Java version, your operating system and your architecture.',
+  'privacy.dest.loaders.when': 'installing a mod loader',
+  'privacy.dest.modrinth.when': 'browsing or installing mods',
+  'privacy.dest.modrinth.sends':
+    'Your search terms and filters. Requests identify the launcher and its version, as Modrinth’s API terms require — not you.',
+  'privacy.dest.packs.when': 'the White Ravens pack catalogue',
+  'privacy.dest.updates.when': 'automatically at every start, and on demand',
+  'privacy.dest.updates.sends':
+    'The update check reveals your IP, the launcher version and your platform to GitHub. There is currently no switch to disable it.',
+  'privacy.dest.feeds': 'News feeds, as this install has them configured:',
+  'privacy.dest.feedOff': 'off — the field is empty, so nothing is fetched',
+
+  'privacy.game.title': 'The game is a separate program',
+  'privacy.game.body':
+    'Once Minecraft starts it is its own process and the launcher is no longer in the middle. It contacts Mojang to verify you on online-mode servers, and every server you join sees your IP, player name and UUID.',
+  'privacy.game.mods':
+    'A mod is arbitrary Java code running with your privileges. It can open any connection and read any file you can read. The launcher verifies that you received exactly the file a manifest named — it cannot tell you that file is trustworthy. Only add sources you trust.',
+
+  'privacy.control.title': 'What you control',
+  'privacy.control.offline':
+    'Offline mode never contacts a sign-in server at all — singleplayer and LAN only.',
+  'privacy.control.feeds': 'Clearing a feed address in Settings stops that feed being fetched.',
+  'privacy.control.proxy': 'A proxy routes every launcher request through a server you choose.',
+  'privacy.control.delete':
+    'Signing out deletes that account’s stored tokens. Deleting the data folder removes everything else — there is nothing held anywhere else to delete.',
+
+  'privacy.fullPolicy': 'Read the full privacy policy',
+  'privacy.fullPolicyHint':
+    'Opens the document in your browser. It covers the same ground in full, including the gaps we know about.',
 
   // ── Bedrock card ─────────────────────────────────────────
   'bedrock.title': 'Looking for Minecraft: Bedrock Edition?',

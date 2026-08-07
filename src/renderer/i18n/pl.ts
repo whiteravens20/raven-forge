@@ -322,6 +322,7 @@ export const pl: Translations = {
   'accounts.title': 'Konta',
   'accounts.loginMicrosoft': 'Zaloguj z Microsoft',
   'accounts.offlineMode': 'Tryb offline',
+  'accounts.privacyLink': 'Co Raven Forge robi z moimi danymi?',
   'accounts.playerName': 'Nazwa gracza',
   'accounts.empty': 'Brak kont — zaloguj się powyżej',
   'accounts.active': '• aktywne',
@@ -475,6 +476,80 @@ export const pl: Translations = {
     'Pisany od zera przez jedną osobę — {author} — pod szyldem {org}, z myślą o własnym serwerze i graczach na nim.',
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Sekret kuźni',
+  'about.privacy': 'Prywatność',
+
+  // ── Prywatność ───────────────────────────────────────────
+  // Pełna polityka to docs/PRIVACY.pl.md; tutaj opisana jest działająca instalacja.
+  'privacy.title': 'Prywatność',
+  'privacy.lead': 'Raven Forge nie zbiera o Tobie żadnych danych.',
+  'privacy.leadBody':
+    'Żadnej analityki, statystyk użycia ani identyfikatora instalacji. White Ravens nie prowadzi serwera, który odbierałby Twoje dane — nie zakładasz u nas konta i nie ma bazy danych z Twoim nazwiskiem.',
+
+  'privacy.never.title': 'Co nigdy się nie dzieje',
+  'privacy.never.telemetry':
+    'Nic nie jest mierzone ani raportowane. W kodzie nie ma żadnego adresu, pod który leciałyby takie dane — dlatego nie ma też przełącznika do wyłączenia.',
+  'privacy.never.identifier':
+    'Nie powstaje ani nie jest wysyłany żaden unikalny identyfikator Twojej instalacji.',
+  'privacy.never.upload':
+    'Raporty z awarii zapisują się do pliku na tym komputerze. Nic ich nie wysyła — to Ty decydujesz, czy dołączyć raport do zgłoszenia błędu.',
+  'privacy.never.account':
+    'Nie zakładasz konta w White Ravens. Twoje konto Minecrafta należy do Microsoftu, a hasło wpisujesz na jego stronie, nigdy w tym launcherze.',
+
+  'privacy.local.title': 'Co zostaje na tym komputerze',
+  'privacy.local.body':
+    'Wszystko mieści się w jednym folderze, który możesz otworzyć i w każdej chwili usunąć.',
+  'privacy.local.profiles':
+    'Twoje profile i ich katalogi gry — światy, zrzuty ekranu, ustawienia, mody.',
+  'privacy.local.settings':
+    'Twoje ustawienia: motyw, język, proxy, adresy kanałów, zaufane klucze.',
+  'privacy.local.accounts':
+    'Lista kont: nazwa gracza, UUID, typ konta i data ostatniego logowania.',
+  'privacy.local.logs':
+    'Log launchera, który dosłownie przepisuje wyjście gry — zredaguj go, zanim komuś wyślesz.',
+  'privacy.local.crashes': 'Raporty z awarii, już pozbawione tokenów i danych konta.',
+  'privacy.local.keychain':
+    'Tokenów logowania w tych plikach nie ma. Trafiają do magazynu poświadczeń systemu — Menedżera poświadczeń, Keychain albo libsecret/kwallet. Na maszynie bez działającego pęku kluczy launcher zapisuje je awaryjnie do pliku z uprawnieniami 0600 i mówi o tym na stronie Konta.',
+
+  'privacy.dest.title': 'Dokąd launcher się łączy',
+  'privacy.dest.body':
+    'Każde z poniższych żądań mówi serwerowi, który je odbiera, jaki masz adres IP i że używasz Raven Forge — na tym polega wykonanie żądania sieciowego. Wszystko idzie przez proxy ustawione w Ustawieniach.',
+  'privacy.dest.nothing': 'Nic poza samym żądaniem.',
+  'privacy.dest.auth.when': 'tylko przy logowaniu przez Microsoft',
+  'privacy.dest.auth.sends':
+    'Strona logowania samego Microsoftu, w osobnym oknie. Launcher dostaje kod autoryzacyjny, wymienia go na tokeny i otrzymuje Twoje UUID, nazwę gracza oraz adres skórki. Tryb offline nie kontaktuje się z żadnym z tych serwerów.',
+  'privacy.dest.mojang.when': 'instalacja lub uruchomienie wersji',
+  'privacy.dest.java.when': 'instalacja środowiska Javy',
+  'privacy.dest.java.sends': 'Wersja Javy, Twój system operacyjny i architektura.',
+  'privacy.dest.loaders.when': 'instalacja loadera modów',
+  'privacy.dest.modrinth.when': 'przeglądanie lub instalowanie modów',
+  'privacy.dest.modrinth.sends':
+    'Twoje frazy wyszukiwania i filtry. Żądania przedstawiają launcher i jego wersję, czego wymaga regulamin API Modrinth — nie przedstawiają Ciebie.',
+  'privacy.dest.packs.when': 'katalog paczek White Ravens',
+  'privacy.dest.updates.when': 'automatycznie przy każdym starcie i na żądanie',
+  'privacy.dest.updates.sends':
+    'Sprawdzenie aktualizacji ujawnia GitHubowi Twoje IP, wersję launchera i platformę. Obecnie nie ma przełącznika, który by je wyłączał.',
+  'privacy.dest.feeds': 'Kanały wiadomości, tak jak są ustawione w tej instalacji:',
+  'privacy.dest.feedOff': 'wyłączony — pole jest puste, więc nic nie jest pobierane',
+
+  'privacy.game.title': 'Gra to osobny program',
+  'privacy.game.body':
+    'Kiedy Minecraft już wystartuje, jest własnym procesem i launcher nie pośredniczy w niczym. Gra łączy się z Mojangiem, żeby zweryfikować Cię na serwerach w trybie online, a każdy serwer, na który wejdziesz, widzi Twoje IP, nazwę gracza i UUID.',
+  'privacy.game.mods':
+    'Mod to dowolny kod Javy działający z Twoimi uprawnieniami. Może otworzyć każde połączenie i odczytać każdy plik, który Ty możesz odczytać. Launcher weryfikuje, że dostałeś dokładnie ten plik, który wskazał manifest — nie jest w stanie powiedzieć, że ten plik jest godny zaufania. Dodawaj tylko źródła, którym ufasz.',
+
+  'privacy.control.title': 'Co masz pod kontrolą',
+  'privacy.control.offline':
+    'Tryb offline nie kontaktuje się z żadnym serwerem logowania — tylko gra jednoosobowa i LAN.',
+  'privacy.control.feeds':
+    'Wyczyszczenie adresu kanału w Ustawieniach sprawia, że przestaje być pobierany.',
+  'privacy.control.proxy':
+    'Proxy przepuszcza każde żądanie launchera przez serwer, który sam wybierasz.',
+  'privacy.control.delete':
+    'Wylogowanie kasuje zapisane tokeny tego konta. Usunięcie folderu danych usuwa całą resztę — nigdzie indziej nic nie leży.',
+
+  'privacy.fullPolicy': 'Przeczytaj pełną politykę prywatności',
+  'privacy.fullPolicyHint':
+    'Otwiera dokument w przeglądarce. Opisuje to samo w całości, razem z lukami, o których wiemy.',
 
   // ── Bedrock card ─────────────────────────────────────────
   'bedrock.title': 'Szukasz Minecraft: Bedrock Edition?',
