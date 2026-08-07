@@ -124,39 +124,47 @@ export function SettingsPage() {
       </Section>
 
       <Section title={t('settings.section.network')}>
-        <Input
+        <TextSetting
           label={t('settings.concurrency')}
           type="number"
-          value={settings.downloadConcurrency}
-          onChange={(e) => update({ downloadConcurrency: Number(e.target.value) })}
           min={1}
           max={8}
+          value={String(settings.downloadConcurrency)}
+          invalidMessage={t('settings.concurrencyInvalid')}
+          onCommit={(v) => update({ downloadConcurrency: Number(v) })}
         />
-        <Input
+        <TextSetting
           label={t('settings.proxy')}
           value={settings.proxyUrl ?? ''}
-          onChange={(e) => update({ proxyUrl: e.target.value || undefined })}
           placeholder={t('settings.proxyPlaceholder')}
+          invalidMessage={t('settings.proxyInvalid')}
+          onCommit={(v) => update({ proxyUrl: v || undefined })}
         />
         <p className="text-xs text-rf-text-muted">{t('settings.proxyHint')}</p>
       </Section>
 
       <Section title={t('settings.section.sources')}>
-        {/* Refetched on blur, not on change: `update` fires per keystroke, and
-            a feed URL is not worth requesting once per typed character. */}
-        <Input
+        <TextSetting
           label={t('settings.newsFeed')}
           value={settings.newsFeedUrl ?? ''}
-          onChange={(e) => update({ newsFeedUrl: e.target.value })}
-          onBlur={() => void refreshFeeds()}
           placeholder={t('settings.feedPlaceholder', { feed: 'news' })}
+          invalidMessage={t('settings.feedInvalid')}
+          onCommit={async (v) => {
+            const saved = await update({ newsFeedUrl: v });
+            if (saved) await refreshFeeds();
+            return saved;
+          }}
         />
-        <Input
+        <TextSetting
           label={t('settings.announcementFeed')}
           value={settings.announcementFeedUrl ?? ''}
-          onChange={(e) => update({ announcementFeedUrl: e.target.value })}
-          onBlur={() => void refreshFeeds()}
           placeholder={t('settings.feedPlaceholder', { feed: 'announcements' })}
+          invalidMessage={t('settings.feedInvalid')}
+          onCommit={async (v) => {
+            const saved = await update({ announcementFeedUrl: v });
+            if (saved) await refreshFeeds();
+            return saved;
+          }}
         />
       </Section>
 
@@ -282,6 +290,69 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </h2>
       <div className="space-y-3 pl-1">{children}</div>
     </div>
+  );
+}
+
+/**
+ * A validated settings field, written back when the field is left rather than
+ * on every keystroke.
+ *
+ * The obvious `value={settings.x} onChange={(e) => update(...)}` shape cannot
+ * work here. Each keystroke is a whole save, so `h` is submitted on its own,
+ * the schema rejects it as not a URL, the store keeps the old settings, and
+ * React restores the input to them. Measured in a real window: the proxy field
+ * swallowed everything up to `socks5:` — the first prefix that happens to parse
+ * as a URL — and the feed fields snapped back to the old address on every key.
+ * Only pasting an already-valid value in one go ever survived.
+ *
+ * A local draft committed on blur puts the finished string in front of the
+ * validator, and gives a rejection somewhere to be said out loud instead of
+ * being mistaken for a field that eats what you type.
+ */
+function TextSetting({
+  label,
+  value,
+  invalidMessage,
+  onCommit,
+  ...inputProps
+}: {
+  label: string;
+  value: string;
+  /** Shown when the main process refuses the value. */
+  invalidMessage: string;
+  /** `false` if the value was rejected. */
+  onCommit: (value: string) => Promise<boolean>;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+
+  // Follow the stored value whenever something else changes it — Reset, mostly.
+  // A rejected draft is deliberately *not* wiped here: `value` did not change,
+  // so the text stays on screen to be corrected.
+  useEffect(() => {
+    setDraft(value);
+    setError(null);
+  }, [value]);
+
+  const commit = async () => {
+    if (draft === value) return;
+    setError((await onCommit(draft)) ? null : invalidMessage);
+  };
+
+  return (
+    <Input
+      label={label}
+      value={draft}
+      error={error ?? undefined}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => void commit()}
+      // Enter is how people finish typing into a single field; without this it
+      // does nothing at all and the value looks unsaved.
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+      {...inputProps}
+    />
   );
 }
 

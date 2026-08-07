@@ -367,12 +367,16 @@ export const pl: Translations = {
     'Nigdy nie łączy się z serwerami logowania. Tylko singleplayer i LAN — serwery w trybie online odrzucą sesję offline.',
   'settings.autoRemoveOrphans': 'Automatycznie usuwaj osierocone mody',
   'settings.concurrency': 'Jednoczesne pobierania (1–8)',
+  'settings.concurrencyInvalid': 'Podaj liczbę od 1 do 8.',
   'settings.proxy': 'Proxy URL (opcjonalnie)',
   'settings.proxyPlaceholder': 'http:// lub socks5://uzytkownik:haslo@host:port',
+  'settings.proxyInvalid':
+    'Nieprawidłowy adres — wymagany schemat http://, https://, socks4:// lub socks5://.',
   'settings.proxyHint':
     'Obsługiwane są HTTP, HTTPS i SOCKS4/5. Przy SOCKS nazwy hostów rozwiązuje proxy, więc nic nie wycieka do lokalnego resolvera.',
   'settings.feedPlaceholder': 'https://twoj-serwer.com/api/{feed}.json',
   'settings.newsFeed': 'News Feed URL',
+  'settings.feedInvalid': 'To nie jest poprawny adres URL. Zostaw puste, aby wyłączyć kanał.',
   'settings.announcementFeed': 'Announcement Feed URL',
   'settings.trustedKeysHint':
     'Manifesty serwerów mogą być podpisane. Dodaj klucz publiczny administratora, aby ufać tylko podpisanym manifestom.',

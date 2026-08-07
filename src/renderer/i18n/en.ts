@@ -364,12 +364,16 @@ export const en = {
     'Never contacts the sign-in servers. Singleplayer and LAN only — online-mode servers refuse an offline session.',
   'settings.autoRemoveOrphans': 'Automatically remove orphaned mods',
   'settings.concurrency': 'Concurrent downloads (1–8)',
+  'settings.concurrencyInvalid': 'Enter a number from 1 to 8.',
   'settings.proxy': 'Proxy URL (optional)',
   'settings.proxyPlaceholder': 'http:// or socks5://user:pass@host:port',
+  'settings.proxyInvalid':
+    'Not a valid address — use an http://, https://, socks4:// or socks5:// URL.',
   'settings.proxyHint':
     'HTTP, HTTPS and SOCKS4/5 are supported. With SOCKS, hostnames are resolved at the proxy, so nothing leaks to your local resolver.',
   'settings.feedPlaceholder': 'https://your-server.com/api/{feed}.json',
   'settings.newsFeed': 'News feed URL',
+  'settings.feedInvalid': 'Not a valid URL. Leave it empty to turn the feed off.',
   'settings.announcementFeed': 'Announcement feed URL',
   'settings.trustedKeysHint':
     'Server manifests can be signed. Add the admin’s public key to trust only signed manifests.',
