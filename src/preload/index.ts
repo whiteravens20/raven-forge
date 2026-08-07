@@ -8,30 +8,6 @@ import type { RavenForgeAPI, EventChannels } from '../shared/ipc-types';
  *
  * SECURITY: Only typed channels are exposed. No raw Node.js APIs.
  */
-type Wrapper = (event: Electron.IpcRendererEvent, ...args: unknown[]) => void;
-
-/**
- * Which wrapper was registered for which callback, on which channel.
- *
- * This used to be a `__wrapper` property hung on the caller's own function, and
- * a function is one object however many times it is registered: subscribing the
- * same callback to two channels left only the second wrapper recorded, so `off`
- * could never remove the first, and subscribing twice to one channel leaked the
- * earlier registration. Keying by channel *and* callback is what makes `off`
- * mean "the subscription I made", rather than "the last one anybody made".
- */
-const wrappers = {
-  byChannel: new Map<string, Map<unknown, Wrapper>>(),
-  for(channel: string): Map<unknown, Wrapper> {
-    let existing = this.byChannel.get(channel);
-    if (!existing) {
-      existing = new Map();
-      this.byChannel.set(channel, existing);
-    }
-    return existing;
-  },
-};
-
 const api: RavenForgeAPI = {
   auth: {
     loginMicrosoft: () => ipcRenderer.invoke('auth:login-microsoft'),
@@ -159,20 +135,22 @@ const api: RavenForgeAPI = {
     isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
   },
 
+  /**
+   * Subscribe, and hand back the only reliable way to unsubscribe.
+   *
+   * A callback crossing the context bridge is proxied afresh on every crossing,
+   * so the object this function receives is not the object a later `off` would
+   * receive — matching them up, by identity or by a lookup table keyed on them,
+   * cannot work. The closure below is the registration, so nothing has to be
+   * matched at all.
+   */
   on: <K extends keyof EventChannels>(channel: K, callback: EventChannels[K]) => {
     // Wrap the callback to strip the IpcRendererEvent first argument
     const wrapper = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => {
       (callback as (...a: unknown[]) => void)(...args);
     };
-    wrappers.for(channel).set(callback, wrapper);
     ipcRenderer.on(channel, wrapper);
-  },
-  off: <K extends keyof EventChannels>(channel: K, callback: EventChannels[K]) => {
-    const forChannel = wrappers.for(channel);
-    const wrapper = forChannel.get(callback);
-    if (!wrapper) return;
-    forChannel.delete(callback);
-    ipcRenderer.removeListener(channel, wrapper);
+    return () => ipcRenderer.removeListener(channel, wrapper);
   },
 };
 

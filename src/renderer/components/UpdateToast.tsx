@@ -42,14 +42,12 @@ export function UpdateToast() {
       setPercent(Math.round(event.progress * 100));
     };
 
-    api.on('updater:update-available', onAvailable);
-    api.on('updater:update-downloaded', onDownloaded);
-    api.on('progress:launcher-update', onProgress);
-    return () => {
-      api.off('updater:update-available', onAvailable);
-      api.off('updater:update-downloaded', onDownloaded);
-      api.off('progress:launcher-update', onProgress);
-    };
+    const stop = [
+      api.on('updater:update-available', onAvailable),
+      api.on('updater:update-downloaded', onDownloaded),
+      api.on('progress:launcher-update', onProgress),
+    ];
+    return () => stop.forEach((off) => off());
   }, []);
 
   if (!info || dismissed) return null;

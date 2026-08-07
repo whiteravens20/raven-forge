@@ -57,8 +57,7 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
       });
     };
 
-    api.on('game:log', handleLog);
-    return () => api.off('game:log', handleLog);
+    return api.on('game:log', handleLog);
   }, [profileId, isLive]);
 
   // Auto-scroll to bottom

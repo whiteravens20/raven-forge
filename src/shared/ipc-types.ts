@@ -411,8 +411,17 @@ export interface RavenForgeAPI {
   };
 
   // -- Event Listener Registration --
-  on: <K extends keyof EventChannels>(channel: K, callback: EventChannels[K]) => void;
-  off: <K extends keyof EventChannels>(channel: K, callback: EventChannels[K]) => void;
+  /**
+   * Subscribe to a main-process event; call the returned function to stop.
+   *
+   * The disposer is the whole interface on purpose. An `off(channel, callback)`
+   * cannot work here: a function handed across the context bridge arrives in the
+   * preload as a fresh proxy every time it crosses, so the callback `off` gets
+   * is never the object `on` recorded, and the listener stays attached forever.
+   * Handing back the one thing that already knows which registration it is
+   * removes the possibility.
+   */
+  on: <K extends keyof EventChannels>(channel: K, callback: EventChannels[K]) => () => void;
 }
 
 // Augment the global Window interface so renderer TS knows about it

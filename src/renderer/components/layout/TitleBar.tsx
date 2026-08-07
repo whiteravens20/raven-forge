@@ -12,9 +12,9 @@ export function TitleBar() {
 
   useEffect(() => {
     const handler = (isMax: boolean) => setMaximized(isMax);
-    api.on('window:maximized-changed', handler);
+    const stop = api.on('window:maximized-changed', handler);
     api.window.isMaximized().then(setMaximized);
-    return () => api.off('window:maximized-changed', handler);
+    return stop;
   }, []);
 
   return (
