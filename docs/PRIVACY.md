@@ -46,7 +46,13 @@ and it will be fixed in whichever of the two is wrong.
 
 ## What is stored on your computer
 
-Everything lives under one directory. **Settings → Data → Data folder** opens it.
+Everything the launcher keeps about you is in one folder, and nothing outside it.
+It holds your profiles and their worlds, your launcher settings, your list of
+accounts, a record of what the launcher has been doing, and crash reports.
+
+You never have to find that folder by hand: **Settings → Data → Data folder**
+opens it on any system, and the in-app privacy page (Info → Privacy) shows the
+exact path this install uses. For reference:
 
 | Platform | Location |
 |---|---|
@@ -67,9 +73,15 @@ Inside it:
 | `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loader installers, and cached metadata. Nothing personal. |
 
 Chromium also keeps its own storage in that folder, including cookies from the
-Microsoft sign-in window — see "Known gaps".
+Microsoft sign-in window. Those are cleared when you log a Microsoft account out.
 
 ### Where credentials are kept
+
+**Your password is never stored, anywhere.** You type it on Microsoft's page, in
+a window of its own; the launcher cannot read it. What it does keep is the pass
+Microsoft hands back afterwards, and that goes into the password safe your
+operating system provides — the same one your web browser uses. The technical
+version of the same statement follows.
 
 Two secrets exist per Microsoft account: the **Microsoft refresh token** (which
 can obtain new sessions) and the **Minecraft session token** (which proves to
@@ -230,7 +242,9 @@ read a report through before attaching it to a public issue.
 ## Deleting everything
 
 - **One account:** "Log out" on the Accounts page removes it from `auth.json`
-  and deletes its keychain entries.
+  and deletes its keychain entries. Logging out of a Microsoft account also
+  clears the sign-in window's cookies, so the next sign-in starts from a blank
+  page rather than recognising you.
 - **All launcher data:** quit the launcher and delete the data folder listed
   above. Nothing survives outside it except the OS keychain entries, which are
   removed by logging out first.
@@ -242,11 +256,6 @@ read a report through before attaching it to a public issue.
 
 Listed on purpose. An honest list beats a clean-looking one.
 
-- **The Microsoft sign-in window shares the launcher's browser session**, which
-  it must, so that your proxy setting applies to it. Its cookies persist in the
-  data folder and are **not** cleared when you log out — the next sign-in may
-  recognise your Microsoft account, though it always asks which account to use.
-  Deleting the data folder removes them.
 - **The update check on start cannot be disabled** from Settings. It is a single
   request to GitHub Releases on each launch. A blocked network simply makes it
   fail quietly.

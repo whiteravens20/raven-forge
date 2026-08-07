@@ -479,77 +479,84 @@ export const pl: Translations = {
   'about.privacy': 'Prywatność',
 
   // ── Prywatność ───────────────────────────────────────────
-  // Pełna polityka to docs/PRIVACY.pl.md; tutaj opisana jest działająca instalacja.
+  // Pisane dla kogoś, kto się niepokoi, a nie dla kogoś, kto pisał kod: bez
+  // nazw plików, uprawnień i protokołów. Techniczne szczegóły są w
+  // docs/PRIVACY.pl.md, linkowanym na dole strony.
   'privacy.title': 'Prywatność',
   'privacy.lead': 'Raven Forge nie zbiera o Tobie żadnych danych.',
   'privacy.leadBody':
-    'Żadnej analityki, statystyk użycia ani identyfikatora instalacji. White Ravens nie prowadzi serwera, który odbierałby Twoje dane — nie zakładasz u nas konta i nie ma bazy danych z Twoim nazwiskiem.',
+    'Żadnych statystyk, profilowania ani identyfikatora Twojego komputera. Nie prowadzimy serwera, który odbierałby Twoje dane — nie masz u nas konta i nigdzie nie ma listy z Twoim nazwiskiem.',
 
   'privacy.never.title': 'Co nigdy się nie dzieje',
   'privacy.never.telemetry':
-    'Nic nie jest mierzone ani raportowane. W kodzie nie ma żadnego adresu, pod który leciałyby takie dane — dlatego nie ma też przełącznika do wyłączenia.',
+    'Nic nie jest mierzone i nic nie jest nigdzie odsyłane. Takie dane nie mają dokąd trafić — dlatego nie ma też przełącznika do wyłączenia.',
   'privacy.never.identifier':
-    'Nie powstaje ani nie jest wysyłany żaden unikalny identyfikator Twojej instalacji.',
+    'Twój komputer nie dostaje numeru, po którym dałoby się go później rozpoznać.',
   'privacy.never.upload':
-    'Raporty z awarii zapisują się do pliku na tym komputerze. Nic ich nie wysyła — to Ty decydujesz, czy dołączyć raport do zgłoszenia błędu.',
+    'Kiedy gra się wysypie, raport zapisuje się na tym komputerze. Nic go nigdzie nie wysyła — to Ty decydujesz, czy dołączyć go do zgłoszenia.',
   'privacy.never.account':
-    'Nie zakładasz konta w White Ravens. Twoje konto Minecrafta należy do Microsoftu, a hasło wpisujesz na jego stronie, nigdy w tym launcherze.',
+    'Nie zakładasz u nas konta. Twoje konto Minecrafta należy do Microsoftu, a jego hasło wpisujesz na ich stronie, nigdy w tym launcherze.',
 
   'privacy.local.title': 'Co zostaje na tym komputerze',
   'privacy.local.body':
-    'Wszystko mieści się w jednym folderze, który możesz otworzyć i w każdej chwili usunąć.',
+    'Wszystko leży w jednym folderze. To, gdzie on jest, zależy od Twojego systemu — ten launcher używa tego:',
   'privacy.local.profiles':
-    'Twoje profile i ich katalogi gry — światy, zrzuty ekranu, ustawienia, mody.',
+    'Twoje profile, a razem z nimi światy, zrzuty ekranu, ustawienia gry i mody.',
   'privacy.local.settings':
-    'Twoje ustawienia: motyw, język, proxy, adresy kanałów, zaufane klucze.',
-  'privacy.local.accounts':
-    'Lista kont: nazwa gracza, UUID, typ konta i data ostatniego logowania.',
+    'Twoje ustawienia launchera — wygląd, język i adresy, z których pobiera treści.',
+  'privacy.local.accounts': 'Twoja lista kont: nazwa gracza i data ostatniego logowania.',
   'privacy.local.logs':
-    'Log launchera, który dosłownie przepisuje wyjście gry — zredaguj go, zanim komuś wyślesz.',
-  'privacy.local.crashes': 'Raporty z awarii, już pozbawione tokenów i danych konta.',
+    'Zapis tego, co launcher robił. Może zawierać Twoją nazwę gracza i nazwy folderów, więc przejrzyj go, zanim komuś wyślesz.',
+  'privacy.local.crashes': 'Raporty z awarii, już bez danych logowania.',
   'privacy.local.keychain':
-    'Tokenów logowania w tych plikach nie ma. Trafiają do magazynu poświadczeń systemu — Menedżera poświadczeń, Keychain albo libsecret/kwallet. Na maszynie bez działającego pęku kluczy launcher zapisuje je awaryjnie do pliku z uprawnieniami 0600 i mówi o tym na stronie Konta.',
+    'Twoje hasło nie jest trzymane ani tutaj, ani nigdzie indziej — wpisujesz je na stronie Microsoftu, nie w tym launcherze. Launcher przechowuje tylko przepustkę, którą Microsoft odsyła, i wkłada ją do systemowego sejfu na hasła — tego samego, z którego korzysta Twoja przeglądarka. Jeśli Twój system takiego sejfu nie udostępnia, launcher trzyma ją u siebie w folderze i mówi o tym wprost na ekranie Konta.',
 
-  'privacy.dest.title': 'Dokąd launcher się łączy',
+  'privacy.dest.title': 'Z kim launcher się kontaktuje',
   'privacy.dest.body':
-    'Każde z poniższych żądań mówi serwerowi, który je odbiera, jaki masz adres IP i że używasz Raven Forge — na tym polega wykonanie żądania sieciowego. Wszystko idzie przez proxy ustawione w Ustawieniach.',
-  'privacy.dest.nothing': 'Nic poza samym żądaniem.',
-  'privacy.dest.auth.when': 'tylko przy logowaniu przez Microsoft',
+    'Poproszenie o cokolwiek dowolnego komputera w internecie mówi mu Twój adres IP — numer, który Twój dostawca przypisał Twojemu łączu. Dzieje się tak przy każdej otwartej stronie i przy wszystkim poniżej. Nic więcej o Tobie tam nie idzie.',
+  'privacy.dest.nothing': 'Tylko prośba o pliki. Nic o Tobie.',
+  'privacy.dest.auth.who': 'Microsoft, Xbox i Mojang',
+  'privacy.dest.auth.when': 'gdy logujesz się przez Microsoft',
   'privacy.dest.auth.sends':
-    'Strona logowania samego Microsoftu, w osobnym oknie. Launcher dostaje kod autoryzacyjny, wymienia go na tokeny i otrzymuje Twoje UUID, nazwę gracza oraz adres skórki. Tryb offline nie kontaktuje się z żadnym z tych serwerów.',
-  'privacy.dest.mojang.when': 'instalacja lub uruchomienie wersji',
-  'privacy.dest.java.when': 'instalacja środowiska Javy',
-  'privacy.dest.java.sends': 'Wersja Javy, Twój system operacyjny i architektura.',
-  'privacy.dest.loaders.when': 'instalacja loadera modów',
-  'privacy.dest.modrinth.when': 'przeglądanie lub instalowanie modów',
+    'Logujesz się na stronie samego Microsoftu, w osobnym oknie — launcher nigdy nie widzi Twojego hasła. Wracają z niej Twoja nazwa gracza, skórka i zgoda na uruchomienie gry. W trybie offline nie dzieje się to w ogóle.',
+  'privacy.dest.mojang.who': 'Mojang',
+  'privacy.dest.mojang.when': 'przy instalacji i uruchamianiu gry',
+  'privacy.dest.java.who': 'Adoptium',
+  'privacy.dest.java.when': 'gdy launcher instaluje za Ciebie Javę',
+  'privacy.dest.java.sends': 'Która wersja Javy jest potrzebna i na jakim jesteś systemie.',
+  'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge i Quilt',
+  'privacy.dest.loaders.when': 'przy instalacji tego, czego mody potrzebują do działania',
+  'privacy.dest.modrinth.who': 'Modrinth',
+  'privacy.dest.modrinth.when': 'gdy szukasz modów',
   'privacy.dest.modrinth.sends':
-    'Twoje frazy wyszukiwania i filtry. Żądania przedstawiają launcher i jego wersję, czego wymaga regulamin API Modrinth — nie przedstawiają Ciebie.',
-  'privacy.dest.packs.when': 'katalog paczek White Ravens',
-  'privacy.dest.updates.when': 'automatycznie przy każdym starcie i na żądanie',
+    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
+  'privacy.dest.packs.who': 'White Ravens',
+  'privacy.dest.packs.when': 'wiadomości i lista paczek serwerowych',
+  'privacy.dest.updates.who': 'GitHub',
+  'privacy.dest.updates.when': 'przy każdym starcie i gdy sprawdzasz aktualizacje',
   'privacy.dest.updates.sends':
-    'Sprawdzenie aktualizacji ujawnia GitHubowi Twoje IP, wersję launchera i platformę. Obecnie nie ma przełącznika, który by je wyłączał.',
-  'privacy.dest.feeds': 'Kanały wiadomości, tak jak są ustawione w tej instalacji:',
-  'privacy.dest.feedOff': 'wyłączony — pole jest puste, więc nic nie jest pobierane',
+    'Jedno pytanie: czy jest nowsza wersja? Dzieje się samo przy każdym starcie i na razie nie da się tego wyłączyć.',
+  'privacy.dest.feeds': 'Wiadomości, tak jak są ustawione na tym komputerze:',
+  'privacy.dest.feedOff': 'wyłączone — nic nie jest pobierane',
 
   'privacy.game.title': 'Gra to osobny program',
   'privacy.game.body':
-    'Kiedy Minecraft już wystartuje, jest własnym procesem i launcher nie pośredniczy w niczym. Gra łączy się z Mojangiem, żeby zweryfikować Cię na serwerach w trybie online, a każdy serwer, na który wejdziesz, widzi Twoje IP, nazwę gracza i UUID.',
+    'Kiedy gra już wystartuje, launcher schodzi jej z drogi. Gra sprawdza u Mojanga, że konto jest Twoje, a każdy serwer, na który wejdziesz, widzi Twój adres IP, nazwę gracza i numer konta — dokładnie tak samo jak przy każdym innym launcherze.',
   'privacy.game.mods':
-    'Mod to dowolny kod Javy działający z Twoimi uprawnieniami. Może otworzyć każde połączenie i odczytać każdy plik, który Ty możesz odczytać. Launcher weryfikuje, że dostałeś dokładnie ten plik, który wskazał manifest — nie jest w stanie powiedzieć, że ten plik jest godny zaufania. Dodawaj tylko źródła, którym ufasz.',
+    'Mod to program napisany przez kogoś innego i kiedy już działa, może zrobić wszystko to, co Ty możesz zrobić na tym komputerze — łącznie z wysyłaniem rzeczy przez internet. Launcher sprawdza, czy mod to dokładnie ten plik, który miał pobrać — nie jest w stanie sprawdzić, czy ten plik jest uczciwy. Instaluj mody tylko z miejsc, którym ufasz.',
 
-  'privacy.control.title': 'Co masz pod kontrolą',
+  'privacy.control.title': 'O czym decydujesz Ty',
   'privacy.control.offline':
-    'Tryb offline nie kontaktuje się z żadnym serwerem logowania — tylko gra jednoosobowa i LAN.',
+    'Tryb offline w ogóle nie kontaktuje się z serwerami logowania — grasz sam albo w sieci domowej.',
   'privacy.control.feeds':
-    'Wyczyszczenie adresu kanału w Ustawieniach sprawia, że przestaje być pobierany.',
-  'privacy.control.proxy':
-    'Proxy przepuszcza każde żądanie launchera przez serwer, który sam wybierasz.',
+    'Wyczyść adres wiadomości w Ustawieniach, a nic więcej nie będzie pobierane.',
+  'privacy.control.proxy': 'Proxy przepuszcza wszystko przez serwer, który sam wybierasz.',
   'privacy.control.delete':
-    'Wylogowanie kasuje zapisane tokeny tego konta. Usunięcie folderu danych usuwa całą resztę — nigdzie indziej nic nie leży.',
+    'Wylogowanie kasuje zapisane logowanie tego konta i zapomina je także w oknie logowania. Usunięcie powyższego folderu usuwa całą resztę — po naszej stronie nie ma czego usuwać.',
 
   'privacy.fullPolicy': 'Przeczytaj pełną politykę prywatności',
   'privacy.fullPolicyHint':
-    'Otwiera dokument w przeglądarce. Opisuje to samo w całości, razem z lukami, o których wiemy.',
+    'Otwiera się w przeglądarce. To samo opisane w całości, razem z tym, co wiemy, że jest niedoskonałe.',
 
   // ── Bedrock card ─────────────────────────────────────────
   'bedrock.title': 'Szukasz Minecraft: Bedrock Edition?',

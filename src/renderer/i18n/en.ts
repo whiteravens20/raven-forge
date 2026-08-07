@@ -467,72 +467,83 @@ export const en = {
   'about.privacy': 'Privacy',
 
   // ── Privacy ──────────────────────────────────────────────
-  // The full policy is docs/PRIVACY.md; this describes the running install.
+  // Written for whoever is worried, not for whoever wrote the code: no file
+  // names, no permission bits, no protocol names. docs/PRIVACY.md is where the
+  // technical detail lives, and it is linked from the bottom of the page.
   'privacy.title': 'Privacy',
   'privacy.lead': 'Raven Forge collects nothing about you.',
   'privacy.leadBody':
-    'No analytics, no usage statistics, no install identifier. White Ravens runs no server that receives your data — there is no account with us and no database with your name in it.',
+    'No statistics, no profiling, no identifier for your computer. We do not run a server that receives your data — you have no account with us and there is no list anywhere with your name on it.',
 
   'privacy.never.title': 'What never happens',
   'privacy.never.telemetry':
-    'Nothing is measured or reported. There is no reporting endpoint in the code, which is why there is no switch to turn one off.',
-  'privacy.never.identifier': 'No unique identifier for your installation is generated or sent.',
+    'Nothing is measured and nothing is reported back. There is nowhere for such data to go, which is why there is no switch to turn it off.',
+  'privacy.never.identifier':
+    'Your computer is never given a number that would let it be recognised again.',
   'privacy.never.upload':
-    'Crash reports are written to a file on this computer. Nothing uploads them — you decide whether to attach one to a bug report.',
+    'When the game crashes, the report is saved on this computer. Nothing sends it anywhere — you decide whether to attach it to a bug report.',
   'privacy.never.account':
-    'You do not create an account with White Ravens. Your Minecraft account belongs to Microsoft, and your password is typed into their page, never into this launcher.',
+    'You do not set up an account with us. Your Minecraft account belongs to Microsoft, and you enter its password on their page, never in this launcher.',
 
   'privacy.local.title': 'What stays on this computer',
-  'privacy.local.body': 'All of it lives in one folder, which you can open and delete at any time.',
+  'privacy.local.body':
+    'All of it sits in one folder. Where that folder is depends on your system — this is the one this launcher is using:',
   'privacy.local.profiles':
-    'Your profiles and their game directories — worlds, screenshots, settings, mods.',
-  'privacy.local.settings': 'Your preferences: theme, language, proxy, feed addresses, keys.',
-  'privacy.local.accounts':
-    'The account list: player name, UUID, account type and when it was last signed in.',
+    'Your profiles, and with them your worlds, screenshots, game settings and mods.',
+  'privacy.local.settings':
+    'Your launcher settings — the look, the language, and the addresses it downloads from.',
+  'privacy.local.accounts': 'Your list of accounts: player name, and when you last signed in.',
   'privacy.local.logs':
-    'The launcher log, which echoes the game’s output verbatim — redact it before sharing it.',
-  'privacy.local.crashes': 'Crash reports, already stripped of tokens and account details.',
+    'A record of what the launcher has been doing. It can contain your player name and folder names, so look it over before sending it to anybody.',
+  'privacy.local.crashes': 'Crash reports, with the sign-in details already taken out.',
   'privacy.local.keychain':
-    'Sign-in tokens are not in these files. They go into the operating system’s credential store — Credential Manager, Keychain, or libsecret/kwallet. On a machine with no working keyring the launcher falls back to a file with 0600 permissions and says so on the Accounts page.',
+    'Your password is not kept here or anywhere else — you type it on Microsoft’s page, not in this launcher. What the launcher does keep is the pass Microsoft hands back, and it puts that in the safe your system provides for passwords, the same one your web browser uses. If your system offers no such safe, the launcher keeps it in its own folder instead and says so plainly on the Accounts screen.',
 
-  'privacy.dest.title': 'Where the launcher connects',
+  'privacy.dest.title': 'Who the launcher talks to',
   'privacy.dest.body':
-    'Every request below tells the server receiving it your IP address and that you use Raven Forge — that is what making a network request means. All of it goes through the proxy configured in Settings.',
-  'privacy.dest.nothing': 'Nothing but the request itself.',
-  'privacy.dest.auth.when': 'only when you sign in with Microsoft',
+    'Asking any computer on the internet for something tells it your IP address — the number your internet provider gave your connection. That happens with every website you open, and with everything below. Nothing else about you goes with it.',
+  'privacy.dest.nothing': 'Only the request for the files. Nothing about you.',
+  'privacy.dest.auth.who': 'Microsoft, Xbox and Mojang',
+  'privacy.dest.auth.when': 'when you sign in with Microsoft',
   'privacy.dest.auth.sends':
-    'Microsoft’s own sign-in page, in a separate window. The launcher receives an authorization code, exchanges it for tokens, and gets back your UUID, player name and skin address. Offline mode never contacts any of these.',
-  'privacy.dest.mojang.when': 'installing or launching a version',
-  'privacy.dest.java.when': 'installing a Java runtime',
-  'privacy.dest.java.sends': 'The Java version, your operating system and your architecture.',
-  'privacy.dest.loaders.when': 'installing a mod loader',
-  'privacy.dest.modrinth.when': 'browsing or installing mods',
+    'You sign in on Microsoft’s own page, in a window of its own — the launcher never sees your password. Back come your player name, your skin, and permission to start the game. In offline mode this never happens at all.',
+  'privacy.dest.mojang.who': 'Mojang',
+  'privacy.dest.mojang.when': 'when installing or starting the game',
+  'privacy.dest.java.who': 'Adoptium',
+  'privacy.dest.java.when': 'when the launcher installs Java for you',
+  'privacy.dest.java.sends': 'Which version of Java is needed, and which system you are on.',
+  'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge and Quilt',
+  'privacy.dest.loaders.when': 'when installing what mods need to run',
+  'privacy.dest.modrinth.who': 'Modrinth',
+  'privacy.dest.modrinth.when': 'when you look for mods',
   'privacy.dest.modrinth.sends':
-    'Your search terms and filters. Requests identify the launcher and its version, as Modrinth’s API terms require — not you.',
-  'privacy.dest.packs.when': 'the White Ravens pack catalogue',
-  'privacy.dest.updates.when': 'automatically at every start, and on demand',
+    'What you type into the search box, and the filters you set. Nothing that says who you are — the request names the launcher that is asking, not the person.',
+  'privacy.dest.packs.who': 'White Ravens',
+  'privacy.dest.packs.when': 'news, and the list of server packs',
+  'privacy.dest.updates.who': 'GitHub',
+  'privacy.dest.updates.when': 'at every start, and when you check for updates',
   'privacy.dest.updates.sends':
-    'The update check reveals your IP, the launcher version and your platform to GitHub. There is currently no switch to disable it.',
-  'privacy.dest.feeds': 'News feeds, as this install has them configured:',
-  'privacy.dest.feedOff': 'off — the field is empty, so nothing is fetched',
+    'One question: is there a newer version? It happens on its own at every start, and there is currently no way to switch that off.',
+  'privacy.dest.feeds': 'News, as set up on this computer:',
+  'privacy.dest.feedOff': 'off — nothing is being downloaded',
 
-  'privacy.game.title': 'The game is a separate program',
+  'privacy.game.title': 'The game is its own program',
   'privacy.game.body':
-    'Once Minecraft starts it is its own process and the launcher is no longer in the middle. It contacts Mojang to verify you on online-mode servers, and every server you join sees your IP, player name and UUID.',
+    'Once the game starts, the launcher steps out of the way. The game checks with Mojang that the account is yours, and every server you join sees your IP address, your player name and your account number — exactly as it would with any other launcher.',
   'privacy.game.mods':
-    'A mod is arbitrary Java code running with your privileges. It can open any connection and read any file you can read. The launcher verifies that you received exactly the file a manifest named — it cannot tell you that file is trustworthy. Only add sources you trust.',
+    'A mod is a program written by somebody else, and once it is running it can do anything you can do on this computer, including sending things over the internet. The launcher checks that a mod is exactly the file it was meant to download — it cannot check whether that file is honest. Install mods only from places you trust.',
 
-  'privacy.control.title': 'What you control',
+  'privacy.control.title': 'What you decide',
   'privacy.control.offline':
-    'Offline mode never contacts a sign-in server at all — singleplayer and LAN only.',
-  'privacy.control.feeds': 'Clearing a feed address in Settings stops that feed being fetched.',
-  'privacy.control.proxy': 'A proxy routes every launcher request through a server you choose.',
+    'Offline mode never contacts a sign-in server at all — you play on your own or on a home network.',
+  'privacy.control.feeds': 'Clear the news address in Settings and nothing more is downloaded.',
+  'privacy.control.proxy': 'A proxy sends everything through a server you choose yourself.',
   'privacy.control.delete':
-    'Signing out deletes that account’s stored tokens. Deleting the data folder removes everything else — there is nothing held anywhere else to delete.',
+    'Signing out deletes that account’s saved sign-in, and forgets it in the sign-in window too. Deleting the folder above removes everything else — on our side there is nothing to delete.',
 
   'privacy.fullPolicy': 'Read the full privacy policy',
   'privacy.fullPolicyHint':
-    'Opens the document in your browser. It covers the same ground in full, including the gaps we know about.',
+    'Opens in your browser. The same ground covered in full, including the parts we know are imperfect.',
 
   // ── Bedrock card ─────────────────────────────────────────
   'bedrock.title': 'Looking for Minecraft: Bedrock Edition?',

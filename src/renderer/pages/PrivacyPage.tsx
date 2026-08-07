@@ -41,6 +41,12 @@ function host(url: string): string {
 }
 
 interface Destination {
+  /**
+   * Who this is, in words. The addresses below it are the proof, not the
+   * heading — nobody recognises their Minecraft account in
+   * `xsts.auth.xboxlive.com`.
+   */
+  who: TranslationKey;
   hosts: string[];
   when: TranslationKey;
   sends: TranslationKey;
@@ -50,21 +56,25 @@ interface Destination {
 
 const DESTINATIONS: readonly Destination[] = [
   {
+    who: 'privacy.dest.auth.who',
     hosts: [host(MS_AUTH_BASE), host(XBOX_AUTH_URL), host(XSTS_AUTH_URL), host(MC_SERVICES_API)],
     when: 'privacy.dest.auth.when',
     sends: 'privacy.dest.auth.sends',
   },
   {
+    who: 'privacy.dest.mojang.who',
     hosts: [host(MOJANG_VERSION_MANIFEST), host(MOJANG_RESOURCES)],
     when: 'privacy.dest.mojang.when',
     sends: 'privacy.dest.nothing',
   },
   {
+    who: 'privacy.dest.java.who',
     hosts: [host(ADOPTIUM_API)],
     when: 'privacy.dest.java.when',
     sends: 'privacy.dest.java.sends',
   },
   {
+    who: 'privacy.dest.loaders.who',
     hosts: [
       host(FABRIC_META_API),
       host(QUILT_META_API),
@@ -75,17 +85,20 @@ const DESTINATIONS: readonly Destination[] = [
     sends: 'privacy.dest.nothing',
   },
   {
+    who: 'privacy.dest.modrinth.who',
     hosts: [host(MODRINTH_API_BASE)],
     when: 'privacy.dest.modrinth.when',
     sends: 'privacy.dest.modrinth.sends',
     notable: true,
   },
   {
+    who: 'privacy.dest.packs.who',
     hosts: [host(WHITE_RAVENS_PACKS_URL)],
     when: 'privacy.dest.packs.when',
     sends: 'privacy.dest.nothing',
   },
   {
+    who: 'privacy.dest.updates.who',
     // electron-updater derives this from the publish block in
     // electron-builder.config.js, so there is no constant to point at.
     hosts: ['github.com'],
@@ -180,7 +193,7 @@ export function PrivacyPage() {
           {DESTINATIONS.map((dest) => (
             <div key={dest.hosts.join()} className="space-y-1 p-3">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="font-mono text-xs text-rf-text">{dest.hosts.join('  ·  ')}</span>
+                <span className="text-sm font-medium text-rf-text">{t(dest.who)}</span>
                 <span className="text-xs text-rf-text-muted">— {t(dest.when)}</span>
               </div>
               <p
@@ -189,6 +202,11 @@ export function PrivacyPage() {
                 }`}
               >
                 {t(dest.sends)}
+              </p>
+              {/* Small and last: the addresses are here so the claim above can
+                  be checked, not because anybody needs to read them. */}
+              <p className="font-mono text-[10px] leading-relaxed text-rf-text-muted">
+                {dest.hosts.join('  ·  ')}
               </p>
             </div>
           ))}

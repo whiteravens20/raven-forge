@@ -49,8 +49,13 @@ a poprawimy to z tych dwóch, które się myli.
 
 ## Co jest przechowywane na Twoim komputerze
 
-Wszystko mieści się w jednym katalogu. **Ustawienia → Dane → Folder danych**
-otwiera go.
+Wszystko, co launcher o Tobie trzyma, leży w jednym folderze i nic poza nim.
+Są tam Twoje profile razem ze światami, ustawienia launchera, lista kont, zapis
+tego, co launcher robił, oraz raporty z awarii.
+
+Nie musisz szukać tego folderu ręcznie: **Ustawienia → Dane → Folder danych**
+otwiera go na każdym systemie, a strona prywatności w apce (Informacje →
+Prywatność) pokazuje dokładną ścieżkę tej instalacji. Dla orientacji:
 
 | System | Lokalizacja |
 |---|---|
@@ -74,6 +79,12 @@ Chromium trzyma w tym folderze także własne dane, w tym ciasteczka z okna
 logowania Microsoftu — patrz „Znane luki”.
 
 ### Gdzie leżą poświadczenia
+
+**Twoje hasło nie jest przechowywane nigdzie.** Wpisujesz je na stronie
+Microsoftu, w osobnym oknie; launcher nie jest w stanie go odczytać. Trzyma
+jedynie przepustkę, którą Microsoft odsyła, i wkłada ją do systemowego sejfu na
+hasła — tego samego, z którego korzysta Twoja przeglądarka. Poniżej to samo,
+tylko technicznie.
 
 Na jedno konto Microsoft przypadają dwa sekrety: **token odświeżający
 Microsoftu** (którym można uzyskać nowe sesje) i **token sesji Minecrafta**
