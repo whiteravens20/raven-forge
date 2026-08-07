@@ -117,6 +117,11 @@ node scripts/sign.mjs dist/<slug>/manifest.json keys/ravenpacks.key
 ```
 
 Distribute the `.pub` value; players paste it under **Settings → Trusted Keys**.
+White Ravens' own key is the exception — it is compiled into the launcher at
+`src/shared/branding.ts`, so first-party packs verify with nothing pasted.
+Rotating it is therefore a launcher release, which is the cost of not shipping a
+key players have to fetch from the same place as the manifest.
+
 Keep the `.key` file secret (`chmod 600`, gitignored, never committed) and store
 it in CI as `PACK_SIGNING_KEY`.
 

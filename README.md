@@ -192,14 +192,20 @@ doubles as a working reference for each format:
 |---|---|
 | News feed | `https://whiteravens20.github.io/raven-packs/raven-forge/news.json` |
 | Announcement feed | `https://whiteravens20.github.io/raven-packs/raven-forge/announcements.json` |
-| Profile manifest (Raven MC) | `https://whiteravens20.github.io/raven-packs/ravenmc/manifest.json` |
+| Pack catalogue | `https://whiteravens20.github.io/raven-packs/packs.json` |
+| Profile manifest (White Ravens Classic) | `https://whiteravens20.github.io/raven-packs/ravenclassic/manifest.json` |
 
-Manifests published there are Ed25519-signed. Adding the public key under
-**Settings → Trusted Keys** does two things: the profile gets a verified badge,
-and — more importantly — the launcher will from then on refuse to install a
-manifest that is not signed by a key you trust. Until you add one, signatures
-are reported but not enforced, which is what keeps unsigned packs from anywhere
-else installable.
+Manifests published there are Ed25519-signed, and the White Ravens public key is
+compiled into the launcher, so those packs read **Verified** with nothing to
+configure. It is shipped rather than downloaded on purpose: a key fetched
+alongside the manifest it vouches for proves nothing, because whoever can
+rewrite one can rewrite the other.
+
+**Settings → Trusted Keys** is for everyone else's packs, and it does something
+stronger than the badge — adding a key makes the launcher refuse to install any
+manifest not signed by a key you trust, unsigned ones included. Until you add
+one, signatures are reported but not enforced, which is what keeps packs from
+anywhere else installable.
 
 ### Forking
 

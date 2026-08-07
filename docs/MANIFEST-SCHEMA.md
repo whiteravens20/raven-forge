@@ -11,6 +11,7 @@ Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher f
   "minecraftVersion": "1.20.4",
   "modLoader": "fabric | quilt | forge | neoforge | vanilla",
   "modLoaderVersion": "0.15.7",
+  "recommendedRamMb": 6144,
   "mods": [],
   "resourcePacks": [],
   "shaders": [],
@@ -18,6 +19,11 @@ Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher f
   "signature": "base64 Ed25519 signature (optional)"
 }
 ```
+
+`recommendedRamMb` is optional and bounded to 512–65536. It is applied **only
+when the profile is created**, so a later sync never overwrites a figure the
+player has since chosen; a manifest without one leaves the launcher's own
+default alone.
 
 ## `mods[]` entries
 
@@ -89,16 +95,21 @@ Paths are resolved relative to the profile's `.minecraft` directory. The launche
 ## Signing
 
 The optional `signature` is the base64-encoded Ed25519 signature of the
-**canonicalized** manifest. It is checked against the user's
-`Settings → Trusted Keys` list inside the sync, on the exact document that is
-about to be installed and before anything is downloaded — not in a separate
-fetch, which would only ever report on bytes nobody installed.
+**canonicalized** manifest. It is checked against the key ring inside the sync,
+on the exact document that is about to be installed and before anything is
+downloaded — not in a separate fetch, which would only ever report on bytes
+nobody installed.
+
+The key ring is the user's `Settings → Trusted Keys` plus the **White Ravens
+publisher key compiled into the launcher**, which is why a first-party pack
+reads "Verified" on an install where nothing has been configured. Only the
+user's own keys switch enforcement on.
 
 What happens next depends on whether the user trusts any key:
 
-| Trusted keys | Signed and valid | Signed but invalid | Unsigned |
+| Trusted keys | Signed and valid | Signed but unmatched | Unsigned |
 |---|---|---|---|
-| none configured | installs, badge "Verified" is not claimed | installs, flagged | installs, flagged "Unsigned" |
+| none configured | installs, badge "Verified" | installs, flagged | installs, flagged "Unsigned" |
 | one or more | installs, badge "Verified" | **refused** | **refused** |
 
 Refusing the unsigned case once keys exist is the point of the scheme: if
