@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { APP_NAME } from '@shared/constants';
+import { REPO_URL, ORG_URL } from '@shared/branding';
 import iconMono from '@assets/icons/icon-mono.svg?raw';
 import { InlineSvg } from '@components/ui/InlineSvg';
 import { BedrockInfoCard } from '@components/BedrockInfoCard';
@@ -11,10 +12,8 @@ import { interleave } from '@renderer/i18n/rich';
 
 const api = window.ravenforge;
 
-const REPO_URL = 'https://github.com/whiteravens20/raven-forge';
 const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`;
 const AUTHOR_URL = 'https://github.com/pavlojs';
-const ORG_URL = 'https://whiteravens.net';
 
 /**
  * Mojang's brand guidelines prescribe this sentence word for word, so it is not

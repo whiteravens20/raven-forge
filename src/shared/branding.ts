@@ -44,3 +44,19 @@ export const WHITE_RAVENS_PACKS_URL = `${PACKS_SITE}/packs.json`;
  * still install anybody's manifest — see `assertManifestTrusted`.
  */
 export const WHITE_RAVENS_PUBLIC_KEY = 'N/xfUD4XtQ8KMV2weZ8hglLoaYkqTdlFpTngu3p/nA8=';
+
+/** The launcher's own source repository — About, and the bug-report links. */
+export const REPO_URL = 'https://github.com/whiteravens20/raven-forge';
+
+/** The organisation behind it, for anyone who would rather not open a GitHub account. */
+export const ORG_URL = 'https://whiteravens.net';
+
+/**
+ * The crash-report issue form, pre-selected.
+ *
+ * `template=` names the file under `.github/ISSUE_TEMPLATE/`; without it GitHub
+ * shows the chooser, which is one more screen between a player who has just
+ * crashed and a filed report. Nothing is pre-filled from the report itself —
+ * the body is a file on their disk that they read first and attach knowingly.
+ */
+export const NEW_CRASH_ISSUE_URL = `${REPO_URL}/issues/new?template=crash_report.md&labels=bug,crash`;

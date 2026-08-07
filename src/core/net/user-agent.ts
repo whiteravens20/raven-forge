@@ -1,4 +1,5 @@
 import { app } from 'electron';
+import { REPO_URL } from '../../shared/branding';
 
 /**
  * How the launcher identifies itself to Modrinth.
@@ -15,5 +16,5 @@ import { app } from 'electron';
  * telling Modrinth it is something it stopped being.
  */
 export function modrinthUserAgent(): string {
-  return `whiteravens20/raven-forge/${app.getVersion()} (https://github.com/whiteravens20/raven-forge)`;
+  return `whiteravens20/raven-forge/${app.getVersion()} (${REPO_URL})`;
 }
