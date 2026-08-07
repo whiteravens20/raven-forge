@@ -5,7 +5,9 @@ import { canonicalize } from '../src/core/updater/canonical';
 import {
   verifyManifestSignature,
   assertManifestTrusted,
+  BUILT_IN_KEYS,
 } from '../src/core/updater/manifest-verify';
+import { WHITE_RAVENS_PUBLIC_KEY } from '../src/shared/branding';
 import type { TrustedKey } from '../src/shared/ipc-types';
 
 /**
@@ -75,11 +77,26 @@ describe('verifyManifestSignature', () => {
     });
   });
 
-  it('cannot validate anything when no key is trusted', () => {
+  it('reports an unknown signer as unmatched when the user trusts nobody', () => {
     expect(verifyManifestSignature(sign(manifest), [])).toMatchObject({
       signed: true,
       valid: false,
     });
+  });
+
+  it('always carries the publisher key, so first-party packs verify unconfigured', () => {
+    // Deleting this key would leave every White Ravens pack reading "matches no
+    // trusted key" on a fresh install, which is where nearly every player is.
+    expect(BUILT_IN_KEYS.map((k) => k.publicKey)).toContain(WHITE_RAVENS_PUBLIC_KEY);
+  });
+
+  it('does not offer the publisher key twice when the user added it too', () => {
+    const mine: TrustedKey[] = [
+      { name: 'Mine', publicKey: WHITE_RAVENS_PUBLIC_KEY, addedAt: '2026-01-01T00:00:00.000Z' },
+    ];
+    const result = verifyManifestSignature(sign(manifest), mine);
+    // The user's name for it wins; the built-in copy is not consulted again.
+    expect(result).toMatchObject({ signed: true, valid: false });
   });
 });
 
