@@ -139,6 +139,13 @@ export const modManifestSchema = z.object({
   }),
   modLoader: z.enum(['vanilla', 'forge', 'neoforge', 'fabric', 'quilt']),
   modLoaderVersion: z.string().optional(),
+  /**
+   * What the pack author says this pack needs, in MB. Used only when the
+   * profile is first created — a later sync must not overwrite a number the
+   * player has since chosen for themselves. Bounded because it is written by
+   * whoever wrote the manifest and ends up on a `-Xmx` line.
+   */
+  recommendedRamMb: z.number().int().min(512).max(65536).optional(),
   mods: z.array(modEntrySchema).default([]),
   resourcePacks: z.array(resourcePackEntrySchema).default([]),
   shaders: z.array(shaderEntrySchema).default([]),

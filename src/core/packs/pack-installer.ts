@@ -119,6 +119,19 @@ export function mrpackToManifest(pack: MrpackContents): ModManifest {
 }
 
 /** A profile created for a pack, before its files arrive. */
+/**
+ * The pack's RAM recommendation, if it made one worth acting on.
+ *
+ * Read here from the manifest as fetched, before the schema has run, so it is
+ * attacker-controlled and gets the same bounds the schema applies — it lands on
+ * a `-Xmx` line, and a pack that asks for 2 TB should leave the profile on the
+ * default rather than produce a JVM that cannot start.
+ */
+function recommendedRam(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return undefined;
+  return value >= 512 && value <= 65536 ? value : undefined;
+}
+
 async function profileForPack(
   name: string,
   minecraftVersion: string,
@@ -129,8 +142,10 @@ async function profileForPack(
     name,
     minecraftVersion,
     modLoader,
-    allocatedRamMb: extras.allocatedRamMb ?? 4096,
     ...extras,
+    // After the spread, not before: a caller that has no recommendation passes
+    // the key as undefined, and spreading that over a default erases it.
+    allocatedRamMb: extras.allocatedRamMb ?? 4096,
   } as Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>);
 }
 
@@ -244,6 +259,7 @@ export async function createProfileFromManifest(url: string): Promise<Profile> {
   const profile = await profileForPack(body.serverName, body.minecraftVersion, body.modLoader, {
     modLoaderVersion: body.modLoaderVersion,
     manifestUrl: url,
+    allocatedRamMb: recommendedRam(body.recommendedRamMb),
   });
 
   await syncManifest(profile.id);
