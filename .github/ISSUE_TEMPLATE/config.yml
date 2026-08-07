@@ -8,6 +8,13 @@ contact_links:
       reporting. Do NOT open a public issue for security bugs, and redact any
       access token from logs before attaching them.
 
+  - name: "\U0001F426‍⬛ Contact White Ravens directly"
+    url: https://whiteravens.net
+    about: >
+      Would rather not open a GitHub account, or the report does not fit any of
+      these forms? Reach us through whiteravens.net. Attach the crash report the
+      launcher wrote, the same as you would here.
+
   - name: "\U0001F4AC Question / Discussion"
     url: https://github.com/whiteravens20/raven-forge/discussions
     about: >

@@ -9,8 +9,12 @@ assignees: ''
 > **Security vulnerability?** Do not open a public issue.
 > Use [private vulnerability reporting](../../security/advisories/new) instead.
 
-> **Before pasting logs:** launcher logs and crash reports can contain a live
-> Minecraft access token, your username and your UUID. **Redact them.**
+> **Did the game crash?** Use the [Game Crash](?template=crash_report.md) form
+> instead — the launcher has already written a report with everything it needs.
+
+> **Before pasting logs:** launcher logs can contain a live Minecraft access
+> token, your username and your UUID. **Redact them.** (The launcher's own crash
+> reports are written with those already removed.)
 
 ## Bug Description
 
