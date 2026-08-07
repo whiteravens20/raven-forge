@@ -20,15 +20,27 @@ import { getMainWindow } from './window';
  * there is no `eval` and no inline script. `img-src https:` is for mod icons
  * and news images, which come from wherever a project hosts them. Fonts are
  * `'self'` since the launcher serves its own.
+ *
+ * The dev server gets one directive relaxed — see `contentSecurityPolicy`.
  */
-export const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "font-src 'self'",
-  "img-src 'self' data: https:",
-  "connect-src 'self' https:",
-].join('; ');
+function contentSecurityPolicy(dev: boolean): string {
+  return [
+    "default-src 'self'",
+    // `@vitejs/plugin-react` serves its react-refresh preamble as an inline
+    // module script, prepended *ahead* of the `<meta>` copy in index.html — so
+    // this header is the only policy that sees it, and blocking it leaves
+    // `npm run dev` on a black window with "can't detect preamble" in the
+    // console. The relaxation is reachable only while VITE_DEV_SERVER_URL is
+    // set, and only for documents the dev server itself served.
+    `script-src 'self'${dev ? " 'unsafe-inline'" : ''}`,
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
+    "img-src 'self' data: https:",
+    "connect-src 'self' https:",
+  ].join('; ');
+}
+
+export const CONTENT_SECURITY_POLICY = contentSecurityPolicy(false);
 
 /**
  * Serve the CSP as a response header, for the launcher's own documents only.
@@ -41,17 +53,18 @@ export const CONTENT_SECURITY_POLICY = [
 export function installContentSecurityPolicy(): void {
   const devServer = process.env.VITE_DEV_SERVER_URL;
 
+  const devPolicy = contentSecurityPolicy(true);
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    const ours =
-      details.url.startsWith('file://') || (devServer ? details.url.startsWith(devServer) : false);
-    if (!ours) {
+    const fromDevServer = devServer ? details.url.startsWith(devServer) : false;
+    if (!details.url.startsWith('file://') && !fromDevServer) {
       callback({});
       return;
     }
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [CONTENT_SECURITY_POLICY],
+        'Content-Security-Policy': [fromDevServer ? devPolicy : CONTENT_SECURITY_POLICY],
       },
     });
   });
