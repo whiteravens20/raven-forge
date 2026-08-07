@@ -143,6 +143,22 @@ body {
   user-select: none;
 }
 
+/* Tailwind v3's Preflight gave buttons `cursor: pointer`; v4 dropped it and left
+   the browser default, which is an arrow. Nearly everything clickable in this
+   launcher is a `<button>` — the external links on the About page, the "open
+   folder" actions, the sidebar tiles — so without this only a real `<a>` shows
+   the hand, and the odd one out looks like the mistake.
+
+   In `@layer base`, not unlayered: utilities live in a later layer, so a
+   `cursor-*` class on any element still wins. `:not(:disabled)` keeps
+   `disabled:cursor-not-allowed` intact on Button and Select. */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
 /* ── Scrollbar ──────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
