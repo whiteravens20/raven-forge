@@ -197,15 +197,6 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to open URL: ${reason(err)}`);
     }
   });
-  handle('system:select-directory', async () => {
-    const win = getMainWindow();
-    if (!win) return fail('No window available');
-    const result = await dialog.showOpenDialog(win, {
-      properties: ['openDirectory', 'createDirectory'],
-    });
-    if (result.canceled || result.filePaths.length === 0) return ok(null);
-    return ok(result.filePaths[0]);
-  });
   handle(
     'system:select-file',
     async (_event, filters?: { name: string; extensions: string[] }[]) => {

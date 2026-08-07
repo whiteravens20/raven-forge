@@ -233,7 +233,6 @@ export interface InvokeChannels {
   'system:get-info': () => Promise<IpcResult<SystemInfo>>;
   'system:open-path': (path: string) => Promise<IpcResult<void>>;
   'system:open-url': (url: string) => Promise<IpcResult<void>>;
-  'system:select-directory': () => Promise<IpcResult<string | null>>;
   'system:select-file': (
     filters?: { name: string; extensions: string[] }[],
   ) => Promise<IpcResult<string | null>>;
@@ -398,7 +397,6 @@ export interface RavenForgeAPI {
     getInfo: InvokeChannels['system:get-info'];
     openPath: InvokeChannels['system:open-path'];
     openUrl: InvokeChannels['system:open-url'];
-    selectDirectory: InvokeChannels['system:select-directory'];
     selectFile: InvokeChannels['system:select-file'];
     getLogsPath: InvokeChannels['system:get-logs-path'];
     readLog: InvokeChannels['system:read-log'];

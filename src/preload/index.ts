@@ -123,7 +123,6 @@ const api: RavenForgeAPI = {
     getInfo: () => ipcRenderer.invoke('system:get-info'),
     openPath: (p) => ipcRenderer.invoke('system:open-path', p),
     openUrl: (url) => ipcRenderer.invoke('system:open-url', url),
-    selectDirectory: () => ipcRenderer.invoke('system:select-directory'),
     selectFile: (filters) => ipcRenderer.invoke('system:select-file', filters),
     getLogsPath: () => ipcRenderer.invoke('system:get-logs-path'),
     readLog: (lines, since) => ipcRenderer.invoke('system:read-log', lines, since),

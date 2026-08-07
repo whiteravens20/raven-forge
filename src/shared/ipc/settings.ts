@@ -13,7 +13,6 @@ export interface GlobalSettings {
   launcherBehaviorOnLaunch: LauncherBehaviorOnLaunch;
   proxyUrl?: string;
   downloadConcurrency: number;
-  customBackgroundsPath?: string;
   newsFeedUrl?: string;
   announcementFeedUrl?: string;
   trustedPublicKeys: TrustedKey[];

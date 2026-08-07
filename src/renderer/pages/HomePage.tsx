@@ -12,7 +12,6 @@ import { NewsStrip } from '@components/NewsStrip';
 import { ProfileAvatar } from '@components/ProfileAvatar';
 import { CrashReporter } from '@components/CrashReporter';
 import { ArticleReader, type Article } from '@components/ArticleReader';
-import { BackgroundRotator } from '@components/layout/BackgroundRotator';
 import { ForgeBackdrop } from '@components/layout/ForgeBackdrop';
 import { useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
@@ -139,17 +138,13 @@ export function HomePage() {
   // it and the next one takes its place.
   const announcement = announcements.find((a) => !dismissedIds.has(a.id));
 
-  const customPath = settings?.customBackgroundsPath;
-
   return (
     // `isolate` is load-bearing: without it this container is no stacking
     // context (position alone doesn't make one), so the backdrop's -z-10
     // resolves against the root context and paints UNDER the app shell's
     // opaque `bg-rf-bg` — i.e. invisibly.
     <div className="relative isolate flex h-full flex-col gap-4 p-6 overflow-y-auto">
-      {/* The built-in backdrop is a live, theme-aware scene; the rotator only
-          exists for user-supplied imagery, which is necessarily static. */}
-      {customPath ? <BackgroundRotator images={[customPath]} /> : <ForgeBackdrop />}
+      <ForgeBackdrop />
 
       {/* The announcement. Only one with something more to say is clickable —
           a banner that opens a dialog repeating its own single sentence teaches

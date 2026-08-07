@@ -6,7 +6,6 @@ import {
   DIR_JAVA,
   DIR_CACHE,
   DIR_LOGS,
-  DIR_BACKGROUNDS,
   FILE_SETTINGS,
   FILE_PROFILES,
 } from '../../shared/constants';
@@ -60,11 +59,6 @@ export const paths = {
   /** logs/ — application logs (electron-log) */
   get logsDir() {
     return path.join(getDataRoot(), DIR_LOGS);
-  },
-
-  /** backgrounds/ — default bundled backgrounds */
-  get backgroundsDir() {
-    return path.join(getDataRoot(), DIR_BACKGROUNDS);
   },
 
   /** Per-profile directory */

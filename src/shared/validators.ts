@@ -53,7 +53,6 @@ export const globalSettingsSchema = z.object({
       { message: 'Proxy must be an http://, https://, socks5:// or socks4:// URL' },
     ),
   downloadConcurrency: z.number().min(1).max(8).default(4),
-  customBackgroundsPath: z.string().optional(),
   // Defaulted here as well as in DEFAULT_SETTINGS, because that one only covers
   // a first launch: an install predating the feeds has a settings.json with the
   // keys absent, and without a default it would stay newsless forever. An empty

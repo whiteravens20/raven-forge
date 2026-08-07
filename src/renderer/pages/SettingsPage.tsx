@@ -77,13 +77,6 @@ export function SettingsPage() {
     });
   };
 
-  const pickBackgroundsFolder = async () => {
-    const result = await api.system.selectDirectory();
-    if (result.success && result.data) {
-      await update({ customBackgroundsPath: result.data });
-    }
-  };
-
   return (
     <div className="flex h-full flex-col gap-6 p-6 overflow-y-auto">
       <h1 className="text-lg font-display font-semibold text-rf-text">{t('settings.title')}</h1>
@@ -101,22 +94,6 @@ export function SettingsPage() {
           value={settings.language}
           onChange={(e) => update({ language: asLocale(e.target.value) })}
         />
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-rf-text-secondary">
-            {t('settings.backgroundsFolder')}
-          </label>
-          <div className="flex gap-2">
-            <Input
-              value={settings.customBackgroundsPath ?? ''}
-              onChange={(e) => update({ customBackgroundsPath: e.target.value || undefined })}
-              placeholder={t('settings.backgroundsPlaceholder')}
-              className="flex-1"
-            />
-            <Button variant="secondary" onClick={pickBackgroundsFolder}>
-              {t('common.choose')}
-            </Button>
-          </div>
-        </div>
       </Section>
 
       <Section title={t('settings.section.behavior')}>

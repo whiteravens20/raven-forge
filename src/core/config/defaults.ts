@@ -12,7 +12,6 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   launcherBehaviorOnLaunch: 'minimize',
   proxyUrl: undefined,
   downloadConcurrency: 4,
-  customBackgroundsPath: undefined,
   // Point at White Ravens' published feeds; both are replaceable in Settings,
   // and an empty string means "no feed" rather than "back to the default".
   // Fork these in src/shared/branding.ts, not here.

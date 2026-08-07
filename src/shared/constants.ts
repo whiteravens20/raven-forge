@@ -9,7 +9,6 @@ export const DIR_LOADERS = 'loaders';
 export const DIR_JAVA = 'java';
 export const DIR_CACHE = 'cache';
 export const DIR_LOGS = 'logs';
-export const DIR_BACKGROUNDS = 'backgrounds';
 
 // ── File names ────────────────────────────────────────────
 export const FILE_SETTINGS = 'settings.json';
