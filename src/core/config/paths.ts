@@ -6,6 +6,7 @@ import {
   DIR_JAVA,
   DIR_CACHE,
   DIR_LOGS,
+  DIR_CRASH_REPORTS,
   FILE_SETTINGS,
   FILE_PROFILES,
 } from '../../shared/constants';
@@ -59,6 +60,15 @@ export const paths = {
   /** logs/ — application logs (electron-log) */
   get logsDir() {
     return path.join(getDataRoot(), DIR_LOGS);
+  },
+
+  /**
+   * crash-reports/ — one file per crash, written for a human to attach to a bug
+   * report. Not to be confused with the `crash-reports/` Minecraft writes inside
+   * each profile's game directory; these quote from those.
+   */
+  get crashReportsDir() {
+    return path.join(getDataRoot(), DIR_CRASH_REPORTS);
   },
 
   /** Per-profile directory */

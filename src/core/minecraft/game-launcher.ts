@@ -15,6 +15,7 @@ import { resolveLaunchMeta } from '../modloader/loader-profile';
 import { getVersionMeta } from './version-manifest';
 import { ensureClientJar, ensureLibraries, ensureAssets } from './asset-downloader';
 import { beginJob, endJob, isCancellation, throwIfCancelled } from '../util/cancellation';
+import { writeCrashReport } from '../diagnostics/crash-report';
 
 const execAsync = promisify(exec);
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
@@ -329,6 +330,30 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
 
   const startTime = Date.now();
 
+  // Both ways out of here end the same way: with a file the player can attach to
+  // a bug report without first having to learn where the launcher keeps its logs.
+  const reportCrash = (
+    exitCode: number,
+    playTimeMinutes: number,
+    logTail: string[],
+    spawnError?: string,
+  ) =>
+    writeCrashReport({
+      profile,
+      exitCode,
+      playTimeMinutes,
+      startedAt: startTime,
+      logTail,
+      spawnError,
+      gameDir,
+      java,
+      accountType: account.type,
+      offlineLaunch: offline,
+      // What must not reach the file. The token is a live credential; the other
+      // two are simply the player's, and neither helps anyone read a stack trace.
+      secrets: [accessToken, uuid, username],
+    });
+
   const win = getMainWindow();
 
   // Notify renderer game started
@@ -376,12 +401,18 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
       runningProcesses.delete(profile.id);
       const playTimeMinutes = Math.round((Date.now() - startTime) / 60000);
       const crashed = code !== 0 && code !== null;
+      const logTail = crashed ? getLogTail(profile.id, 100) : undefined;
       const exitInfo: GameExitInfo = {
         profileId: profile.id,
         exitCode: code ?? -1,
         crashed,
-        logTail: crashed ? getLogTail(profile.id, 100) : undefined,
+        logTail,
         playTimeMinutes,
+        // Written before the buffer is cleared below, and before the renderer is
+        // told anything — the card offers the file, so it has to exist by then.
+        reportPath: crashed
+          ? await reportCrash(code ?? -1, playTimeMinutes, logTail ?? [])
+          : undefined,
       };
 
       log.info(`Game exited for ${profile.name} with code ${code} (played ${playTimeMinutes} min)`);
@@ -401,17 +432,24 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   });
 
   child.on('error', (err) => {
-    runningProcesses.delete(profile.id);
-    log.error(`Game process error for ${profile.name}:`, err);
-    const exitInfo: GameExitInfo = {
-      profileId: profile.id,
-      exitCode: -1,
-      crashed: true,
-      logTail: getLogTail(profile.id, 100),
-      playTimeMinutes: 0,
-    };
-    getMainWindow()?.webContents.send('game:exited', exitInfo);
-    clearBuffer(profile.id);
+    void (async () => {
+      runningProcesses.delete(profile.id);
+      log.error(`Game process error for ${profile.name}:`, err);
+      const logTail = getLogTail(profile.id, 100);
+      const exitInfo: GameExitInfo = {
+        profileId: profile.id,
+        exitCode: -1,
+        crashed: true,
+        logTail,
+        playTimeMinutes: 0,
+        // The process never ran, so there is no output and no crash file of the
+        // game's own — the error itself is the whole finding, and the report is
+        // where it says which Java it tried to start.
+        reportPath: await reportCrash(-1, 0, logTail, err.message),
+      };
+      getMainWindow()?.webContents.send('game:exited', exitInfo);
+      clearBuffer(profile.id);
+    })();
   });
 }
 

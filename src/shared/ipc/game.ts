@@ -26,4 +26,13 @@ export interface GameExitInfo {
   /** Last N lines of game log if crashed */
   logTail?: string[];
   playTimeMinutes: number;
+  /**
+   * The crash report written for this exit, if one could be written.
+   *
+   * A file under `crash-reports/`, already stripped of credentials, holding
+   * what a bug report needs — versions, mods, the game's own crash file. The
+   * log tail above is the same output, but it lives only in this object: it is
+   * gone when the card is dismissed and gone again when the app restarts.
+   */
+  reportPath?: string;
 }
