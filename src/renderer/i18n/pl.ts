@@ -245,7 +245,7 @@ export const pl: Translations = {
   'profiles.verify.unsigned': 'Niepodpisany',
   'profiles.verify.notSynced': 'Jeszcze niesprawdzony',
   'profiles.verify.valid': 'Zweryfikowano: {signer}',
-  'profiles.verify.invalid': 'Nieprawidłowy podpis',
+  'profiles.verify.invalid': 'Podpis nie pasuje do żadnego zaufanego klucza',
 
   // ── Profile form ─────────────────────────────────────────
   'profileForm.createTitle': 'Nowy profil',

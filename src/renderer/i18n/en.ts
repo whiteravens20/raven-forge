@@ -243,7 +243,7 @@ export const en = {
   'profiles.verify.unsigned': 'Unsigned',
   'profiles.verify.notSynced': 'Not checked yet',
   'profiles.verify.valid': 'Verified: {signer}',
-  'profiles.verify.invalid': 'Invalid signature',
+  'profiles.verify.invalid': 'Signature matches no trusted key',
 
   // ── Profile form ─────────────────────────────────────────
   'profileForm.createTitle': 'New profile',
