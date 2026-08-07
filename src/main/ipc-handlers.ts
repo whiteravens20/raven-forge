@@ -284,7 +284,13 @@ export function registerAllIpcHandlers(): void {
   });
   handle('settings:reset', async () => {
     try {
-      return ok(await resetSettings());
+      const settings = await resetSettings();
+      // Same as `settings:update`: the proxy lives in two network stacks, not in
+      // the settings file, so clearing the field is not what turns it off.
+      // Without this, a reset put every other setting back and left all traffic
+      // still going through the proxy the user had just removed — until restart.
+      await applyProxySettings(settings);
+      return ok(settings);
     } catch (err) {
       return fail(`Failed to reset settings: ${reason(err)}`);
     }
