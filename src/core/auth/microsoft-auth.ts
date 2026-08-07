@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, session } from 'electron';
 import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { getMainWindow } from '../../main/window';
@@ -408,8 +408,43 @@ export async function loginOffline(username: string): Promise<MinecraftAccount> 
   return account;
 }
 
+/**
+ * Forget the sign-in window's cookies.
+ *
+ * The authorization window shares the launcher's session — it has to, or the
+ * proxy set in Settings would not apply to it — so Microsoft's cookies outlive
+ * the account unless something removes them. A "log out" after which the next
+ * sign-in already knows who you are has not logged anybody out.
+ *
+ * Clearing the whole cookie jar rather than a list of Microsoft domains: the
+ * launcher's own page is a `file://` document and sets no cookies of its own,
+ * so everything in here was set by a page this flow loaded. A domain list would
+ * be a thing to keep correct as Microsoft moves hosts around, and being wrong
+ * about it would fail silently, in the direction of leaving the session behind.
+ *
+ * Never throws. Logging out must succeed even where this cannot.
+ */
+async function clearSignInCookies(): Promise<void> {
+  try {
+    await session.defaultSession.clearStorageData({ storages: ['cookies'] });
+    log.info('Cleared the sign-in window cookies');
+  } catch (err) {
+    log.warn('Could not clear the sign-in window cookies:', err);
+  }
+}
+
 export async function logoutAccount(accountId: string): Promise<void> {
+  // Read before removing — afterwards there is nothing left to ask what it was.
+  const account = await getAccount(accountId);
   await removeAccount(accountId);
+
+  // An offline account never opened that window, so there is nothing of its to
+  // clear, and wiping the jar would only sign out the Microsoft accounts that
+  // are still here.
+  if (account?.type === 'microsoft') {
+    await clearSignInCookies();
+  }
+
   pushAuthState();
   log.info(`Logged out account: ${accountId}`);
 }
