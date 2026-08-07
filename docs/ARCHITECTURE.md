@@ -21,7 +21,11 @@ raven-forge/
 ├── README.md                     # dev setup + feature overview
 ├── docs/
 │   ├── ARCHITECTURE.md           # this document
-│   └── MANIFEST-SCHEMA.md        # remote manifest spec
+│   ├── AZURE-SETUP.md            # registering the Azure app + Mojang approval
+│   ├── MANIFEST-SCHEMA.md        # remote manifest spec
+│   ├── PRIVACY.md                # what is stored and sent (EN — canonical pair)
+│   ├── PRIVACY.pl.md             # the same, in Polish; both are maintained
+│   └── SIGNING.md                # Ed25519 manifest signing
 ├── electron-builder.config.js    # NSIS + .deb + AppImage targets
 ├── eslint.config.mjs             # flat-config, react + @typescript-eslint
 ├── tsconfig.json                 # umbrella project for typecheck-all
@@ -49,6 +53,7 @@ raven-forge/
     │   └── styles/global.css     # @import "tailwindcss" + CSS variables
     ├── core/                     # business logic, runs in main process
     │   ├── auth/                 # MS OAuth → Xbox → XSTS → MC chain, keytar token store
+    │   ├── diagnostics/          # crash-report.ts — one redacted file per crash
     │   ├── java/                 # Adoptium Temurin download + version selection
     │   ├── minecraft/            # version manifest, asset/library download, game launcher
     │   ├── modloader/            # Fabric, Quilt, Forge and NeoForge installers
@@ -163,6 +168,17 @@ plaintext secrets move into the keychain and are stripped from the file. Any
 entry the keychain rejects is left untouched, so a failed migration never costs
 the user a login.
 
+**Logging out clears the sign-in cookies.** The authorization window runs in the
+default session — it has to, or the configured proxy would not apply to it — so
+Microsoft's cookies outlive the account unless something removes them, and a
+"log out" the next sign-in can see straight through is not one. `logoutAccount`
+clears the whole cookie jar when the account being removed is a Microsoft one.
+The whole jar rather than a Microsoft domain list: the launcher's own page is a
+`file://` document that sets no cookies, so everything in there was set by a
+page the sign-in flow loaded, and a domain list would be one more thing to keep
+correct as Microsoft moves hosts around. An offline account never opened that
+window, so its logout leaves the jar alone.
+
 ## Launcher startup sequence
 
 ```mermaid
@@ -215,7 +231,7 @@ The `package.json` `main` field points at `dist/main/index.js`; the preload refe
 
 ## Open implementation gaps
 
-Last checked against the code on **2026-08-05**. Keep it that way — a stale gap
+Last checked against the code on **2026-08-07**. Keep it that way — a stale gap
 list is worse than none, because it sends people looking for problems that were
 fixed and hides the ones that were not.
 
@@ -226,6 +242,16 @@ fixed and hides the ones that were not.
 - **The launcher has never updated itself from a published release.** The update
   check, platform matrix and install-before-play path are covered by tests, but
   there is no tagged release to update *from*.
+- **Crash reports have never been produced by a real crash.** `crash-report.ts`
+  is unit-tested and was exercised end to end in the running app against a
+  synthetic `game:exited` and a hand-written Mojang crash file, so
+  `readMinecraftCrash` reading a genuine one is still unproven.
+- **The startup update check cannot be switched off.** One request to GitHub
+  Releases on every launch, with no setting behind it — itemised in
+  [PRIVACY.md](PRIVACY.md) rather than left for someone to discover.
+- **Launcher logs are not redacted.** Only crash reports are. `main.log` echoes
+  the game's stdout verbatim, and a mod that prints its launch arguments prints
+  a live session token with them.
 - No Mica/acrylic backdrop on Windows 11; no one-click rollback to the previous
   launcher version; no warning when a user-installed mod collides with a manifest
   mod.

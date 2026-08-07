@@ -25,6 +25,8 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Java Management** — auto-download Adoptium Temurin JRE (Java 8/17/21)
 - **Shaders & Resource Packs** — first-class content management per profile
 - **Auto-Update** — launcher self-updates via GitHub Releases (electron-updater)
+- **Crash Reports** — one file per crash with versions, mods and the game's own report, written with tokens and account details already stripped out
+- **No Telemetry** — nothing is measured, nothing is sent; the app itself lists what it stores and every server it contacts ([privacy policy](docs/PRIVACY.md))
 - **Modern UI** — dark gaming-grade design, animated voxel hero scenes (drone flight, Nether forge, mine, tech workshop), news feed, frameless window
 
 ---
@@ -112,6 +114,7 @@ src/
 ├── core/           # Business logic (runs in main process)
 │   ├── auth/       # Microsoft OAuth + offline auth
 │   ├── config/     # Settings + paths
+│   ├── diagnostics/# Crash reports — one redacted file per crash
 │   ├── java/       # Adoptium JRE management
 │   ├── minecraft/  # Version manifest, assets, game launcher
 │   ├── modloader/  # Fabric/Quilt/Forge/NeoForge installers
