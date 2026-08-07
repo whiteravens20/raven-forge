@@ -144,6 +144,12 @@ manifest URL you configured, the news and announcement feeds you configured, and
 GitHub Releases for launcher updates. All of them honour the proxy set in
 Settings → Network.
 
+Every one of those is itemised, with what it sends, in
+[docs/PRIVACY.md](docs/PRIVACY.md) ([po polsku](docs/PRIVACY.pl.md)) — which is
+also where the local data, the credential store and the known gaps are described
+in full. The launcher shows the same picture for the running install under
+Info → Privacy.
+
 ---
 
 ## Known Gaps
