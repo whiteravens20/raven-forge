@@ -241,6 +241,15 @@ export function SettingsPage() {
             }
           }}
         />
+        <PathRow
+          label={t('settings.crashReportsFolder')}
+          onOpen={async () => {
+            const result = await api.system.getInfo();
+            if (result.success && result.data) {
+              await api.system.openPath(result.data.crashReportsDirectory);
+            }
+          }}
+        />
         <div className="flex items-center gap-2">
           <span className="text-sm text-rf-text-secondary">{t('settings.logs')}:</span>
           <button

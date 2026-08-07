@@ -157,6 +157,10 @@ export const en = {
   'crash.bodyWithTime': 'Profile {profile} exited with code {code} after {minutes} min.',
   'crash.showLogs': 'Show logs',
   'crash.hideLogs': 'Hide logs',
+  'crash.reportSaved':
+    'A crash report was saved on this computer — nothing was sent anywhere. Access tokens and your account details are already removed from it.',
+  'crash.openReport': 'Open report',
+  'crash.reportBug': 'Report a bug',
 
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profiles',
@@ -385,6 +389,7 @@ export const en = {
   'settings.trustedKeyAdd': 'Add key',
   'settings.trustedKeyFailed': 'Could not add the key',
   'settings.dataFolder': 'Data folder',
+  'settings.crashReportsFolder': 'Crash reports',
   'settings.logs': 'Logs',
   'settings.showLogs': 'Show logs',
   'settings.reset': 'Reset settings',

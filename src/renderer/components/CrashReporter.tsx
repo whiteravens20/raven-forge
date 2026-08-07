@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { AlertTriangle, X, FileText } from 'lucide-react';
+import { AlertTriangle, X, FileText, FolderOpen, Bug } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { NEW_CRASH_ISSUE_URL } from '@shared/branding';
 import { useT } from '@renderer/i18n';
 import type { GameExitInfo } from '@shared/ipc-types';
+
+const api = window.ravenforge;
 
 interface CrashReporterProps {
   crashInfo: GameExitInfo;
@@ -45,8 +48,14 @@ export function CrashReporter({ crashInfo, profileName, onDismiss }: CrashReport
         </button>
       </div>
 
-      {crashInfo.logTail && crashInfo.logTail.length > 0 && (
-        <div>
+      {/* Says out loud that nothing left the machine, and that the file is the
+          thing to attach — the log tail below is gone the moment this is closed. */}
+      {crashInfo.reportPath && (
+        <p className="text-xs text-rf-text-muted">{t('crash.reportSaved')}</p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {crashInfo.logTail && crashInfo.logTail.length > 0 && (
           <Button
             variant="secondary"
             size="sm"
@@ -55,13 +64,34 @@ export function CrashReporter({ crashInfo, profileName, onDismiss }: CrashReport
           >
             {showLogs ? t('crash.hideLogs') : t('crash.showLogs')}
           </Button>
+        )}
 
-          {showLogs && (
-            <pre className="mt-2 max-h-48 overflow-y-auto rounded border border-rf-border bg-rf-bg p-2 font-mono text-[10px] text-rf-text-secondary">
-              {crashInfo.logTail.join('\n')}
-            </pre>
-          )}
-        </div>
+        {crashInfo.reportPath && (
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<FolderOpen size={12} />}
+              onClick={() => void api.system.openPath(crashInfo.reportPath!)}
+            >
+              {t('crash.openReport')}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Bug size={12} />}
+              onClick={() => void api.system.openUrl(NEW_CRASH_ISSUE_URL)}
+            >
+              {t('crash.reportBug')}
+            </Button>
+          </>
+        )}
+      </div>
+
+      {showLogs && crashInfo.logTail && (
+        <pre className="max-h-48 overflow-y-auto rounded border border-rf-border bg-rf-bg p-2 font-mono text-[10px] text-rf-text-secondary">
+          {crashInfo.logTail.join('\n')}
+        </pre>
       )}
     </div>
   );

@@ -165,6 +165,7 @@ export function registerAllIpcHandlers(): void {
       totalMemoryMb: Math.round(os.totalmem() / 1024 / 1024),
       freeMemoryMb: Math.round(os.freemem() / 1024 / 1024),
       dataDirectory: paths.root,
+      crashReportsDirectory: paths.crashReportsDir,
     };
     return ok(info);
   });

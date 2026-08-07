@@ -146,6 +146,10 @@ export const pl: Translations = {
   'crash.bodyWithTime': 'Profil {profile} zakończył się kodem błędu {code} po {minutes} min.',
   'crash.showLogs': 'Pokaż logi',
   'crash.hideLogs': 'Ukryj logi',
+  'crash.reportSaved':
+    'Raport z awarii zapisano na tym komputerze — nic nie zostało nigdzie wysłane. Token dostępu i dane konta zostały z niego usunięte.',
+  'crash.openReport': 'Otwórz raport',
+  'crash.reportBug': 'Zgłoś błąd',
 
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profile',
@@ -388,6 +392,7 @@ export const pl: Translations = {
   'settings.trustedKeyAdd': 'Dodaj klucz',
   'settings.trustedKeyFailed': 'Nie udało się dodać klucza',
   'settings.dataFolder': 'Folder danych',
+  'settings.crashReportsFolder': 'Raporty z awarii',
   'settings.logs': 'Logi',
   'settings.showLogs': 'Pokaż logi',
   'settings.reset': 'Resetuj ustawienia',

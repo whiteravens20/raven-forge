@@ -13,6 +13,8 @@ export interface SystemInfo {
   totalMemoryMb: number;
   freeMemoryMb: number;
   dataDirectory: string;
+  /** Where the crash reports land, so Settings can offer to open it. */
+  crashReportsDirectory: string;
 }
 
 /**
