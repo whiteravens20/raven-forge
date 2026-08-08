@@ -324,9 +324,44 @@ jobs:
 
             | Platform | File | Notes |
             |---|---|---|
-            | Windows 10 1809+ / 11 | `Raven Forge Launcher Setup ${{ github.ref_name }}.exe` | NSIS installer |
-            | Debian 11+ / Ubuntu 20.04+ | `raven-forge-launcher_*_amd64.deb` | recommended on Ubuntu 23.10+ |
-            | Any x64 Linux, glibc ≥ 2.25 | `Raven Forge Launcher-*.AppImage` | blocked by AppArmor on Ubuntu 23.10+ |
+            | Windows 10 1809+ / 11 | `Raven Forge Launcher Setup ${{ github.ref_name }}.exe` | NSIS installer, nothing to install first |
+            | Debian 11+ / Ubuntu 20.04+ | `raven-forge-launcher_*_amd64.deb` | recommended on Linux — apt pulls everything |
+            | Any x64 Linux, glibc ≥ 2.25 | `Raven Forge Launcher-*.AppImage` | needs libraries installed by hand, see below |
+
+            Java is not on this list. The launcher downloads the JRE each profile
+            needs, by itself, on first launch — along with the game, the mod
+            loader and the mods.
+
+            ### Linux: the .deb
+
+            ```bash
+            sudo apt install ./raven-forge-launcher_*_amd64.deb
+            ```
+
+            `apt`, not `dpkg -i` — `dpkg` skips dependency resolution and leaves you
+            with a package that cannot start.
+
+            ### Linux: the AppImage
+
+            An AppImage carries no dependency information, so nothing installs
+            these for you. Run one of these first, then `chmod +x` the file:
+
+            ```bash
+            # Debian / Ubuntu / Mint
+            sudo apt install libgtk-3-0 libnss3 libgbm1 libsecret-1-0 libnotify4 xdg-utils libfuse2
+            sudo apt install libasound2t64 || sudo apt install libasound2
+
+            # Fedora
+            sudo dnf install gtk3 nss mesa-libgbm libsecret libnotify xdg-utils fuse-libs alsa-lib
+
+            # Arch
+            sudo pacman -S --needed gtk3 nss mesa libsecret libnotify xdg-utils fuse2 alsa-lib
+            ```
+
+            On **Ubuntu 23.10 and later** the AppImage additionally cannot start at
+            all: AppArmor restricts unprivileged user namespaces there and an
+            AppImage cannot ship a SUID sandbox helper. Use the `.deb` — it
+            installs an AppArmor profile that solves this properly.
 
             ## Verifying what you downloaded
 

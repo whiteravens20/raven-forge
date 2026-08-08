@@ -300,9 +300,21 @@ somewhere else.
 | Debian package | `raven-forge-launcher_<version>_amd64.deb` | ~90 MB | **Debian 11+**, **Ubuntu 20.04+**, x64 |
 | AppImage | `Raven Forge Launcher-<version>.AppImage` | ~115 MB | Any x64 Linux with glibc ≥ 2.25 |
 
-The Linux floor is the Electron binary's own: it links `GLIBC_2.25`, and the
-package depends on `libnotify4`, `libxss1` and `libsecret-1-0` — all stock in
-both Debian and Ubuntu. Windows 7/8/8.1 are not supported; Electron dropped them.
+The Linux floor is the Electron binary's own: it links `GLIBC_2.25`, which the
+`.deb` declares as `libc6 (>= 2.25)` so apt refuses the install rather than
+letting it fail at startup. Windows 7/8/8.1 are not supported; Electron dropped
+them.
+
+**The `.deb` carries the full dependency list; the AppImage cannot.** `fpm` — the
+tool electron-builder builds Debian packages with — does not run
+`dpkg-shlibdeps`, so nothing computes that list for you: whatever the
+`deb.depends` array in [electron-builder.config.js](electron-builder.config.js)
+omits is simply absent from the package, `apt install ./…` reports success, and
+the app dies on a missing `.so`. The array is therefore measured from the built
+binary rather than assumed, and the comment above it carries the command to
+regenerate it after an Electron bump. Note that `strings` matters as much as
+`objdump` there — libsecret, libnotify, libasound, libcups and libgbm are
+`dlopen`'d, so a link-time-only audit misses them.
 
 ### Manual build
 
@@ -361,16 +373,46 @@ Unsigned builds trip SmartScreen; see [docs/SIGNING.md](docs/SIGNING.md).
 sudo apt install ./raven-forge-launcher_0.1.0_amd64.deb
 ```
 
-`apt` pulls the three library dependencies. The package's post-install step
-sets the SUID bit on `chrome-sandbox`, which the renderer needs because it runs
-with `sandbox: true`.
+Use `apt`, not `dpkg -i` — `dpkg` installs the package without resolving
+anything, and every library below then goes missing. `apt` pulls all of them,
+sets up the `/usr/bin/raven-forge-launcher` symlink, configures `chrome-sandbox`
+(the renderer runs with `sandbox: true`, so it needs one of the two sandboxes),
+and on Ubuntu 24.04+ installs the AppArmor profile that lets the user-namespace
+sandbox work.
 
-**AppImage** — `chmod +x` and run it. One caveat worth knowing: **Ubuntu 23.10
-and later** restrict unprivileged user namespaces through AppArmor, and an
-AppImage cannot carry a SUID `chrome-sandbox` because it is mounted as your own
-user. Electron apps therefore fail to start there. Prefer the `.deb` on Ubuntu;
-if you need the AppImage, install an AppArmor profile for it, or relax the
-restriction system-wide:
+**AppImage** — nothing resolves dependencies for you here; an AppImage carries no
+dependency metadata at all, and the file bundles Electron but not the system
+libraries it links. Install these first, then `chmod +x` and run it:
+
+```bash
+# Debian / Ubuntu / Mint
+sudo apt install libgtk-3-0 libnss3 libgbm1 libsecret-1-0 libnotify4 xdg-utils libfuse2
+sudo apt install libasound2t64 || sudo apt install libasound2
+
+# Fedora
+sudo dnf install gtk3 nss mesa-libgbm libsecret libnotify xdg-utils fuse-libs alsa-lib
+
+# Arch
+sudo pacman -S --needed gtk3 nss mesa libsecret libnotify xdg-utils fuse2 alsa-lib
+```
+
+The rest of the list — cairo, pango, the X libraries, cups — comes in with GTK on
+all three. `alsa-lib` needs the fallback line on Debian and Ubuntu because 24.04
+renamed the package to `libasound2t64` and left `libasound2` as a virtual name
+with two providers, which apt will not install by name. `libfuse2` is for the
+AppImage runtime itself, not for the launcher: without it the file exits with
+*"AppImages require FUSE to run"* before any of our code runs.
+
+Missing `xdg-utils` is the quiet one — the app starts fine and then "open folder"
+and every external link silently do nothing, because `shell.openExternal` shells
+out to `xdg-open` on Linux.
+
+One further caveat: **Ubuntu 23.10 and later** restrict unprivileged user
+namespaces through AppArmor, and an AppImage cannot carry a SUID `chrome-sandbox`
+because it is mounted as your own user. Electron apps therefore fail to start
+there. Prefer the `.deb` on Ubuntu — it ships an AppArmor profile and its
+post-install step loads it. If you need the AppImage, write a profile for it, or
+relax the restriction system-wide:
 
 ```bash
 sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
