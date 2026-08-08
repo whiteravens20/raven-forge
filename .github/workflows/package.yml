@@ -72,13 +72,16 @@ jobs:
           [ ${#deb[@]} -eq 1 ] || { echo "::error::expected exactly one .deb, found ${#deb[@]}"; exit 1; }
           [ ${#appimage[@]} -eq 1 ] || { echo "::error::expected exactly one .AppImage, found ${#appimage[@]}"; exit 1; }
 
-          # The sandbox helper must stay setuid root. electron-builder generates
-          # a postinst that chmods it; a custom --after-install replaces that
-          # script wholesale, and the app then fails to start with a SUID
-          # sandbox error on every Debian install.
+          # electron-builder generates a postinst that links the binary into
+          # /usr/bin, configures chrome-sandbox and loads the AppArmor profile
+          # Ubuntu 24+ needs. A `deb.fpm: --after-install` entry in the config
+          # replaces that script wholesale rather than adding to it, which is how
+          # all three were silently lost once already.
           dpkg-deb --control "${deb[0]}" /tmp/ctrl
-          grep -q 'chmod 4755' /tmp/ctrl/postinst \
-            || { echo "::error::postinst no longer chmods chrome-sandbox to 4755 — see build/postinst.sh"; exit 1; }
+          for step in 'chmod 4755' 'update-alternatives' 'apparmor_parser'; do
+            grep -q "$step" /tmp/ctrl/postinst \
+              || { echo "::error::postinst no longer runs '$step' — did something set deb.fpm --after-install?"; exit 1; }
+          done
 
           # The .desktop entry must carry StartupWMClass or the desktop
           # environment cannot match the running window to the installed icon.
@@ -87,6 +90,39 @@ jobs:
             || { echo "::error::.desktop entry lost StartupWMClass — check linux.syncDesktopName"; exit 1; }
 
           ls -lh out/*.deb out/*.AppImage
+
+      # `fpm` does not run dpkg-shlibdeps, so the dependency list in
+      # electron-builder.config.js is maintained by hand and nothing else notices
+      # when an Electron bump starts linking a library it does not name. The
+      # runner already has every GUI library installed, which is precisely why
+      # this has to happen somewhere clean.
+      #
+      # It starts the app rather than only running `ldd`, because the two failure
+      # modes are different. A missing declaration shows up in `ldd`; a wrong one
+      # does not. `Depends: libasound2` on Ubuntu 24.04 resolves to an OSS
+      # compatibility stub that satisfies `ldd` and then kills the launcher on
+      # `undefined symbol: snd_device_name_get_hint`.
+      - name: Start the .deb on a clean Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/out:/pkg:ro" ubuntu:24.04 bash -c '
+            set -e
+            apt-get update -qq >/dev/null
+            apt-get install -y -qq --no-install-recommends /pkg/*.deb xvfb xauth >/dev/null
+            if ldd "/opt/Raven Forge Launcher/raven-forge-launcher" | grep "not found"; then
+              echo "::error::the package does not declare every library the binary links"
+              exit 1
+            fi
+            set +e
+            HOME=/root timeout 20 xvfb-run -a /usr/bin/raven-forge-launcher --no-sandbox >/tmp/run.log 2>&1
+            code=$?
+            if [ "$code" != 124 ]; then
+              echo "::error::the launcher exited with $code instead of staying up"
+              cat /tmp/run.log
+              exit 1
+            fi
+          '
 
       - name: Verify Windows artifacts
         if: runner.os == 'Windows'
