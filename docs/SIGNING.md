@@ -29,10 +29,16 @@ exactly the same SmartScreen warning as an unsigned one.
 
 | | OV (Organisation Validation) | EV (Extended Validation) |
 |---|---|---|
-| Cost | lower | higher |
-| Key storage | `.pfx` file | hardware token / cloud HSM (mandatory) |
-| SmartScreen | reputation accrues over downloads | trusted immediately |
-| CI-friendly | yes | needs a cloud signing service |
+| Cost | $150–300/year | $400+/year |
+| Key storage | hardware token / cloud HSM | hardware token / cloud HSM |
+| SmartScreen | reputation accrues over downloads | **the same, since 2024** |
+| CI-friendly | with a cloud HSM | with a cloud HSM |
+
+**Do not buy EV for SmartScreen.** It used to bypass the warning outright on
+first download, which was the entire reason to pay the premium; Microsoft
+removed that in 2024 and an EV-signed file now builds reputation exactly like an
+OV one. EV still means stricter identity checks, which may matter to an
+enterprise buyer, and nothing else.
 
 Since June 2023 the CA/Browser Forum requires **all** code-signing private keys
 to live on FIPS 140-2 Level 2 hardware. In practice that means new OV
@@ -74,10 +80,39 @@ osslsigncode verify 'Raven-Forge-Launcher-Setup-0.2.0.exe'
 
 ### SmartScreen
 
-A newly signed OV build still shows "Windows protected your PC" until the
-certificate accrues reputation. Reputation follows the **certificate**, not the
-file, so it carries across releases — do not rotate certificates casually. EV
-certificates skip this.
+A newly signed build still shows "Windows protected your PC" until it accrues
+reputation, and Microsoft's own guidance now describes that reputation as
+accumulating **per file hash** — so every release starts over to some degree,
+and no certificate tier skips it. Signing is still worth doing: it names a
+publisher the warning can attribute the file to, and it is what lets reputation
+accrue at all. It is not a switch that turns the warning off.
+
+### Signing this for free
+
+There is exactly one route that costs nothing *and* removes the warning, and it
+is not a certificate:
+
+| Route | Cost | Open to us? |
+|---|---|---|
+| **Microsoft Store, MSIX** — the Store re-signs the package | free | yes — free developer account, worldwide, no SmartScreen at all |
+| **SignPath Foundation** — free OV signing for open source | free | **no** — it requires an OSI-approved licence, and this project is PolyForm Noncommercial |
+| **Azure Artifact Signing** (ex-Trusted Signing) | ~$10/month | **no** — individuals are limited to the USA and Canada; EU *organisations* qualify, EU individuals do not |
+| **OV certificate** from a CA | $150–300/year | yes, worldwide, needs a token or cloud HSM |
+| **Self-signed** | free | pointless — Windows blocks it harder than an unsigned file |
+
+Two of those "no"s are ours to change rather than facts of the world. SignPath
+wants an OSI-approved licence, and PolyForm Noncommercial is deliberately not
+one; that trade was made for the app's licensing, not for signing, and it should
+not be reopened for this. Azure wants a legal entity if you are in the EU, so
+registering White Ravens as one would open a $10/month path that works directly
+from CI with no hardware.
+
+The Store route only re-signs **MSIX**. Submitting the NSIS installer through the
+Store instead does not get it signed — Microsoft re-signs packages, not
+installers. It would also take that copy of the launcher out of
+`electron-updater`'s hands, since Store apps update through the Store; shipping
+both, a Store MSIX and the direct NSIS download, is the arrangement that keeps
+the in-app updater working for everyone who does not come via the Store.
 
 ---
 
