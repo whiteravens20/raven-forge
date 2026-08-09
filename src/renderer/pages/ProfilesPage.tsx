@@ -147,6 +147,16 @@ export function ProfilesPage() {
     }
   }, [selectedId, selectedProfile?.manifestUrl]);
 
+  // The startup pack check lands after this page is already on screen, so the
+  // badge has to be told rather than asked. Without this it would keep the
+  // answer it read on selection until the profile was selected again — which is
+  // how it managed to say "Synced" about a pack that had moved twice.
+  useEffect(() => {
+    return api.on('profiles:sync-status-changed', (status) => {
+      if (status.profileId === selectedId) setSyncStatus(status);
+    });
+  }, [selectedId]);
+
   const startCreate = () => setChoosingSource(true);
 
   /** The by-hand route, reached from the source picker. */

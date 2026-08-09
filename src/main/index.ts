@@ -7,6 +7,7 @@ import { loadSettings } from '../core/config/settings-manager';
 import { ensureDataDirectories } from './init';
 import { applyProxySettings } from '../core/net/proxy';
 import { initUpdater, checkForUpdates } from '../core/updater/launcher-updater';
+import { checkAllProfilesForPackUpdates } from '../core/mods/mod-sync';
 
 // Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();
@@ -41,6 +42,9 @@ app.whenReady().then(async () => {
 
   initUpdater();
   void checkForUpdates();
+  // The launcher's own update check has a counterpart for the packs profiles
+  // follow. Both are fire-and-forget: neither should hold up the window.
+  void checkAllProfilesForPackUpdates();
 
   log.info('Raven Forge Launcher ready.');
 });

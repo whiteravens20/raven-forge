@@ -11,7 +11,7 @@ import {
 } from '../util/cancellation';
 import { paths } from '../config/paths';
 import { getSettings } from '../config/settings-manager';
-import { getProfile } from '../profiles/profile-manager';
+import { getAllProfiles, getProfile } from '../profiles/profile-manager';
 import {
   getModVersions,
   getProjectTitle,
@@ -27,6 +27,7 @@ import { writeJsonAtomic } from '../util/atomic-file';
 import { syncContentFromManifest } from './content-manager';
 import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import { configVersion, shouldApplyConfigOverride } from './config-overrides';
+import { pendingChanges } from './pack-diff';
 import { getMainWindow } from '../../main/window';
 import { verifyManifestSignature, assertManifestTrusted } from '../updater/manifest-verify';
 import type { SignedManifest } from '../updater/canonical';
@@ -201,6 +202,70 @@ export async function getLastManifestVerification(
 
   const { verification } = await readSyncState(profileId);
   return verification ?? { signed: false, valid: false, neverSynced: true };
+}
+
+/**
+ * Ask whether the pack moved, and record the answer — installing nothing.
+ *
+ * Without this the badge only ever changed when a sync ended, so a profile read
+ * "Synced" from the moment it last reconciled until the next time the player
+ * happened to press Sync, however many pack releases went by in between. The
+ * check costs one conditional GET: unchanged manifests come back 304 and are
+ * reconciled against the cached copy.
+ *
+ * The fetched ETag is deliberately **not** stored. The recorded one means "the
+ * manifest this profile was last reconciled against", and a check reconciles
+ * nothing — keeping it is what makes the next real sync still see the update.
+ */
+export async function checkForPackUpdates(profileId: string): Promise<void> {
+  const profile = await getProfile(profileId);
+  if (!profile?.manifestUrl) return;
+
+  const previous = await readSyncState(profileId);
+  // Nothing installed yet is not something to be behind on, and the badge
+  // already says so.
+  if (previous.status === 'never-synced') return;
+
+  try {
+    const settings = await getSettings();
+    const { manifest } = await obtainManifest(
+      profileId,
+      profile.name,
+      profile.manifestUrl,
+      previous.manifestEtag,
+      settings.trustedPublicKeys,
+      new AbortController().signal,
+    );
+
+    const pending = pendingChanges(manifest.mods, await readLockFile(profileId));
+
+    // A sync that ran while this check was in flight knows better than it does.
+    const current = await readSyncState(profileId);
+    if (current.lastSyncedAt !== previous.lastSyncedAt) return;
+
+    await writeSyncState(profileId, {
+      ...current,
+      pendingUpdates: pending,
+      status: pending > 0 ? 'updates-available' : 'synced',
+    });
+    log.info(
+      pending > 0
+        ? `${profile.name}: the pack moved — ${pending} mod(s) differ from the manifest`
+        : `${profile.name}: up to date with the pack`,
+    );
+  } catch (err) {
+    // A check the player never asked for must not turn a working profile red.
+    // Pressing Sync reports a real failure properly; this one only ever had
+    // permission to deliver good news or none.
+    log.warn(`Update check failed for ${profile.name}: ${err}`);
+  }
+}
+
+/** Every profile that follows a pack, checked once at startup. */
+export async function checkAllProfilesForPackUpdates(): Promise<void> {
+  for (const profile of await getAllProfiles()) {
+    if (profile.manifestUrl) await checkForPackUpdates(profile.id);
+  }
 }
 
 // ── Manifest entry resolution ──────────────────────────────

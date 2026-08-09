@@ -108,6 +108,24 @@ sequenceDiagram
     Main-->>UI: IpcResult<void>
 ```
 
+**A sync happens on two triggers, and the badge on a third.** Pressing Sync is
+one; launching a profile that follows a manifest is the other, because nothing
+else in the launch path touches mods — it ensures the loader, Java, the client
+jar and the assets, and used to start the game on whatever mod list happened to
+be on disk. A player who never pressed Sync could join a server running a mod
+list that server had stopped running.
+
+The badge is separate, and passive. `checkForPackUpdates` runs once at startup
+per profile: one conditional GET, diffed against `installed.lock`, written to the
+sync state and pushed to the UI. It installs nothing and it never stores the ETag
+it fetched — the recorded one means "the manifest this profile was reconciled
+against", and keeping it is what lets the next real sync still see the update.
+It also refuses to report failure: a check nobody asked for turning a working
+profile red would be worse than saying nothing, and pressing Sync reports
+properly. Before this, `status` was only ever written when a sync ended, so a
+profile read "Synced" from its last reconcile until the next one — however many
+pack releases went by in between.
+
 A pack's config overrides (`configFiles[]`) are applied on a different rule from
 its mods, and the difference is the point. A mod jar is the pack's file and the
 manifest's hash is the last word on it. A config file becomes the *player's* the
