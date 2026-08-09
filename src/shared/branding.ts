@@ -11,7 +11,7 @@
  * a default but a constant — see its own note.
  */
 
-import type { Locale } from './ipc/settings';
+import type { Locale, TrustedKey } from './ipc/settings';
 
 /** Where the published feeds and pack manifests live. */
 const PACKS_SITE = 'https://whiteravens20.github.io/raven-packs';
@@ -46,6 +46,47 @@ export const WHITE_RAVENS_PACKS_URL = `${PACKS_SITE}/packs.json`;
  * still install anybody's manifest — see `assertManifestTrusted`.
  */
 export const WHITE_RAVENS_PUBLIC_KEY = 'N/xfUD4XtQ8KMV2weZ8hglLoaYkqTdlFpTngu3p/nA8=';
+
+/**
+ * The publisher's own key as a key-ring entry, always present.
+ *
+ * Without it the launcher's first-party packs read "no trusted keys" on a fresh
+ * install, which is the state nearly every player is in — a signature scheme
+ * that verifies nothing until the player pastes a key by hand is a scheme that
+ * verifies nothing.
+ *
+ * Lives here rather than beside the verifier because Settings has to show it.
+ * A key that silently decides which packs read "Verified", while the screen
+ * listing trusted keys shows an empty list, is indistinguishable from a badge
+ * the launcher made up.
+ *
+ * `addedAt` is the epoch because it was never added; the UI labels it built-in
+ * instead of printing a date.
+ */
+export const BUILT_IN_KEYS: TrustedKey[] = [
+  {
+    name: 'White Ravens',
+    publicKey: WHITE_RAVENS_PUBLIC_KEY,
+    addedAt: '1970-01-01T00:00:00.000Z',
+  },
+];
+
+/**
+ * Everything the launcher will check a signature against: the player's keys
+ * plus the publisher's, without listing a key they added twice.
+ *
+ * Shared by the verifier and by Settings on purpose — the list the player is
+ * shown has to be the list the signature is actually checked against, or the
+ * screen is decoration.
+ */
+export function trustedKeyRing(userKeys: TrustedKey[]): TrustedKey[] {
+  return [...BUILT_IN_KEYS, ...userKeys.filter((k) => !isBuiltInKey(k.publicKey))];
+}
+
+/** Whether this key came with the launcher, and so cannot be removed. */
+export function isBuiltInKey(publicKey: string): boolean {
+  return BUILT_IN_KEYS.some((k) => k.publicKey === publicKey);
+}
 
 /** The launcher's own source repository — About, and the bug-report links. */
 export const REPO_URL = 'https://github.com/whiteravens20/raven-forge';

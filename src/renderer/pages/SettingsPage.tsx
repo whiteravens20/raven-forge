@@ -8,6 +8,7 @@ import { Button } from '@components/ui/Button';
 import { LogViewer } from '@components/LogViewer';
 import { Spinner } from '@components/ui/Spinner';
 import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
+import { isBuiltInKey, trustedKeyRing } from '@shared/branding';
 import type {
   ThemeMode,
   LauncherBehaviorOnLaunch,
@@ -171,11 +172,13 @@ export function SettingsPage() {
       <Section title={t('settings.section.trustedKeys')}>
         <p className="text-xs text-rf-text-muted">{t('settings.trustedKeysHint')}</p>
 
+        {/* The built-in key leads the list because it is why a White Ravens pack
+            reads "Verified" on a fresh install. Listing only the player's own
+            keys made the badge look like it came from nowhere. */}
         <div className="space-y-2">
-          {settings.trustedPublicKeys.length === 0 ? (
-            <p className="text-xs text-rf-text-muted py-2">{t('settings.trustedKeysEmpty')}</p>
-          ) : (
-            settings.trustedPublicKeys.map((key) => (
+          {trustedKeyRing(settings.trustedPublicKeys).map((key) => {
+            const builtIn = isBuiltInKey(key.publicKey);
+            return (
               <div
                 key={key.publicKey}
                 className="flex items-start gap-2 rounded-lg border border-rf-border bg-rf-surface p-3"
@@ -186,20 +189,24 @@ export function SettingsPage() {
                     {key.publicKey}
                   </p>
                   <p className="text-[10px] text-rf-text-muted">
-                    {t('settings.trustedKeyAdded', {
-                      date: new Date(key.addedAt).toLocaleDateString(locale),
-                    })}
+                    {builtIn
+                      ? t('settings.trustedKeyBuiltIn')
+                      : t('settings.trustedKeyAdded', {
+                          date: new Date(key.addedAt).toLocaleDateString(locale),
+                        })}
                   </p>
                 </div>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  icon={<Trash2 size={12} />}
-                  onClick={() => removeTrustedKey(key.publicKey)}
-                />
+                {!builtIn && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon={<Trash2 size={12} />}
+                    onClick={() => removeTrustedKey(key.publicKey)}
+                  />
+                )}
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
 
         <div className="grid grid-cols-2 gap-2 rounded-lg border border-rf-border bg-rf-surface p-3">

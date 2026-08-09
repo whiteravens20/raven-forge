@@ -1,33 +1,9 @@
 import nacl from 'tweetnacl';
 import { decodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import { log } from '../../main/logger';
-import { WHITE_RAVENS_PUBLIC_KEY } from '../../shared/branding';
+import { trustedKeyRing } from '../../shared/branding';
 import type { ManifestVerification, TrustedKey } from '../../shared/ipc-types';
 import { canonicalize, type SignedManifest } from './canonical';
-
-/**
- * The publisher's own key, always present.
- *
- * Without it the launcher's first-party packs read "no trusted keys" on a fresh
- * install, which is the state nearly every player is in — a signature scheme
- * that verifies nothing until the player pastes a key by hand is a scheme that
- * verifies nothing.
- */
-export const BUILT_IN_KEYS: TrustedKey[] = [
-  {
-    name: 'White Ravens',
-    publicKey: WHITE_RAVENS_PUBLIC_KEY,
-    addedAt: '1970-01-01T00:00:00.000Z',
-  },
-];
-
-/** The user's keys plus the publisher's, without duplicating a key they added. */
-function keyRing(trustedKeys: TrustedKey[]): TrustedKey[] {
-  const builtIn = BUILT_IN_KEYS.filter(
-    (k) => !trustedKeys.some((t) => t.publicKey === k.publicKey),
-  );
-  return [...trustedKeys, ...builtIn];
-}
 
 /**
  * Check a manifest's Ed25519 signature against the trusted keys.
@@ -56,7 +32,7 @@ export function verifyManifestSignature(
     return { signed: true, valid: false, error: 'Signature is not valid base64' };
   }
 
-  const keys = keyRing(trustedKeys);
+  const keys = trustedKeyRing(trustedKeys);
   const message = decodeUTF8(canonicalize(manifest));
   for (const key of keys) {
     try {

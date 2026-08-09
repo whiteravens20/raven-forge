@@ -2,12 +2,8 @@ import { describe, it, expect } from 'vitest';
 import nacl from 'tweetnacl';
 import { encodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import { canonicalize } from '../src/core/updater/canonical';
-import {
-  verifyManifestSignature,
-  assertManifestTrusted,
-  BUILT_IN_KEYS,
-} from '../src/core/updater/manifest-verify';
-import { WHITE_RAVENS_PUBLIC_KEY } from '../src/shared/branding';
+import { verifyManifestSignature, assertManifestTrusted } from '../src/core/updater/manifest-verify';
+import { BUILT_IN_KEYS, WHITE_RAVENS_PUBLIC_KEY } from '../src/shared/branding';
 import type { TrustedKey } from '../src/shared/ipc-types';
 
 /**

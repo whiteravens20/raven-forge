@@ -384,8 +384,8 @@ export const pl: Translations = {
   'settings.feedInvalid': 'To nie jest poprawny adres URL. Zostaw puste, aby wyłączyć kanał.',
   'settings.announcementFeed': 'Announcement Feed URL',
   'settings.trustedKeysHint':
-    'Manifesty serwerów mogą być podpisane. Dodaj klucz publiczny administratora, aby ufać tylko podpisanym manifestom.',
-  'settings.trustedKeysEmpty': 'Brak zaufanych kluczy',
+    'Klucz White Ravens jest wbudowany w launcher, dlatego paczki White Ravens są weryfikowane od pierwszego uruchomienia. Dopóki nie dodasz własnego klucza, launcher pokazuje wynik weryfikacji, ale niczego nie blokuje. Dodanie klucza włącza wymuszanie: instalowane będą wyłącznie podpisane manifesty, które da się zweryfikować.',
+  'settings.trustedKeyBuiltIn': 'Wbudowany w launcher — zawsze zaufany',
   'settings.trustedKeyAdded': 'Dodano: {date}',
   'settings.trustedKeyName': 'Nazwa klucza',
   'settings.trustedKeyNamePlaceholder': 'np. Raven SMP Admin',
