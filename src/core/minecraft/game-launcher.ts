@@ -15,7 +15,11 @@ import { resolveLaunchMeta } from '../modloader/loader-profile';
 import { getVersionMeta } from './version-manifest';
 import { ensureClientJar, ensureLibraries, ensureAssets } from './asset-downloader';
 import { beginJob, endJob, isCancellation, throwIfCancelled } from '../util/cancellation';
-import { writeCrashReport } from '../diagnostics/crash-report';
+import {
+  isShutdownWatchdogCrash,
+  readMinecraftCrash,
+  writeCrashReport,
+} from '../diagnostics/crash-report';
 
 const execAsync = promisify(exec);
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
@@ -336,6 +340,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     exitCode: number,
     playTimeMinutes: number,
     logTail: string[],
+    minecraftCrash?: { file: string; content: string },
     spawnError?: string,
   ) =>
     writeCrashReport({
@@ -344,6 +349,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
       playTimeMinutes,
       startedAt: startTime,
       logTail,
+      minecraftCrash,
       spawnError,
       gameDir,
       java,
@@ -400,7 +406,17 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     void (async () => {
       runningProcesses.delete(profile.id);
       const playTimeMinutes = Math.round((Date.now() - startTime) / 60000);
-      const crashed = code !== 0 && code !== null;
+      const failed = code !== 0 && code !== null;
+
+      // A non-zero exit is not yet a crash. Minecraft's shutdown watchdog halts
+      // the JVM when something — nearly always a mod's leaked non-daemon thread
+      // pool — keeps the process alive after the window is already gone, and
+      // that arrives here looking exactly like a crash while the player has
+      // simply finished playing. Their file says so, so read it before judging.
+      const minecraftCrash = failed ? await readMinecraftCrash(gameDir, startTime) : undefined;
+      const hungOnExit = isShutdownWatchdogCrash(minecraftCrash);
+      const crashed = failed && !hungOnExit;
+
       const logTail = crashed ? getLogTail(profile.id, 100) : undefined;
       const exitInfo: GameExitInfo = {
         profileId: profile.id,
@@ -411,10 +427,17 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
         // Written before the buffer is cleared below, and before the renderer is
         // told anything — the card offers the file, so it has to exist by then.
         reportPath: crashed
-          ? await reportCrash(code ?? -1, playTimeMinutes, logTail ?? [])
+          ? await reportCrash(code ?? -1, playTimeMinutes, logTail ?? [], minecraftCrash)
           : undefined,
       };
 
+      if (hungOnExit) {
+        log.warn(
+          `${profile.name} finished, but the JVM would not exit and Minecraft's shutdown ` +
+            `watchdog halted it (code ${code}). The session had already ended, so this is ` +
+            'not reported as a crash.',
+        );
+      }
       log.info(`Game exited for ${profile.name} with code ${code} (played ${playTimeMinutes} min)`);
 
       // `lastPlayed` and total play time are both shown in the profile list and
@@ -445,7 +468,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
         // The process never ran, so there is no output and no crash file of the
         // game's own — the error itself is the whole finding, and the report is
         // where it says which Java it tried to start.
-        reportPath: await reportCrash(-1, 0, logTail, err.message),
+        reportPath: await reportCrash(-1, 0, logTail, undefined, err.message),
       };
       getMainWindow()?.webContents.send('game:exited', exitInfo);
       clearBuffer(profile.id);

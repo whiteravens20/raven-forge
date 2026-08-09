@@ -1,6 +1,10 @@
 import os from 'node:os';
 import { describe, it, expect } from 'vitest';
-import { redactSecrets, buildCrashReport } from '../src/core/diagnostics/crash-report';
+import {
+  redactSecrets,
+  buildCrashReport,
+  isShutdownWatchdogCrash,
+} from '../src/core/diagnostics/crash-report';
 import type { CrashReportInput } from '../src/core/diagnostics/crash-report';
 import type { Profile } from '../src/shared/ipc-types';
 
@@ -102,5 +106,40 @@ describe('buildCrashReport', () => {
   it('says the process never started, when that is what happened', () => {
     const report = buildCrashReport({ ...input, spawnError: 'spawn java ENOENT' }, []);
     expect(report).toContain('spawn java ENOENT');
+  });
+});
+
+/**
+ * A session that ended normally must not be shown to the player as a crash.
+ *
+ * Minecraft's shutdown watchdog halts the JVM when a mod's leaked thread keeps
+ * the process alive after the window is gone, and it writes a crash file and
+ * exits non-zero on the way out. Both signals say "crash" and neither is one:
+ * the game was already over, and nothing was lost.
+ */
+describe('isShutdownWatchdogCrash', () => {
+  it('recognises the watchdog that fires after the game has already closed', () => {
+    expect(
+      isShutdownWatchdogCrash({
+        content: [
+          '---- Minecraft Crash Report ----',
+          'Description: Client shutdown from post-main',
+          '',
+          'java.lang.Error: Watchdog (Client shutdown from post-main)',
+        ].join('\n'),
+      }),
+    ).toBe(true);
+  });
+
+  it('still calls a real crash a crash', () => {
+    expect(
+      isShutdownWatchdogCrash({
+        content: 'Description: Rendering overlay\n\njava.lang.NullPointerException',
+      }),
+    ).toBe(false);
+  });
+
+  it('treats a run that wrote no crash file as a crash to be reported', () => {
+    expect(isShutdownWatchdogCrash(undefined)).toBe(false);
   });
 });

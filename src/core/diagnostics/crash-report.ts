@@ -83,10 +83,43 @@ export interface CrashReportInput {
   offlineLaunch: boolean;
   /** Values to redact — token, UUID, player name. See `redactSecrets`. */
   secrets: string[];
+  /**
+   * The game's own crash file, already read by the caller.
+   *
+   * The exit handler has to read it before it can tell a crash from a shutdown
+   * that overran, so it hands the result over rather than have this read the
+   * same file a second time. Absent when the process never started.
+   */
+  minecraftCrash?: { file: string; content: string };
 }
 
 function field(label: string, value: string | number | undefined | null): string {
   return `${label}: ${value === undefined || value === null || value === '' ? '—' : value}`;
+}
+
+/**
+ * Minecraft's own description for "the window closed, but the JVM would not".
+ *
+ * After the main loop ends, the client starts a watchdog; if the process is
+ * still alive when it fires, the watchdog dumps every thread, writes this crash
+ * report and halts the JVM — which reaches the launcher as a non-zero exit.
+ *
+ * The session was already over by then. It is almost always a mod that left a
+ * non-daemon thread pool running, so the JVM had nothing left to do and no
+ * permission to leave, and nothing the player did or lost has anything to do
+ * with it. See `isShutdownWatchdogCrash`.
+ */
+const SHUTDOWN_WATCHDOG_DESCRIPTION = 'Client shutdown from post-main';
+
+/**
+ * Whether the game's crash file is the shutdown watchdog rather than a crash.
+ *
+ * Matched on Mojang's own description string, not on the exit code: the code is
+ * just `halt()`'s argument and says nothing about why. A real crash that
+ * happened to use the same code still reports as one.
+ */
+export function isShutdownWatchdogCrash(minecraftCrash?: { content: string }): boolean {
+  return minecraftCrash?.content.includes(SHUTDOWN_WATCHDOG_DESCRIPTION) ?? false;
 }
 
 /**
@@ -98,7 +131,7 @@ function field(label: string, value: string | number | undefined | null): string
  * since the game started count; the directory keeps old ones forever, and the
  * one from last month is worse than none.
  */
-async function readMinecraftCrash(
+export async function readMinecraftCrash(
   gameDir: string,
   startedAt: number,
 ): Promise<{ file: string; content: string } | undefined> {
@@ -271,15 +304,12 @@ async function prune(dir: string): Promise<void> {
  */
 export async function writeCrashReport(input: CrashReportInput): Promise<string | undefined> {
   try {
-    const [mods, minecraftCrash] = await Promise.all([
-      listMods(input.gameDir),
-      readMinecraftCrash(input.gameDir, input.startedAt),
-    ]);
+    const mods = await listMods(input.gameDir);
 
     const dir = paths.crashReportsDir;
     await fs.mkdir(dir, { recursive: true });
     const file = path.join(dir, `crash-${slug(input.profile.name)}-${stamp(Date.now())}.txt`);
-    await fs.writeFile(file, buildCrashReport(input, mods, minecraftCrash), 'utf-8');
+    await fs.writeFile(file, buildCrashReport(input, mods, input.minecraftCrash), 'utf-8');
     await prune(dir);
 
     log.info(`Wrote crash report for ${input.profile.name} to ${file}`);
