@@ -4,9 +4,9 @@
 # Tags created on any other branch are refused by the guard job.
 #
 # Produces, for one tag:
-#   Raven Forge Launcher Setup <ver>.exe   NSIS installer, Authenticode-signed
+#   Raven-Forge-Launcher-Setup-<ver>.exe   NSIS installer, Authenticode-signed
 #   raven-forge-launcher_<ver>_amd64.deb   Debian 11+ / Ubuntu 20.04+
-#   Raven Forge Launcher-<ver>.AppImage    any x64 glibc >= 2.25
+#   Raven-Forge-Launcher-<ver>.AppImage    any x64 glibc >= 2.25
 #   latest.yml / latest-linux.yml + .blockmap   electron-updater feeds
 #   SHA256SUMS.txt                         checksums over every artefact
 #   sbom.cdx.json                          CycloneDX SBOM of the shipped deps
@@ -324,9 +324,9 @@ jobs:
 
             | Platform | File | Notes |
             |---|---|---|
-            | Windows 10 1809+ / 11 | `Raven Forge Launcher Setup ${{ github.ref_name }}.exe` | NSIS installer, nothing to install first |
+            | Windows 10 1809+ / 11 | `Raven-Forge-Launcher-Setup-*.exe` | NSIS installer, nothing to install first |
             | Debian 11+ / Ubuntu 20.04+ | `raven-forge-launcher_*_amd64.deb` | recommended on Linux — apt pulls everything |
-            | Any x64 Linux, glibc ≥ 2.25 | `Raven Forge Launcher-*.AppImage` | needs libraries installed by hand, see below |
+            | Any x64 Linux, glibc ≥ 2.25 | `Raven-Forge-Launcher-*.AppImage` | needs libraries installed by hand, see below |
 
             Java is not on this list. The launcher downloads the JRE each profile
             needs, by itself, on first launch — along with the game, the mod

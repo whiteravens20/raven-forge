@@ -290,9 +290,9 @@ somewhere else.
 
 | Target | File | Size | Runs on |
 |---|---|---|---|
-| NSIS installer | `Raven Forge Launcher Setup <version>.exe` | ~96 MB | **Windows 11** and Windows 10 (1809+), x64 |
+| NSIS installer | `Raven-Forge-Launcher-Setup-<version>.exe` | ~96 MB | **Windows 11** and Windows 10 (1809+), x64 |
 | Debian package | `raven-forge-launcher_<version>_amd64.deb` | ~90 MB | **Debian 11+**, **Ubuntu 20.04+**, x64 |
-| AppImage | `Raven Forge Launcher-<version>.AppImage` | ~115 MB | Any x64 Linux with glibc ≥ 2.25 |
+| AppImage | `Raven-Forge-Launcher-<version>.AppImage` | ~115 MB | Any x64 Linux with glibc ≥ 2.25 |
 
 The Linux floor is the Electron binary's own: it links `GLIBC_2.25`, which the
 `.deb` declares as `libc6 (>= 2.25)` so apt refuses the install rather than

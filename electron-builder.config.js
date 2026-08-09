@@ -54,6 +54,16 @@ const config = {
   },
 
   nsis: {
+    // No spaces, because two halves of the update path disagree about what to
+    // do with them. GitHub turns a space in an uploaded asset's name into a
+    // dot; electron-updater builds its download URL with `name.replace(/ /g,
+    // "-")`, matching electron-builder's own publisher, which this repo does
+    // not use — the release is assembled by the workflow instead. So
+    // `${productName}` produced an asset called `Raven.Forge.Launcher.Setup…`
+    // and a `latest.yml` pointing at `Raven-Forge-Launcher-Setup…`, and the
+    // updater found the new version and then 404'd fetching it. A name with no
+    // space in it survives both transformations unchanged.
+    artifactName: 'Raven-Forge-Launcher-Setup-${version}.${ext}',
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     perMachine: false,
@@ -91,6 +101,14 @@ const config = {
         Keywords: 'minecraft;launcher;mods;',
       },
     },
+  },
+
+  // Same reason as the NSIS installer: the AppImage is an updater target, so
+  // its name has to survive GitHub's upload and electron-updater's URL builder
+  // saying the same thing. The .deb needs no rule — Debian's own naming
+  // convention has never allowed a space.
+  appImage: {
+    artifactName: 'Raven-Forge-Launcher-${version}.${ext}',
   },
 
   deb: {

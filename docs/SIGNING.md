@@ -63,13 +63,13 @@ Delete `cert.b64` afterwards. It is the private key in a thin disguise.
 
 ```powershell
 # Windows
-Get-AuthenticodeSignature 'Raven Forge Launcher Setup 0.1.0.exe' | Format-List
+Get-AuthenticodeSignature 'Raven-Forge-Launcher-Setup-0.2.0.exe' | Format-List
 # Status must be "Valid"; check SignerCertificate.Subject is you.
 ```
 
 ```bash
 # Linux, against a downloaded artefact
-osslsigncode verify 'Raven Forge Launcher Setup 0.1.0.exe'
+osslsigncode verify 'Raven-Forge-Launcher-Setup-0.2.0.exe'
 ```
 
 ### SmartScreen
