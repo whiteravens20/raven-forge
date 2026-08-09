@@ -8,22 +8,17 @@ contact_links:
       reporting. Do NOT open a public issue for security bugs, and redact any
       access token from logs before attaching them.
 
+  - name: "\U0001F9E9 A mod or a modpack is the problem"
+    url: https://github.com/whiteravens20/raven-packs/issues
+    about: >
+      A crash caused by one mod belongs with that mod's authors — this launcher
+      ships their file, not their code. Anything about a White Ravens pack's
+      contents or versions belongs in raven-packs. Open an issue here only if
+      you believe the launcher installed the wrong thing.
+
   - name: "\U0001F426‍⬛ Contact White Ravens directly"
     url: https://whiteravens.net
     about: >
-      Would rather not open a GitHub account, or the report does not fit any of
-      these forms? Reach us through whiteravens.net. Attach the crash report the
-      launcher wrote, the same as you would here.
-
-  - name: "\U0001F4AC Question / Discussion"
-    url: https://github.com/whiteravens20/raven-forge/discussions
-    about: >
-      Ask a question, share feedback, or start a general discussion about the
-      launcher.
-
-  - name: "\U0001F9E9 Mod or modpack problem"
-    url: https://github.com/whiteravens20/raven-forge/discussions
-    about: >
-      A crash caused by a specific mod, or a question about a pack's contents,
-      belongs with that mod's or pack's authors. Open a discussion here only if
-      you believe the launcher installed the wrong thing.
+      Have a question, or would rather not open a GitHub account? Reach us
+      through whiteravens.net. Attach the crash report the launcher wrote, the
+      same as you would here.
