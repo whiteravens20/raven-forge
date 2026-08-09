@@ -217,7 +217,7 @@ sequenceDiagram
 - The Microsoft OAuth flow uses PKCE (S256) and a `state` value, and accepts a code only from the exact redirect URI it asked for.
 - Every download is verified against the strongest hash its source published — sha512, sha256 or sha1, in that order (`expectedHash` in `core/mods/integrity.ts`). Modrinth supplies sha512 for every file; a `.mrpack` supplies sha512 and sha1; a manifest entry may publish any of them. **An entry that publishes no hash at all is installed unverified** — the launcher does not invent one. Mojang's own assets and libraries are the exception that does retry: `asset-downloader.ts` retries a failed or mismatched download three times, because it is fetching thousands of files. `downloadToFile`, which fetches mods, does not retry.
 - The Forge/NeoForge installer jar, the Adoptium JRE and the vanilla client jar are all executed or extracted after download, and all three are checked against a published checksum where the publisher provides one (Maven `.sha512`/`.sha256`/`.sha1` sidecars, Adoptium's `/assets` response, Mojang's version metadata). Where none exists the download proceeds over HTTPS and says so in the log.
-- Manifest Ed25519 signatures are checked inside the sync, on the exact document about to be installed, before anything is downloaded. The White Ravens publisher key is **compiled into the launcher** (`src/shared/branding.ts`) and always in the key ring, so a first-party pack verifies on a fresh install; shipping it beats downloading it, since a key served next to the manifest it signs is written by whoever wrote the manifest. **With no trusted keys configured nothing is enforced** — that is the default install, and refusing every unsigned manifest out of the box would refuse every pack that exists. **Adding a trusted key switches enforcement on**: from then on a manifest for that profile must carry a signature that verifies, and an unsigned one is refused rather than waved through, because otherwise stripping the signature would be a way past the check. The badge on the profile reports what the last sync found, not what a fresh fetch would find.
+- Manifest Ed25519 signatures are checked inside the sync, on the exact document about to be installed, before anything is downloaded. The White Ravens publisher key is **compiled into the launcher** (`src/shared/branding.ts`) and always in the key ring, so a first-party pack verifies on a fresh install; shipping it beats downloading it, since a key served next to the manifest it signs is written by whoever wrote the manifest. **With no trusted keys configured nothing is enforced** — that is the default install, and refusing every unsigned manifest out of the box would refuse every pack that exists. **Adding a trusted key switches enforcement on**: from then on a manifest for that profile must carry a signature that verifies, and an unsigned one is refused rather than waved through, because otherwise stripping the signature would be a way past the check. The badge on the profile reports what the last sync found, not what a fresh fetch would find. Settings → Trusted keys lists the built-in key alongside the player's own, unremovable and labelled as built in: it is what makes a White Ravens pack read "Verified" on an install where the player has added nothing, and a screen that hid it left the badge looking invented.
 
 ## Build pipeline
 
@@ -242,10 +242,18 @@ fixed and hides the ones that were not.
 - **The launcher has never updated itself from a published release.** The update
   check, platform matrix and install-before-play path are covered by tests, but
   there is no tagged release to update *from*.
-- **Crash reports have never been produced by a real crash.** `crash-report.ts`
-  is unit-tested and was exercised end to end in the running app against a
-  synthetic `game:exited` and a hand-written Mojang crash file, so
-  `readMinecraftCrash` reading a genuine one is still unproven.
+- **Crash reports are now proven against a real exit.** A Windows 26.2/Fabric
+  session produced one end to end: `readMinecraftCrash` found Mojang's own file,
+  quoted it, and the redaction replaced the token, the account UUID, the player
+  name and `C:\Users\…`. What it also showed is that **a non-zero exit is not
+  always a crash**: Minecraft's shutdown watchdog halts the JVM when something
+  keeps the process alive after the window has closed — nearly always a mod that
+  left a non-daemon thread pool running — and it writes a crash file and exits
+  non-zero on the way out, for a session the player had already finished.
+  `isShutdownWatchdogCrash` matches Mojang's own `Client shutdown from
+  post-main` description, and that exit is logged but not reported as a crash.
+  Matching the description rather than the exit code is deliberate: the code is
+  only `halt()`'s argument and says nothing about why.
 - **The startup update check cannot be switched off.** One request to GitHub
   Releases on every launch, with no setting behind it — itemised in
   [PRIVACY.md](PRIVACY.md) rather than left for someone to discover.
