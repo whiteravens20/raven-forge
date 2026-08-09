@@ -22,7 +22,7 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Bilingual UI** — Polish and English, switchable in Settings
 - **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla
 - **Microsoft Auth** — full OAuth 2.0 → Xbox Live → Minecraft JWT chain + offline mode
-- **Java Management** — auto-download Adoptium Temurin JRE (Java 8/17/21)
+- **Java Management** — auto-download the Adoptium Temurin JRE the game actually asks for; Mojang's version metadata names the major (Java 25 for 26.2, 21 for 1.21, and so on), with a table covering versions old enough not to state one
 - **Shaders & Resource Packs** — first-class content management per profile
 - **Auto-Update** — launcher self-updates via GitHub Releases (electron-updater)
 - **Crash Reports** — one file per crash with versions, mods and the game's own report, written with tokens and account details already stripped out
@@ -133,7 +133,7 @@ test/               # Vitest suites (pure logic) + Electron/keytar stubs
 
 ---
 
-## Configuration: News Feed, Backgrounds & Announcements
+## Configuration: News Feed & Announcements
 
 A fresh install points at White Ravens' published feeds (listed under [Live endpoints](#live-endpoints)). Both are yours to change — under Settings, or in the settings JSON file at `<userData>/settings.json`. Clearing a field switches that section off rather than restoring the default.
 
@@ -204,11 +204,14 @@ configure. It is shipped rather than downloaded on purpose: a key fetched
 alongside the manifest it vouches for proves nothing, because whoever can
 rewrite one can rewrite the other.
 
-**Settings → Trusted Keys** is for everyone else's packs, and it does something
-stronger than the badge — adding a key makes the launcher refuse to install any
-manifest not signed by a key you trust, unsigned ones included. Until you add
-one, signatures are reported but not enforced, which is what keeps packs from
-anywhere else installable.
+**Settings → Trusted Keys** lists that built-in key first — unremovable, and
+labelled as shipped with the launcher, because it is the reason a White Ravens
+pack reads Verified on an install where you added nothing.
+
+Adding a key of your own does something stronger than the badge: from then on
+the launcher refuses to install any manifest not signed by a key you trust,
+unsigned ones included. Until you add one, signatures are reported but not
+enforced, which is what keeps packs from anywhere else installable.
 
 ### Forking
 
@@ -229,15 +232,6 @@ plainly the player's own.
 ### UI Language
 
 Polish and English ship in `src/renderer/i18n/`; switch under Settings → Appearance. Adding a language is copying `en.ts`, translating the values, and registering it — TypeScript names any key you miss. See [CONTRIBUTING.md](CONTRIBUTING.md#translations).
-
-### Background Images
-Place `.jpg` / `.png` files in a local folder and set:
-```json
-{
-  "customBackgroundsPath": "/path/to/your/backgrounds"
-}
-```
-Or leave empty to use the built-in default backgrounds.
 
 > **Note:** An empty `newsFeedUrl` or `announcementFeedUrl` shows an empty section — the launcher has no placeholder copy to fall back on, because demo text presented as a server's announcements is worse than nothing.
 
@@ -425,7 +419,7 @@ Debian does not apply that restriction, so the AppImage runs as-is.
 - **Push or PR to `main`/`dev`** → lint, typecheck, tests, format check, and build on Linux + Windows ([build.yml](.github/workflows/build.yml))
 - **Push or PR to `main`/`dev`, plus weekly** → CodeQL ([codeql.yml](.github/workflows/codeql.yml)) and the dependency/secret gates ([security.yml](.github/workflows/security.yml))
 - **Nightly and on demand** → the full electron-builder run for both platforms ([package.yml](.github/workflows/package.yml)), so a packaging regression surfaces on a weekday rather than during a release
-- **Push a tag `v*`** (e.g. `git tag v0.1.0 && git push --tags`) → builds installers, signs (if certs configured), and creates a draft GitHub Release ([release.yml](.github/workflows/release.yml))
+- **Push a tag `vMAJOR.MINOR.PATCH`** (e.g. `git tag v0.1.0 && git push --tags`) → builds installers, signs (if certs configured), and creates a draft GitHub Release ([release.yml](.github/workflows/release.yml)). The pattern is exact — a suffixed tag like `v0.1.0-beta` triggers nothing
 
 ### Code Signing
 
