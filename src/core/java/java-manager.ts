@@ -39,8 +39,18 @@ function getJavaExecutable(): string {
   return process.platform === 'win32' ? 'java.exe' : 'java';
 }
 
+/**
+ * Where a managed JRE lives.
+ *
+ * The launcher executes `bin/java` out of this directory for the rest of the
+ * session, and the number that names it originates in a version meta fetched
+ * over the network — `requiredJavaFor` bounds it, but that is a decision made
+ * two modules away. The name is therefore built from digits rather than from
+ * whatever was passed: `jre-21`, and nothing that is not that shape.
+ */
 function getManagedJavaDir(majorVersion: number): string {
-  return path.join(paths.javaDir, `jre-${majorVersion}`);
+  const digits = String(majorVersion).replace(/\D/g, '');
+  return path.join(paths.javaDir, `jre-${digits}`);
 }
 
 function getManagedJavaPath(majorVersion: number): string {
