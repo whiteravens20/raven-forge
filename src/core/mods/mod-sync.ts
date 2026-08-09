@@ -26,6 +26,7 @@ import { readJsonCapped } from '../net/json';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { syncContentFromManifest } from './content-manager';
 import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
+import { configVersion, shouldApplyConfigOverride } from './config-overrides';
 import { getMainWindow } from '../../main/window';
 import { verifyManifestSignature, assertManifestTrusted } from '../updater/manifest-verify';
 import type { SignedManifest } from '../updater/canonical';
@@ -71,6 +72,15 @@ async function writeLockFile(profileId: string, mods: InstalledMod[]): Promise<v
   await writeJsonAtomic(paths.profileLockFile(profileId), mods);
 }
 
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ── Sync state (ETag + last result), persisted per profile ─
 
 interface SyncState {
@@ -88,6 +98,15 @@ interface SyncState {
    * response.
    */
   verification?: ManifestVerification;
+  /**
+   * Which version of each config override this profile has already been given,
+   * keyed by the path inside the game directory.
+   *
+   * It is what separates "the author changed this file" from "the player did" —
+   * see `shouldApplyConfigOverride`. Rebuilt from the manifest on every sync, so
+   * a path the pack stopped shipping drops out with it.
+   */
+  appliedConfigs?: Record<string, string>;
 }
 
 async function readSyncState(profileId: string): Promise<SyncState> {
@@ -486,6 +505,9 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     }
 
     // Config overrides, resolved relative to the profile's .minecraft directory.
+    const appliedConfigs: Record<string, string> = {};
+    let configsWritten = 0;
+
     for (const config of manifest.configFiles) {
       report({ text: config.path }, config.path);
 
@@ -495,11 +517,16 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         throw new Error(`Manifest config path escapes the game directory: ${config.path}`);
       }
 
-      if (!(await fileMatches(dest, config))) {
+      const exists = await fileExists(dest);
+      if (shouldApplyConfigOverride(config, previousState.appliedConfigs?.[config.path], exists)) {
         await downloadToFile(config.url, dest, signal);
         await verifyDownload(dest, config, `config ${config.path}`);
         log.info(`Applied config override: ${config.path}`);
+        configsWritten++;
       }
+
+      const version = configVersion(config);
+      if (version) appliedConfigs[config.path] = version;
       done++;
     }
 
@@ -534,6 +561,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       pendingUpdates,
       status: pendingUpdates > 0 ? 'updates-available' : 'synced',
       verification,
+      appliedConfigs,
     });
 
     emitProgress('progress:mod-sync', {
@@ -545,7 +573,8 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     });
     log.info(
       `Manifest sync complete for ${profile.name}: ${synced.length} mods, ` +
-        `${manifest.configFiles.length} configs, ${orphaned.length} orphaned`,
+        `${configsWritten} of ${manifest.configFiles.length} configs written, ` +
+        `${orphaned.length} orphaned`,
     );
   } catch (err) {
     // A cancelled sync is not an error state — leave the profile as it was

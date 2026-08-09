@@ -108,6 +108,20 @@ sequenceDiagram
     Main-->>UI: IpcResult<void>
 ```
 
+A pack's config overrides (`configFiles[]`) are applied on a different rule from
+its mods, and the difference is the point. A mod jar is the pack's file and the
+manifest's hash is the last word on it. A config file becomes the *player's* the
+moment they open the game — so the sync records which version of each override it
+last delivered (`appliedConfigs` in the profile's sync state) and writes the file
+only when that version changed, or when the file is gone.
+
+Hashing the file on disk cannot answer this, and using it as the test was a real
+bug: Minecraft rewrites `options.txt` on every exit, so from the first session
+onwards the file never matched the manifest again, and every sync handed the
+player's FOV, volume and keybinds back to the pack's defaults. Comparing what the
+pack says now against what the pack said last time separates the author's update
+from the player's edit, and only the author's update is delivered.
+
 ## Microsoft auth chain
 
 ```mermaid
