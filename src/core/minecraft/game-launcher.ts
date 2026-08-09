@@ -9,6 +9,7 @@ import { getMainWindow } from '../../main/window';
 import { getSettings } from '../config/settings-manager';
 import { getAuthState, getMinecraftAccessToken } from '../auth/microsoft-auth';
 import { getProfile, recordPlaySession } from '../profiles/profile-manager';
+import { syncManifest } from '../mods/mod-sync';
 import { ensureJavaVersion } from '../java/java-manager';
 import { installLoader, isLoaderInstalled } from '../modloader/loader-manager';
 import { resolveLaunchMeta } from '../modloader/loader-profile';
@@ -122,6 +123,27 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   }
 
   log.info(`Launching game for profile: ${profile.name} (MC ${profile.minecraftVersion})`);
+
+  // A profile that follows a pack is brought up to the pack before it starts.
+  // Nothing else in this path touches mods — the loader, Java, the client jar
+  // and the assets are all it used to ensure — so a player who never pressed
+  // Sync would join a server running a mod list that server stopped running.
+  //
+  // Before beginJob, not after: syncManifest starts a job of its own for this
+  // profile, and beginJob aborts whatever it finds registered. Doing it the
+  // other way round would have the sync cancel the launch that asked for it.
+  if (profile.manifestUrl) {
+    try {
+      await syncManifest(profile.id);
+    } catch (err) {
+      // Cancelling is the player's own decision — do not then launch anyway.
+      if (isCancellation(err)) throw err;
+      // Anything else means the pack could not be reached at all: syncManifest
+      // already falls back to the last manifest that validated. Starting with
+      // what is installed beats refusing to start, and the log says why.
+      log.warn(`Could not sync ${profile.name} before launch: ${err}`);
+    }
+  }
 
   // Everything from here to spawn is cancellable: it can run for minutes and
   // the user has no other way out short of killing the launcher.
