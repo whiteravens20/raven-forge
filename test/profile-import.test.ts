@@ -5,10 +5,13 @@ import { readImportedProfile } from '../src/core/profiles/profile-manager';
  * What a profile export is allowed to bring with it.
  *
  * A profile file gets passed around — posted in a Discord channel, attached to
- * a forum reply. `preLaunchCommand` goes to a shell and `customJavaPath` goes to
- * `spawn`, both at the next launch, so before this an "here's my profile"
- * attachment ran whatever its author liked on the machine that opened it, with
- * no step at which anyone was asked.
+ * a forum reply. Four fields reach a process or the filesystem at the next
+ * launch: `preLaunchCommand` goes to a shell, `customJavaPath` chooses the
+ * binary `spawn` runs, `javaArgs` is spliced into the JVM's own argument list
+ * (`-XX:OnOutOfMemoryError=…` is a command), and `gameDirectory` is `mkdir`'d
+ * and used as the working directory. Before this an "here's my profile"
+ * attachment ran whatever its author liked, or wrote wherever it liked, on the
+ * machine that opened it, with no step at which anyone was asked.
  */
 
 const exported = {
@@ -26,13 +29,13 @@ const importOf = (extra: Record<string, unknown> = {}) =>
 
 describe('readImportedProfile', () => {
   it('keeps the fields that describe a profile', () => {
-    const { data } = importOf({ serverIp: 'mc.example.net', javaArgs: '-XX:+UseZGC' });
+    const { data } = importOf({ serverIp: 'mc.example.net', allocatedRamMb: 8192 });
     expect(data).toMatchObject({
       name: 'Ravens',
       minecraftVersion: '1.21.4',
       modLoader: 'fabric',
       serverIp: 'mc.example.net',
-      javaArgs: '-XX:+UseZGC',
+      allocatedRamMb: 8192,
     });
   });
 
@@ -46,6 +49,22 @@ describe('readImportedProfile', () => {
     const { data, dropped } = importOf({ customJavaPath: '/tmp/not-a-jvm' });
     expect(data).not.toHaveProperty('customJavaPath');
     expect(dropped).toContain('customJavaPath');
+  });
+
+  it('never carries JVM arguments across — they are an execution surface', () => {
+    // `-XX:OnOutOfMemoryError=` runs a shell command; the token has no space, so
+    // splitting on whitespace keeps it whole and the JVM runs it on the next OOM.
+    const { data, dropped } = importOf({
+      javaArgs: '-XX:OnOutOfMemoryError=touch$IFS/tmp/pwned',
+    });
+    expect(data).not.toHaveProperty('javaArgs');
+    expect(dropped).toContain('javaArgs');
+  });
+
+  it('never carries a game directory across', () => {
+    const { data, dropped } = importOf({ gameDirectory: '/home/victim/.config/autostart' });
+    expect(data).not.toHaveProperty('gameDirectory');
+    expect(dropped).toContain('gameDirectory');
   });
 
   it('reports nothing dropped for an ordinary profile', () => {
