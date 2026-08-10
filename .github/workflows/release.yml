@@ -64,12 +64,14 @@ jobs:
 
       - name: Check branch containment
         id: check
+        # Use the runner-provided env vars, not ${{ }} interpolation, so a crafted
+        # ref or SHA cannot break out of the string into the shell.
         run: |
-          if git branch -r --contains "${{ github.sha }}" | grep -q 'origin/main'; then
+          if git branch -r --contains "$GITHUB_SHA" | grep -q 'origin/main'; then
             echo "on-main=true" >> "$GITHUB_OUTPUT"
           else
             echo "on-main=false" >> "$GITHUB_OUTPUT"
-            echo "::error::Tag ${{ github.ref_name }} does not point to a commit on main. Release skipped."
+            echo "::error::Tag $GITHUB_REF_NAME does not point to a commit on main. Release skipped."
             exit 1
           fi
 
@@ -292,8 +294,10 @@ jobs:
 
       - name: Extract tag message
         id: tag-msg
+        # `$GITHUB_REF_NAME` rather than ${{ github.ref_name }}: the tag name is
+        # never interpolated into the script, so it cannot break out of the quotes.
         run: |
-          MSG=$(git tag -l --format='%(contents)' "${{ github.ref_name }}" \
+          MSG=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME" \
             | sed '/-----BEGIN SSH SIGNATURE-----/,/-----END SSH SIGNATURE-----/d' | head -100)
           {
             echo "message<<GH_EOF"
