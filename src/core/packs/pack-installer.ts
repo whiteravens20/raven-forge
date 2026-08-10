@@ -7,6 +7,7 @@ import { downloadToFile } from '../net/download';
 import { createProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
 import { readMrpack, applyOverrides, type MrpackContents, type MrpackFile } from './mrpack';
+import { assertSecureContentUrl } from '../../shared/validators';
 import type { ModManifest } from '../../shared/manifest-schema';
 import type { Profile } from '../../shared/ipc-types';
 
@@ -20,6 +21,14 @@ import type { Profile } from '../../shared/ipc-types';
  * which also means each one gets hash verification, cancellation, orphan
  * removal and the resource-pack order written into `options.txt` for free.
  */
+
+/**
+ * The initial pack download is a `.mrpack` (references, not jars) or a manifest
+ * (a few kilobytes) — both small by construction. This cap is the ceiling on a
+ * URL the launcher does not control, so a hostile or mistaken multi-gigabyte
+ * response is refused before it fills the disk, well clear of any real pack.
+ */
+const MAX_PACK_DOWNLOAD_BYTES = 256 * 1024 * 1024;
 
 /** Where a file inside a pack lands decides which part of a manifest it becomes. */
 const MODS_DIR = 'mods/';
@@ -193,11 +202,11 @@ const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
  * right is one short download.
  */
 export async function createProfileFromUrl(url: string): Promise<Profile> {
-  requireHttpUrl(url);
+  assertSecureContentUrl(url);
 
   const scratch = path.join(paths.cacheDir, `pack-${crypto.randomUUID()}`);
   try {
-    await downloadToFile(url, scratch);
+    await downloadToFile(url, scratch, { maxBytes: MAX_PACK_DOWNLOAD_BYTES });
 
     const head = Buffer.alloc(ZIP_MAGIC.length);
     const handle = await fs.open(scratch, 'r');
@@ -219,13 +228,6 @@ export async function createProfileFromUrl(url: string): Promise<Profile> {
   }
 }
 
-function requireHttpUrl(url: string): void {
-  const parsed = new URL(url);
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new Error('A pack URL must be http or https');
-  }
-}
-
 /**
  * Create a profile that follows a manifest URL.
  *
@@ -234,7 +236,7 @@ function requireHttpUrl(url: string): void {
  * `.mrpack` import, which is a snapshot of a pack at one version.
  */
 export async function createProfileFromManifest(url: string): Promise<Profile> {
-  requireHttpUrl(url);
+  assertSecureContentUrl(url);
 
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`Could not fetch the manifest: ${res.status} ${res.statusText}`);

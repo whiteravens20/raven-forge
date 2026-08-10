@@ -30,6 +30,9 @@ import { configVersion, shouldApplyConfigOverride } from './config-overrides';
 import { pendingChanges } from './pack-diff';
 import { getMainWindow } from '../../main/window';
 import { verifyManifestSignature, assertManifestTrusted } from '../updater/manifest-verify';
+import { isFirstPartyManifestUrl } from '../../shared/branding';
+import { assertSecureContentUrl } from '../../shared/validators';
+import { resolveWithin } from '../util/safe-path';
 import type { SignedManifest } from '../updater/canonical';
 import {
   fileNameFromUrl,
@@ -349,7 +352,7 @@ async function fetchModEntry(
     await fs.mkdir(path.dirname(destPath), { recursive: true });
     await fs.copyFile(resolved.localPath, destPath);
   } else {
-    await downloadToFile(resolved.url!, destPath, signal);
+    await downloadToFile(resolved.url!, destPath, { signal });
   }
 
   // The manifest's own hashes win — `expectedHash` prefers sha512, then sha256,
@@ -403,10 +406,16 @@ async function obtainManifest(
   const headers: Record<string, string> = {};
   if (knownEtag) headers['If-None-Match'] = knownEtag;
 
+  // A manifest served over plaintext http can be rewritten in transit — the
+  // signature stripped, the mod URLs repointed — so it is refused before the
+  // first byte, whether this is a fresh fetch or a cache revalidation.
+  assertSecureContentUrl(manifestUrl);
+  const firstParty = isFirstPartyManifestUrl(manifestUrl);
+
   /** Apply the trust policy, then hand back what the caller may install. */
   const approve = (loaded: LoadedManifest, etag: string | undefined) => {
     const verification = verifyManifestSignature(loaded.raw as SignedManifest, trustedKeys);
-    assertManifestTrusted(verification, trustedKeys, profileName);
+    assertManifestTrusted(verification, trustedKeys, profileName, firstParty);
     return { manifest: loaded.manifest, etag, verification };
   };
 
@@ -576,15 +585,20 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     for (const config of manifest.configFiles) {
       report({ text: config.path }, config.path);
 
-      const dest = path.join(paths.profileGameDir(profileId), config.path);
-      const relative = path.relative(paths.profileGameDir(profileId), dest);
+      const gameDir = paths.profileGameDir(profileId);
+      const dest = path.join(gameDir, config.path);
+      const relative = path.relative(gameDir, dest);
       if (relative.startsWith('..') || path.isAbsolute(relative)) {
         throw new Error(`Manifest config path escapes the game directory: ${config.path}`);
       }
 
       const exists = await fileExists(dest);
       if (shouldApplyConfigOverride(config, previousState.appliedConfigs?.[config.path], exists)) {
-        await downloadToFile(config.url, dest, signal);
+        // Refuse a symlink already sitting in the game dir that would redirect
+        // this write out of the tree: the parent is proven contained through
+        // realpath here, and `noFollow` refuses a link at the file itself.
+        await resolveWithin(gameDir, config.path);
+        await downloadToFile(config.url, dest, { signal, noFollow: true });
         await verifyDownload(dest, config, `config ${config.path}`);
         log.info(`Applied config override: ${config.path}`);
         configsWritten++;

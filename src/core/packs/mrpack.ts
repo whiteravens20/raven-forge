@@ -1,9 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { constants as fsConstants } from 'node:fs';
 import yauzl from 'yauzl';
 import { z } from 'zod';
 import { log } from '../../main/logger';
+import { resolveWithin } from '../util/safe-path';
 import type { ModLoaderType } from '../../shared/ipc-types';
+
+/** `O_NOFOLLOW` where the platform has it; 0 elsewhere leaves the flag off. */
+const O_NOFOLLOW = fsConstants.O_NOFOLLOW ?? 0;
 
 /**
  * Reading a Modrinth modpack (`.mrpack`).
@@ -22,6 +27,30 @@ import type { ModLoaderType } from '../../shared/ipc-types';
 
 /** Nothing in this format is large. A pack index past this is not one. */
 const MAX_INDEX_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Ceilings on what a `.mrpack` may decompress to, held in memory as it is read.
+ *
+ * The archive is references, not jars — an override is a config file, a script,
+ * at most a small bundled resource pack — so these are anti-bomb ceilings, not
+ * a quota any real pack approaches. Without them a 20 KB zip whose entries
+ * inflate to gigabytes (a classic deflate bomb) is read whole into the map
+ * below and takes the main process down with it. The per-entry cap stops one
+ * enormous file; the total stops a thousand merely large ones.
+ */
+const MAX_ENTRY_BYTES = 128 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 512 * 1024 * 1024;
+
+/** How much a `.mrpack` may decompress to. Overridable so a test can use bytes. */
+export interface MrpackLimits {
+  maxEntryBytes: number;
+  maxTotalBytes: number;
+}
+
+const DEFAULT_LIMITS: MrpackLimits = {
+  maxEntryBytes: MAX_ENTRY_BYTES,
+  maxTotalBytes: MAX_TOTAL_BYTES,
+};
 
 /**
  * Loader keys the format uses, mapped to the launcher's own names.
@@ -102,8 +131,8 @@ function safeRelativePath(entry: string): string | null {
   return normalised;
 }
 
-/** Read every entry of a zip into memory, keyed by name. */
-async function readZipEntries(file: string): Promise<Map<string, Buffer>> {
+/** Read every entry of a zip into memory, keyed by name, under a size ceiling. */
+async function readZipEntries(file: string, limits: MrpackLimits): Promise<Map<string, Buffer>> {
   const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
     yauzl.open(file, { lazyEntries: true }, (err, opened) => {
       if (err || !opened) reject(err ?? new Error(`Could not open ${file}`));
@@ -112,28 +141,63 @@ async function readZipEntries(file: string): Promise<Map<string, Buffer>> {
   });
 
   const entries = new Map<string, Buffer>();
+  let total = 0;
   await new Promise<void>((resolve, reject) => {
+    // Once a cap is hit the read is over: stop the loop, close the archive so it
+    // is not left reading gigabytes into a promise that already rejected, and
+    // let the first failure be the one reported.
+    let bailed = false;
+    const fail = (err: Error) => {
+      if (bailed) return;
+      bailed = true;
+      zip.close();
+      reject(err);
+    };
+
     zip.on('entry', (entry: yauzl.Entry) => {
+      if (bailed) return;
       if (entry.fileName.endsWith('/')) {
         zip.readEntry();
         return;
       }
+      // The zip's own table declares the inflated size. It can lie, so it is not
+      // trusted alone — but a declared size over the cap is refused before a byte
+      // is read, and the running count below catches an entry that under-declares.
+      if (entry.uncompressedSize > limits.maxEntryBytes) {
+        fail(new Error(`The pack contains an implausibly large file: ${entry.fileName}`));
+        return;
+      }
       zip.openReadStream(entry, (err, stream) => {
         if (err || !stream) {
-          reject(err ?? new Error(`Could not read ${entry.fileName}`));
+          fail(err ?? new Error(`Could not read ${entry.fileName}`));
           return;
         }
         const chunks: Buffer[] = [];
-        stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-        stream.on('error', reject);
+        let entryBytes = 0;
+        stream.on('data', (chunk: Buffer) => {
+          entryBytes += chunk.length;
+          total += chunk.length;
+          if (entryBytes > limits.maxEntryBytes || total > limits.maxTotalBytes) {
+            stream.destroy();
+            fail(
+              new Error('The pack is far larger decompressed than any real modpack — refusing it'),
+            );
+            return;
+          }
+          chunks.push(chunk);
+        });
+        stream.on('error', fail);
         stream.on('end', () => {
+          if (bailed) return;
           entries.set(entry.fileName, Buffer.concat(chunks));
           zip.readEntry();
         });
       });
     });
-    zip.on('end', resolve);
-    zip.on('error', reject);
+    zip.on('end', () => {
+      if (!bailed) resolve();
+    });
+    zip.on('error', fail);
     zip.readEntry();
   });
 
@@ -160,8 +224,11 @@ function readLoader(dependencies: Record<string, string>): {
  * a file marked `unsupported` for the client has no business being counted in
  * what the player is about to be shown.
  */
-export async function readMrpack(file: string): Promise<MrpackContents> {
-  const entries = await readZipEntries(file);
+export async function readMrpack(
+  file: string,
+  limits: MrpackLimits = DEFAULT_LIMITS,
+): Promise<MrpackContents> {
+  const entries = await readZipEntries(file, limits);
 
   const indexRaw = entries.get('modrinth.index.json');
   if (!indexRaw) {
@@ -234,14 +301,20 @@ export async function applyOverrides(
   overrides: Map<string, Buffer>,
 ): Promise<number> {
   for (const [relative, data] of overrides) {
-    const dest = path.join(gameDir, relative);
-    // Belt and braces: the paths were checked on the way in, and are checked
-    // again against the directory they are actually being written to.
-    if (!dest.startsWith(gameDir + path.sep)) {
-      throw new Error(`Refusing to write ${relative} outside the game directory`);
+    // Confirms the parent stays inside the game dir even through a symlink; the
+    // `O_NOFOLLOW` open below then refuses a symlink sitting where the file
+    // itself goes. `fs.writeFile(dest)` followed either, so a link left in the
+    // game dir by a previous pack could redirect a write out of the tree.
+    const dest = await resolveWithin(gameDir, relative);
+    const handle = await fs.open(
+      dest,
+      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC | O_NOFOLLOW,
+    );
+    try {
+      await handle.writeFile(data);
+    } finally {
+      await handle.close();
     }
-    await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.writeFile(dest, data);
   }
   return overrides.size;
 }
