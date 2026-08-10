@@ -57,31 +57,42 @@ export function verifyManifestSignature(
  *
  * The policy, in full:
  *
- * - **No trusted keys configured** — nothing is enforced. This is the default
- *   install and the one most people are on; a launcher that refused every
- *   unsigned manifest out of the box would refuse every pack that exists.
+ * - **First-party manifest** — one served from the White Ravens packs site
+ *   (`firstParty`). Always held to the built-in key, whatever the player has
+ *   configured. The publisher signs every one of these, the key that vouches
+ *   for them ships in the launcher, and the badge already verifies against it;
+ *   letting an unsigned or tampered first-party manifest install because the
+ *   player never pasted a key of their own would mean the built-in key vouches
+ *   for the badge but guards nothing. A network attacker on the manifest's
+ *   transport is exactly who this stops.
+ * - **No trusted keys configured, manifest not first-party** — nothing is
+ *   enforced. This is the default install and the one most people are on; a
+ *   launcher that refused every unsigned third-party pack out of the box would
+ *   refuse every pack that exists.
  * - **At least one trusted key configured** — the manifest must carry a
  *   signature that verifies against one of them. Unsigned counts as a failure,
  *   not as an exemption: if stripping the signature were enough to skip the
  *   check, an attacker in a position to modify the manifest would simply strip
  *   it, and the whole scheme would protect nothing.
  *
- * Adding a key is therefore the act of switching enforcement on, which is the
- * only reading under which the feature does what its name says.
+ * Adding a key switches enforcement on for everything; a first-party address
+ * has it on already. Either way the feature does what its name says.
  */
 export function assertManifestTrusted(
   verification: ManifestVerification,
   trustedKeys: TrustedKey[],
   profileName: string,
+  firstParty = false,
 ): void {
-  if (trustedKeys.length === 0 || verification.valid) return;
+  if (verification.valid) return;
+  if (!firstParty && trustedKeys.length === 0) return;
 
   const detail = verification.signed
     ? (verification.error ?? 'the signature does not verify')
     : 'it carries no signature at all';
-  throw new Error(
-    `Refusing to install the manifest for ${profileName}: ${detail}. ` +
-      'Trusted keys are configured, so only a signed and verified manifest is installed. ' +
-      'Remove the trusted keys in Settings to sync unsigned manifests again.',
-  );
+  const policy = firstParty
+    ? 'This is a White Ravens pack, so it must be signed by the built-in key — a copy failing that check has been tampered with in transit or is not genuine.'
+    : 'Trusted keys are configured, so only a signed and verified manifest is installed. ' +
+      'Remove the trusted keys in Settings to sync unsigned manifests again.';
+  throw new Error(`Refusing to install the manifest for ${profileName}: ${detail}. ${policy}`);
 }
