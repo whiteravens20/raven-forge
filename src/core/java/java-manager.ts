@@ -188,45 +188,47 @@ interface AdoptiumAsset {
  * Resolved through `/assets/latest` rather than through `/binary/latest`,
  * because the assets response carries the sha256 alongside the link and the
  * binary endpoint carries only a redirect. Everything downloaded here is
- * extracted and then executed on every launch from that point on, so "what
- * should this hash to" is not a question to leave unanswered.
+ * extracted and then executed as the JVM on every launch from that point on, so
+ * "what should this hash to" is not a question to leave unanswered.
  *
- * A resolve failure is not fatal: the binary endpoint still works and is still
- * HTTPS, so the install falls back to it unverified rather than leaving someone
- * unable to get a JVM at all.
+ * A missing checksum is therefore fatal, not a reason to fall back to the
+ * unverified binary endpoint: HTTPS authenticates Adoptium, but the checksum is
+ * what catches a tampered mirror or a download that arrived wrong, and a runtime
+ * that runs on every launch is the last thing to install unverified. If the
+ * resolve fails, the install fails with it — the binary endpoint is the same
+ * host, so falling back to it bought availability only by dropping the check.
  */
 async function resolveAdoptiumBinary(
   majorVersion: number,
   platform: string,
   arch: string,
-): Promise<{ url: string; sha256?: string }> {
-  const fallback = `${ADOPTIUM_API}/binary/latest/${majorVersion}/ga/${platform}/${arch}/jre/hotspot/normal/eclipse?project=jdk`;
-
-  try {
-    const query = new URLSearchParams({
-      architecture: arch,
-      image_type: 'jre',
-      os: platform,
-      vendor: 'eclipse',
-    });
-    const res = await fetch(`${ADOPTIUM_API}/assets/latest/${majorVersion}/hotspot?${query}`, {
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const assets = (await res.json()) as AdoptiumAsset[];
-    const pkg = assets.find((a) => a.binary?.package?.link)?.binary?.package;
-    if (!pkg?.link) throw new Error('no binary package in the response');
-    if (!pkg.checksum) log.warn(`Adoptium listed JRE ${majorVersion} with no checksum`);
-
-    return { url: pkg.link, sha256: pkg.checksum };
-  } catch (err) {
-    log.warn(
-      `Could not resolve a checksum for JRE ${majorVersion} (${String(err)}) — ` +
-        'falling back to the unverified binary endpoint',
-    );
-    return { url: fallback };
+): Promise<{ url: string; sha256: string }> {
+  const query = new URLSearchParams({
+    architecture: arch,
+    image_type: 'jre',
+    os: platform,
+    vendor: 'eclipse',
+  });
+  const res = await fetch(`${ADOPTIUM_API}/assets/latest/${majorVersion}/hotspot?${query}`, {
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    throw new Error(`Could not reach Adoptium to resolve JRE ${majorVersion}: HTTP ${res.status}`);
   }
+
+  const assets = (await res.json()) as AdoptiumAsset[];
+  const pkg = assets.find((a) => a.binary?.package?.link)?.binary?.package;
+  if (!pkg?.link) {
+    throw new Error(`Adoptium listed no JRE ${majorVersion} binary for ${platform}/${arch}`);
+  }
+  if (!pkg.checksum) {
+    throw new Error(
+      `Adoptium listed JRE ${majorVersion} for ${platform}/${arch} with no checksum — ` +
+        'refusing to install a runtime that cannot be verified',
+    );
+  }
+
+  return { url: pkg.link, sha256: pkg.checksum };
 }
 
 async function downloadAdoptium(majorVersion: number): Promise<string> {
@@ -297,8 +299,9 @@ async function downloadAdoptium(majorVersion: number): Promise<string> {
   }
 
   // Deletes the archive and throws on mismatch. Everything inside it is about
-  // to be extracted and then run as the JVM for every launch.
-  if (sha256) await verifyDownload(tmpFile, { sha256 }, `JRE ${majorVersion}`);
+  // to be extracted and then run as the JVM for every launch, and the resolver
+  // guarantees a checksum, so this always runs.
+  await verifyDownload(tmpFile, { sha256 }, `JRE ${majorVersion}`);
 
   emitJavaProgress({
     operationId: `java-${majorVersion}`,
