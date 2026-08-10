@@ -17,10 +17,7 @@
       "@shared/*": ["src/shared/*"]
     }
   },
-  "references": [
-    { "path": "./tsconfig.main.json" },
-    { "path": "./tsconfig.renderer.json" }
-  ],
+  "references": [{ "path": "./tsconfig.main.json" }, { "path": "./tsconfig.renderer.json" }],
   "include": [],
   "exclude": ["node_modules", "dist", "out"]
 }

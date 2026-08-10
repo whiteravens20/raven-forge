@@ -27,20 +27,20 @@ default alone.
 
 ## `mods[]` entries
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes | Stable identifier — match across versions to enable update detection. |
-| `name` | string | yes | Display name. |
-| `version` | string | yes | Free-form version label, recorded in `installed.lock`. |
-| `source` | `"modrinth" \| "url" \| "local"` | yes | Provenance. Also selects the resolver when no `url` is given. |
-| `url` | string (URL) | recommended | Direct download URL. **When present the launcher skips resolution entirely** — see below. |
-| `fileName` | string | no | Exact filename to write — a bare name, with no `/`, `\\` or path segments. Defaults to the last path segment of `url`. A value carrying a path is rejected outright, and the whole manifest with it. |
-| `projectId` | string | when source = modrinth and no `url` | Modrinth project identifier, resolved against `version` at sync time. |
-| `localPath` | string | when source = local | Absolute path on the player's machine — niche, used for LAN / offline. |
-| `sha512` | string (128 hex) | recommended | Preferred integrity check. |
-| `sha256` | string (64 hex) | alternative | Used when `sha512` is absent. |
-| `required` | boolean | default `true` | If `false`, the launcher installs but the user can disable. |
-| `side` | `"client" \| "server" \| "both"` | default `"client"` | `server`-only entries are skipped when syncing a client profile. |
+| Field       | Type                             | Required                            | Notes                                                                                                                                                                                                |
+| ----------- | -------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`        | string                           | yes                                 | Stable identifier — match across versions to enable update detection.                                                                                                                                |
+| `name`      | string                           | yes                                 | Display name.                                                                                                                                                                                        |
+| `version`   | string                           | yes                                 | Free-form version label, recorded in `installed.lock`.                                                                                                                                               |
+| `source`    | `"modrinth" \| "url" \| "local"` | yes                                 | Provenance. Also selects the resolver when no `url` is given.                                                                                                                                        |
+| `url`       | string (URL)                     | recommended                         | Direct download URL. **When present the launcher skips resolution entirely** — see below.                                                                                                            |
+| `fileName`  | string                           | no                                  | Exact filename to write — a bare name, with no `/`, `\\` or path segments. Defaults to the last path segment of `url`. A value carrying a path is rejected outright, and the whole manifest with it. |
+| `projectId` | string                           | when source = modrinth and no `url` | Modrinth project identifier, resolved against `version` at sync time.                                                                                                                                |
+| `localPath` | string                           | when source = local                 | Absolute path on the player's machine — niche, used for LAN / offline.                                                                                                                               |
+| `sha512`    | string (128 hex)                 | recommended                         | Preferred integrity check.                                                                                                                                                                           |
+| `sha256`    | string (64 hex)                  | alternative                         | Used when `sha512` is absent.                                                                                                                                                                        |
+| `required`  | boolean                          | default `true`                      | If `false`, the launcher installs but the user can disable.                                                                                                                                          |
+| `side`      | `"client" \| "server" \| "both"` | default `"client"`                  | `server`-only entries are skipped when syncing a client profile.                                                                                                                                     |
 
 ### Integrity
 
@@ -107,10 +107,10 @@ user's own keys switch enforcement on.
 
 What happens next depends on whether the user trusts any key:
 
-| Trusted keys | Signed and valid | Signed but unmatched | Unsigned |
-|---|---|---|---|
-| none configured | installs, badge "Verified" | installs, flagged | installs, flagged "Unsigned" |
-| one or more | installs, badge "Verified" | **refused** | **refused** |
+| Trusted keys    | Signed and valid           | Signed but unmatched | Unsigned                     |
+| --------------- | -------------------------- | -------------------- | ---------------------------- |
+| none configured | installs, badge "Verified" | installs, flagged    | installs, flagged "Unsigned" |
+| one or more     | installs, badge "Verified" | **refused**          | **refused**                  |
 
 Refusing the unsigned case once keys exist is the point of the scheme: if
 deleting the `signature` field were enough to skip the check, anyone able to
@@ -127,7 +127,7 @@ The signed byte string is the manifest serialized as JSON with:
 
 The recursion is load-bearing. An earlier implementation used
 `JSON.stringify(rest, Object.keys(rest).sort())`; passing an array as the second
-argument makes it a property *allowlist* applied at every level, so every entry
+argument makes it a property _allowlist_ applied at every level, so every entry
 in `mods[]` serialized as `{}` and the signature covered only top-level scalars
 plus array lengths — a tampered manifest that swapped every mod for a backdoored
 jar still verified. See `canonicalize()` in

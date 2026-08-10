@@ -2,16 +2,16 @@
 
 ## Tech stack
 
-| Layer | Choice | Rationale |
-|---|---|---|
-| Shell | **Electron 41** | Mature ecosystem, first-class Windows + Linux packaging via electron-builder, signed auto-updates via electron-updater, and predictable Node integration for game-launching subprocesses. Tauri was considered but its Rust toolchain raises the contributor bar and its WebView2/WebKitGTK story complicates spawning Java with full stdio capture across platforms. |
-| Renderer | **React 19 + Vite 7** | Strict typing, fast HMR, broad ecosystem (Zustand, Framer Motion, react-router). |
-| Styling | **Tailwind v4 + CSS custom properties** | Theming via `--rf-*` variables on `[data-theme]`, atomic utility classes for the dark gaming aesthetic. The Vite plugin (`@tailwindcss/vite`) is the supported v4 integration; PostCSS is intentionally not configured. |
-| State | **Zustand** | Tiny, no providers, easy to share between pages. |
-| Validation | **Zod** | Runtime validation at IPC + manifest boundaries; types inferred via `z.infer`. |
-| Crypto | **tweetnacl** | Pure-JS Ed25519 for manifest signature verification — avoids native dependency churn. |
-| Secret storage | **keytar** | OS keychain (Credential Manager / libsecret / Keychain) for MSA refresh tokens and Minecraft session tokens. Degrades to a `0600` file where no keyring exists. |
-| Logging | **electron-log** | File rotation, level filtering, accessible from `Settings → Open logs folder`. |
+| Layer          | Choice                                  | Rationale                                                                                                                                                                                                                                                                                                                                                             |
+| -------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell          | **Electron 41**                         | Mature ecosystem, first-class Windows + Linux packaging via electron-builder, signed auto-updates via electron-updater, and predictable Node integration for game-launching subprocesses. Tauri was considered but its Rust toolchain raises the contributor bar and its WebView2/WebKitGTK story complicates spawning Java with full stdio capture across platforms. |
+| Renderer       | **React 19 + Vite 7**                   | Strict typing, fast HMR, broad ecosystem (Zustand, Framer Motion, react-router).                                                                                                                                                                                                                                                                                      |
+| Styling        | **Tailwind v4 + CSS custom properties** | Theming via `--rf-*` variables on `[data-theme]`, atomic utility classes for the dark gaming aesthetic. The Vite plugin (`@tailwindcss/vite`) is the supported v4 integration; PostCSS is intentionally not configured.                                                                                                                                               |
+| State          | **Zustand**                             | Tiny, no providers, easy to share between pages.                                                                                                                                                                                                                                                                                                                      |
+| Validation     | **Zod**                                 | Runtime validation at IPC + manifest boundaries; types inferred via `z.infer`.                                                                                                                                                                                                                                                                                        |
+| Crypto         | **tweetnacl**                           | Pure-JS Ed25519 for manifest signature verification — avoids native dependency churn.                                                                                                                                                                                                                                                                                 |
+| Secret storage | **keytar**                              | OS keychain (Credential Manager / libsecret / Keychain) for MSA refresh tokens and Minecraft session tokens. Degrades to a `0600` file where no keyring exists.                                                                                                                                                                                                       |
+| Logging        | **electron-log**                        | File rotation, level filtering, accessible from `Settings → Open logs folder`.                                                                                                                                                                                                                                                                                        |
 
 ## Project layout
 
@@ -128,7 +128,7 @@ pack releases went by in between.
 
 A pack's config overrides (`configFiles[]`) are applied on a different rule from
 its mods, and the difference is the point. A mod jar is the pack's file and the
-manifest's hash is the last word on it. A config file becomes the *player's* the
+manifest's hash is the last word on it. A config file becomes the _player's_ the
 moment they open the game — so the sync records which version of each override it
 last delivered (`appliedConfigs` in the profile's sync state) and writes the file
 only when that version changed, or when the file is gone.
@@ -179,13 +179,13 @@ sequenceDiagram
 **expiry** — no secrets. The tokens themselves go to the OS keychain under
 service `com.ravenforge.launcher`:
 
-| Key | Lifetime | Used for |
-|---|---|---|
+| Key                     | Lifetime              | Used for                                   |
+| ----------------------- | --------------------- | ------------------------------------------ |
 | `msRefresh:<accountId>` | months, until revoked | Re-running the Xbox→XSTS→MC chain silently |
-| `mcAccess:<accountId>` | ~24 h | The `--accessToken` JVM argument at launch |
+| `mcAccess:<accountId>`  | ~24 h                 | The `--accessToken` JVM argument at launch |
 
 Keeping `expiresAt` in the file is deliberate: the "does this need refreshing?"
-check on every launch costs a file read, and only actually *spending* the token
+check on every launch costs a file read, and only actually _spending_ the token
 touches the keychain.
 
 **Fallback.** A machine with no keyring daemon — headless Linux, a bare window
@@ -253,11 +253,11 @@ sequenceDiagram
 
 ## Build pipeline
 
-| Step | Tool | Output |
-|---|---|---|
-| Renderer | `vite build` | `dist/renderer/` (HTML + hashed JS/CSS) |
-| Main + preload + core + shared | `tsc -p tsconfig.main.json` | `dist/main/`, `dist/preload/`, `dist/core/`, `dist/shared/` |
-| Package | `electron-builder` | `out/` — NSIS `.exe` (Windows), `.deb` + `.AppImage` (Linux) |
+| Step                           | Tool                        | Output                                                       |
+| ------------------------------ | --------------------------- | ------------------------------------------------------------ |
+| Renderer                       | `vite build`                | `dist/renderer/` (HTML + hashed JS/CSS)                      |
+| Main + preload + core + shared | `tsc -p tsconfig.main.json` | `dist/main/`, `dist/preload/`, `dist/core/`, `dist/shared/`  |
+| Package                        | `electron-builder`          | `out/` — NSIS `.exe` (Windows), `.deb` + `.AppImage` (Linux) |
 
 The `package.json` `main` field points at `dist/main/index.js`; the preload reference inside `window.ts` is `path.join(__dirname, '..', 'preload', 'index.js')`, which resolves correctly from `dist/main/`.
 
@@ -273,7 +273,7 @@ fixed and hides the ones that were not.
   `AUTH_UNREACHABLE` offline offer — has only ever been exercised against stubs.
 - **The launcher has never updated itself from a published release.** The update
   check, platform matrix and install-before-play path are covered by tests, but
-  there is no tagged release to update *from*.
+  there is no tagged release to update _from_.
 - **Crash reports are now proven against a real exit.** A Windows 26.2/Fabric
   session produced one end to end: `readMinecraftCrash` found Mojang's own file,
   quoted it, and the redaction replaced the token, the account UUID, the player
@@ -283,7 +283,7 @@ fixed and hides the ones that were not.
   left a non-daemon thread pool running — and it writes a crash file and exits
   non-zero on the way out, for a session the player had already finished.
   `isShutdownWatchdogCrash` matches Mojang's own `Client shutdown from
-  post-main` description, and that exit is logged but not reported as a crash.
+post-main` description, and that exit is logged but not reported as a crash.
   Matching the description rather than the exit code is deliberate: the code is
   only `halt()`'s argument and says nothing about why.
 - **The startup update check cannot be switched off.** One request to GitHub

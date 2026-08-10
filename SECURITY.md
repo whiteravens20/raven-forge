@@ -24,10 +24,10 @@ Please include:
 
 What to expect:
 
-| Stage | Target |
-|---|---|
-| Acknowledgement | 72 hours |
-| Initial assessment | 7 days |
+| Stage                        | Target                    |
+| ---------------------------- | ------------------------- |
+| Acknowledgement              | 72 hours                  |
+| Initial assessment           | 7 days                    |
 | Fix or documented mitigation | 30 days for high/critical |
 
 This is a solo, unpaid project. There is no bug bounty. Credit in the release
@@ -49,9 +49,9 @@ release receives security fixes; there are no backports to earlier tags. No
 release has been published yet — until the first tag, the supported version is
 whatever is on `main`.
 
-| Version | Supported |
-|---|---|
-| Latest release | ✅ |
+| Version        | Supported         |
+| -------------- | ----------------- |
+| Latest release | ✅                |
 | Anything older | ❌ — update first |
 
 ---
@@ -160,8 +160,8 @@ Listed on purpose. An honest list beats a clean-looking one.
   pointed at an unsigned manifest trusts whoever controls that URL, bounded only
   by the hashes that same manifest supplies.
 - **Mods are not sandboxed.** A Minecraft mod is arbitrary Java running with your
-  user's privileges. Raven Forge verifies that you got *the file the manifest
-  named*; it cannot tell you that file is safe. Only add manifest sources you
+  user's privileges. Raven Forge verifies that you got _the file the manifest
+  named_; it cannot tell you that file is safe. Only add manifest sources you
   trust.
 - **No reproducible builds.** You cannot currently verify that a published binary
   corresponds to the tagged source.
@@ -172,12 +172,12 @@ Listed on purpose. An honest list beats a clean-looking one.
 
 Reports on the following will be closed without a fix:
 
-| Not a vulnerability | Why |
-|---|---|
-| A malicious mod on a manifest you chose to trust | Trusting the source is the user's decision; see above |
-| Reading your own tokens from your own keychain | Local user with your privileges is outside the threat model |
-| "The installer is unsigned" on a self-built binary | Signing happens in release CI with the maintainer's certificate |
-| Vulnerabilities in Minecraft, Mojang/Microsoft services, or Modrinth | Report those to their respective vendors |
-| Anything requiring physical access to an unlocked machine | Outside the threat model |
-| Denial of service against your own launcher instance | No multi-user surface to protect |
-| Automated scanner output with no demonstrated impact | Send the analysis, not the report |
+| Not a vulnerability                                                  | Why                                                             |
+| -------------------------------------------------------------------- | --------------------------------------------------------------- |
+| A malicious mod on a manifest you chose to trust                     | Trusting the source is the user's decision; see above           |
+| Reading your own tokens from your own keychain                       | Local user with your privileges is outside the threat model     |
+| "The installer is unsigned" on a self-built binary                   | Signing happens in release CI with the maintainer's certificate |
+| Vulnerabilities in Minecraft, Mojang/Microsoft services, or Modrinth | Report those to their respective vendors                        |
+| Anything requiring physical access to an unlocked machine            | Outside the threat model                                        |
+| Denial of service against your own launcher instance                 | No multi-user surface to protect                                |
+| Automated scanner output with no demonstrated impact                 | Send the analysis, not the report                               |

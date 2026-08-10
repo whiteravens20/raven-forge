@@ -3,14 +3,14 @@
 Raven Forge has **two independent signing systems**. They are easy to confuse
 and solve different problems:
 
-| | Installer signing | Manifest signing |
-|---|---|---|
-| **Protects** | the launcher binary a user downloads | the mod list a launcher installs |
-| **Scheme** | Authenticode (Windows), X.509 | Ed25519 detached signature |
-| **Key holder** | the launcher maintainer | the server/pack admin |
-| **Verified by** | Windows / SmartScreen at install time | the launcher at sync time |
-| **Configured in** | `electron-builder.config.js`, release CI secrets | Settings → Trusted Keys, per profile |
-| **Tooling** | electron-builder | `raven-packs` (`scripts/keygen.mjs`, `scripts/sign.mjs`) |
+|                   | Installer signing                                | Manifest signing                                         |
+| ----------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| **Protects**      | the launcher binary a user downloads             | the mod list a launcher installs                         |
+| **Scheme**        | Authenticode (Windows), X.509                    | Ed25519 detached signature                               |
+| **Key holder**    | the launcher maintainer                          | the server/pack admin                                    |
+| **Verified by**   | Windows / SmartScreen at install time            | the launcher at sync time                                |
+| **Configured in** | `electron-builder.config.js`, release CI secrets | Settings → Trusted Keys, per profile                     |
+| **Tooling**       | electron-builder                                 | `raven-packs` (`scripts/keygen.mjs`, `scripts/sign.mjs`) |
 
 A signed installer says nothing about the mods it later downloads, and a signed
 manifest says nothing about where the launcher itself came from. Both are worth
@@ -27,12 +27,12 @@ Sectigo, SSL.com, …). Self-signed certificates do not help: Windows only trust
 a chain that terminates in its own root store, so a self-signed build triggers
 exactly the same SmartScreen warning as an unsigned one.
 
-| | OV (Organisation Validation) | EV (Extended Validation) |
-|---|---|---|
-| Cost | $150–300/year | $400+/year |
-| Key storage | hardware token / cloud HSM | hardware token / cloud HSM |
-| SmartScreen | reputation accrues over downloads | **the same, since 2024** |
-| CI-friendly | with a cloud HSM | with a cloud HSM |
+|             | OV (Organisation Validation)      | EV (Extended Validation)   |
+| ----------- | --------------------------------- | -------------------------- |
+| Cost        | $150–300/year                     | $400+/year                 |
+| Key storage | hardware token / cloud HSM        | hardware token / cloud HSM |
+| SmartScreen | reputation accrues over downloads | **the same, since 2024**   |
+| CI-friendly | with a cloud HSM                  | with a cloud HSM           |
 
 **Do not buy EV for SmartScreen.** It used to bypass the warning outright on
 first download, which was the entire reason to pay the premium; Microsoft
@@ -89,16 +89,16 @@ accrue at all. It is not a switch that turns the warning off.
 
 ### Signing this for free
 
-There is exactly one route that costs nothing *and* removes the warning, and it
+There is exactly one route that costs nothing _and_ removes the warning, and it
 is not a certificate:
 
-| Route | Cost | Open to us? |
-|---|---|---|
-| **Microsoft Store, MSIX** — the Store re-signs the package | free | yes — free developer account, worldwide, no SmartScreen at all |
-| **SignPath Foundation** — free OV signing for open source | free | **no** — it requires an OSI-approved licence, and this project is PolyForm Noncommercial |
-| **Azure Artifact Signing** (ex-Trusted Signing) | ~$10/month | **no** — individuals are limited to the USA and Canada; EU *organisations* qualify, EU individuals do not |
-| **OV certificate** from a CA | $150–300/year | yes, worldwide, needs a token or cloud HSM |
-| **Self-signed** | free | pointless — Windows blocks it harder than an unsigned file |
+| Route                                                      | Cost          | Open to us?                                                                                               |
+| ---------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
+| **Microsoft Store, MSIX** — the Store re-signs the package | free          | yes — free developer account, worldwide, no SmartScreen at all                                            |
+| **SignPath Foundation** — free OV signing for open source  | free          | **no** — it requires an OSI-approved licence, and this project is PolyForm Noncommercial                  |
+| **Azure Artifact Signing** (ex-Trusted Signing)            | ~$10/month    | **no** — individuals are limited to the USA and Canada; EU _organisations_ qualify, EU individuals do not |
+| **OV certificate** from a CA                               | $150–300/year | yes, worldwide, needs a token or cloud HSM                                                                |
+| **Self-signed**                                            | free          | pointless — Windows blocks it harder than an unsigned file                                                |
 
 Two of those "no"s are ours to change rather than facts of the world. SignPath
 wants an OSI-approved licence, and PolyForm Noncommercial is deliberately not

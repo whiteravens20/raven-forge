@@ -34,22 +34,22 @@ Include the exact error message shown in the app, if any.
 
 ## Environment
 
-| Field | Value |
-|---|---|
-| Raven Forge version | e.g. 0.1.0 (Info page) |
-| Operating System | e.g. Windows 11 24H2 / Debian 12 / Ubuntu 24.04 |
-| Install method | installer (.exe) / .deb / .AppImage / built from source |
-| Node.js (source builds only) | e.g. 24.x |
+| Field                        | Value                                                   |
+| ---------------------------- | ------------------------------------------------------- |
+| Raven Forge version          | e.g. 0.1.0 (Info page)                                  |
+| Operating System             | e.g. Windows 11 24H2 / Debian 12 / Ubuntu 24.04         |
+| Install method               | installer (.exe) / .deb / .AppImage / built from source |
+| Node.js (source builds only) | e.g. 24.x                                               |
 
 ## Profile Configuration
 
-| Field | Value |
-|---|---|
-| Minecraft version | e.g. 1.21.4 |
-| Mod loader + version | e.g. Fabric 0.19.3 / Quilt / Vanilla |
-| Java | auto-downloaded / system, and the version |
-| Account type | Microsoft / offline |
-| Manifest source | signed / unsigned / none |
+| Field                | Value                                     |
+| -------------------- | ----------------------------------------- |
+| Minecraft version    | e.g. 1.21.4                               |
+| Mod loader + version | e.g. Fabric 0.19.3 / Quilt / Vanilla      |
+| Java                 | auto-downloaded / system, and the version |
+| Account type         | Microsoft / offline                       |
+| Manifest source      | signed / unsigned / none                  |
 
 ## Where does it fail?
 

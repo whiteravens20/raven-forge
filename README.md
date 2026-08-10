@@ -35,11 +35,11 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 
 ### Prerequisites
 
-| Tool | Version |
-|------|---------|
+| Tool    | Version        |
+| ------- | -------------- |
 | Node.js | ≥ 24.0.0 (LTS) |
-| npm | ≥ 11.0.0 |
-| Git | any recent |
+| npm     | ≥ 11.0.0       |
+| Git     | any recent     |
 
 ### Windows 10/11
 
@@ -80,22 +80,22 @@ npm run dev
 
 ## npm Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start Electron + Vite dev server (hot reload) |
-| `npm run build` | Build main + renderer for production |
-| `npm run dist` | Build + package installer (auto-detect platform) |
-| `npm run dist:win` | Build + package NSIS installer (Windows) |
-| `npm run dist:linux` | Build + package .deb + AppImage (Linux) |
-| `npm run icons` | Rasterise `icon.svg` → `icon.png`, `icon.ico`, installer sidebar |
-| `npm run lint` | Run ESLint |
-| `npm run lint:fix` | Run ESLint with auto-fix |
-| `npm run typecheck` | TypeScript type checking (all projects) |
-| `npm test` | Run the Vitest suite once |
-| `npm run test:watch` | Vitest in watch mode |
-| `npm run format` | Format code with Prettier |
-| `npm run format:check` | Check formatting without writing |
-| `npm run clean` | Remove dist/ and out/ |
+| Script                 | Description                                                      |
+| ---------------------- | ---------------------------------------------------------------- |
+| `npm run dev`          | Start Electron + Vite dev server (hot reload)                    |
+| `npm run build`        | Build main + renderer for production                             |
+| `npm run dist`         | Build + package installer (auto-detect platform)                 |
+| `npm run dist:win`     | Build + package NSIS installer (Windows)                         |
+| `npm run dist:linux`   | Build + package .deb + AppImage (Linux)                          |
+| `npm run icons`        | Rasterise `icon.svg` → `icon.png`, `icon.ico`, installer sidebar |
+| `npm run lint`         | Run ESLint                                                       |
+| `npm run lint:fix`     | Run ESLint with auto-fix                                         |
+| `npm run typecheck`    | TypeScript type checking (all projects)                          |
+| `npm test`             | Run the Vitest suite once                                        |
+| `npm run test:watch`   | Vitest in watch mode                                             |
+| `npm run format`       | Format code with Prettier                                        |
+| `npm run format:check` | Check formatting without writing                                 |
+| `npm run clean`        | Remove dist/ and out/                                            |
 
 ---
 
@@ -138,12 +138,15 @@ test/               # Vitest suites (pure logic) + Electron/keytar stubs
 A fresh install points at White Ravens' published feeds (listed under [Live endpoints](#live-endpoints)). Both are yours to change — under Settings, or in the settings JSON file at `<userData>/settings.json`. Clearing a field switches that section off rather than restoring the default.
 
 ### News Feed
+
 ```json
 {
   "newsFeedUrl": "https://your-server.com/api/news.json"
 }
 ```
+
 Expected response format:
+
 ```json
 [
   {
@@ -163,12 +166,15 @@ Only `id`, `title`, `excerpt` and `publishedAt` are required. Clicking a card op
 `body` accepts a small Markdown subset — `## headings`, `- lists`, `**bold**`, `*italic*`, `` `code` `` and `[links](https://…)`. It is parsed into elements, never into HTML, so a feed cannot inject markup. Anything outside the subset renders as the literal text you wrote.
 
 ### Announcements
+
 ```json
 {
   "announcementFeedUrl": "https://your-server.com/api/announcements.json"
 }
 ```
+
 Expected response format:
+
 ```json
 [
   {
@@ -191,12 +197,12 @@ White Ravens publishes both feeds — and the pack manifests — from the siblin
 [raven-packs](https://github.com/whiteravens20/raven-packs) repository, which
 doubles as a working reference for each format:
 
-| Setting | URL |
-|---|---|
-| News feed | `https://whiteravens20.github.io/raven-packs/raven-forge/news.json` |
-| Announcement feed | `https://whiteravens20.github.io/raven-packs/raven-forge/announcements.json` |
-| Pack catalogue | `https://whiteravens20.github.io/raven-packs/packs.json` |
-| Profile manifest (White Ravens Classic) | `https://whiteravens20.github.io/raven-packs/ravenclassic/manifest.json` |
+| Setting                                 | URL                                                                          |
+| --------------------------------------- | ---------------------------------------------------------------------------- |
+| News feed                               | `https://whiteravens20.github.io/raven-packs/raven-forge/news.json`          |
+| Announcement feed                       | `https://whiteravens20.github.io/raven-packs/raven-forge/announcements.json` |
+| Pack catalogue                          | `https://whiteravens20.github.io/raven-packs/packs.json`                     |
+| Profile manifest (White Ravens Classic) | `https://whiteravens20.github.io/raven-packs/ravenclassic/manifest.json`     |
 
 Manifests published there are Ed25519-signed, and the White Ravens public key is
 compiled into the launcher, so those packs read **Verified** with nothing to
@@ -217,11 +223,11 @@ enforced, which is what keeps packs from anywhere else installable.
 
 Every address the launcher ships pointing at White Ravens lives in one file,
 [`src/shared/branding.ts`](src/shared/branding.ts): the two feed defaults and
-the pack catalogue behind *Play on the White Ravens servers*. Change those three
+the pack catalogue behind _Play on the White Ravens servers_. Change those three
 constants and a fork inherits none of our infrastructure. Nothing else in the
 codebase hardcodes a `whiteravens20` URL.
 
-The two feed values are only *defaults* — they seed a first launch and an
+The two feed values are only _defaults_ — they seed a first launch and an
 install that predates them, and any player can point them elsewhere. The
 catalogue URL is deliberately not settable: its entries become manifest URLs
 that profiles get created from, so a settable address would turn a screen badged
@@ -239,11 +245,11 @@ Polish and English ship in `src/renderer/i18n/`; switch under Settings → Appea
 
 ## Mod Sources
 
-| Source | API key | Notes |
-|---|---|---|
-| **Modrinth** | not needed | The primary source. Search, version lookup and downloads all go through the [public API](https://docs.modrinth.com/). Publishes `sha512`. |
-| **Direct URL** | — | For custom or private mods, via the manifest's `"source": "url"` field. Skips API lookups entirely and keeps working when a source is down. |
-| **Local file** | — | A jar you already have, via `"source": "local"`. |
+| Source         | API key    | Notes                                                                                                                                       |
+| -------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Modrinth**   | not needed | The primary source. Search, version lookup and downloads all go through the [public API](https://docs.modrinth.com/). Publishes `sha512`.   |
+| **Direct URL** | —          | For custom or private mods, via the manifest's `"source": "url"` field. Skips API lookups entirely and keeps working when a source is down. |
+| **Local file** | —          | A jar you already have, via `"source": "local"`.                                                                                            |
 
 **CurseForge is deliberately not supported.** Its API key is issued per developer
 after a manual application, and the [3rd Party API terms](https://support.curseforge.com/support/solutions/articles/9000207405-curse-forge-3rd-party-api-terms-and-conditions)
@@ -259,11 +265,11 @@ be downloaded by hand and added as a local file.
 
 A new profile can start from a whole pack rather than an empty form.
 
-| Route | Format | Keeps updating? |
-|---|---|---|
-| **White Ravens packs** | The catalogue at [`raven-packs`](https://github.com/whiteravens20/raven-packs), which publishes a `packs.json` index beside each pack's manifest | Yes — the profile stores the manifest URL and every sync reconciles against it |
-| **A link** | Either a Raven Forge manifest v2 or a `.mrpack` — including the link behind Modrinth's Download button | A manifest, yes; a `.mrpack`, no |
-| **`.mrpack` file** | [Modrinth's modpack format](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack) — a zip holding `modrinth.index.json` and `overrides/` | No — an import is a snapshot of one version |
+| Route                  | Format                                                                                                                                                              | Keeps updating?                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **White Ravens packs** | The catalogue at [`raven-packs`](https://github.com/whiteravens20/raven-packs), which publishes a `packs.json` index beside each pack's manifest                    | Yes — the profile stores the manifest URL and every sync reconciles against it |
+| **A link**             | Either a Raven Forge manifest v2 or a `.mrpack` — including the link behind Modrinth's Download button                                                              | A manifest, yes; a `.mrpack`, no                                               |
+| **`.mrpack` file**     | [Modrinth's modpack format](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack) — a zip holding `modrinth.index.json` and `overrides/` | No — an import is a snapshot of one version                                    |
 
 One field takes both kinds of link, and which one arrived is decided from the
 bytes at the address rather than from the file extension: Modrinth's CDN ends
@@ -288,11 +294,11 @@ somewhere else.
 
 ### Supported targets
 
-| Target | File | Size | Runs on |
-|---|---|---|---|
-| NSIS installer | `Raven-Forge-Launcher-Setup-<version>.exe` | ~96 MB | **Windows 11** and Windows 10 (1809+), x64 |
-| Debian package | `raven-forge-launcher_<version>_amd64.deb` | ~90 MB | **Debian 11+**, **Ubuntu 20.04+**, x64 |
-| AppImage | `Raven-Forge-Launcher-<version>.AppImage` | ~115 MB | Any x64 Linux with glibc ≥ 2.25 |
+| Target         | File                                       | Size    | Runs on                                    |
+| -------------- | ------------------------------------------ | ------- | ------------------------------------------ |
+| NSIS installer | `Raven-Forge-Launcher-Setup-<version>.exe` | ~96 MB  | **Windows 11** and Windows 10 (1809+), x64 |
+| Debian package | `raven-forge-launcher_<version>_amd64.deb` | ~90 MB  | **Debian 11+**, **Ubuntu 20.04+**, x64     |
+| AppImage       | `Raven-Forge-Launcher-<version>.AppImage`  | ~115 MB | Any x64 Linux with glibc ≥ 2.25            |
 
 The Linux floor is the Electron binary's own: it links `GLIBC_2.25`, which the
 `.deb` declares as `libc6 (>= 2.25)` so apt refuses the install rather than
@@ -395,7 +401,7 @@ all three. `alsa-lib` needs the fallback line on Debian and Ubuntu because 24.04
 renamed the package to `libasound2t64` and left `libasound2` as a virtual name
 with two providers, which apt will not install by name. `libfuse2` is for the
 AppImage runtime itself, not for the launcher: without it the file exits with
-*"AppImages require FUSE to run"* before any of our code runs.
+_"AppImages require FUSE to run"_ before any of our code runs.
 
 Missing `xdg-utils` is the quiet one — the app starts fine and then "open folder"
 and every external link silently do nothing, because `shell.openExternal` shells
@@ -432,6 +438,7 @@ Short version for the installer: add `WIN_CSC_LINK` (base64 of your `.pfx`) and 
 ## Architecture
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation including:
+
 - Mod-sync data flow diagram
 - Microsoft OAuth authentication chain
 - Launcher startup sequence
@@ -443,11 +450,11 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture docum
 
 Contributions are welcome — bug fixes, macOS support, accessibility and translations.
 
-| Document | What it covers |
-|---|---|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, project layout, coding guidelines, how to verify a change, PR process |
-| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community expectations |
-| [SECURITY.md](SECURITY.md) | Security model, known gaps, and how to report a vulnerability privately |
+| Document                                                                | What it covers                                                                              |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                                      | Setup, project layout, coding guidelines, how to verify a change, PR process                |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)                                | Community expectations                                                                      |
+| [SECURITY.md](SECURITY.md)                                              | Security model, known gaps, and how to report a vulnerability privately                     |
 | [docs/PRIVACY.md](docs/PRIVACY.md) · [🇵🇱 po polsku](docs/PRIVACY.pl.md) | Every byte stored and every server contacted, and why. Also in the app under Info → Privacy |
 
 `dev` is the working branch; `main` is a release snapshot synced from it by the maintainer. Fork and open your PR against `dev`, never `main`. Commits follow [Conventional Commits](https://www.conventionalcommits.org/), one topic per commit, subject line only. There is **no `CHANGELOG.md`** — release notes are generated by GitHub from everything that landed since the previous tag, grouped by [`.github/release.yml`](.github/release.yml).

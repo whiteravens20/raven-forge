@@ -24,10 +24,7 @@ const config = {
     buildResources: 'build',
   },
 
-  files: [
-    'dist/**/*',
-    'package.json',
-  ],
+  files: ['dist/**/*', 'package.json'],
 
   // Asar archive for security + performance
   asar: true,

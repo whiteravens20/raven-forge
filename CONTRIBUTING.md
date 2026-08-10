@@ -46,7 +46,7 @@ before opening a pull request.
 
 **Not accepted:**
 
-- Anything that helps run Minecraft without a licence — cracked-client support, auth-server bypasses, "premium" account generators. Offline mode exists for playing without a *network connection*, not without a *licence*.
+- Anything that helps run Minecraft without a licence — cracked-client support, auth-server bypasses, "premium" account generators. Offline mode exists for playing without a _network connection_, not without a _licence_.
 - Telemetry, analytics, ads, or bundled affiliate links.
 - Weakening hash verification or manifest signature checks, or adding a way to click past a failed one.
 - Auto-installing content from an unverified source.
@@ -58,11 +58,11 @@ before opening a pull request.
 
 ### Requirements
 
-| Tool | Version |
-|---|---|
-| Node.js | ≥ 24.0.0 |
-| npm | ≥ 11 (bundled with Node) |
-| Git | any recent |
+| Tool    | Version                  |
+| ------- | ------------------------ |
+| Node.js | ≥ 24.0.0                 |
+| npm     | ≥ 11 (bundled with Node) |
+| Git     | any recent               |
 
 Platform prerequisites for the native `keytar` build are listed in the [README](README.md#dev-setup) — build tools on Windows, `libsecret-1-dev` on Debian/Ubuntu.
 
@@ -124,18 +124,18 @@ Architecture detail lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the
 - **TypeScript everywhere.** No `any`, and no type assertion without a comment explaining why it is sound.
 - Keep functions small and single-purpose. Match the surrounding style; ESLint is the source of truth.
 - **No dead code, no commented-out blocks, no speculative abstraction, no backwards-compatibility shims.** If something is unused, delete it.
-- Comments explain *why*, not *what*. A comment restating the line below it is noise; a comment recording why the obvious approach failed is worth its weight.
+- Comments explain _why_, not _what_. A comment restating the line below it is noise; a comment recording why the obvious approach failed is worth its weight.
 - Every user-facing string goes through the i18n dictionary — see [Translations](#translations).
 
 ### Naming
 
-| Context | Convention |
-|---|---|
-| Files | `kebab-case.ts`, `PascalCase.tsx` for React components |
-| Variables / functions | `camelCase` |
-| Types / interfaces | `PascalCase` |
-| Constants | `UPPER_SNAKE_CASE` |
-| IPC channels | `namespace:verb-noun` (e.g. `system:open-url`) |
+| Context               | Convention                                             |
+| --------------------- | ------------------------------------------------------ |
+| Files                 | `kebab-case.ts`, `PascalCase.tsx` for React components |
+| Variables / functions | `camelCase`                                            |
+| Types / interfaces    | `PascalCase`                                           |
+| Constants             | `UPPER_SNAKE_CASE`                                     |
+| IPC channels          | `namespace:verb-noun` (e.g. `system:open-url`)         |
 
 ### Dependencies
 

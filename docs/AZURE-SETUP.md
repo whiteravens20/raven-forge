@@ -17,7 +17,7 @@ This guide assumes you have never opened the Azure portal before.
 
 ## Read this first: cost, safety, and the waiting period
 
-**Is it free?** Yes. App registration is part of the *Microsoft Entra ID Free*
+**Is it free?** Yes. App registration is part of the _Microsoft Entra ID Free_
 tier and is not billed — Microsoft's own guidance is explicit that registering
 an application costs nothing and keeps working indefinitely. One caveat worth
 knowing before you start: when you create the account, **Microsoft may ask for a
@@ -26,7 +26,7 @@ handing over a card number is not acceptable to you, stop here and use offline
 mode — there is no way around that check.
 
 **Is it safe to put the ID in the app?** Yes, and this is worth understanding
-rather than taking on faith. Raven Forge is a *public OAuth client* — a desktop
+rather than taking on faith. Raven Forge is a _public OAuth client_ — a desktop
 app that runs on machines you do not control. Public clients are defined by the
 fact that they **hold no client secret**, because any secret shipped in a
 downloadable binary can be extracted by anyone who downloads it. You will never
@@ -35,7 +35,7 @@ like an app's name; every open-source launcher (Prism, ATLauncher, Helios) ships
 theirs in plain sight. Leaking it costs you nothing, because it grants nothing
 on its own.
 
-What the ID *does* is identify your app on the consent screen the player sees.
+What the ID _does_ is identify your app on the consent screen the player sees.
 The player's password never reaches Raven Forge — they type it on Microsoft's
 own page. What comes back is a token scoped to `XboxLive.signin`, which is only
 good for signing in to Xbox Live and Minecraft. It cannot read email, files,
@@ -46,7 +46,7 @@ created Azure app **cannot** talk to `api.minecraftservices.com` until it is
 reviewed. Until then the login chain runs fine right up to the last step and
 then fails with **HTTP 403 / "Invalid app registration"**. You submit a form and
 wait. Budget days, not minutes. Steps 5–7 below cover this, and the order
-matters — you must attempt a login *before* you request review.
+matters — you must attempt a login _before_ you request review.
 
 ---
 
@@ -69,11 +69,11 @@ matters — you must attempt a login *before* you request review.
 
 Fill in the form:
 
-| Field | What to enter |
-|---|---|
-| **Name** | Anything you like — `Raven Forge` is fine. Players see this on the consent screen, so pick something recognisable. |
-| **Supported account types** | **Accounts in any identity provider or organizational directory (for authenticating users with personal Microsoft accounts)** — the option whose description mentions *personal Microsoft accounts (Skype, Xbox)*. |
-| **Redirect URI** | Leave it **empty** for now. Step 2 adds it properly. |
+| Field                       | What to enter                                                                                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Name**                    | Anything you like — `Raven Forge` is fine. Players see this on the consent screen, so pick something recognisable.                                                                                                 |
+| **Supported account types** | **Accounts in any identity provider or organizational directory (for authenticating users with personal Microsoft accounts)** — the option whose description mentions _personal Microsoft accounts (Skype, Xbox)_. |
+| **Redirect URI**            | Leave it **empty** for now. Step 2 adds it properly.                                                                                                                                                               |
 
 Click **Register**.
 
@@ -169,15 +169,15 @@ that failed with a 403 should now come back with your username and skin.
 
 ## Troubleshooting
 
-| What you see | What it means |
-|---|---|
-| `Microsoft login is not configured — this build has no Azure client ID` | `RAVENFORGE_CLIENT_ID` was not set for this build or this run. Step 4. |
-| **403** from Minecraft, or *"Invalid app registration"* | The app has not been approved yet, or approval has not propagated. Steps 5–7. This is the normal state for a new registration. |
-| `AADSTS700016` / *application not found in directory* | The client ID is wrong, or the account type excludes personal accounts. Steps 1 and 3. |
-| `AADSTS50011` / redirect URI mismatch | The redirect URI in Azure does not match exactly. Step 2. |
-| `This Microsoft account has no Xbox account` | The account has never used Xbox Live. Sign in once at <https://www.xbox.com> to create the profile, then retry. |
-| `This account belongs to a minor and requires a parent to add it to a Family` | Microsoft family-safety restriction on the account being signed in. Not something the launcher can work around. |
-| `This account does not own Minecraft: Java Edition` | Auth worked. That account simply has no Java Edition licence — a Bedrock-only or Game Pass account will do this. |
+| What you see                                                                  | What it means                                                                                                                  |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Microsoft login is not configured — this build has no Azure client ID`       | `RAVENFORGE_CLIENT_ID` was not set for this build or this run. Step 4.                                                         |
+| **403** from Minecraft, or _"Invalid app registration"_                       | The app has not been approved yet, or approval has not propagated. Steps 5–7. This is the normal state for a new registration. |
+| `AADSTS700016` / _application not found in directory_                         | The client ID is wrong, or the account type excludes personal accounts. Steps 1 and 3.                                         |
+| `AADSTS50011` / redirect URI mismatch                                         | The redirect URI in Azure does not match exactly. Step 2.                                                                      |
+| `This Microsoft account has no Xbox account`                                  | The account has never used Xbox Live. Sign in once at <https://www.xbox.com> to create the profile, then retry.                |
+| `This account belongs to a minor and requires a parent to add it to a Family` | Microsoft family-safety restriction on the account being signed in. Not something the launcher can work around.                |
+| `This account does not own Minecraft: Java Edition`                           | Auth worked. That account simply has no Java Edition licence — a Bedrock-only or Game Pass account will do this.               |
 
 ## Revoking access
 
