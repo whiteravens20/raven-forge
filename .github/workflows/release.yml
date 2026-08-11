@@ -195,6 +195,18 @@ jobs:
         env:
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
 
+      # electron-builder drops a debug dump of its effective config next to the
+      # artefacts, and the `*.yml` globs below would carry it along. Both runners
+      # write one, `merge-multiple` makes the second silently overwrite the first,
+      # and the release then ships one file against two checksums — so
+      # `sha256sum -c` reports a failure on a release where every installer is
+      # actually intact. It is not something a user downloads; drop it here, before
+      # the checksums or any upload can see it.
+      - name: Drop electron-builder's debug dump
+        shell: bash
+        working-directory: out
+        run: rm -f builder-debug.yml
+
       # Checksums are computed on the machine that produced the file, before it
       # is ever uploaded, so they cover the artefact end to end.
       - name: Checksums
