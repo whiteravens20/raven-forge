@@ -1,7 +1,7 @@
 {
   "name": "raven-forge-launcher",
   "productName": "Raven Forge Launcher",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Custom Minecraft: Java Edition launcher with mod management, auto-sync, and server profiles",
   "author": {
     "name": "White Ravens",
