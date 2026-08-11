@@ -36,14 +36,14 @@ a poprawimy to z tych dwóch, które się myli.
 
 ## Czego Raven Forge nie robi
 
-| | |
-|---|---|
-| Analityka lub telemetria | Nie ma. W kodzie nie istnieje żaden endpoint raportujący — dlatego nie ma też przełącznika do wyłączenia. |
-| Identyfikator instalacji | Nie jest generowany ani wysyłany. |
+|                                    |                                                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Analityka lub telemetria           | Nie ma. W kodzie nie istnieje żaden endpoint raportujący — dlatego nie ma też przełącznika do wyłączenia.               |
+| Identyfikator instalacji           | Nie jest generowany ani wysyłany.                                                                                       |
 | Wysyłanie raportów z awarii do nas | Raporty zapisują się do pliku lokalnie. Nic ich nie wysyła; to Ty decydujesz, czy i kiedy dołączyć jeden do zgłoszenia. |
-| Konto w White Ravens | Nie istnieje. Twoje konto Minecrafta jest kontem Microsoftu. |
-| Sprzedaż lub udostępnianie danych | Nie ma czego sprzedawać ani udostępniać. |
-| Reklamy lub skrypty śledzące | Interfejs launchera nie ładuje żadnego zdalnego kodu — zabrania tego jego Content-Security-Policy. |
+| Konto w White Ravens               | Nie istnieje. Twoje konto Minecrafta jest kontem Microsoftu.                                                            |
+| Sprzedaż lub udostępnianie danych  | Nie ma czego sprzedawać ani udostępniać.                                                                                |
+| Reklamy lub skrypty śledzące       | Interfejs launchera nie ładuje żadnego zdalnego kodu — zabrania tego jego Content-Security-Policy.                      |
 
 ---
 
@@ -57,23 +57,23 @@ Nie musisz szukać tego folderu ręcznie: **Ustawienia → Dane → Folder danyc
 otwiera go na każdym systemie, a strona prywatności w apce (Informacje →
 Prywatność) pokazuje dokładną ścieżkę tej instalacji. Dla orientacji:
 
-| System | Lokalizacja |
-|---|---|
-| Windows | `%APPDATA%\Raven Forge Launcher` |
-| Linux | `~/.config/Raven Forge Launcher` |
-| macOS | `~/Library/Application Support/Raven Forge Launcher` |
+| System  | Lokalizacja                                          |
+| ------- | ---------------------------------------------------- |
+| Windows | `%APPDATA%\Raven Forge Launcher`                     |
+| Linux   | `~/.config/Raven Forge Launcher`                     |
+| macOS   | `~/Library/Application Support/Raven Forge Launcher` |
 
 W środku:
 
-| Ścieżka | Zawartość |
-|---|---|
-| `settings.json` | Twoje ustawienia — motyw, język, adres proxy, adresy kanałów, liczba równoległych pobrań, zaufane klucze podpisu. |
-| `profiles.json` | Twoje profile: nazwy, wersje Minecrafta, loadery, przydzielony RAM, adresy manifestów, czas gry i daty ostatniego uruchomienia. |
-| `profiles/<id>/.minecraft/` | Prawdziwy katalog gry, osobny dla każdego profilu — światy, zrzuty ekranu, `options.txt`, mody, paczki zasobów, shadery. To pliki samego Minecrafta, trzymane osobno dla każdego profilu. |
-| `auth.json` | Lista kont: nazwa gracza, UUID, typ konta, adres skórki i data ostatniego uwierzytelnienia. Zapisywany z uprawnieniami `0600`. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej. |
-| `logs/main.log` | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”. |
-| `crash-reports/` | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”. |
-| `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, instalatory loaderów i zbuforowane metadane. Nic osobistego. |
+| Ścieżka                       | Zawartość                                                                                                                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings.json`               | Twoje ustawienia — motyw, język, adres proxy, adresy kanałów, liczba równoległych pobrań, zaufane klucze podpisu.                                                                         |
+| `profiles.json`               | Twoje profile: nazwy, wersje Minecrafta, loadery, przydzielony RAM, adresy manifestów, czas gry i daty ostatniego uruchomienia.                                                           |
+| `profiles/<id>/.minecraft/`   | Prawdziwy katalog gry, osobny dla każdego profilu — światy, zrzuty ekranu, `options.txt`, mody, paczki zasobów, shadery. To pliki samego Minecrafta, trzymane osobno dla każdego profilu. |
+| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta, adres skórki i data ostatniego uwierzytelnienia. Zapisywany z uprawnieniami `0600`. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.  |
+| `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                             |
+| `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                |
+| `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, instalatory loaderów i zbuforowane metadane. Nic osobistego.                                                                                                     |
 
 Chromium trzyma w tym folderze także własne dane, w tym ciasteczka z okna
 logowania Microsoftu — patrz „Znane luki”.
@@ -132,11 +132,11 @@ Wszystko to respektuje proxy ustawione w **Ustawienia → Sieć i pobieranie**.
 
 ### Tylko przy logowaniu przez Microsoft
 
-| Host | Co jest wysyłane |
-|---|---|
-| `login.microsoftonline.com` | Strona logowania Microsoftu otwiera się w osobnym oknie. **Dane wpisujesz na stronie Microsoftu; launcher nie może ich odczytać.** Dostaje tylko kod autoryzacyjny, który wymienia na tokeny z użyciem PKCE. |
-| `user.auth.xboxlive.com`, `xsts.auth.xboxlive.com` | Token dostępu Microsoftu, w zamian za token Xbox Live. |
-| `api.minecraftservices.com` | Token Xbox, w zamian za sesję Minecrafta. Zwraca Twoje UUID, nazwę gracza i adres skórki. |
+| Host                                               | Co jest wysyłane                                                                                                                                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `login.microsoftonline.com`                        | Strona logowania Microsoftu otwiera się w osobnym oknie. **Dane wpisujesz na stronie Microsoftu; launcher nie może ich odczytać.** Dostaje tylko kod autoryzacyjny, który wymienia na tokeny z użyciem PKCE. |
+| `user.auth.xboxlive.com`, `xsts.auth.xboxlive.com` | Token dostępu Microsoftu, w zamian za token Xbox Live.                                                                                                                                                       |
+| `api.minecraftservices.com`                        | Token Xbox, w zamian za sesję Minecrafta. Zwraca Twoje UUID, nazwę gracza i adres skórki.                                                                                                                    |
 
 Launcher prosi dokładnie o dwa zakresy OAuth: `XboxLive.signin` i
 `offline_access`. Nie może odczytać Twojej poczty, kontaktów ani niczego innego
@@ -146,23 +146,23 @@ na Twoim koncie Microsoft.
 
 ### Żeby zainstalować i uruchomić grę
 
-| Host | Kiedy | Co jest wysyłane |
-|---|---|---|
-| `piston-meta.mojang.com`, `resources.download.minecraft.net`, serwery bibliotek Mojanga | Instalacja lub uruchomienie wersji | Nic poza samym żądaniem. |
-| `api.adoptium.net` | Instalacja zarządzanego środowiska Javy | Wersja Javy, Twój system i architektura. |
-| `meta.fabricmc.net`, `meta.quiltmc.org`, `maven.minecraftforge.net`, `files.minecraftforge.net`, `maven.neoforged.net` | Instalacja loadera | Nic poza samym żądaniem. |
+| Host                                                                                                                   | Kiedy                                   | Co jest wysyłane                         |
+| ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------- |
+| `piston-meta.mojang.com`, `resources.download.minecraft.net`, serwery bibliotek Mojanga                                | Instalacja lub uruchomienie wersji      | Nic poza samym żądaniem.                 |
+| `api.adoptium.net`                                                                                                     | Instalacja zarządzanego środowiska Javy | Wersja Javy, Twój system i architektura. |
+| `meta.fabricmc.net`, `meta.quiltmc.org`, `maven.minecraftforge.net`, `files.minecraftforge.net`, `maven.neoforged.net` | Instalacja loadera                      | Nic poza samym żądaniem.                 |
 
 ### Żeby znaleźć i zainstalować zawartość
 
-| Host | Kiedy | Co jest wysyłane |
-|---|---|---|
-| `api.modrinth.com`, `cdn.modrinth.com` | Przeglądanie lub instalowanie modów, shaderów i paczek zasobów | **Twoje frazy wyszukiwania i filtry.** Regulamin API Modrinth wymaga identyfikującego się User-Agenta, więc żądania niosą `whiteravens20/raven-forge/<wersja> (<adres repo>)` — nazwę i wersję launchera, nie Ciebie. |
-| Serwer, na którym leży ikona moda lub obrazek wiadomości | Przy ich wyświetlaniu | Żądanie idzie do tego serwera. Obrazki ładują się prosto stamtąd, gdzie projekt je opublikował. |
+| Host                                                     | Kiedy                                                          | Co jest wysyłane                                                                                                                                                                                                      |
+| -------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api.modrinth.com`, `cdn.modrinth.com`                   | Przeglądanie lub instalowanie modów, shaderów i paczek zasobów | **Twoje frazy wyszukiwania i filtry.** Regulamin API Modrinth wymaga identyfikującego się User-Agenta, więc żądania niosą `whiteravens20/raven-forge/<wersja> (<adres repo>)` — nazwę i wersję launchera, nie Ciebie. |
+| Serwer, na którym leży ikona moda lub obrazek wiadomości | Przy ich wyświetlaniu                                          | Żądanie idzie do tego serwera. Obrazki ładują się prosto stamtąd, gdzie projekt je opublikował.                                                                                                                       |
 
 ### Do White Ravens
 
-| Host | Kiedy | Co jest wysyłane |
-|---|---|---|
+| Host                      | Kiedy                                                         | Co jest wysyłane         |
+| ------------------------- | ------------------------------------------------------------- | ------------------------ |
 | `whiteravens20.github.io` | Kanał wiadomości, kanał ogłoszeń i katalog paczek serwerowych | Nic poza samym żądaniem. |
 
 To **statyczne pliki na GitHub Pages**. Nie prowadzimy żadnego serwera ani
@@ -183,8 +183,8 @@ Ten, kto prowadzi tamten adres, widzi Twoje IP.
 
 ### Do GitHuba
 
-| Host | Kiedy | Co jest wysyłane |
-|---|---|---|
+| Host            | Kiedy                                                                            | Co jest wysyłane                                                                   |
+| --------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | GitHub Releases | **Automatycznie przy każdym starcie** oraz po naciśnięciu „Sprawdź aktualizacje” | Nic poza samym żądaniem. Ujawnia GitHubowi Twoje IP, wersję launchera i platformę. |
 
 Patrz „Znane luki” — obecnie nie ma przełącznika wyłączającego automatyczne
@@ -236,13 +236,13 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 ## Co możesz wyłączyć
 
-| Ustawienie | Efekt |
-|---|---|
-| **Tryb offline** (Ustawienia → Zachowanie) | Nigdy nie kontaktuje się z serwerami uwierzytelniania. Tylko gra jednoosobowa i LAN. |
-| **Adres kanału wiadomości / ogłoszeń** (Ustawienia → Źródła treści) | Wyczyść pole, a dany kanał nie będzie już pobierany. |
-| **Proxy** (Ustawienia → Sieć i pobieranie) | Kieruje każde żądanie launchera przez proxy, które kontrolujesz. |
-| Nieużywanie strony Mody | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz lub nie zainstalujesz. |
-| Konto offline | Żaden serwer Microsoftu ani Xboxa nie jest w ogóle dotykany. |
+| Ustawienie                                                          | Efekt                                                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Tryb offline** (Ustawienia → Zachowanie)                          | Nigdy nie kontaktuje się z serwerami uwierzytelniania. Tylko gra jednoosobowa i LAN. |
+| **Adres kanału wiadomości / ogłoszeń** (Ustawienia → Źródła treści) | Wyczyść pole, a dany kanał nie będzie już pobierany.                                 |
+| **Proxy** (Ustawienia → Sieć i pobieranie)                          | Kieruje każde żądanie launchera przez proxy, które kontrolujesz.                     |
+| Nieużywanie strony Mody                                             | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz lub nie zainstalujesz.        |
+| Konto offline                                                       | Żaden serwer Microsoftu ani Xboxa nie jest w ogóle dotykany.                         |
 
 ---
 

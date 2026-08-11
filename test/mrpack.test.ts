@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { ZipWriter } from './helpers/zip';
-import { readMrpack } from '../src/core/packs/mrpack';
+import { readMrpack, applyOverrides } from '../src/core/packs/mrpack';
 import { mrpackToManifest } from '../src/core/packs/pack-installer';
 
 let dir: string;
@@ -137,6 +137,70 @@ describe('readMrpack', () => {
   it('rejects an index it cannot trust the shape of', async () => {
     const contents = index({ files: [{ path: 'mods/x.jar' }] }); // no downloads
     await expect(readMrpack(await pack('malformed', contents))).rejects.toThrow(/malformed/);
+  });
+
+  it('refuses a single entry that decompresses past the per-entry cap', async () => {
+    // A deflate bomb ships as a tiny zip whose one entry inflates to gigabytes.
+    // The declared size is checked before a byte is read; here a 64-byte override
+    // against a 16-byte cap stands in for that, so the test costs nothing.
+    const p = await pack('entry-bomb', index(), { 'overrides/big.bin': 'x'.repeat(64) });
+    await expect(readMrpack(p, { maxEntryBytes: 16, maxTotalBytes: 1024 })).rejects.toThrow(
+      /implausibly large/,
+    );
+  });
+
+  it('refuses a pack whose entries total past the cap', async () => {
+    // Each entry is under the per-entry cap; together they cross the total, which
+    // is what a pack of a thousand merely-large files would do.
+    const p = await pack('total-bomb', index(), {
+      'overrides/a.txt': 'x'.repeat(40),
+      'overrides/b.txt': 'y'.repeat(40),
+    });
+    await expect(readMrpack(p, { maxEntryBytes: 1024, maxTotalBytes: 50 })).rejects.toThrow(
+      /larger decompressed/,
+    );
+  });
+});
+
+describe('applyOverrides', () => {
+  it('writes an ordinary override into the game directory', async () => {
+    const gameDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-overrides-'));
+    await applyOverrides(gameDir, new Map([['config/opts.txt', Buffer.from('ok')]]));
+    expect(await fs.readFile(path.join(gameDir, 'config/opts.txt'), 'utf-8')).toBe('ok');
+    await fs.rm(gameDir, { recursive: true, force: true });
+  });
+
+  it('refuses to follow a symlinked directory out of the game directory', async () => {
+    const gameDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-overrides-'));
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-outside-'));
+    // A previous pack, or the player, left a symlinked subdir pointing away.
+    await fs.symlink(outside, path.join(gameDir, 'config'));
+
+    await expect(
+      applyOverrides(gameDir, new Map([['config/evil.txt', Buffer.from('x')]])),
+    ).rejects.toThrow(/symlink|outside/);
+    // Nothing was written through the link.
+    await expect(fs.readFile(path.join(outside, 'evil.txt'))).rejects.toThrow();
+
+    await fs.rm(gameDir, { recursive: true, force: true });
+    await fs.rm(outside, { recursive: true, force: true });
+  });
+
+  it('refuses a symlinked file sitting where an override would be written', async () => {
+    const gameDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-overrides-'));
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-outside-'));
+    const target = path.join(outside, 'target.txt');
+    await fs.writeFile(target, 'original');
+    await fs.symlink(target, path.join(gameDir, 'options.txt'));
+
+    await expect(
+      applyOverrides(gameDir, new Map([['options.txt', Buffer.from('overwritten')]])),
+    ).rejects.toThrow();
+    // The file the link pointed at is untouched — O_NOFOLLOW refused to open it.
+    expect(await fs.readFile(target, 'utf-8')).toBe('original');
+
+    await fs.rm(gameDir, { recursive: true, force: true });
+    await fs.rm(outside, { recursive: true, force: true });
   });
 });
 

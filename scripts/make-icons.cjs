@@ -121,9 +121,7 @@ async function render(html, width, height) {
   await win.loadURL(`data:text/html;base64,${Buffer.from(html).toString('base64')}`);
   const frame = await painted;
   const sized =
-    frame.getSize().width === width
-      ? frame
-      : frame.resize({ width, height, quality: 'best' });
+    frame.getSize().width === width ? frame : frame.resize({ width, height, quality: 'best' });
   win.destroy();
   return sized;
 }
@@ -172,10 +170,13 @@ display:flex;align-items:flex-start;justify-content:center;padding-top:56px;box-
 // app mid-run — silently, taking the buffered output with it.
 app.on('window-all-closed', () => {});
 
-app.whenReady().then(main).then(
-  () => app.exit(0),
-  (err) => {
-    console.error(`[make-icons] ${err.message}`);
-    app.exit(1);
-  },
-);
+app
+  .whenReady()
+  .then(main)
+  .then(
+    () => app.exit(0),
+    (err) => {
+      console.error(`[make-icons] ${err.message}`);
+      app.exit(1);
+    },
+  );

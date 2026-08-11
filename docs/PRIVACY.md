@@ -33,14 +33,14 @@ and it will be fixed in whichever of the two is wrong.
 
 ## What Raven Forge does not do
 
-| | |
-|---|---|
-| Analytics or telemetry | None. There is no reporting endpoint in the code, which is why there is no switch to turn it off. |
-| Install identifier | None is generated or sent. |
-| Crash reporting to us | Crash reports are written to a local file. Nothing uploads them; you attach one to an issue if and when you choose to. |
-| An account with White Ravens | Does not exist. Your Minecraft account is with Microsoft. |
-| Selling or sharing data | There is no data to sell or share. |
-| Advertising or tracking scripts | The launcher's own interface loads no remote code at all — its Content-Security-Policy forbids it. |
+|                                 |                                                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Analytics or telemetry          | None. There is no reporting endpoint in the code, which is why there is no switch to turn it off.                      |
+| Install identifier              | None is generated or sent.                                                                                             |
+| Crash reporting to us           | Crash reports are written to a local file. Nothing uploads them; you attach one to an issue if and when you choose to. |
+| An account with White Ravens    | Does not exist. Your Minecraft account is with Microsoft.                                                              |
+| Selling or sharing data         | There is no data to sell or share.                                                                                     |
+| Advertising or tracking scripts | The launcher's own interface loads no remote code at all — its Content-Security-Policy forbids it.                     |
 
 ---
 
@@ -54,23 +54,23 @@ You never have to find that folder by hand: **Settings → Data → Data folder*
 opens it on any system, and the in-app privacy page (Info → Privacy) shows the
 exact path this install uses. For reference:
 
-| Platform | Location |
-|---|---|
-| Windows | `%APPDATA%\Raven Forge Launcher` |
-| Linux | `~/.config/Raven Forge Launcher` |
-| macOS | `~/Library/Application Support/Raven Forge Launcher` |
+| Platform | Location                                             |
+| -------- | ---------------------------------------------------- |
+| Windows  | `%APPDATA%\Raven Forge Launcher`                     |
+| Linux    | `~/.config/Raven Forge Launcher`                     |
+| macOS    | `~/Library/Application Support/Raven Forge Launcher` |
 
 Inside it:
 
-| Path | Contents |
-|---|---|
-| `settings.json` | Your preferences — theme, language, proxy address, feed URLs, download concurrency, trusted signing keys. |
-| `profiles.json` | Your profiles: names, Minecraft versions, mod loaders, allocated RAM, manifest URLs, play time and last-played timestamps. |
-| `profiles/<id>/.minecraft/` | A real Minecraft game directory per profile — worlds, screenshots, `options.txt`, mods, resource packs, shaders. Minecraft's own files, kept apart per profile. |
-| `auth.json` | The account list: Minecraft username, UUID, account type, skin URL, and when each was last authenticated. Written with `0600` permissions. **Secrets are not normally in this file** — see below. |
-| `logs/main.log` | The launcher's log, rotated at 5 MB. See "What ends up in the log". |
-| `crash-reports/` | One file per crash, redacted, newest 20 kept. See "Crash reports". |
-| `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loader installers, and cached metadata. Nothing personal. |
+| Path                          | Contents                                                                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings.json`               | Your preferences — theme, language, proxy address, feed URLs, download concurrency, trusted signing keys.                                                                                         |
+| `profiles.json`               | Your profiles: names, Minecraft versions, mod loaders, allocated RAM, manifest URLs, play time and last-played timestamps.                                                                        |
+| `profiles/<id>/.minecraft/`   | A real Minecraft game directory per profile — worlds, screenshots, `options.txt`, mods, resource packs, shaders. Minecraft's own files, kept apart per profile.                                   |
+| `auth.json`                   | The account list: Minecraft username, UUID, account type, skin URL, and when each was last authenticated. Written with `0600` permissions. **Secrets are not normally in this file** — see below. |
+| `logs/main.log`               | The launcher's log, rotated at 5 MB. See "What ends up in the log".                                                                                                                               |
+| `crash-reports/`              | One file per crash, redacted, newest 20 kept. See "Crash reports".                                                                                                                                |
+| `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loader installers, and cached metadata. Nothing personal.                                                                                                           |
 
 Chromium also keeps its own storage in that folder, including cookies from the
 Microsoft sign-in window. Those are cleared when you log a Microsoft account out.
@@ -129,11 +129,11 @@ All of it honours the proxy configured in **Settings → Network**.
 
 ### Only when you sign in with Microsoft
 
-| Host | What is sent |
-|---|---|
-| `login.microsoftonline.com` | Microsoft's own sign-in page opens in a separate window. **You type your credentials into Microsoft's page; the launcher cannot read them.** It receives only an authorization code, which it exchanges for tokens using PKCE. |
-| `user.auth.xboxlive.com`, `xsts.auth.xboxlive.com` | The Microsoft access token, to obtain an Xbox Live token. |
-| `api.minecraftservices.com` | The Xbox token, to obtain a Minecraft session. Returns your UUID, username and skin URL. |
+| Host                                               | What is sent                                                                                                                                                                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `login.microsoftonline.com`                        | Microsoft's own sign-in page opens in a separate window. **You type your credentials into Microsoft's page; the launcher cannot read them.** It receives only an authorization code, which it exchanges for tokens using PKCE. |
+| `user.auth.xboxlive.com`, `xsts.auth.xboxlive.com` | The Microsoft access token, to obtain an Xbox Live token.                                                                                                                                                                      |
+| `api.minecraftservices.com`                        | The Xbox token, to obtain a Minecraft session. Returns your UUID, username and skin URL.                                                                                                                                       |
 
 The launcher requests exactly two OAuth scopes: `XboxLive.signin` and
 `offline_access`. It cannot read your email, your contacts, or anything else in
@@ -143,23 +143,23 @@ your Microsoft account.
 
 ### To install and run the game
 
-| Host | When | What is sent |
-|---|---|---|
-| `piston-meta.mojang.com`, `resources.download.minecraft.net`, Mojang's library servers | Installing or launching a version | Nothing but the request itself. |
-| `api.adoptium.net` | Installing a managed Java runtime | The Java version, your OS and architecture. |
-| `meta.fabricmc.net`, `meta.quiltmc.org`, `maven.minecraftforge.net`, `files.minecraftforge.net`, `maven.neoforged.net` | Installing a mod loader | Nothing but the request itself. |
+| Host                                                                                                                   | When                              | What is sent                                |
+| ---------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------- |
+| `piston-meta.mojang.com`, `resources.download.minecraft.net`, Mojang's library servers                                 | Installing or launching a version | Nothing but the request itself.             |
+| `api.adoptium.net`                                                                                                     | Installing a managed Java runtime | The Java version, your OS and architecture. |
+| `meta.fabricmc.net`, `meta.quiltmc.org`, `maven.minecraftforge.net`, `files.minecraftforge.net`, `maven.neoforged.net` | Installing a mod loader           | Nothing but the request itself.             |
 
 ### To find and install content
 
-| Host | When | What is sent |
-|---|---|---|
-| `api.modrinth.com`, `cdn.modrinth.com` | Browsing or installing mods, shaders, resource packs | **Your search terms and filters.** Modrinth's API terms require an identifying User-Agent, so requests carry `whiteravens20/raven-forge/<version> (<repo URL>)` — the launcher name and version, not you. |
-| Whatever hosts a mod icon or news image | Displaying them | The request goes to that host. Images are loaded straight from wherever a project publishes them. |
+| Host                                    | When                                                 | What is sent                                                                                                                                                                                              |
+| --------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api.modrinth.com`, `cdn.modrinth.com`  | Browsing or installing mods, shaders, resource packs | **Your search terms and filters.** Modrinth's API terms require an identifying User-Agent, so requests carry `whiteravens20/raven-forge/<version> (<repo URL>)` — the launcher name and version, not you. |
+| Whatever hosts a mod icon or news image | Displaying them                                      | The request goes to that host. Images are loaded straight from wherever a project publishes them.                                                                                                         |
 
 ### To White Ravens
 
-| Host | When | What is sent |
-|---|---|---|
+| Host                      | When                                                               | What is sent                    |
+| ------------------------- | ------------------------------------------------------------------ | ------------------------------- |
 | `whiteravens20.github.io` | The news feed, the announcement feed and the server pack catalogue | Nothing but the request itself. |
 
 These are **static files on GitHub Pages**. We run no server and no logging of
@@ -179,8 +179,8 @@ Whoever operates that address sees your IP.
 
 ### To GitHub
 
-| Host | When | What is sent |
-|---|---|---|
+| Host            | When                                                                          | What is sent                                                                                   |
+| --------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | GitHub Releases | **Automatically, on every start**, and whenever you press "Check for updates" | Nothing but the request. It reveals your IP, the launcher version and your platform to GitHub. |
 
 See "Known gaps" — there is currently no switch to disable the automatic check.
@@ -229,13 +229,13 @@ read a report through before attaching it to a public issue.
 
 ## What you can turn off
 
-| Setting | Effect |
-|---|---|
-| **Offline mode** (Settings → Behaviour) | Never contacts any authentication server. Singleplayer and LAN only. |
-| **News / announcement feed URL** (Settings → Content sources) | Clear the field and that feed is never fetched. |
-| **Proxy** (Settings → Network) | Routes every launcher request through a proxy you control. |
-| Not using the Mods page | Nothing is sent to Modrinth unless you search or install. |
-| Using an offline account | No Microsoft or Xbox server is ever contacted. |
+| Setting                                                       | Effect                                                               |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| **Offline mode** (Settings → Behaviour)                       | Never contacts any authentication server. Singleplayer and LAN only. |
+| **News / announcement feed URL** (Settings → Content sources) | Clear the field and that feed is never fetched.                      |
+| **Proxy** (Settings → Network)                                | Routes every launcher request through a proxy you control.           |
+| Not using the Mods page                                       | Nothing is sent to Modrinth unless you search or install.            |
+| Using an offline account                                      | No Microsoft or Xbox server is ever contacted.                       |
 
 ---
 

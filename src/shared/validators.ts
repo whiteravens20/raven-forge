@@ -6,6 +6,42 @@ import { isSafeFileName } from './manifest-schema';
 // These schemas validate data at IPC boundaries.
 // Types are inferred from schemas via z.infer<typeof schema>.
 
+/**
+ * Whether a URL is safe to fetch content the launcher then *acts on* — a
+ * manifest whose mods land on the class path, a pack that becomes a profile.
+ *
+ * HTTPS always; plaintext HTTP only to loopback. A manifest or pack fetched
+ * over http can be rewritten in transit — the signature stripped, the mod URLs
+ * repointed — by anyone on the path between here and the host, so the plaintext
+ * ones are refused before a byte is downloaded. Loopback stays open so a pack
+ * author can serve from `http://localhost` while they build one, where there is
+ * no wire to tamper with. News and announcement feeds are render-only data and
+ * are not held to this.
+ */
+export function isSecureContentUrl(value: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(value);
+  } catch {
+    return false;
+  }
+  if (u.protocol === 'https:') return true;
+  if (u.protocol === 'http:') {
+    return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(u.hostname);
+  }
+  return false;
+}
+
+/** Throwing form of {@link isSecureContentUrl}, for the fetch boundaries. */
+export function assertSecureContentUrl(value: string): void {
+  if (!isSecureContentUrl(value)) {
+    throw new Error(
+      'A manifest or pack URL must be https:// (plain http:// is allowed only for localhost). ' +
+        'Fetched over http it could be tampered with in transit.',
+    );
+  }
+}
+
 export const trustedKeySchema = z.object({
   name: z.string().min(1),
   publicKey: z.string().min(1),

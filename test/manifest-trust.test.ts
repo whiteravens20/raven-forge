@@ -2,8 +2,16 @@ import { describe, it, expect } from 'vitest';
 import nacl from 'tweetnacl';
 import { encodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import { canonicalize } from '../src/core/updater/canonical';
-import { verifyManifestSignature, assertManifestTrusted } from '../src/core/updater/manifest-verify';
-import { BUILT_IN_KEYS, WHITE_RAVENS_PUBLIC_KEY } from '../src/shared/branding';
+import {
+  verifyManifestSignature,
+  assertManifestTrusted,
+} from '../src/core/updater/manifest-verify';
+import {
+  BUILT_IN_KEYS,
+  WHITE_RAVENS_PUBLIC_KEY,
+  isFirstPartyManifestUrl,
+} from '../src/shared/branding';
+import { isSecureContentUrl } from '../src/shared/validators';
 import type { TrustedKey } from '../src/shared/ipc-types';
 
 /**
@@ -125,5 +133,72 @@ describe('assertManifestTrusted', () => {
         'Ravens',
       ),
     ).toThrow(/does not match/);
+  });
+
+  it('refuses an unsigned first-party manifest even with no keys configured', () => {
+    // The built-in key vouches for every White Ravens pack; an unsigned copy of
+    // one has been tampered with in transit, and "the player added no keys of
+    // their own" must not be a way past that. This is the fix for the manifest
+    // that installed anyway because enforcement keyed off the user list.
+    expect(() =>
+      assertManifestTrusted({ signed: false, valid: false }, [], 'Ravens', true),
+    ).toThrow(/White Ravens pack/);
+  });
+
+  it('still installs a verified first-party manifest', () => {
+    expect(() =>
+      assertManifestTrusted({ signed: true, valid: true }, [], 'Ravens', true),
+    ).not.toThrow();
+  });
+
+  it('leaves a third-party manifest on the opt-in policy', () => {
+    expect(() =>
+      assertManifestTrusted({ signed: false, valid: false }, [], 'Ravens', false),
+    ).not.toThrow();
+  });
+});
+
+describe('isFirstPartyManifestUrl', () => {
+  it('recognises a manifest served from the packs site', () => {
+    expect(
+      isFirstPartyManifestUrl(
+        'https://whiteravens20.github.io/raven-packs/ravenclassic/manifest.json',
+      ),
+    ).toBe(true);
+  });
+
+  it('does not treat a look-alike host as first-party', () => {
+    expect(
+      isFirstPartyManifestUrl('https://whiteravens20.github.io.evil.example/raven-packs/x.json'),
+    ).toBe(false);
+    expect(isFirstPartyManifestUrl('https://evil.example/raven-packs/x.json')).toBe(false);
+  });
+
+  it('does not let a different path on the same host inherit the trust', () => {
+    expect(isFirstPartyManifestUrl('https://whiteravens20.github.io/other/x.json')).toBe(false);
+  });
+
+  it('rejects a garbage URL rather than throwing', () => {
+    expect(isFirstPartyManifestUrl('not a url')).toBe(false);
+  });
+});
+
+describe('isSecureContentUrl', () => {
+  it('accepts https', () => {
+    expect(isSecureContentUrl('https://example.net/manifest.json')).toBe(true);
+  });
+
+  it('rejects plaintext http to a remote host', () => {
+    expect(isSecureContentUrl('http://example.net/manifest.json')).toBe(false);
+  });
+
+  it('allows http only to loopback, for a pack author testing locally', () => {
+    expect(isSecureContentUrl('http://localhost:8080/pack.mrpack')).toBe(true);
+    expect(isSecureContentUrl('http://127.0.0.1/pack.mrpack')).toBe(true);
+  });
+
+  it('rejects a non-web scheme', () => {
+    expect(isSecureContentUrl('file:///etc/passwd')).toBe(false);
+    expect(isSecureContentUrl('ftp://example.net/x')).toBe(false);
   });
 });

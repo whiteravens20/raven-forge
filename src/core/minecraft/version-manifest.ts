@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import type { FileHandle } from 'node:fs/promises';
 import path from 'node:path';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
@@ -21,18 +22,24 @@ export async function getVersionManifest(forceRefresh = false): Promise<VersionM
 
   const cacheFile = path.join(paths.cacheDir, MANIFEST_CACHE_FILE);
 
-  // Try disk cache
+  // Try disk cache. One handle serves both the freshness check and the read:
+  // stat-then-open asks about one file and reads whatever is at that path a
+  // moment later, which is not necessarily the same file.
   if (!forceRefresh) {
+    let handle: FileHandle | undefined;
     try {
-      const stat = await fs.stat(cacheFile);
+      handle = await fs.open(cacheFile, 'r');
+      const stat = await handle.stat();
       if (Date.now() - stat.mtimeMs < MANIFEST_MAX_AGE_MS) {
-        const raw = await fs.readFile(cacheFile, 'utf-8');
+        const raw = await handle.readFile('utf-8');
         cachedManifest = JSON.parse(raw) as VersionManifest;
         cachedAt = Date.now();
         return cachedManifest;
       }
     } catch {
       /* no cache */
+    } finally {
+      await handle?.close();
     }
   }
 

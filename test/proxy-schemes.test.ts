@@ -9,13 +9,17 @@ import { DEFAULT_SETTINGS } from '../src/core/config/defaults';
  * dispatcher a saved value gets. A scheme the schema allows but no dispatcher
  * handles is the silent-no-op this replaced.
  */
-const settingsWith = (proxyUrl: string) => globalSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, proxyUrl });
+const settingsWith = (proxyUrl: string) =>
+  globalSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, proxyUrl });
 
 describe('isSocksProxy', () => {
-  it.each(['socks://h:1080', 'socks4://h:1080', 'socks4a://h:1080', 'socks5://h:1080', 'socks5h://h:1080'])(
-    'recognises %s',
-    (url) => expect(isSocksProxy(url)).toBe(true),
-  );
+  it.each([
+    'socks://h:1080',
+    'socks4://h:1080',
+    'socks4a://h:1080',
+    'socks5://h:1080',
+    'socks5h://h:1080',
+  ])('recognises %s', (url) => expect(isSocksProxy(url)).toBe(true));
 
   it.each(['http://h:8080', 'https://h:8080'])('does not claim %s', (url) =>
     expect(isSocksProxy(url)).toBe(false),

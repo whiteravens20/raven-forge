@@ -22,7 +22,10 @@ const vanilla: VersionMeta = {
     { name: 'com.mojang:jtracy:1.0.37:natives-linux' },
     { name: 'com.mojang:jtracy:1.0.37:natives-windows' },
   ],
-  arguments: { game: ['--version', '${version_name}'], jvm: ['-Djava.library.path=${natives_directory}'] },
+  arguments: {
+    game: ['--version', '${version_name}'],
+    jvm: ['-Djava.library.path=${natives_directory}'],
+  },
 };
 
 /** What a Fabric profile JSON actually looks like: partial, with inheritsFrom. */
@@ -85,7 +88,10 @@ describe('mergeVersionMeta', () => {
       arguments: { game: ['--fabric'], jvm: ['-Dfabric=1'] },
     });
     expect(withArgs.arguments?.game).toEqual(['--version', '${version_name}', '--fabric']);
-    expect(withArgs.arguments?.jvm).toEqual(['-Djava.library.path=${natives_directory}', '-Dfabric=1']);
+    expect(withArgs.arguments?.jvm).toEqual([
+      '-Djava.library.path=${natives_directory}',
+      '-Dfabric=1',
+    ]);
   });
 
   it('clears inheritsFrom so the chain is not walked twice', () => {
@@ -93,11 +99,16 @@ describe('mergeVersionMeta', () => {
   });
 
   it('lets a child replace the legacy argument string wholesale', () => {
-    const legacyParent: VersionMeta = { ...vanilla, minecraftArguments: '--username ${auth_player_name}' };
-    expect(mergeVersionMeta(legacyParent, { minecraftArguments: '--tweakClass x' }).minecraftArguments).toBe(
-      '--tweakClass x',
+    const legacyParent: VersionMeta = {
+      ...vanilla,
+      minecraftArguments: '--username ${auth_player_name}',
+    };
+    expect(
+      mergeVersionMeta(legacyParent, { minecraftArguments: '--tweakClass x' }).minecraftArguments,
+    ).toBe('--tweakClass x');
+    expect(mergeVersionMeta(legacyParent, {}).minecraftArguments).toBe(
+      '--username ${auth_player_name}',
     );
-    expect(mergeVersionMeta(legacyParent, {}).minecraftArguments).toBe('--username ${auth_player_name}');
   });
 
   it('does not mutate either input', () => {

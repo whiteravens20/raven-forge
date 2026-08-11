@@ -343,17 +343,34 @@ export async function exportProfile(profileId: string): Promise<string> {
  * Fields an imported profile never keeps.
  *
  * A profile export is a file that gets passed around — posted in a Discord
- * channel, attached to a forum reply — and `preLaunchCommand` is handed to a
- * *shell* at the next launch while `customJavaPath` is handed to `spawn`. That
- * makes an innocuous-looking "here's my profile" attachment a way to run
- * whatever the sender likes on the machine that opens it, with no step at which
- * anyone is asked.
+ * channel, attached to a forum reply — and four of its fields reach a process
+ * or the filesystem the next time it launches:
  *
- * Both stay available as features; they are simply set by the person at the
- * keyboard, in the profile editor, rather than arriving inside a file. That is
- * the difference between configuring a hook and receiving one.
+ * - `preLaunchCommand` is handed to a *shell*;
+ * - `customJavaPath` chooses the binary `spawn` runs;
+ * - `javaArgs` is split straight into the JVM's own argument list, and JVM
+ *   arguments are an execution surface in their own right — `-XX:OnOutOfMemoryError=…`
+ *   and `-XX:OnError=…` run a shell command, `-javaagent`/`-agentpath` load code
+ *   at startup — so a token with no whitespace in it (a literal `$IFS` does the
+ *   rest) is a command the moment the game OOMs or crashes, which a modded
+ *   instance does routinely;
+ * - `gameDirectory` becomes the JVM's working directory and is `mkdir`'d first,
+ *   so a hostile export writes a directory tree, and redirects the game's saves
+ *   and configs, anywhere the user can write.
+ *
+ * All four make an innocuous-looking "here's my profile" attachment a way to
+ * run whatever the sender likes — or scribble wherever they like — on the
+ * machine that opens it, with no step at which anyone is asked. They stay
+ * available as features; they are simply set by the person at the keyboard, in
+ * the profile editor, rather than arriving inside a file. That is the
+ * difference between configuring a hook and receiving one.
  */
-export const NOT_IMPORTED = ['preLaunchCommand', 'customJavaPath'] as const;
+export const NOT_IMPORTED = [
+  'preLaunchCommand',
+  'customJavaPath',
+  'javaArgs',
+  'gameDirectory',
+] as const;
 
 /** A profile export, reduced to what may safely be turned into a new profile. */
 export interface ImportedProfile {
@@ -398,6 +415,8 @@ export function readImportedProfile(json: string): ImportedProfile {
     totalPlayTimeMinutes: _tp,
     preLaunchCommand: _pre,
     customJavaPath: _java,
+    javaArgs: _jargs,
+    gameDirectory: _gdir,
     ...data
   } = parsed.data;
 

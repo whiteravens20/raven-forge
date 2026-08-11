@@ -15,11 +15,11 @@ The launcher writes one file per crash and offers it on the Home screen — the
 **Open report** button on the red card (**Otwórz raport** in Polish). It is also
 reachable any time from **Settings → Data → Crash reports**, or directly at:
 
-| OS | Path |
-|---|---|
-| Windows | `%APPDATA%\Raven Forge Launcher\crash-reports\` |
-| Linux | `~/.config/Raven Forge Launcher/crash-reports/` |
-| macOS | `~/Library/Application Support/Raven Forge Launcher/crash-reports/` |
+| OS      | Path                                                                |
+| ------- | ------------------------------------------------------------------- |
+| Windows | `%APPDATA%\Raven Forge Launcher\crash-reports\`                     |
+| Linux   | `~/.config/Raven Forge Launcher/crash-reports/`                     |
+| macOS   | `~/Library/Application Support/Raven Forge Launcher/crash-reports/` |
 
 The newest file is the one for the crash you just had. It already contains the
 launcher version, your OS, the profile, Java, the installed mods, Minecraft's

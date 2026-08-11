@@ -86,10 +86,7 @@ describe('resolveConditionalArgs', () => {
   it('lets a later disallow veto an earlier allow', () => {
     // This is how Mojang expresses "on macOS, except on this architecture".
     const arg: ConditionalArg = {
-      rules: [
-        { action: 'allow' },
-        { action: 'disallow', os: { name: 'osx' } },
-      ],
+      rules: [{ action: 'allow' }, { action: 'disallow', os: { name: 'osx' } }],
       value: '-Dfoo=bar',
     };
     expect(resolveConditionalArgs([arg], {}, 'linux')).toEqual(['-Dfoo=bar']);
@@ -107,9 +104,9 @@ describe('resolveConditionalArgs', () => {
 
 describe('substituteVars', () => {
   it('replaces ${…} placeholders', () => {
-    expect(substituteVars(['--username', '${auth_player_name}'], { auth_player_name: 'pavlojs' })).toEqual(
-      ['--username', 'pavlojs'],
-    );
+    expect(
+      substituteVars(['--username', '${auth_player_name}'], { auth_player_name: 'pavlojs' }),
+    ).toEqual(['--username', 'pavlojs']);
   });
 
   it('replaces several placeholders in one argument', () => {

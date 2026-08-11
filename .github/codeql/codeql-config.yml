@@ -1,0 +1,24 @@
+name: Raven Forge
+
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+# Two queries in security-extended are written for servers and fire structurally
+# on a desktop downloader. Raven Forge exists to fetch version metadata, JREs,
+# loaders and mods over HTTPS and write them to disk; both of these describe that
+# and nothing else, once per download call site, forever.
+#
+#   js/http-to-file-access  "arbitrary file upload / might indicate a backdoor"
+#   js/file-access-to-http  "unauthorized information disclosure"
+#
+# What actually protects those paths is checked elsewhere and stays checked: the
+# downloads are hash-verified (src/core/mods/integrity.ts), the manifest is
+# signature-verified, and the queries that catch remote data *choosing* a path —
+# js/path-injection, js/zip-slip — are still on. Excluding these two is what
+# keeps the alert list something worth reading.
+query-filters:
+  - exclude:
+      id: js/http-to-file-access
+  - exclude:
+      id: js/file-access-to-http

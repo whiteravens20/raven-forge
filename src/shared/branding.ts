@@ -34,6 +34,30 @@ export const DEFAULT_ANNOUNCEMENT_FEED_URL = `${PACKS_SITE}/raven-forge/announce
 export const WHITE_RAVENS_PACKS_URL = `${PACKS_SITE}/packs.json`;
 
 /**
+ * Whether a manifest URL is one the publisher serves and signs.
+ *
+ * First-party manifests live under the packs site above and arrive signed with
+ * the built-in key, so they are held to that signature no matter what the player
+ * has configured — see `assertManifestTrusted`. A manifest anywhere else is the
+ * player's own address and keeps the opt-in policy. Matching on origin + path
+ * rather than a flag stored on the profile means a first-party URL pasted by
+ * hand is treated exactly like one the catalogue offered, and a look-alike host
+ * cannot inherit the trust by naming itself similarly.
+ */
+export function isFirstPartyManifestUrl(url: string): boolean {
+  try {
+    const target = new URL(url);
+    const base = new URL(PACKS_SITE);
+    return (
+      target.origin === base.origin &&
+      (target.pathname === base.pathname || target.pathname.startsWith(`${base.pathname}/`))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The key White Ravens signs its manifests with, compiled in.
  *
  * Shipped rather than downloaded, and that is the whole point: a key fetched

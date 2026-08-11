@@ -2,12 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import {
-  expectedHash,
-  fileMatches,
-  hashFile,
-  verifyDownload,
-} from '../src/core/mods/integrity';
+import { expectedHash, fileMatches, hashFile, verifyDownload } from '../src/core/mods/integrity';
 
 // `expectedHash` only picks between fields, so these are well-formed but
 // arbitrary. Anything that has to match a real file uses `real.*` below.

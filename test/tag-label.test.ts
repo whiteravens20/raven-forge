@@ -38,9 +38,7 @@ describe('tagLabel', () => {
     ['quilt', 'Quilt'],
     ['iris', 'Iris'],
     ['canvas', 'Canvas'],
-  ])('needs no special case for %s', (input, expected) =>
-    expect(tagLabel(input)).toBe(expected),
-  );
+  ])('needs no special case for %s', (input, expected) => expect(tagLabel(input)).toBe(expected));
 
   it('does not throw on an empty tag', () => {
     expect(tagLabel('')).toBe('');

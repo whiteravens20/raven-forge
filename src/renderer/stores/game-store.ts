@@ -36,20 +36,17 @@ interface GameStore {
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
-  // Subscribe to game events once
-  let subscribed = false;
-  if (!subscribed) {
-    api.on('game:started', (pid) => {
-      get().addRunning(pid);
-    });
-    api.on('game:exited', (info) => {
-      get().removeRunning(info.profileId, info);
-      // Main has just folded this session into the profile's play stats; re-read
-      // so "last played" and the hour count update without a navigation.
-      void useProfileStore.getState().load();
-    });
-    subscribed = true;
-  }
+  // Subscribed once, here: this factory runs a single time, when the store is
+  // created. The flag that used to guard it could never be anything but false.
+  api.on('game:started', (pid) => {
+    get().addRunning(pid);
+  });
+  api.on('game:exited', (info) => {
+    get().removeRunning(info.profileId, info);
+    // Main has just folded this session into the profile's play stats; re-read
+    // so "last played" and the hour count update without a navigation.
+    void useProfileStore.getState().load();
+  });
 
   return {
     running: new Set(),
