@@ -2,7 +2,7 @@
   <img src="assets/brand/logo.svg" alt="Raven Forge — Minecraft: Java Edition launcher" width="640">
 </p>
 
-> **⚠️ EARLY DEVELOPMENT — This project is in active early development. Expect breaking changes, missing features, incomplete UI, and rough edges. Not ready for production use. Contributions and feedback are welcome!**
+> **🧪 TESTING & DEVELOPMENT — Raven Forge is usable today, but it is still in testing and active development. Some features are still landing, a few edges are rough, and details may change between releases. Bug reports, feedback and contributions are very welcome!**
 
 Custom Minecraft: Java Edition launcher with mod management, auto-sync from server manifests, and server profiles.
 
