@@ -38,6 +38,7 @@ export function HomePage() {
   const dismissedIds = useNewsStore((s) => s.dismissedIds);
   const dismiss = useNewsStore((s) => s.dismiss);
   const refreshNews = useNewsStore((s) => s.refresh);
+  const feedError = useNewsStore((s) => s.feedError);
 
   const settings = useSettingsStore((s) => s.settings);
 
@@ -335,6 +336,16 @@ export function HomePage() {
             <RefreshCw size={14} />
           </button>
         </div>
+
+        {/* A feed that cannot be reached says so. Left silent, a dead or
+            mistyped URL is indistinguishable from a quiet week — the entries
+            below simply stop being current and nothing marks the moment. */}
+        {feedError && (
+          <p className="mb-2 text-xs text-rf-warning">
+            {news.length > 0 ? t('home.newsStale') : t('home.newsUnavailable')}
+          </p>
+        )}
+
         <NewsStrip
           items={news}
           onOpen={(item) =>

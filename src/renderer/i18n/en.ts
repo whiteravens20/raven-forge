@@ -142,6 +142,8 @@ export const en = {
   'home.refreshNews': 'Refresh news and announcements',
   'home.newsOlder': 'Older news',
   'home.newsNewer': 'Newer news',
+  'home.newsStale': 'Could not refresh the feed — these are the last entries loaded.',
+  'home.newsUnavailable': 'Could not load the news feed. Check the feed address in Settings.',
   'news.openInBrowser': 'Open in browser',
   'news.noBody': 'This entry carries no further text.',
   'home.ram': '{mb} MB RAM',

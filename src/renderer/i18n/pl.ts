@@ -131,6 +131,9 @@ export const pl: Translations = {
   'home.refreshNews': 'Odśwież aktualności i ogłoszenia',
   'home.newsOlder': 'Starsze aktualności',
   'home.newsNewer': 'Nowsze aktualności',
+  'home.newsStale': 'Nie udało się odświeżyć kanału — to ostatnie wczytane wpisy.',
+  'home.newsUnavailable':
+    'Nie udało się wczytać kanału aktualności. Sprawdź adres kanału w Ustawieniach.',
   'news.openInBrowser': 'Otwórz w przeglądarce',
   'news.noBody': 'Ten wpis nie ma dalszej treści.',
   'home.ram': '{mb} MB RAM',
