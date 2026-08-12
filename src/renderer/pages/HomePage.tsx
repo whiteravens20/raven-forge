@@ -297,8 +297,12 @@ export function HomePage() {
           </p>
         )}
 
-        {/* Console toggle */}
-        {selectedId && settings?.showLiveConsole && runningNow && (
+        {/* Console toggle. Deliberately outlives the game: gated on `runningNow`
+            alone it vanished the instant the game exited and left an open
+            console that only its own ✕ could dismiss. The log is worth keeping
+            after an exit — that is when it explains something — so the console
+            stays, and the button that closes it stays with it. */}
+        {selectedId && settings?.showLiveConsole && (runningNow || isConsoleVisible) && (
           <Button
             variant="ghost"
             size="sm"
@@ -310,7 +314,7 @@ export function HomePage() {
         )}
 
         {/* Live console */}
-        {selectedId && isConsoleVisible && (
+        {selectedId && settings?.showLiveConsole && isConsoleVisible && (
           <div className="w-full max-w-2xl">
             <LiveConsole profileId={selectedId} onClose={() => toggleConsole(selectedId, false)} />
           </div>
