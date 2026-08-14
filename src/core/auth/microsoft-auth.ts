@@ -304,7 +304,7 @@ async function authenticateMinecraft(xstsToken: string, userHash: string): Promi
 interface McProfile {
   id: string;
   name: string;
-  skins?: Array<{ url: string }>;
+  skins?: Array<{ url: string; state?: string }>;
 }
 
 async function getMinecraftProfile(mcAccessToken: string): Promise<McProfile> {
@@ -320,6 +320,29 @@ async function getMinecraftProfile(mcAccessToken: string): Promise<McProfile> {
   }
 
   return res.json() as Promise<McProfile>;
+}
+
+/**
+ * The skin the player is currently wearing, as a URL the renderer can load.
+ *
+ * Two corrections to what the profile endpoint hands back.
+ *
+ * The `skins` array lists what the account has uploaded and marks one `ACTIVE`;
+ * the worn skin is not reliably first, so taking `[0]` can show a texture the
+ * player replaced long ago.
+ *
+ * And the `url` comes back as plain `http://textures.minecraft.net/...` — has
+ * done for years. The renderer's policy is `img-src 'self' data: https:`
+ * (`src/main/security.ts`), so the browser refused to load it and the account
+ * showed a broken image. The same host serves the same texture over TLS, so
+ * upgrading the scheme is the whole fix; widening the policy to `http:` to
+ * accommodate one URL would be trading the app's transport guarantees for a
+ * 40px picture.
+ */
+export function activeSkinUrl(profile: McProfile): string | undefined {
+  const skins = profile.skins ?? [];
+  const skin = skins.find((s) => s.state === 'ACTIVE') ?? skins[0];
+  return skin?.url.replace(/^http:\/\//i, 'https://');
 }
 
 // ── Auth broadcast to renderer ─────────────────────────────
@@ -353,7 +376,7 @@ async function fullMicrosoftAuthChain(
     uuid: profile.id,
     username: profile.name,
     type: 'microsoft',
-    skinUrl: profile.skins?.[0]?.url,
+    skinUrl: activeSkinUrl(profile),
     lastAuthenticated: new Date().toISOString(),
   };
 

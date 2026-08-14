@@ -1,10 +1,48 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { LogOut, UserPlus, Shield, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '@stores/auth-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { useT } from '@renderer/i18n';
+
+/**
+ * A player's head, cropped out of their skin.
+ *
+ * What Mojang gives us is the whole 64×64 skin sheet — the unwrapped texture for
+ * the entire body. Drawing that into a 40px box, as this page used to, squashes
+ * the whole atlas into a square: arms, legs and torso included, no face to speak
+ * of. The head's front is the 8×8 region at (8,8), and the hat layer that sits
+ * over it is the 8×8 at (40,8), so both are scaled up and stacked here.
+ *
+ * The arithmetic falls out of the head being exactly an eighth of the sheet: the
+ * sheet scales to `size * 8`, which makes every source pixel `size / 8` wide and
+ * every 8px step in the source exactly one `size`. Nearest-neighbour keeps it a
+ * Minecraft head rather than a smear.
+ *
+ * Cropping here, rather than asking Crafatar or mc-heads for a ready-made
+ * avatar, keeps the player's UUID from being handed to a third party for a
+ * picture we already have the pixels for.
+ */
+function SkinHead({ url, size = 40 }: { url: string; size?: number }) {
+  const layer: CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    backgroundImage: `url("${url}")`,
+    backgroundSize: `${size * 8}px ${size * 8}px`,
+    imageRendering: 'pixelated',
+  };
+
+  return (
+    <div
+      className="relative shrink-0 overflow-hidden rounded bg-rf-bg-tertiary"
+      style={{ width: size, height: size }}
+    >
+      <div style={{ ...layer, backgroundPosition: `-${size}px -${size}px` }} />
+      <div style={{ ...layer, backgroundPosition: `-${size * 5}px -${size}px` }} />
+    </div>
+  );
+}
 
 export function AccountsPage() {
   const accounts = useAuthStore((s) => s.accounts);
@@ -129,7 +167,7 @@ export function AccountsPage() {
               }`}
             >
               {account.skinUrl ? (
-                <img src={account.skinUrl} alt="" className="h-10 w-10 rounded" />
+                <SkinHead url={account.skinUrl} />
               ) : (
                 <div className="flex h-10 w-10 items-center justify-center rounded bg-rf-bg-tertiary text-rf-text-muted text-sm font-bold">
                   {account.username[0].toUpperCase()}
