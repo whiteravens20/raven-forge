@@ -1,10 +1,21 @@
 import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
-import { LogOut, UserPlus, Shield, ShieldAlert } from 'lucide-react';
+import { LogOut, UserPlus, Shield, ShieldAlert, ExternalLink } from 'lucide-react';
 import { useAuthStore } from '@stores/auth-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { useT } from '@renderer/i18n';
+
+const api = window.ravenforge;
+
+/**
+ * Where a Microsoft account is actually managed — skin, cape and username.
+ *
+ * Deliberately without the locale segment minecraft.net uses in its paths: left
+ * off, the site redirects to the visitor's own locale, which is more use to
+ * somebody not reading English than a hardcoded `/en-us/` would be.
+ */
+const MC_ACCOUNT_URL = 'https://www.minecraft.net/msaprofile/mygames/editprofile';
 
 /**
  * A player's head, cropped out of their skin.
@@ -186,6 +197,19 @@ export function AccountsPage() {
                 {account.id !== activeAccountId && (
                   <Button variant="ghost" size="sm" onClick={() => setActive(account.id)}>
                     {t('accounts.setActive')}
+                  </Button>
+                )}
+                {/* Skin, cape and username all live on minecraft.net, and the
+                    launcher is the wrong place to reimplement any of them. An
+                    offline account has nothing on the other end of this link. */}
+                {account.type === 'microsoft' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<ExternalLink size={12} />}
+                    onClick={() => void api.system.openUrl(MC_ACCOUNT_URL)}
+                  >
+                    {t('accounts.manage')}
                   </Button>
                 )}
                 <Button

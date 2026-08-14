@@ -326,6 +326,7 @@ export const en = {
   'accounts.empty': 'No accounts — sign in above',
   'accounts.active': '• active',
   'accounts.setActive': 'Set active',
+  'accounts.manage': 'Account settings',
   'accounts.logout': 'Sign out',
   'accounts.loginFailed': 'Sign-in failed',
   'accounts.plaintextTitle': 'Credentials are not in the system keychain',

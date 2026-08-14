@@ -330,6 +330,7 @@ export const pl: Translations = {
   'accounts.empty': 'Brak kont — zaloguj się powyżej',
   'accounts.active': '• aktywne',
   'accounts.setActive': 'Ustaw aktywne',
+  'accounts.manage': 'Ustawienia konta',
   'accounts.logout': 'Wyloguj',
   'accounts.loginFailed': 'Logowanie nie powiodło się',
   'accounts.plaintextTitle': 'Dane logowania poza pęcherzem kluczy',
