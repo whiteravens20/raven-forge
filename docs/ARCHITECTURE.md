@@ -278,7 +278,7 @@ fixed and hides the ones that were not.
 - **The `AUTH_UNREACHABLE` offer is proven against real unreachable hosts.** Not
   stubs: the launcher's own proxy setting was pointed at a local CONNECT proxy
   that refused the four auth hosts and tunnelled everything else, which is the
-  only way to reach the code at all — the session token is resolved *after* Java,
+  only way to reach the code at all — the session token is resolved _after_ Java,
   the client jar, libraries and assets, so cutting the network wholesale fails
   several steps too early. With a Microsoft account whose session had expired,
   the refresh failed at `login.microsoftonline.com`, `isNetworkFailure` sorted it
