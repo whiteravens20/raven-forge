@@ -110,6 +110,8 @@ export const pl: Translations = {
 
   // ── Home ─────────────────────────────────────────────────
   'home.signedInAs': 'Zalogowano jako',
+  'home.accountMicrosoft': 'konto Microsoft',
+  'home.accountOffline': 'konto offline',
   'home.notSignedIn': 'Nie zalogowano — przejdź do zakładki Konta',
   'home.noProfiles': 'Brak profili — utwórz nowy w zakładce Profile',
   'home.play': 'GRAJ',
@@ -131,6 +133,9 @@ export const pl: Translations = {
   'home.refreshNews': 'Odśwież aktualności i ogłoszenia',
   'home.newsOlder': 'Starsze aktualności',
   'home.newsNewer': 'Nowsze aktualności',
+  'home.newsStale': 'Nie udało się odświeżyć kanału — to ostatnie wczytane wpisy.',
+  'home.newsUnavailable':
+    'Nie udało się wczytać kanału aktualności. Sprawdź adres kanału w Ustawieniach.',
   'news.openInBrowser': 'Otwórz w przeglądarce',
   'news.noBody': 'Ten wpis nie ma dalszej treści.',
   'home.ram': '{mb} MB RAM',
@@ -327,6 +332,7 @@ export const pl: Translations = {
   'accounts.empty': 'Brak kont — zaloguj się powyżej',
   'accounts.active': '• aktywne',
   'accounts.setActive': 'Ustaw aktywne',
+  'accounts.manage': 'Ustawienia konta',
   'accounts.logout': 'Wyloguj',
   'accounts.loginFailed': 'Logowanie nie powiodło się',
   'accounts.plaintextTitle': 'Dane logowania poza pęcherzem kluczy',

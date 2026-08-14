@@ -46,7 +46,7 @@ import type {
 } from './ipc/mods';
 import type { JavaInstallation } from './ipc/java';
 import type { GlobalSettings, TrustedKey } from './ipc/settings';
-import type { Announcement, NewsItem } from './ipc/news';
+import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
 import type { ManifestVerification, UpdateCheck, UpdateInfo } from './ipc/updater';
 import type { LogTail, SystemInfo } from './ipc/system';
@@ -215,10 +215,10 @@ export interface InvokeChannels {
   'settings:remove-trusted-key': (publicKey: string) => Promise<IpcResult<void>>;
 
   // -- News & Announcements --
-  'news:get': () => Promise<IpcResult<NewsItem[]>>;
-  'news:refresh': () => Promise<IpcResult<NewsItem[]>>;
-  'announcements:get': () => Promise<IpcResult<Announcement[]>>;
-  'announcements:refresh': () => Promise<IpcResult<Announcement[]>>;
+  'news:get': () => Promise<IpcResult<FeedResult<NewsItem>>>;
+  'news:refresh': () => Promise<IpcResult<FeedResult<NewsItem>>>;
+  'announcements:get': () => Promise<IpcResult<FeedResult<Announcement>>>;
+  'announcements:refresh': () => Promise<IpcResult<FeedResult<Announcement>>>;
   'announcements:dismiss': (id: string) => Promise<IpcResult<void>>;
 
   // -- Manifest Verification --

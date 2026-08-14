@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { NewsItem, Announcement } from '../../shared/ipc-types';
+import type { NewsItem, Announcement, FeedResult } from '../../shared/ipc-types';
 import { newsItemSchema, announcementSchema } from '../../shared/validators';
 import { getSettings } from '../config/settings-manager';
 import { modrinthUserAgent } from '../net/user-agent';
@@ -13,10 +13,9 @@ import { log } from '../../main/logger';
  * cache on nothing meant the placeholders fetched at startup — when no URL was
  * set — stayed cached, so a URL entered afterwards did nothing until restart.
  */
-interface FeedCache<T> {
+interface FeedCache<T> extends FeedResult<T> {
   /** Empty string means no feed is configured, so nothing was fetched. */
   source: string;
-  items: T[];
 }
 
 let newsCache: FeedCache<NewsItem> | null = null;
@@ -87,12 +86,17 @@ async function fetchFeed<T>(
 /**
  * Resolve a feed, reusing the cache only when it belongs to the same URL.
  *
- * Every outcome that is not a successful fetch shows the last good result for
- * that URL, or an empty section. There is deliberately no placeholder copy to
- * fall back to: presenting demo text as the server's announcements is worse
- * than showing nothing, and an emptied feed URL is a decision, not a gap to
- * fill in. A fresh install has White Ravens' feeds set (see `branding.ts`), so
- * the no-URL case only arises when somebody cleared the field on purpose.
+ * A failed fetch keeps the last good result for that URL and says so, rather
+ * than passing stale articles off as current — that silence is what let a dead
+ * feed sit on the home page looking like a quiet week. There is deliberately no
+ * placeholder copy to fall back to: presenting demo text as the server's
+ * announcements is worse than showing nothing, and an emptied feed URL is a
+ * decision, not a gap to fill in. A fresh install has White Ravens' feeds set
+ * (see `branding.ts`), so the no-URL case only arises when somebody cleared the
+ * field on purpose.
+ *
+ * A cached *failure* is never served: an unforced call retries, so a feed that
+ * was down at startup is not written off for the rest of the session.
  */
 async function loadFeed<T>(
   cache: FeedCache<T> | null,
@@ -101,23 +105,26 @@ async function loadFeed<T>(
   label: string,
   forceRefresh: boolean,
 ): Promise<FeedCache<T>> {
-  if (!url) return { source: '', items: [] };
-  if (cache?.source === url && !forceRefresh) return cache;
+  if (!url) return { source: '', items: [], failed: false };
+  if (cache?.source === url && !cache.failed && !forceRefresh) return cache;
 
   const fetched = await fetchFeed(url, schema, label, forceRefresh);
-  if (fetched) return { source: url, items: fetched };
-  return cache?.source === url ? cache : { source: url, items: [] };
+  if (fetched) return { source: url, items: fetched, failed: false };
+
+  // Same URL: keep what it last gave us. Different URL: nothing, because the
+  // previous feed's articles are not this one's.
+  return { source: url, items: cache?.source === url ? cache.items : [], failed: true };
 }
 
 /** News for the home page. */
-export async function fetchNews(forceRefresh = false): Promise<NewsItem[]> {
+export async function fetchNews(forceRefresh = false): Promise<FeedResult<NewsItem>> {
   const { newsFeedUrl } = await getSettings();
   newsCache = await loadFeed(newsCache, newsFeedUrl, newsItemSchema, 'News', forceRefresh);
-  return newsCache.items;
+  return { items: newsCache.items, failed: newsCache.failed };
 }
 
 /** Same contract as {@link fetchNews}, for the banner strip. */
-export async function fetchAnnouncements(forceRefresh = false): Promise<Announcement[]> {
+export async function fetchAnnouncements(forceRefresh = false): Promise<FeedResult<Announcement>> {
   const { announcementFeedUrl } = await getSettings();
   announcementsCache = await loadFeed(
     announcementsCache,
@@ -126,5 +133,5 @@ export async function fetchAnnouncements(forceRefresh = false): Promise<Announce
     'Announcements',
     forceRefresh,
   );
-  return announcementsCache.items;
+  return { items: announcementsCache.items, failed: announcementsCache.failed };
 }

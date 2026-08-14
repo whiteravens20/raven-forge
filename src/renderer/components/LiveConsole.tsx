@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Terminal, X } from 'lucide-react';
-import { useSettingsStore } from '@stores/settings-store';
 import { useLocale, useT } from '@renderer/i18n';
 import type { GameLogLine } from '@shared/ipc-types';
 
@@ -11,8 +10,14 @@ interface LiveConsoleProps {
   onClose: () => void;
 }
 
+/**
+ * The game's output, as it arrives.
+ *
+ * Whether the console is offered at all is the caller's decision — it owns the
+ * `showLiveConsole` setting and the visibility toggle. This component assumes it
+ * is only mounted when it should be shown.
+ */
 export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
-  const settings = useSettingsStore((s) => s.settings);
   const t = useT();
   const locale = useLocale();
   const [lines, setLines] = useState<GameLogLine[]>([]);
@@ -20,12 +25,9 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef(true);
 
-  const isLive = settings?.showLiveConsole ?? false;
-
   // Seed from main's ring buffer: the console is usually opened well after the
   // game started, and without this it sits empty until the next line arrives.
   useEffect(() => {
-    if (!isLive) return;
     let cancelled = false;
     void api.game.getLogTail(profileId).then((result) => {
       if (cancelled || !result.success || !result.data) return;
@@ -43,11 +45,9 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
     return () => {
       cancelled = true;
     };
-  }, [profileId, isLive]);
+  }, [profileId]);
 
   useEffect(() => {
-    if (!isLive) return;
-
     const handleLog = (_pid: string, line: GameLogLine) => {
       if (_pid !== profileId) return;
       setLines((prev) => {
@@ -58,7 +58,17 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
     };
 
     return api.on('game:log', handleLog);
-  }, [profileId, isLive]);
+  }, [profileId]);
+
+  // The console survives the game exiting, so a second launch would otherwise
+  // append to the previous session's output and present the two as one run.
+  // Main empties its ring buffer when it spawns the process; empty ours on the
+  // event that spawn produces.
+  useEffect(() => {
+    return api.on('game:started', (pid) => {
+      if (pid === profileId) setLines([]);
+    });
+  }, [profileId]);
 
   // Auto-scroll to bottom
   const handleScroll = () => {
@@ -73,8 +83,6 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [lines]);
-
-  if (!isLive) return null;
 
   return (
     <div

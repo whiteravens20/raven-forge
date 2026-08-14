@@ -263,14 +263,28 @@ The `package.json` `main` field points at `dist/main/index.js`; the preload refe
 
 ## Open implementation gaps
 
-Last checked against the code on **2026-08-07**. Keep it that way — a stale gap
+Last checked against the code on **2026-08-14**. Keep it that way — a stale gap
 list is worse than none, because it sends people looking for problems that were
 fixed and hides the ones that were not.
 
-- **Microsoft login is untested against a real Azure app.** The OAuth → Xbox Live
-  → Minecraft JWT chain is written and the client id is injected at build time,
-  but no approved application exists yet, so the whole path — including the
-  `AUTH_UNREACHABLE` offline offer — has only ever been exercised against stubs.
+- **Microsoft login is proven against an approved Azure app.** The OAuth → Xbox
+  Live → Minecraft JWT chain has signed a real account in on Windows and come
+  back with its profile, so the path is no longer stub-only. What it exposed is
+  that the profile endpoint hands back the skin over plain `http://` and offers
+  the whole 64×64 sheet rather than a head — the renderer's `img-src` refused the
+  first and the account rendered a broken image, which no test could have caught
+  because nothing in the auth chain failed. Both are handled in `activeSkinUrl`
+  and on the accounts page.
+- **The `AUTH_UNREACHABLE` offer is proven against real unreachable hosts.** Not
+  stubs: the launcher's own proxy setting was pointed at a local CONNECT proxy
+  that refused the four auth hosts and tunnelled everything else, which is the
+  only way to reach the code at all — the session token is resolved _after_ Java,
+  the client jar, libraries and assets, so cutting the network wholesale fails
+  several steps too early. With a Microsoft account whose session had expired,
+  the refresh failed at `login.microsoftonline.com`, `isNetworkFailure` sorted it
+  from a rejection, the renderer offered offline play, and accepting the offer
+  took the `offline && type === 'microsoft'` branch and launched the game with
+  the `0` token sentinel.
 - **The launcher has never updated itself from a published release.** The update
   check, platform matrix and install-before-play path are covered by tests, but
   there is no tagged release to update _from_.

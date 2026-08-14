@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { NewsItem, Announcement } from '@shared/ipc-types';
+import type { NewsItem, Announcement, FeedResult, IpcResult } from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
@@ -8,10 +8,24 @@ interface NewsStore {
   announcements: Announcement[];
   dismissedIds: Set<string>;
   loading: boolean;
+  /**
+   * Set when the last attempt at either feed failed.
+   *
+   * One flag for both because one button refreshes both, and that button is
+   * where the page reports it. Whichever half failed, something the user asked
+   * for did not happen, and saying nothing is how a dead feed URL used to pass
+   * for a slow news week.
+   */
+  feedError: boolean;
 
   load: () => Promise<void>;
   refresh: () => Promise<void>;
   dismiss: (id: string) => void;
+}
+
+/** A dead channel and a dead feed are the same news to the page. */
+function failed<T>(res: IpcResult<FeedResult<T>>): boolean {
+  return !res.success || (res.data?.failed ?? true);
 }
 
 export const useNewsStore = create<NewsStore>((set, get) => ({
@@ -21,13 +35,15 @@ export const useNewsStore = create<NewsStore>((set, get) => ({
     JSON.parse(localStorage.getItem('rf-dismissed-announcements') ?? '[]') as string[],
   ),
   loading: false,
+  feedError: false,
 
   load: async () => {
     set({ loading: true });
     const [newsRes, annRes] = await Promise.all([api.news.get(), api.announcements.get()]);
     set({
-      news: newsRes.success && newsRes.data ? newsRes.data : [],
-      announcements: annRes.success && annRes.data ? annRes.data : [],
+      news: newsRes.data?.items ?? [],
+      announcements: annRes.data?.items ?? [],
+      feedError: failed(newsRes) || failed(annRes),
       loading: false,
     });
   },
@@ -39,8 +55,12 @@ export const useNewsStore = create<NewsStore>((set, get) => ({
     set({ loading: true });
     const [newsRes, annRes] = await Promise.all([api.news.refresh(), api.announcements.refresh()]);
     set({
-      ...(newsRes.success && newsRes.data ? { news: newsRes.data } : {}),
-      ...(annRes.success && annRes.data ? { announcements: annRes.data } : {}),
+      // A failed fetch still carries the last good items, so this assigns rather
+      // than preserves. The guard is for the call itself failing, which carries
+      // nothing at all — and then what is on screen is the best we have.
+      ...(newsRes.data ? { news: newsRes.data.items } : {}),
+      ...(annRes.data ? { announcements: annRes.data.items } : {}),
+      feedError: failed(newsRes) || failed(annRes),
       loading: false,
     });
   },

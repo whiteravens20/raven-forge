@@ -121,6 +121,8 @@ export const en = {
 
   // ── Home ─────────────────────────────────────────────────
   'home.signedInAs': 'Signed in as',
+  'home.accountMicrosoft': 'Microsoft account',
+  'home.accountOffline': 'offline account',
   'home.notSignedIn': 'Not signed in — go to the Accounts tab',
   'home.noProfiles': 'No profiles — create one in the Profiles tab',
   'home.play': 'PLAY',
@@ -142,6 +144,8 @@ export const en = {
   'home.refreshNews': 'Refresh news and announcements',
   'home.newsOlder': 'Older news',
   'home.newsNewer': 'Newer news',
+  'home.newsStale': 'Could not refresh the feed — these are the last entries loaded.',
+  'home.newsUnavailable': 'Could not load the news feed. Check the feed address in Settings.',
   'news.openInBrowser': 'Open in browser',
   'news.noBody': 'This entry carries no further text.',
   'home.ram': '{mb} MB RAM',
@@ -324,6 +328,7 @@ export const en = {
   'accounts.empty': 'No accounts — sign in above',
   'accounts.active': '• active',
   'accounts.setActive': 'Set active',
+  'accounts.manage': 'Account settings',
   'accounts.logout': 'Sign out',
   'accounts.loginFailed': 'Sign-in failed',
   'accounts.plaintextTitle': 'Credentials are not in the system keychain',

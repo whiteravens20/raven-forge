@@ -45,8 +45,14 @@ contacts, or anything else in the account.
 created Azure app **cannot** talk to `api.minecraftservices.com` until it is
 reviewed. Until then the login chain runs fine right up to the last step and
 then fails with **HTTP 403 / "Invalid app registration"**. You submit a form and
-wait. Budget days, not minutes. Steps 5–7 below cover this, and the order
-matters — you must attempt a login _before_ you request review.
+wait. Steps 5–7 below cover this, and the order matters — you must attempt a
+login _before_ you request review.
+
+There is no published turnaround, and nobody should promise you one: the form
+issues no ticket number and offers no way to chase a submission. Plan for weeks
+rather than days, and see step 7 for the part that catches people out — approval
+is not necessarily announced, so the way to find out is to try logging in again,
+not to watch your inbox.
 
 ---
 
@@ -159,11 +165,29 @@ The form asks for your **Application (client) ID** and **Directory (tenant) ID**
 from step 3. Describe the app honestly — a third-party Minecraft: Java Edition
 launcher for personal/community use.
 
-## Step 7 — Wait, then verify
+Then give the reviewer something to check. A single sentence is true but
+unverifiable, and on the other end of the form is a person with no way to tell
+your app from anyone else's. If your launcher is public, say where: repository,
+release page, privacy policy. Say that it is a public OAuth client holding no
+secret, that the only scope it asks for is `XboxLive.signin`, and that players
+sign in with their own accounts. None of that changes what you are asking for —
+it changes how long someone has to spend deciding whether to grant it.
+
+## Step 7 — Wait, then verify by trying, not by waiting
 
 Approval is a manual review, and changes can take up to a further 24 hours to
-propagate after it lands. When it goes through, repeat step 5 — the same click
-that failed with a 403 should now come back with your username and skin.
+propagate after it lands.
+
+**Do not wait for a confirmation email.** Approval is applied to your app id and
+may arrive with no message at all, so silence tells you nothing — an app that was
+granted access weeks ago looks exactly like one still in the queue. The only
+authoritative answer is the API itself: repeat step 5, and the same click that
+failed with a 403 comes back with your username and skin.
+
+Re-test on a schedule you can live with. If it is still failing after several
+weeks, submit the form again with the fuller description from step 6 rather than
+resending the same one — a duplicate of a thin request is still a thin request,
+and there is no queue position to lose.
 
 ---
 

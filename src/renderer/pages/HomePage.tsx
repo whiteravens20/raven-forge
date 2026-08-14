@@ -38,6 +38,7 @@ export function HomePage() {
   const dismissedIds = useNewsStore((s) => s.dismissedIds);
   const dismiss = useNewsStore((s) => s.dismiss);
   const refreshNews = useNewsStore((s) => s.refresh);
+  const feedError = useNewsStore((s) => s.feedError);
 
   const settings = useSettingsStore((s) => s.settings);
 
@@ -186,7 +187,18 @@ export function HomePage() {
             <p className="text-sm text-rf-text-secondary">
               {t('home.signedInAs')}{' '}
               <span className="font-medium text-rf-text">{activeAccount.username}</span>
-              <span className="ml-1 text-rf-text-muted">({activeAccount.type})</span>
+              {/* The union member itself was being printed here, so the line read
+                  "Zalogowano jako Nick (microsoft)" — an internal identifier, lowercase
+                  and untranslated, in the middle of a Polish sentence. */}
+              <span className="ml-1 text-rf-text-muted">
+                (
+                {t(
+                  activeAccount.type === 'microsoft'
+                    ? 'home.accountMicrosoft'
+                    : 'home.accountOffline',
+                )}
+                )
+              </span>
             </p>
           ) : (
             <p className="text-sm text-rf-warning">{t('home.notSignedIn')}</p>
@@ -297,8 +309,12 @@ export function HomePage() {
           </p>
         )}
 
-        {/* Console toggle */}
-        {selectedId && settings?.showLiveConsole && runningNow && (
+        {/* Console toggle. Deliberately outlives the game: gated on `runningNow`
+            alone it vanished the instant the game exited and left an open
+            console that only its own ✕ could dismiss. The log is worth keeping
+            after an exit — that is when it explains something — so the console
+            stays, and the button that closes it stays with it. */}
+        {selectedId && settings?.showLiveConsole && (runningNow || isConsoleVisible) && (
           <Button
             variant="ghost"
             size="sm"
@@ -310,7 +326,7 @@ export function HomePage() {
         )}
 
         {/* Live console */}
-        {selectedId && isConsoleVisible && (
+        {selectedId && settings?.showLiveConsole && isConsoleVisible && (
           <div className="w-full max-w-2xl">
             <LiveConsole profileId={selectedId} onClose={() => toggleConsole(selectedId, false)} />
           </div>
@@ -331,6 +347,16 @@ export function HomePage() {
             <RefreshCw size={14} />
           </button>
         </div>
+
+        {/* A feed that cannot be reached says so. Left silent, a dead or
+            mistyped URL is indistinguishable from a quiet week — the entries
+            below simply stop being current and nothing marks the moment. */}
+        {feedError && (
+          <p className="mb-2 text-xs text-rf-warning">
+            {news.length > 0 ? t('home.newsStale') : t('home.newsUnavailable')}
+          </p>
+        )}
+
         <NewsStrip
           items={news}
           onOpen={(item) =>
