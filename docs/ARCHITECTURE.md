@@ -274,8 +274,17 @@ fixed and hides the ones that were not.
   the whole 64×64 sheet rather than a head — the renderer's `img-src` refused the
   first and the account rendered a broken image, which no test could have caught
   because nothing in the auth chain failed. Both are handled in `activeSkinUrl`
-  and on the accounts page. Still unexercised: the `AUTH_UNREACHABLE` offline
-  offer, which needs the auth hosts to be unreachable rather than merely stubbed.
+  and on the accounts page.
+- **The `AUTH_UNREACHABLE` offer is proven against real unreachable hosts.** Not
+  stubs: the launcher's own proxy setting was pointed at a local CONNECT proxy
+  that refused the four auth hosts and tunnelled everything else, which is the
+  only way to reach the code at all — the session token is resolved *after* Java,
+  the client jar, libraries and assets, so cutting the network wholesale fails
+  several steps too early. With a Microsoft account whose session had expired,
+  the refresh failed at `login.microsoftonline.com`, `isNetworkFailure` sorted it
+  from a rejection, the renderer offered offline play, and accepting the offer
+  took the `offline && type === 'microsoft'` branch and launched the game with
+  the `0` token sentinel.
 - **The launcher has never updated itself from a published release.** The update
   check, platform matrix and install-before-play path are covered by tests, but
   there is no tagged release to update _from_.
