@@ -187,7 +187,18 @@ export function HomePage() {
             <p className="text-sm text-rf-text-secondary">
               {t('home.signedInAs')}{' '}
               <span className="font-medium text-rf-text">{activeAccount.username}</span>
-              <span className="ml-1 text-rf-text-muted">({activeAccount.type})</span>
+              {/* The union member itself was being printed here, so the line read
+                  "Zalogowano jako Nick (microsoft)" — an internal identifier, lowercase
+                  and untranslated, in the middle of a Polish sentence. */}
+              <span className="ml-1 text-rf-text-muted">
+                (
+                {t(
+                  activeAccount.type === 'microsoft'
+                    ? 'home.accountMicrosoft'
+                    : 'home.accountOffline',
+                )}
+                )
+              </span>
             </p>
           ) : (
             <p className="text-sm text-rf-warning">{t('home.notSignedIn')}</p>

@@ -110,6 +110,8 @@ export const pl: Translations = {
 
   // ── Home ─────────────────────────────────────────────────
   'home.signedInAs': 'Zalogowano jako',
+  'home.accountMicrosoft': 'konto Microsoft',
+  'home.accountOffline': 'konto offline',
   'home.notSignedIn': 'Nie zalogowano — przejdź do zakładki Konta',
   'home.noProfiles': 'Brak profili — utwórz nowy w zakładce Profile',
   'home.play': 'GRAJ',

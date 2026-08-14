@@ -121,6 +121,8 @@ export const en = {
 
   // ── Home ─────────────────────────────────────────────────
   'home.signedInAs': 'Signed in as',
+  'home.accountMicrosoft': 'Microsoft account',
+  'home.accountOffline': 'offline account',
   'home.notSignedIn': 'Not signed in — go to the Accounts tab',
   'home.noProfiles': 'No profiles — create one in the Profiles tab',
   'home.play': 'PLAY',
