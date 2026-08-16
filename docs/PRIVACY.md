@@ -265,6 +265,9 @@ read a report through before attaching it to a public issue.
 - **All launcher data:** quit the launcher and delete the data folder listed
   above. Nothing survives outside it except the OS keychain entries, which are
   removed by logging out first.
+- **Uninstalling:** removing the launcher and removing your data are separate
+  steps. On Windows the uninstaller asks which you want; on Linux the package
+  never touches your home directory. [UNINSTALL.md](UNINSTALL.md) covers both.
 - **On our side:** there is nothing to delete. We hold nothing.
 
 ---

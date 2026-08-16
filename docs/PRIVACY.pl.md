@@ -271,6 +271,9 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 - **Wszystkie dane launchera:** zamknij launcher i usuń wymieniony wyżej folder
   danych. Poza nim nie zostaje nic oprócz wpisów w magazynie poświadczeń
   systemu, które znikają, jeśli najpierw się wylogujesz.
+- **Odinstalowanie:** usunięcie launchera i usunięcie danych to dwie osobne
+  rzeczy. Na Windows deinstalator pyta, co zrobić; na Linuksie pakiet w ogóle nie
+  rusza katalogu domowego. Opisuje to [UNINSTALL.md](UNINSTALL.md).
 - **Po naszej stronie:** nie ma czego usuwać. Nie mamy niczego.
 
 ---
