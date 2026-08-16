@@ -75,7 +75,7 @@ npm run dev          # Vite renderer + tsc watch for main + Electron
 
 ### Microsoft login in development
 
-The Azure client ID is baked into `dist/` at build time by `scripts/inject-client-id.mjs`, and `RAVENFORGE_CLIENT_ID` overrides it at runtime. Without either, `loginMicrosoft()` fails with a readable message and you are limited to offline mode — which is fine for most UI work:
+The Azure client ID is baked into `dist/` at build time by `scripts/inject-build-ids.mjs`, and `RAVENFORGE_CLIENT_ID` overrides it at runtime. Without either, `loginMicrosoft()` fails with a readable message and you are limited to offline mode — which is fine for most UI work:
 
 ```bash
 RAVENFORGE_CLIENT_ID=<your-azure-app-id> npm run dev

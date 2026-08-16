@@ -46,9 +46,12 @@ authority: it names an application on a status line and nothing more. There is n
 client secret involved, nothing is authorised by it, and nothing can be done with
 somebody else's ID beyond making a status say their application's name.
 
-That is why it is compiled into the source rather than fed in as a build secret,
-unlike the Azure client ID's build-time injection — see
-[AZURE-SETUP.md](AZURE-SETUP.md), where the reasoning is different.
+**It is still not committed**, and the reason is forks rather than secrecy.
+Hardcoded, anyone who rebuilt this repo unchanged would ship builds declaring
+_our_ application: their players' statuses would read "Playing Raven Forge" and
+the portal's usage figures would be theirs mixed with ours. Injected at build
+time, a fork inherits nothing and simply gets the feature switched off — the same
+reasoning as [AZURE-SETUP.md](AZURE-SETUP.md), where the ID is likewise public.
 
 ---
 
@@ -60,13 +63,28 @@ unlike the Azure client ID's build-time injection — see
    set it up.
 2. **New Application**, name it `Raven Forge`. The name is what every player's
    status will read, so it is the one field worth getting right the first time.
-3. On **General Information**, copy the **Application ID**.
-4. Paste it into `DISCORD_APPLICATION_ID` in
-   [`src/shared/branding.ts`](../src/shared/branding.ts), replacing the empty
-   string.
+3. On **General Information**, copy the **Application ID** — 17–20 digits, no
+   dashes.
+4. Hand it to the build as `RAVENFORGE_DISCORD_APP_ID`. Nothing is edited in the
+   source; `scripts/inject-build-ids.mjs` bakes it into `dist/` and rejects a
+   value that is not a snowflake rather than shipping a build that silently
+   cannot connect.
 
-That is the whole functional part. Rebuild, switch the setting on under
-**Settings → Behaviour**, and start a profile with Discord running.
+```bash
+# a dev run
+RAVENFORGE_DISCORD_APP_ID=123456789012345678 npm run dev
+
+# a packaged build
+RAVENFORGE_DISCORD_APP_ID=123456789012345678 npm run dist:linux
+```
+
+For releases, set it as the repository **secret**
+`RAVENFORGE_DISCORD_APP_ID`; [release.yml](../.github/workflows/release.yml)
+passes it through. Unlike the Azure client ID, a missing one does not fail the
+release — the status feature is optional, so the build simply ships without it.
+
+That is the whole functional part. Switch the setting on under **Settings →
+Behaviour** and start a profile with Discord running.
 
 ---
 
@@ -110,7 +128,7 @@ The feature is fail-soft by design: every failure below is one line in
 
 | Symptom                            | Cause                                                                                                                                                       |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `no application ID compiled in`    | Step 4 above was not done, or the build predates it.                                                                                                        |
+| `no application ID compiled in`    | `RAVENFORGE_DISCORD_APP_ID` was not set for this build or this run. Step 4.                                                                                 |
 | `no Discord IPC socket found`      | Discord is not running, or only the browser client is — the desktop application is what opens the socket.                                                   |
 | Nothing appears, no log line       | The setting is off, or the player has **Settings → Activity Privacy → Display current activity as a status message** disabled in Discord itself.            |
 | A mod's status shows instead       | Presence mods (CraftPresence, Simple Discord RPC) declare their own activity, and Discord shows one at a time. Expected — turn off whichever you want less. |

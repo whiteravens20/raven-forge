@@ -28,7 +28,13 @@ import net from 'node:net';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { log } from '../../main/logger';
-import { DISCORD_APPLICATION_ID } from '../../shared/branding';
+import { BUILD_DISCORD_APP_ID } from './build-config';
+
+// Unconfigured builds stay runnable: the setting is still there, and switching
+// it on costs one log line rather than a failed launch.
+const APP_ID_PLACEHOLDER = 'REPLACE_WITH_YOUR_DISCORD_APP_ID';
+const APP_ID = process.env.RAVENFORGE_DISCORD_APP_ID ?? BUILD_DISCORD_APP_ID;
+const HAS_APP_ID = Boolean(APP_ID) && APP_ID !== APP_ID_PLACEHOLDER;
 
 /** Opcodes from Discord's IPC framing. */
 const OP_HANDSHAKE = 0;
@@ -189,7 +195,7 @@ function handshake(sock: net.Socket): Promise<boolean> {
     sock.on('data', onData);
     sock.once('error', onFailure);
     sock.once('close', onFailure);
-    sock.write(encodeFrame(OP_HANDSHAKE, { v: 1, client_id: DISCORD_APPLICATION_ID }));
+    sock.write(encodeFrame(OP_HANDSHAKE, { v: 1, client_id: APP_ID }));
   });
 }
 
@@ -215,7 +221,7 @@ function sendActivity(sock: net.Socket, activity: unknown): void {
  */
 export async function setGamePresence(presence: GamePresence): Promise<void> {
   try {
-    if (!DISCORD_APPLICATION_ID) {
+    if (!HAS_APP_ID) {
       log.info('Discord Rich Presence: no application ID compiled in, skipping.');
       return;
     }

@@ -22,6 +22,9 @@
 #                            installers ship the placeholder and Microsoft login
 #                            is dead for every user — the build fails rather than
 #                            publish that. See docs/AZURE-SETUP.md.
+#   RAVENFORGE_DISCORD_APP_ID  Discord application ID for the opt-in status
+#                            feature (optional). Absent, the setting is present
+#                            and does nothing. See docs/DISCORD-SETUP.md.
 #   WIN_CSC_LINK             base64 of the code-signing .pfx  (optional)
 #   WIN_CSC_KEY_PASSWORD     its password                     (optional)
 #
@@ -134,7 +137,7 @@ jobs:
       - run: npm ci
 
       # Refuse to build an installer that cannot log anybody in. `build:main`
-      # bakes the id into dist/ via scripts/inject-client-id.mjs; with the secret
+      # bakes the id into dist/ via scripts/inject-build-ids.mjs; with the secret
       # unset it would quietly leave the placeholder in place.
       - name: Require an Azure client ID
         shell: bash
@@ -150,6 +153,10 @@ jobs:
         shell: bash
         env:
           RAVENFORGE_CLIENT_ID: ${{ secrets.RAVENFORGE_CLIENT_ID }}
+          # Unset is a supported state, unlike the client ID above: the Discord
+          # status is opt-in and off by default, so a release without it ships a
+          # setting that logs one line and does nothing.
+          RAVENFORGE_DISCORD_APP_ID: ${{ secrets.RAVENFORGE_DISCORD_APP_ID }}
           # electron-builder reads these two names. Empty => unsigned build.
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}

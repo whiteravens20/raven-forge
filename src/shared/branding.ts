@@ -112,22 +112,6 @@ export function isBuiltInKey(publicKey: string): boolean {
   return BUILT_IN_KEYS.some((k) => k.publicKey === publicKey);
 }
 
-/**
- * The Discord application this launcher declares its Rich Presence as.
- *
- * Not a secret: every application using Discord's IPC ships its own ID, and it
- * is visible to anyone who looks at the socket traffic. It names the White
- * Ravens application on the status line and nothing else — there is no token
- * and nothing to authorise.
- *
- * Empty means the feature is off, which is the state of a fork that has not
- * registered an application of its own, and of this repo until one exists. The
- * launcher logs one line and launches the game exactly as it otherwise would.
- * Fill it from the Discord developer portal's General Information page — see
- * `docs/DISCORD-SETUP.md`.
- */
-export const DISCORD_APPLICATION_ID = '';
-
 /** The launcher's own source repository — About, and the bug-report links. */
 export const REPO_URL = 'https://github.com/whiteravens20/raven-forge';
 

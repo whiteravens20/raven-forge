@@ -21,7 +21,7 @@
     "dev:renderer": "vite",
     "dev:electron": "wait-on tcp:127.0.0.1:5173 dist/main/index.js dist/preload/index.js && node scripts/dev-electron.mjs",
     "build": "npm run build:renderer && npm run build:main",
-    "build:main": "tsc -p tsconfig.main.json && node scripts/inject-client-id.mjs",
+    "build:main": "tsc -p tsconfig.main.json && node scripts/inject-build-ids.mjs",
     "build:renderer": "vite build",
     "dist": "npm run build && electron-builder -c electron-builder.config.js",
     "dist:win": "npm run build && electron-builder -c electron-builder.config.js --win",
