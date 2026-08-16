@@ -174,6 +174,7 @@ export const en = {
   'profiles.emptyHint': 'Add your first profile with the + button',
   'profiles.pickOrCreate': 'Select a profile, or create a new one',
   'profiles.copyName': '{name} (copy)',
+  'profiles.openFolder': 'Open profile folder',
   // ── Deleting a profile ───────────────────────────────────
   'delete.title': 'Delete profile "{name}"',
   'delete.intro':

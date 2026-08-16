@@ -29,6 +29,7 @@ const api: RavenForgeAPI = {
     adoptOrphaned: (profileId) => ipcRenderer.invoke('profiles:adopt-orphaned', profileId),
     discardOrphaned: (profileId) => ipcRenderer.invoke('profiles:discard-orphaned', profileId),
     duplicate: (profileId, name) => ipcRenderer.invoke('profiles:duplicate', profileId, name),
+    openFolder: (profileId) => ipcRenderer.invoke('profiles:open-folder', profileId),
     export: (profileId) => ipcRenderer.invoke('profiles:export', profileId),
     import: (json) => ipcRenderer.invoke('profiles:import', json),
     getSyncStatus: (profileId) => ipcRenderer.invoke('profiles:get-sync-status', profileId),

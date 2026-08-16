@@ -164,6 +164,7 @@ export const pl: Translations = {
   'profiles.emptyHint': 'Dodaj pierwszy profil przyciskiem +',
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
   'profiles.copyName': '{name} (kopia)',
+  'profiles.openFolder': 'Otwórz folder profilu',
   // ── Usuwanie profilu ─────────────────────────────────────
   'delete.title': 'Usuń profil „{name}”',
   'delete.intro':

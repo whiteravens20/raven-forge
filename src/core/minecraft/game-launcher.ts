@@ -8,7 +8,7 @@ import { paths } from '../config/paths';
 import { getMainWindow } from '../../main/window';
 import { getSettings } from '../config/settings-manager';
 import { getAuthState, getMinecraftAccessToken } from '../auth/microsoft-auth';
-import { getProfile, recordPlaySession } from '../profiles/profile-manager';
+import { getProfile, recordPlaySession, resolveGameDir } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
 import { ensureJavaVersion } from '../java/java-manager';
 import { installLoader, isLoaderInstalled } from '../modloader/loader-manager';
@@ -150,9 +150,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   const signal = beginJob(profile.id);
 
   // Resolve paths
-  const gameDir = profile.gameDirectory
-    ? path.resolve(profile.gameDirectory)
-    : paths.profileGameDir(profile.id);
+  const gameDir = resolveGameDir(profile);
   const versionsDir = path.join(paths.cacheDir, 'versions');
   const librariesDir = path.join(paths.cacheDir, 'libraries');
   const assetsDir = path.join(paths.cacheDir, 'assets');

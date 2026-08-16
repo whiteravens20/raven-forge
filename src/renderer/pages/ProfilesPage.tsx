@@ -8,6 +8,7 @@ import {
   Edit3,
   Download,
   Upload,
+  FolderOpen,
   RefreshCw,
   ShieldCheck,
   ShieldAlert,
@@ -357,6 +358,7 @@ export function ProfilesPage() {
             }
             onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
+            onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
             onSync={handleSync}
             onQuickConnect={handleQuickConnect}
             quickConnectBusy={quickConnectBusy}
@@ -408,6 +410,7 @@ interface DetailProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onExport: () => void;
+  onOpenFolder: () => void;
   onSync: () => void;
   onQuickConnect: () => void;
   quickConnectBusy: boolean;
@@ -424,6 +427,7 @@ function ProfileDetail({
   onDuplicate,
   onDelete,
   onExport,
+  onOpenFolder,
   onSync,
   onQuickConnect,
   quickConnectBusy,
@@ -458,6 +462,13 @@ function ProfileDetail({
             icon={<Download size={14} />}
             onClick={onExport}
             title={t('common.export')}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<FolderOpen size={14} />}
+            onClick={onOpenFolder}
+            title={t('profiles.openFolder')}
           />
           <Button
             variant="danger"

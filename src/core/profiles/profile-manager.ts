@@ -220,6 +220,20 @@ export async function deleteProfile(profileId: string, deleteFiles = true): Prom
   log.info(`Deleted profile: ${name} (${profileId})`);
 }
 
+/**
+ * The directory the game actually runs in.
+ *
+ * Normally the profile's own `.minecraft`, but a profile may point somewhere
+ * else entirely. Everything that shows the player "their" files — the launcher
+ * spawning the JVM, the button that opens the folder — has to resolve it the
+ * same way, or the launcher opens a directory the game has never written to.
+ */
+export function resolveGameDir(profile: Profile): string {
+  return profile.gameDirectory
+    ? path.resolve(profile.gameDirectory)
+    : paths.profileGameDir(profile.id);
+}
+
 /** Where a kept-behind profile leaves its identity. */
 function orphanRecordPath(profileId: string): string {
   return path.join(paths.profileDir(profileId), 'profile.json');
