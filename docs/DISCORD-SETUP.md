@@ -126,6 +126,12 @@ the launcher itself is killed — Discord drops the activity with the connection
 The feature is fail-soft by design: every failure below is one line in
 `logs/main.log` and a launch that proceeds normally.
 
+One caveat stated plainly: the socket paths were developed and exercised on
+Linux. The Windows named pipe (`\\.\pipe\discord-ipc-0` through `-9`) is
+Discord's documented location and is covered by a unit test, but it has not been
+confirmed against a real Windows Discord install. If the status works on Linux
+and not on Windows, that is the first thing to check.
+
 | Symptom                            | Cause                                                                                                                                                       |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `no application ID compiled in`    | `RAVENFORGE_DISCORD_APP_ID` was not set for this build or this run. Step 4.                                                                                 |
