@@ -15,9 +15,9 @@ import { getMainWindow } from './window';
  * markup in ahead of it is unconstrained. Confirmed to apply to `file://`
  * documents on Electron 41, which is how the packaged renderer is loaded.
  *
- * `style-src` needs `unsafe-inline` because React sets inline styles and
- * framer-motion animates through them; `script-src` deliberately does not, so
- * there is no `eval` and no inline script. `img-src https:` is for mod icons
+ * `style-src` needs `unsafe-inline` because React sets inline styles;
+ * `script-src` deliberately does not, so there is no `eval` and no inline
+ * script. `img-src https:` is for mod icons
  * and news images, which come from wherever a project hosts them. Fonts are
  * `'self'` since the launcher serves its own.
  *
