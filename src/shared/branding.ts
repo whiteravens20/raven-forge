@@ -123,7 +123,8 @@ export function isBuiltInKey(publicKey: string): boolean {
  * Empty means the feature is off, which is the state of a fork that has not
  * registered an application of its own, and of this repo until one exists. The
  * launcher logs one line and launches the game exactly as it otherwise would.
- * Fill it from the Discord developer portal's General Information page.
+ * Fill it from the Discord developer portal's General Information page — see
+ * `docs/DISCORD-SETUP.md`.
  */
 export const DISCORD_APPLICATION_ID = '';
 
