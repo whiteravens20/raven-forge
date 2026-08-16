@@ -187,6 +187,22 @@ See "Known gaps" — there is currently no switch to disable the automatic check
 
 ---
 
+## Discord status
+
+Off by default. Turned on under **Settings → Behaviour**, the launcher writes to
+Discord's own socket on your computer while the game runs, and Discord puts the
+profile name, the Minecraft version and the loader on your status.
+
+- Nothing leaves your computer through Raven Forge. The socket is local; what
+  Discord does with the status afterwards is Discord's behaviour, and everyone
+  who can see your Discord profile can see it.
+- **The server address is never sent**, though the launcher knows it. It would
+  be published to your entire friends list, and the address is not only yours.
+- The status is cleared when the game exits, crashes, or fails to start.
+- With the setting off, no socket is opened and nothing is written.
+
+---
+
 ## The game is a separate program
 
 Once Minecraft starts, it is its own process, and Raven Forge is no longer in
@@ -234,6 +250,7 @@ read a report through before attaching it to a public issue.
 | **Offline mode** (Settings → Behaviour)                       | Never contacts any authentication server. Singleplayer and LAN only. |
 | **News / announcement feed URL** (Settings → Content sources) | Clear the field and that feed is never fetched.                      |
 | **Proxy** (Settings → Network)                                | Routes every launcher request through a proxy you control.           |
+| **Discord status** (Settings → Behaviour)                     | Off by default. On, your Discord profile shows what you are playing. |
 | Not using the Mods page                                       | Nothing is sent to Modrinth unless you search or install.            |
 | Using an offline account                                      | No Microsoft or Xbox server is ever contacted.                       |
 

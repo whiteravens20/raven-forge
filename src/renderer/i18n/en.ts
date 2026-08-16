@@ -374,6 +374,11 @@ export const en = {
   'settings.offlineModeHint':
     'Never contacts the sign-in servers. Singleplayer and LAN only — online-mode servers refuse an offline session.',
   'settings.autoRemoveOrphans': 'Automatically remove orphaned mods',
+  'settings.discordPresence': 'Show the game on your Discord status',
+  'settings.discordPresenceHint':
+    'While the game runs, your status shows the profile name, version and loader — never the ' +
+    'server address. Everyone who can see your Discord profile can see it. Presence mods such ' +
+    'as CraftPresence will fight with it: Discord shows one activity at a time.',
   'settings.concurrency': 'Concurrent downloads (1–8)',
   'settings.concurrencyInvalid': 'Enter a number from 1 to 8.',
   'settings.proxy': 'Proxy URL (optional)',

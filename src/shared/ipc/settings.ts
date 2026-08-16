@@ -18,6 +18,8 @@ export interface GlobalSettings {
   trustedPublicKeys: TrustedKey[];
   autoRemoveOrphanedMods: boolean;
   showLiveConsole: boolean;
+  /** Show the running profile on the player's Discord status. */
+  discordRichPresence: boolean;
   /** Never contact auth servers; launch offline. Singleplayer and LAN only. */
   offlineMode: boolean;
 }

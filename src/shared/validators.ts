@@ -99,6 +99,13 @@ export const globalSettingsSchema = z.object({
   autoRemoveOrphanedMods: z.boolean().default(false),
   showLiveConsole: z.boolean().default(false),
   /**
+   * Off unless asked for. It publishes what the player is doing to everyone who
+   * can see their Discord profile, and it competes with the presence mods —
+   * CraftPresence and the like — that already say more than the launcher can,
+   * since Discord shows one activity at a time.
+   */
+  discordRichPresence: z.boolean().default(false),
+  /**
    * Never contact the auth servers; launch every profile with the offline
    * session token. Singleplayer and LAN only — an online-mode server rejects it.
    * A single launch can override this either way.

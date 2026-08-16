@@ -9,6 +9,8 @@ import { getMainWindow } from '../../main/window';
 import { getSettings } from '../config/settings-manager';
 import { getAuthState, getMinecraftAccessToken } from '../auth/microsoft-auth';
 import { getProfile, recordPlaySession, resolveGameDir } from '../profiles/profile-manager';
+import { setGamePresence, clearGamePresence } from '../discord/rich-presence';
+import { loaderLabel } from '../../shared/labels';
 import { syncManifest } from '../mods/mod-sync';
 import { ensureJavaVersion } from '../java/java-manager';
 import { installLoader, isLoaderInstalled } from '../modloader/loader-manager';
@@ -380,6 +382,17 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
       secrets: [accessToken, uuid, username],
     });
 
+  // Never awaited: finding Discord's socket takes as long as it takes, and the
+  // game is already running. A failure in here cannot reach the launch path.
+  if (settings.discordRichPresence) {
+    void setGamePresence({
+      profileName: profile.name,
+      minecraftVersion: profile.minecraftVersion,
+      loader: loaderLabel(profile.modLoader),
+      startedAt: startTime,
+    });
+  }
+
   const win = getMainWindow();
 
   // Notify renderer game started
@@ -425,6 +438,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   child.on('exit', (code) => {
     void (async () => {
       runningProcesses.delete(profile.id);
+      clearGamePresence();
       const playTimeMinutes = Math.round((Date.now() - startTime) / 60000);
       const failed = code !== 0 && code !== null;
 
@@ -477,6 +491,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   child.on('error', (err) => {
     void (async () => {
       runningProcesses.delete(profile.id);
+      clearGamePresence();
       log.error(`Game process error for ${profile.name}:`, err);
       const logTail = getLogTail(profile.id, 100);
       const exitInfo: GameExitInfo = {

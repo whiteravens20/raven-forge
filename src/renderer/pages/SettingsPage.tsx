@@ -117,6 +117,12 @@ export function SettingsPage() {
           label={t('settings.autoRemoveOrphans')}
         />
         <CheckboxRow
+          checked={settings.discordRichPresence}
+          onChange={(v) => update({ discordRichPresence: v })}
+          label={t('settings.discordPresence')}
+        />
+        <p className="text-xs text-rf-text-muted">{t('settings.discordPresenceHint')}</p>
+        <CheckboxRow
           checked={settings.offlineMode}
           onChange={(v) => update({ offlineMode: v })}
           label={t('settings.offlineMode')}
