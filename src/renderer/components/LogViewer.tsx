@@ -164,7 +164,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
         aria-label={t('logs.title')}
       >
         <header className="flex items-center gap-3 border-b border-rf-border px-4 py-2.5">
-          <FileText size={15} className="text-rf-accent shrink-0" />
+          <FileText size={15} className="text-rf-accent-text shrink-0" />
           <h2 className="text-sm font-medium text-rf-text">{t('logs.title')}</h2>
 
           <div className="ml-2 flex gap-3 text-[11px] text-rf-text-muted">
@@ -183,7 +183,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
                 onClick={() => setFilter(level)}
                 className={`rounded px-2 py-1 text-[11px] transition-colors ${
                   filter === level
-                    ? 'bg-rf-accent/15 text-rf-accent'
+                    ? 'bg-rf-accent/15 text-rf-accent-text'
                     : 'text-rf-text-muted hover:text-rf-text-secondary'
                 }`}
               >

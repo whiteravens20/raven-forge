@@ -22,7 +22,7 @@ export function Input({ label, error, className = '', id, ...props }: InputProps
       )}
       <input
         id={inputId}
-        className={`rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text placeholder:text-rf-text-muted outline-none focus:border-rf-accent focus:ring-1 focus:ring-rf-accent transition-colors ${
+        className={`rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text placeholder:text-rf-text-muted outline-none focus:border-rf-accent-text focus:ring-1 focus:ring-rf-accent-text transition-colors ${
           error ? 'border-rf-danger focus:ring-rf-danger' : ''
         } ${className}`}
         aria-invalid={error ? 'true' : undefined}

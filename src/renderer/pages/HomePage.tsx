@@ -212,7 +212,7 @@ export function HomePage() {
             <select
               value={selectedId ?? ''}
               onChange={(e) => selectProfile(e.target.value)}
-              className="rounded-lg border border-rf-border bg-rf-surface px-4 py-2 text-sm text-rf-text outline-none focus:border-rf-accent min-w-[200px]"
+              className="rounded-lg border border-rf-border bg-rf-surface px-4 py-2 text-sm text-rf-text outline-none focus:border-rf-accent-text min-w-[200px]"
             >
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>

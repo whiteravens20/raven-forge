@@ -20,8 +20,8 @@ export function TitleBar() {
   return (
     <header className="drag-region flex h-9 items-center justify-between bg-rf-bg-secondary border-b border-rf-border select-none shrink-0">
       <div className="flex items-center gap-2 px-3">
-        <InlineSvg markup={iconMono} className="h-4 w-4 text-rf-accent" />
-        <span className="text-sm font-display font-semibold text-rf-accent tracking-wide">
+        <InlineSvg markup={iconMono} className="h-4 w-4 text-rf-accent-text" />
+        <span className="text-sm font-display font-semibold text-rf-accent-text tracking-wide">
           RAVEN FORGE
         </span>
       </div>
@@ -43,7 +43,11 @@ export function TitleBar() {
         </button>
         <button
           onClick={() => api.window.close()}
-          className="flex h-full w-11 items-center justify-center text-rf-text-secondary hover:bg-rf-danger hover:text-white transition-colors"
+          // `--rf-bg` rather than white for the glyph: this is the one place the
+          // app fills with `--rf-danger`, and that colour is a light red in the
+          // dark themes and a dark red in the light one. Taking the page
+          // background inverts with it and stays legible either way.
+          className="flex h-full w-11 items-center justify-center text-rf-text-secondary hover:bg-rf-danger hover:text-rf-bg transition-colors"
           aria-label={t('window.close')}
         >
           <X size={14} />

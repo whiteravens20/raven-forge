@@ -23,7 +23,7 @@ export function Select({ label, options, error, className = '', id, ...props }: 
         className={`rounded-lg border bg-rf-surface px-3 py-2 text-sm text-rf-text outline-none transition-colors appearance-none disabled:opacity-50 disabled:cursor-not-allowed ${
           error
             ? 'border-rf-danger focus:border-rf-danger'
-            : 'border-rf-border focus:border-rf-accent'
+            : 'border-rf-border focus:border-rf-accent-text'
         } ${className}`}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={error ? errorId : undefined}

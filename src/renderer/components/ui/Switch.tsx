@@ -28,7 +28,7 @@ export function Switch({ checked, onChange, label, className = '', ...props }: S
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-1 focus:ring-rf-accent focus:ring-offset-1 focus:ring-offset-rf-bg disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-1 focus:ring-rf-accent-text focus:ring-offset-1 focus:ring-offset-rf-bg disabled:cursor-not-allowed disabled:opacity-50 ${
         checked ? 'bg-rf-accent' : 'bg-rf-border'
       } ${className}`}
       {...props}

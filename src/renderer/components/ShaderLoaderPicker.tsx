@@ -46,7 +46,7 @@ export function ShaderLoaderPicker({ options, busy, onInstall, onSkip }: Props) 
         aria-label={t('shaderLoader.title')}
       >
         <header className="flex items-center gap-2 border-b border-rf-border px-5 py-3">
-          <Sparkles size={15} className="shrink-0 text-rf-accent" />
+          <Sparkles size={15} className="shrink-0 text-rf-accent-text" />
           <h2
             id="shader-loader-title"
             className="flex-1 text-sm font-display font-semibold text-rf-text"
