@@ -388,11 +388,11 @@ libraries it links. Install these first, then `chmod +x` and run it:
 
 ```bash
 # Debian / Ubuntu / Mint
-sudo apt install libgtk-3-0 libnss3 libgbm1 libsecret-1-0 libnotify4 xdg-utils libfuse2
+sudo apt install libgtk-3-0 libnss3 libgbm1 libsecret-1-0 libnotify4 xdg-utils libfuse2 fuse
 sudo apt install libasound2t64 || sudo apt install libasound2
 
 # Fedora
-sudo dnf install gtk3 nss mesa-libgbm libsecret libnotify xdg-utils fuse-libs alsa-lib
+sudo dnf install gtk3 nss mesa-libgbm libsecret libnotify xdg-utils fuse-libs fuse alsa-lib
 
 # Arch
 sudo pacman -S --needed gtk3 nss mesa libsecret libnotify xdg-utils fuse2 alsa-lib
@@ -401,9 +401,17 @@ sudo pacman -S --needed gtk3 nss mesa libsecret libnotify xdg-utils fuse2 alsa-l
 The rest of the list — cairo, pango, the X libraries, cups — comes in with GTK on
 all three. `alsa-lib` needs the fallback line on Debian and Ubuntu because 24.04
 renamed the package to `libasound2t64` and left `libasound2` as a virtual name
-with two providers, which apt will not install by name. `libfuse2` is for the
-AppImage runtime itself, not for the launcher: without it the file exits with
-_"AppImages require FUSE to run"_ before any of our code runs.
+with two providers, which apt will not install by name.
+
+`libfuse2` and `fuse` belong to the AppImage runtime rather than to the launcher,
+and one without the other gets you nowhere: `libfuse2` is the library, while
+`fusermount` — the helper that actually mounts the image — ships in `fuse`, which
+`libfuse2` only _suggests_. A current desktop looks equipped and is not, because
+what it installs is `fuse3`, whose helper is named `fusermount3` and is not the
+one a type-2 AppImage looks for. Without the helper the file stops at _"fuse:
+failed to exec fusermount"_, without the library at _"AppImages require FUSE to
+run"_ — both before any of our code runs. Arch ships both in `fuse2`, so one
+package covers it there.
 
 Missing `xdg-utils` is the quiet one — the app starts fine and then "open folder"
 and every external link silently do nothing, because `shell.openExternal` shells
