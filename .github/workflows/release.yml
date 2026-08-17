@@ -259,8 +259,15 @@ jobs:
 
       - run: npm ci --ignore-scripts
 
+      # Not `npm sbom`, which under-reports. On npm 11.17 it writes 41 components
+      # for the 62 packages that are actually inside `app.asar`, dropping
+      # js-yaml, fs-extra, debug, minimist and the rest of electron-updater's
+      # own subtree — all of which `npm ls --omit=dev --all` lists, so the graph
+      # is right and the writer is not. An SBOM missing a third of what ships is
+      # worse than no SBOM, because it reads as an all-clear. CycloneDX's own
+      # generator matches the packed tree exactly, package for package.
       - name: CycloneDX SBOM
-        run: npm sbom --omit=dev --sbom-format cyclonedx > sbom.cdx.json
+        run: npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-format JSON --output-file sbom.cdx.json
 
       - uses: actions/upload-artifact@v7
         with:
