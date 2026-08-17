@@ -335,7 +335,9 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
       if (stdout.trim()) log.info(`[pre-launch] ${stdout.trim()}`);
       if (stderr.trim()) log.warn(`[pre-launch] ${stderr.trim()}`);
     } catch (err) {
-      throw new Error(`Pre-launch command failed: ${err instanceof Error ? err.message : err}`);
+      throw new Error(`Pre-launch command failed: ${err instanceof Error ? err.message : err}`, {
+        cause: err,
+      });
     }
   }
 

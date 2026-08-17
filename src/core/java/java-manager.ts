@@ -380,7 +380,9 @@ export async function ensureJavaVersion(majorVersion: number): Promise<JavaInsta
     const detectedVersion = parseJavaVersion(stderr);
     log.info(`Verified Java ${detectedVersion} at ${javaPath}`);
   } catch (err) {
-    throw new Error(`Installed JRE ${majorVersion} but failed to verify: ${err}`);
+    throw new Error(`Installed JRE ${majorVersion} but failed to verify: ${err}`, {
+      cause: err,
+    });
   }
 
   return {
