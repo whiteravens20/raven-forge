@@ -378,15 +378,19 @@ jobs:
 
             ```bash
             # Debian / Ubuntu / Mint
-            sudo apt install libgtk-3-0 libnss3 libgbm1 libsecret-1-0 libnotify4 xdg-utils libfuse2
+            sudo apt install libgtk-3-0 libnss3 libgbm1 libsecret-1-0 libnotify4 xdg-utils libfuse2 fuse
             sudo apt install libasound2t64 || sudo apt install libasound2
 
             # Fedora
-            sudo dnf install gtk3 nss mesa-libgbm libsecret libnotify xdg-utils fuse-libs alsa-lib
+            sudo dnf install gtk3 nss mesa-libgbm libsecret libnotify xdg-utils fuse-libs fuse alsa-lib
 
             # Arch
             sudo pacman -S --needed gtk3 nss mesa libsecret libnotify xdg-utils fuse2 alsa-lib
             ```
+
+            `fuse` as well as `libfuse2`: the library alone only *suggests* the
+            `fusermount` helper that does the mounting, and without it the AppImage
+            stops before any of our code runs. Arch's `fuse2` already carries both.
 
             On **Ubuntu 23.10 and later** the AppImage additionally cannot start at
             all: AppArmor restricts unprivileged user namespaces there and an
