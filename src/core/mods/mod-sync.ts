@@ -76,6 +76,21 @@ async function writeLockFile(profileId: string, mods: InstalledMod[]): Promise<v
   await writeJsonAtomic(paths.profileLockFile(profileId), mods);
 }
 
+/**
+ * Where a mod's jar sits, which depends on whether it is switched on.
+ *
+ * Switching a mod off renames its file rather than deleting it, so every piece
+ * of code that goes looking for one has to ask the lock file first. Nothing did
+ * during a sync, and the cost was quiet: the check looked for `<name>.jar`,
+ * found only `<name>.jar.disabled`, called the mod missing and downloaded it
+ * again — leaving both files in `mods/`. The game loads by extension, so a mod
+ * the launcher showed as off was loaded anyway, on every sync, for as long as
+ * the profile followed a pack.
+ */
+function modFilePath(modsDir: string, fileName: string, enabled: boolean): string {
+  return path.join(modsDir, enabled ? fileName : `${fileName}.disabled`);
+}
+
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
@@ -557,8 +572,10 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     interface PlannedMod {
       entry: ModEntry;
       resolved: Awaited<ReturnType<typeof resolveModEntry>>;
+      /** Where the file belongs, suffix included when the mod is switched off. */
       destPath: string;
       previous?: InstalledMod;
+      enabled: boolean;
       /** Set when the file is already there and matches — nothing to fetch. */
       hash?: string;
     }
@@ -570,7 +587,11 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
 
       const previous = existing.find((m) => m.id === entry.id);
       const resolved = await resolveModEntry(entry, manifest);
-      const destPath = path.join(modsDir, resolved.fileName);
+      // A mod the player switched off stays off, whether or not this sync has
+      // to fetch a new build of it. Both the file looked for and the file
+      // written therefore carry the suffix its state implies.
+      const enabled = previous?.enabled ?? true;
+      const destPath = modFilePath(modsDir, resolved.fileName, enabled);
 
       // Already on disk and matching the manifest hash — leave it alone.
       let hash: string | undefined;
@@ -578,7 +599,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         hash = previous.sha256 ?? (await sha256File(destPath));
       }
 
-      plannedMods.push({ entry, resolved, destPath, previous, hash });
+      plannedMods.push({ entry, resolved, destPath, previous, enabled, hash });
       checked++;
     }
 
@@ -627,7 +648,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       });
 
     for (const planned of plannedMods) {
-      const { entry, resolved, destPath, previous } = planned;
+      const { entry, resolved, destPath, previous, enabled } = planned;
 
       if (!planned.hash) {
         throwIfCancelled(signal, 'Sync');
@@ -636,10 +657,11 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         log.info(`Downloading mod: ${entry.name} (${resolved.fileName})`);
         planned.hash = await fetchModEntry(entry, resolved, destPath, signal);
 
-        // A version bump changes the filename; drop the file it replaced.
+        // A version bump changes the filename; drop the file it replaced, at
+        // whichever of the two names that file was under.
         if (previous && previous.fileName !== resolved.fileName) {
           try {
-            await fs.rm(path.join(modsDir, previous.fileName), { force: true });
+            await fs.rm(modFilePath(modsDir, previous.fileName, enabled), { force: true });
           } catch {
             /* ok */
           }
@@ -656,7 +678,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         sha256: planned.hash,
         required: entry.required,
         side: entry.side,
-        enabled: previous?.enabled ?? true,
+        enabled,
         fromManifest: true,
       });
     }
@@ -696,7 +718,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     if (settings.autoRemoveOrphanedMods) {
       for (const stale of orphaned) {
         try {
-          await fs.rm(path.join(modsDir, stale.fileName), { force: true });
+          await fs.rm(modFilePath(modsDir, stale.fileName, stale.enabled), { force: true });
         } catch {
           /* ok */
         }
@@ -977,9 +999,7 @@ export async function uninstallMod(profileId: string, modId: string): Promise<vo
   if (!mod) throw new Error(`Mod ${modId} not found in profile ${profileId}`);
 
   // Delete file
-  const filePath = mod.enabled
-    ? path.join(modsDir, mod.fileName)
-    : path.join(modsDir, `${mod.fileName}.disabled`);
+  const filePath = modFilePath(modsDir, mod.fileName, mod.enabled);
   try {
     await fs.rm(filePath, { force: true });
   } catch {
@@ -1003,14 +1023,10 @@ export async function toggleModEnabled(
 
   if (mod.enabled === enabled) return;
 
-  const currentPath = mod.enabled
-    ? path.join(modsDir, mod.fileName)
-    : path.join(modsDir, `${mod.fileName}.disabled`);
-  const newPath = enabled
-    ? path.join(modsDir, mod.fileName)
-    : path.join(modsDir, `${mod.fileName}.disabled`);
-
-  await fs.rename(currentPath, newPath);
+  await fs.rename(
+    modFilePath(modsDir, mod.fileName, mod.enabled),
+    modFilePath(modsDir, mod.fileName, enabled),
+  );
   mod.enabled = enabled;
   await writeLockFile(profileId, mods);
   log.info(`${enabled ? 'Enabled' : 'Disabled'} mod ${mod.name} in profile ${profileId}`);
