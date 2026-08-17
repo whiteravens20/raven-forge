@@ -27,6 +27,7 @@
   --color-rf-text-muted: var(--rf-text-muted);
   --color-rf-accent: var(--rf-accent);
   --color-rf-accent-hover: var(--rf-accent-hover);
+  --color-rf-accent-text: var(--rf-accent-text);
   --color-rf-danger: var(--rf-danger);
   --color-rf-warning: var(--rf-warning);
   --color-rf-success: var(--rf-success);
@@ -72,6 +73,30 @@
 
 /* ── Theme CSS Custom Properties ────────────────────────── */
 
+/* Every foreground token below clears WCAG AA for small text — 4.5:1 — on all
+   four surfaces of its own theme, and the semantic three additionally clear it
+   composited on their own `/5`–`/20` tint over those surfaces, because that is
+   how every badge in the app is built (`bg-rf-warning/10 text-rf-warning`).
+   The tint is worth about half a point of contrast, which is enough to turn a
+   colour that passes on paper into one that fails on screen.
+   `test/contrast.test.ts` reads this file and fails if a value stops clearing
+   it, so these are not numbers to nudge by eye.
+
+   The three text greys are also kept a clear step apart from each other. Once
+   `--rf-text-muted` has to pass AA it lands close to where
+   `--rf-text-secondary` used to be, so the whole ramp moves, not just the
+   bottom of it — otherwise the hierarchy the three tokens exist to express
+   quietly collapses into one colour.
+
+   `--rf-accent` and `--rf-accent-text` are two colours because one cannot do
+   both jobs. The accent is a fill with white text on it — primary buttons, the
+   progress bar — and a purple light enough to read *as* text against a dark
+   surface is far too light to sit under white. So: fills, borders and tints
+   take `--rf-accent`; anything the eye reads as a glyph — text, icons, focus
+   rings — takes `--rf-accent-text`. The semantic three need no such split;
+   nothing fills with them except the window close button, which takes its
+   glyph colour from `--rf-bg` and so inverts correctly in every theme. */
+
 :root {
   /* Dark theme (default) */
   --rf-bg: #0f0f13;
@@ -80,11 +105,12 @@
   --rf-surface: #22222e;
   --rf-border: #2e2e3e;
   --rf-text: #e8e8f0;
-  --rf-text-secondary: #a8a8be;
-  --rf-text-muted: #6e6e88;
+  --rf-text-secondary: #bcbcd0;
+  --rf-text-muted: #9090a6;
   --rf-accent: #7c3aed;
   --rf-accent-hover: #6d28d9;
-  --rf-danger: #ef4444;
+  --rf-accent-text: #c4b5fd;
+  --rf-danger: #fa8a8a;
   --rf-warning: #f59e0b;
   --rf-success: #22c55e;
 }
@@ -96,11 +122,12 @@
   --rf-surface: #1a1a1a;
   --rf-border: #222222;
   --rf-text: #f0f0f0;
-  --rf-text-secondary: #aaaaaa;
-  --rf-text-muted: #666666;
+  --rf-text-secondary: #b8b8b8;
+  --rf-text-muted: #8c8c8c;
   --rf-accent: #7c3aed;
   --rf-accent-hover: #6d28d9;
-  --rf-danger: #ef4444;
+  --rf-accent-text: #c4b5fd;
+  --rf-danger: #fa8a8a;
   --rf-warning: #f59e0b;
   --rf-success: #22c55e;
 }
@@ -112,13 +139,17 @@
   --rf-surface: #ffffff;
   --rf-border: #d0d0dd;
   --rf-text: #1a1a2e;
-  --rf-text-secondary: #4a4a6a;
-  --rf-text-muted: #8888aa;
+  --rf-text-secondary: #3a3a55;
+  --rf-text-muted: #5c5c7d;
   --rf-accent: #7c3aed;
   --rf-accent-hover: #6d28d9;
-  --rf-danger: #dc2626;
-  --rf-warning: #d97706;
-  --rf-success: #16a34a;
+  --rf-accent-text: #5b21b6;
+  /* Amber and green are the two hues that cannot stay vivid on a light
+     background and still be readable at 12px — an accessible amber is a brown.
+     The vivid versions survive in the dark themes above, where they pass. */
+  --rf-danger: #8f1919;
+  --rf-warning: #7c3f0a;
+  --rf-success: #0d5a2c;
 }
 
 /* ── Base ───────────────────────────────────────────────── */
@@ -192,7 +223,7 @@ body {
   --bd-grid: 0.17;
   --bd-ember: 0.85;
   --bd-noise: 0.055;
-  --bd-terrain-wash: 0;
+  --bd-scene-wash: 0;
 }
 
 /* Pure black swallows soft light — push the sources harder. */
@@ -203,8 +234,15 @@ body {
   --bd-noise: 0.045;
 }
 
-/* On a light field the glow must whisper, the grid carries more of the
-   depth, and the voxel map gets washed toward pastel. */
+/* On a light field the glow must whisper, the grid carries more of the depth,
+   and every scene is washed toward pastel — see `--bd-scene-wash` in
+   ForgeBackdrop.
+
+   0.72 is measured, not chosen: wash a black pixel with that much `--rf-bg`
+   and `--rf-text-secondary` still reads against it at 4.5:1 (the minimum is
+   0.694). `--rf-text-muted` would need 0.89, which is why the one place muted
+   text sits on the backdrop — the home page's launch column — has a scrim of
+   its own instead of the whole picture being flattened for it. */
 [data-theme='light'] .rf-backdrop {
   --bd-aurora-a: 0.16;
   --bd-aurora-b: 0.1;
@@ -212,7 +250,26 @@ body {
   --bd-grid: 0.12;
   --bd-ember: 0.55;
   --bd-noise: 0.03;
-  --bd-terrain-wash: 0.32;
+  --bd-scene-wash: 0.72;
+}
+
+/* The home page's launch column reads against this rather than against
+   whichever scene is up: the backdrop paints a scrim of its own, but that one
+   is a vertical gradient for the page as a whole, and its weakest point is the
+   middle — exactly where this column sits.
+
+   Full strength across the middle and faded to nothing well before the edges,
+   so it reads as depth behind the button rather than as a panel with an edge.
+   `--rf-bg` rather than a literal, so it lightens the light theme's overworld
+   and darkens the dark themes' lava with the same rule. */
+.rf-launch-scrim {
+  background: radial-gradient(
+    ellipse 44% 58% at 50% 50%,
+    var(--rf-bg) 0%,
+    var(--rf-bg) 52%,
+    transparent 100%
+  );
+  opacity: 0.88;
 }
 
 .rf-backdrop .rf-bd-aurora-a {

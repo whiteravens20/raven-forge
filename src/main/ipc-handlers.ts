@@ -22,6 +22,7 @@ import {
   listOrphanedProfiles,
   adoptOrphanedProfile,
   discardOrphanedProfile,
+  resolveGameDir,
 } from '../core/profiles/profile-manager';
 import {
   setProfileIcon,
@@ -473,6 +474,26 @@ export function registerAllIpcHandlers(): void {
       return ok(await duplicateProfile(profileId, name));
     } catch (err) {
       return fail(`Failed to duplicate profile: ${reason(err)}`);
+    }
+  });
+  handle('profiles:open-folder', async (_event, profileId: string) => {
+    try {
+      const profile = await getProfile(profileId);
+      if (!profile) return fail('Profile not found');
+      const dir = resolveGameDir(profile);
+      // A profile that has never been launched has no game directory yet, and
+      // opening a path that does not exist only produces an error the player
+      // cannot act on. Create it: this is where the launcher would put it.
+      await fs.mkdir(dir, { recursive: true });
+      // `shell.openPath` picks the platform's own file manager — Explorer,
+      // Finder, whatever `xdg-open` resolves to — and reports failure by
+      // resolving with a message rather than throwing. A headless Linux box
+      // with no file manager installed lands there.
+      const failure = await shell.openPath(dir);
+      if (failure) return fail(failure);
+      return ok(undefined);
+    } catch (err) {
+      return fail(`Failed to open profile folder: ${reason(err)}`);
     }
   });
   handle('profiles:export', async (_event, profileId: string) => {

@@ -20,8 +20,9 @@ export function createMainWindow(): BrowserWindow {
     minHeight: MIN_WINDOW_HEIGHT,
     frame: false,
     titleBarStyle: 'hidden',
-    backgroundColor: '#0f1117',
-    show: false,
+    // `--rf-bg` of the default theme, so the frame the compositor paints before
+    // the first document arrives is already the colour the app settles on.
+    backgroundColor: '#0f0f13',
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
@@ -35,10 +36,14 @@ export function createMainWindow(): BrowserWindow {
     },
   });
 
-  // Show window when renderer is ready (avoids white flash)
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
-  });
+  // Deliberately not `show: false` plus `ready-to-show`. That is the usual way
+  // to avoid a white flash, and `backgroundColor` above already handles the
+  // flash — what waiting for the first paint also did was leave the desktop
+  // with no window and no taskbar button for as long as the renderer took to
+  // boot. On a machine that has just installed the app, with a scanner reading
+  // app.asar for the first time, that is long enough for someone to decide the
+  // launcher did not start and run it a second time. index.html paints its own
+  // holding screen, so the window is never blank for a user to interpret.
 
   // Open external links in system browser, not in Electron
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

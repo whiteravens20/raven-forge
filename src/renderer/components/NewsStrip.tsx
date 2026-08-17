@@ -84,7 +84,7 @@ export function NewsStrip({
         tabIndex={0}
         role="group"
         aria-label={t('home.news')}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rf-accent rounded-lg"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rf-accent-text rounded-lg"
       >
         {items.map((item) => (
           // `min-w` is the floor a quarter of the row may not go below; past it

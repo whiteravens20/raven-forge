@@ -117,6 +117,12 @@ export function SettingsPage() {
           label={t('settings.autoRemoveOrphans')}
         />
         <CheckboxRow
+          checked={settings.discordRichPresence}
+          onChange={(v) => update({ discordRichPresence: v })}
+          label={t('settings.discordPresence')}
+        />
+        <p className="text-xs text-rf-text-muted">{t('settings.discordPresenceHint')}</p>
+        <CheckboxRow
           checked={settings.offlineMode}
           onChange={(v) => update({ offlineMode: v })}
           label={t('settings.offlineMode')}
@@ -261,7 +267,7 @@ export function SettingsPage() {
           <span className="text-sm text-rf-text-secondary">{t('settings.logs')}:</span>
           <button
             onClick={() => setShowLogs(true)}
-            className="text-sm text-rf-accent hover:underline"
+            className="text-sm text-rf-accent-text hover:underline"
           >
             {t('settings.showLogs')}
           </button>
@@ -273,7 +279,7 @@ export function SettingsPage() {
                 await api.system.openPath(result.data);
               }
             }}
-            className="text-sm text-rf-accent hover:underline"
+            className="text-sm text-rf-accent-text hover:underline"
           >
             {t('common.openFolder')}
           </button>
@@ -400,7 +406,7 @@ function PathRow({ label, onOpen }: { label: string; onOpen: () => void }) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm text-rf-text-secondary">{label}:</span>
-      <button onClick={onOpen} className="text-sm text-rf-accent hover:underline">
+      <button onClick={onOpen} className="text-sm text-rf-accent-text hover:underline">
         {t('common.openFolder')}
       </button>
     </div>
@@ -487,7 +493,7 @@ function UpdateRow() {
         <p className="text-xs text-rf-text-muted">{t('settings.updateUpToDate')}</p>
       )}
       {result?.status === 'available' && (
-        <p className="text-xs text-rf-accent">
+        <p className="text-xs text-rf-accent-text">
           {t('settings.updateAvailable', { version: result.update.version })}
         </p>
       )}

@@ -27,7 +27,7 @@ raven-forge/
 │   ├── PRIVACY.pl.md             # the same, in Polish; both are maintained
 │   └── SIGNING.md                # Ed25519 manifest signing
 ├── electron-builder.config.js    # NSIS + .deb + AppImage targets
-├── eslint.config.mjs             # flat-config, react + @typescript-eslint
+├── eslint.config.mjs             # flat-config, react-hooks + @typescript-eslint
 ├── tsconfig.json                 # umbrella project for typecheck-all
 ├── tsconfig.main.json            # main + preload + core + shared (Node ESM)
 ├── tsconfig.renderer.json        # renderer (DOM)
@@ -54,6 +54,7 @@ raven-forge/
     ├── core/                     # business logic, runs in main process
     │   ├── auth/                 # MS OAuth → Xbox → XSTS → MC chain, keytar token store
     │   ├── diagnostics/          # crash-report.ts — one redacted file per crash
+    │   ├── discord/              # Rich Presence over Discord's local IPC socket (opt-in)
     │   ├── java/                 # Adoptium Temurin download + version selection
     │   ├── minecraft/            # version manifest, asset/library download, game launcher
     │   ├── modloader/            # Fabric, Quilt, Forge and NeoForge installers

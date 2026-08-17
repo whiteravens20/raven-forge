@@ -87,6 +87,7 @@ export interface InvokeChannels {
   /** Delete kept files for good. */
   'profiles:discard-orphaned': (profileId: string) => Promise<IpcResult<void>>;
   'profiles:duplicate': (profileId: string, name?: string) => Promise<IpcResult<Profile>>;
+  'profiles:open-folder': (profileId: string) => Promise<IpcResult<void>>;
   'profiles:export': (profileId: string) => Promise<IpcResult<string>>; // returns JSON string
   'profiles:import': (json: string) => Promise<IpcResult<Profile>>;
   'profiles:get-sync-status': (profileId: string) => Promise<IpcResult<ProfileSyncStatus>>;
@@ -316,6 +317,7 @@ export interface RavenForgeAPI {
     adoptOrphaned: InvokeChannels['profiles:adopt-orphaned'];
     discardOrphaned: InvokeChannels['profiles:discard-orphaned'];
     duplicate: InvokeChannels['profiles:duplicate'];
+    openFolder: InvokeChannels['profiles:open-folder'];
     export: InvokeChannels['profiles:export'];
     import: InvokeChannels['profiles:import'];
     getSyncStatus: InvokeChannels['profiles:get-sync-status'];

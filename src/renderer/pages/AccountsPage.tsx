@@ -114,7 +114,7 @@ export function AccountsPage() {
           About — this is the moment the question actually occurs to someone. */}
       <Link
         to="/privacy"
-        className="-mt-3 self-start text-xs text-rf-text-muted underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent"
+        className="-mt-3 self-start text-xs text-rf-text-muted underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent-text"
       >
         {t('accounts.privacyLink')}
       </Link>
@@ -189,7 +189,7 @@ export function AccountsPage() {
                 <p className="text-xs text-rf-text-muted">
                   {account.type === 'microsoft' ? 'Microsoft' : 'Offline'}
                   {account.id === activeAccountId && (
-                    <span className="ml-1 text-rf-accent">{t('accounts.active')}</span>
+                    <span className="ml-1 text-rf-accent-text">{t('accounts.active')}</span>
                   )}
                 </p>
               </div>

@@ -3,6 +3,7 @@ import { Search, Download, Package } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
+import { Switch } from '@components/ui/Switch';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
 import { useLocale, useT } from '@renderer/i18n';
@@ -139,7 +140,7 @@ export function ModsPage() {
 
   const handleToggle = async (modId: string, enabled: boolean) => {
     if (!selectedId) return;
-    await api.mods.toggleEnabled(selectedId, modId, !enabled);
+    await api.mods.toggleEnabled(selectedId, modId, enabled);
     await loadInstalled();
   };
 
@@ -287,14 +288,13 @@ export function ModsPage() {
                     {mod.fromManifest && ` • ${t('mods.fromManifest')}`}
                   </p>
                 </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleToggle(mod.id, mod.enabled)}
-                  >
-                    {mod.enabled ? t('common.disable') : t('common.enable')}
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={mod.enabled}
+                    onChange={(next) => handleToggle(mod.id, next)}
+                    label={mod.name}
+                    title={mod.enabled ? t('common.disable') : t('common.enable')}
+                  />
                   {!mod.fromManifest && (
                     <Button variant="danger" size="sm" onClick={() => handleUninstall(mod.id)}>
                       {t('common.remove')}

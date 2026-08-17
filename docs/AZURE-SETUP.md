@@ -136,9 +136,13 @@ build — it gets baked into the output:
 RAVENFORGE_CLIENT_ID=a1b2c3d4-1234-5678-90ab-cdef12345678 npm run dist:linux
 ```
 
-In CI, set `RAVENFORGE_CLIENT_ID` as a repository **variable** (not a secret —
-it is not one, and secrets are masked in logs, which only makes debugging
-harder).
+In CI, set `RAVENFORGE_CLIENT_ID` as a repository **secret**. That is the one
+[release.yml](../.github/workflows/release.yml) reads, and a release refuses to
+build without it rather than shipping installers nobody can log into.
+
+The value itself is not a secret — see the section above. A GitHub secret is
+just the delivery mechanism here, and the one cost is that the value comes out
+masked in the logs.
 
 If you build without the variable set, the app still builds and runs; Microsoft
 login refuses with the message at the top of this page and offline mode keeps

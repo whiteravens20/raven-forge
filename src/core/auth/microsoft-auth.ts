@@ -527,7 +527,7 @@ export async function getMinecraftAccessToken(accountId: string): Promise<string
       throw new AuthServersUnreachableError(err);
     }
     log.error(`Silent token refresh failed for ${accountId}:`, err);
-    throw new Error('Session expired — please log in again');
+    throw new Error('Session expired — please log in again', { cause: err });
   }
 
   const refreshed = await getMcSession(accountId);

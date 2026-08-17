@@ -131,7 +131,7 @@ export function PrivacyPage() {
       <header className="space-y-3">
         <h1 className="text-lg font-display font-semibold text-rf-text">{t('privacy.title')}</h1>
         <div className="flex items-start gap-3 rounded-lg border border-rf-accent/30 bg-rf-accent/5 p-4">
-          <ShieldCheck size={20} className="mt-0.5 shrink-0 text-rf-accent" />
+          <ShieldCheck size={20} className="mt-0.5 shrink-0 text-rf-accent-text" />
           <div className="space-y-1">
             <p className="text-sm font-medium text-rf-text">{t('privacy.lead')}</p>
             <p className="text-xs leading-relaxed text-rf-text-secondary">
@@ -165,7 +165,7 @@ export function PrivacyPage() {
           </code>
           <button
             onClick={() => void openDataFolder()}
-            className="flex shrink-0 items-center gap-1 text-sm text-rf-accent hover:underline"
+            className="flex shrink-0 items-center gap-1 text-sm text-rf-accent-text hover:underline"
           >
             <FolderOpen size={14} />
             {t('common.openFolder')}
@@ -245,7 +245,7 @@ export function PrivacyPage() {
       <footer className="flex flex-col gap-2 border-t border-rf-border pt-4">
         <button
           onClick={() => void api.system.openUrl(privacyPolicyUrl(locale))}
-          className="flex items-center gap-1.5 self-start text-sm text-rf-accent hover:underline"
+          className="flex items-center gap-1.5 self-start text-sm text-rf-accent-text hover:underline"
         >
           <ExternalLink size={14} />
           {t('privacy.fullPolicy')}
@@ -270,7 +270,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Item({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex gap-2 text-sm leading-relaxed text-rf-text-secondary">
-      <span aria-hidden className="text-rf-accent">
+      <span aria-hidden className="text-rf-accent-text">
         •
       </span>
       <span>{children}</span>

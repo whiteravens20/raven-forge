@@ -8,6 +8,7 @@ import {
   Edit3,
   Download,
   Upload,
+  FolderOpen,
   RefreshCw,
   ShieldCheck,
   ShieldAlert,
@@ -357,6 +358,7 @@ export function ProfilesPage() {
             }
             onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
+            onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
             onSync={handleSync}
             onQuickConnect={handleQuickConnect}
             quickConnectBusy={quickConnectBusy}
@@ -408,6 +410,7 @@ interface DetailProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onExport: () => void;
+  onOpenFolder: () => void;
   onSync: () => void;
   onQuickConnect: () => void;
   quickConnectBusy: boolean;
@@ -424,6 +427,7 @@ function ProfileDetail({
   onDuplicate,
   onDelete,
   onExport,
+  onOpenFolder,
   onSync,
   onQuickConnect,
   quickConnectBusy,
@@ -458,6 +462,13 @@ function ProfileDetail({
             icon={<Download size={14} />}
             onClick={onExport}
             title={t('common.export')}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<FolderOpen size={14} />}
+            onClick={onOpenFolder}
+            title={t('profiles.openFolder')}
           />
           <Button
             variant="danger"
@@ -822,7 +833,7 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
           value={draft.notes ?? ''}
           onChange={(e) => set('notes', e.target.value || undefined)}
           rows={3}
-          className="w-full rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text placeholder:text-rf-text-muted outline-none focus:border-rf-accent transition-colors resize-none"
+          className="w-full rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text placeholder:text-rf-text-muted outline-none focus:border-rf-accent-text transition-colors resize-none"
           placeholder={t('profileForm.notesPlaceholder')}
         />
       </div>

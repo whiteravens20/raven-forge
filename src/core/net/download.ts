@@ -113,7 +113,12 @@ export async function downloadToFile(
     // signal tells them apart, and only one of them is a failure worth naming.
     // A size refusal aborted the fetch itself, so it must not be read as either.
     if (!tooBig && controller.signal.aborted && !signal?.aborted) {
-      throw new Error(`Download stalled for ${STALL_TIMEOUT_MS / 1000}s and was cancelled: ${url}`);
+      throw new Error(
+        `Download stalled for ${STALL_TIMEOUT_MS / 1000}s and was cancelled: ${url}`,
+        {
+          cause: err,
+        },
+      );
     }
     throw err;
   } finally {

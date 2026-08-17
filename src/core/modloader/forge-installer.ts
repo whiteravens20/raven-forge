@@ -414,6 +414,7 @@ export async function installForgeLike(
           .slice(-3)
           .join(' ') || 'none'
       }`,
+      { cause: err },
     );
   }
 

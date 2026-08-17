@@ -76,6 +76,21 @@ async function writeLockFile(profileId: string, mods: InstalledMod[]): Promise<v
   await writeJsonAtomic(paths.profileLockFile(profileId), mods);
 }
 
+/**
+ * Where a mod's jar sits, which depends on whether it is switched on.
+ *
+ * Switching a mod off renames its file rather than deleting it, so every piece
+ * of code that goes looking for one has to ask the lock file first. Nothing did
+ * during a sync, and the cost was quiet: the check looked for `<name>.jar`,
+ * found only `<name>.jar.disabled`, called the mod missing and downloaded it
+ * again — leaving both files in `mods/`. The game loads by extension, so a mod
+ * the launcher showed as off was loaded anyway, on every sync, for as long as
+ * the profile followed a pack.
+ */
+function modFilePath(modsDir: string, fileName: string, enabled: boolean): string {
+  return path.join(modsDir, enabled ? fileName : `${fileName}.disabled`);
+}
+
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
@@ -520,28 +535,63 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     const userInstalled = existing.filter((m) => !m.fromManifest);
     const synced: InstalledMod[] = [];
 
-    const total = entries.length + manifest.configFiles.length;
-    let done = 0;
+    // Checking comes first and downloading second, as two passes with two
+    // counters, because the single pass they replace could not tell the two
+    // apart on screen. Every profile that follows a pack is synced before it
+    // launches, and the overwhelmingly common outcome is that nothing has
+    // moved — but the progress line still walked the mod list one name at a
+    // time under a file counter, which is indistinguishable from installing
+    // them. The first person to try the launcher reported the pack being
+    // downloaded twice; it never was. Now the counter that runs during the
+    // check says it is checking, and the download counter only exists, and
+    // only counts, when there is something to fetch.
+    const checkTotal = entries.length + manifest.configFiles.length;
+    let checked = 0;
 
-    const report = (message: ProgressMessage, currentFile?: string) =>
+    // Neither pass may report 1: the renderer clears an operation that says it
+    // has finished, and the download pass may still be to come. Both counters
+    // are emitted before the item they announce, so the last value of each is
+    // one short — the single completion event at the end of the sync is the
+    // only thing that reports the whole job done.
+    const reportCheck = () =>
       emitProgress('progress:mod-sync', {
         operationId: profileId,
-        progress: total > 0 ? done / total : 1,
-        message,
-        currentFile,
-        filesCompleted: done,
-        filesTotal: total,
+        progress: checkTotal > 0 ? checked / checkTotal : 0,
+        message: { key: 'progress.msg.checkingFiles' },
+        filesCompleted: checked,
+        filesTotal: checkTotal,
       });
 
-    report({ key: 'progress.msg.syncing', vars: { name: profile.name } });
+    emitProgress('progress:mod-sync', {
+      operationId: profileId,
+      progress: 0,
+      message: { key: 'progress.msg.syncing', vars: { name: profile.name } },
+    });
 
+    /** One manifest mod, resolved against what is already on disk. */
+    interface PlannedMod {
+      entry: ModEntry;
+      resolved: Awaited<ReturnType<typeof resolveModEntry>>;
+      /** Where the file belongs, suffix included when the mod is switched off. */
+      destPath: string;
+      previous?: InstalledMod;
+      enabled: boolean;
+      /** Set when the file is already there and matches — nothing to fetch. */
+      hash?: string;
+    }
+
+    const plannedMods: PlannedMod[] = [];
     for (const entry of entries) {
       throwIfCancelled(signal, 'Sync');
-      report({ text: entry.name });
+      reportCheck();
 
       const previous = existing.find((m) => m.id === entry.id);
       const resolved = await resolveModEntry(entry, manifest);
-      const destPath = path.join(modsDir, resolved.fileName);
+      // A mod the player switched off stays off, whether or not this sync has
+      // to fetch a new build of it. Both the file looked for and the file
+      // written therefore carry the suffix its state implies.
+      const enabled = previous?.enabled ?? true;
+      const destPath = modFilePath(modsDir, resolved.fileName, enabled);
 
       // Already on disk and matching the manifest hash — leave it alone.
       let hash: string | undefined;
@@ -549,41 +599,22 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         hash = previous.sha256 ?? (await sha256File(destPath));
       }
 
-      if (!hash) {
-        log.info(`Downloading mod: ${entry.name} (${resolved.fileName})`);
-        hash = await fetchModEntry(entry, resolved, destPath, signal);
-
-        // A version bump changes the filename; drop the file it replaced.
-        if (previous && previous.fileName !== resolved.fileName) {
-          try {
-            await fs.rm(path.join(modsDir, previous.fileName), { force: true });
-          } catch {
-            /* ok */
-          }
-        }
-      }
-
-      synced.push({
-        id: entry.id,
-        name: entry.name,
-        version: resolved.version,
-        source: entry.source,
-        fileName: resolved.fileName,
-        sha256: hash,
-        required: entry.required,
-        side: entry.side,
-        enabled: previous?.enabled ?? true,
-        fromManifest: true,
-      });
-      done++;
+      plannedMods.push({ entry, resolved, destPath, previous, enabled, hash });
+      checked++;
     }
 
-    // Config overrides, resolved relative to the profile's .minecraft directory.
-    const appliedConfigs: Record<string, string> = {};
-    let configsWritten = 0;
+    /** One config override, and whether this sync has to write it. */
+    interface PlannedConfig {
+      config: ModManifest['configFiles'][number];
+      gameDir: string;
+      dest: string;
+      write: boolean;
+    }
 
+    const plannedConfigs: PlannedConfig[] = [];
     for (const config of manifest.configFiles) {
-      report({ text: config.path }, config.path);
+      throwIfCancelled(signal, 'Sync');
+      reportCheck();
 
       const gameDir = paths.profileGameDir(profileId);
       const dest = path.join(gameDir, config.path);
@@ -593,7 +624,74 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       }
 
       const exists = await fileExists(dest);
-      if (shouldApplyConfigOverride(config, previousState.appliedConfigs?.[config.path], exists)) {
+      const write = shouldApplyConfigOverride(
+        config,
+        previousState.appliedConfigs?.[config.path],
+        exists,
+      );
+      plannedConfigs.push({ config, gameDir, dest, write });
+      checked++;
+    }
+
+    const downloadTotal =
+      plannedMods.filter((p) => !p.hash).length + plannedConfigs.filter((c) => c.write).length;
+    let fetched = 0;
+
+    const reportDownload = (message: ProgressMessage, currentFile?: string) =>
+      emitProgress('progress:mod-sync', {
+        operationId: profileId,
+        progress: downloadTotal > 0 ? fetched / downloadTotal : 0,
+        message,
+        currentFile,
+        filesCompleted: fetched,
+        filesTotal: downloadTotal,
+      });
+
+    for (const planned of plannedMods) {
+      const { entry, resolved, destPath, previous, enabled } = planned;
+
+      if (!planned.hash) {
+        throwIfCancelled(signal, 'Sync');
+        reportDownload({ key: 'progress.msg.downloadingFile', vars: { name: entry.name } });
+
+        log.info(`Downloading mod: ${entry.name} (${resolved.fileName})`);
+        planned.hash = await fetchModEntry(entry, resolved, destPath, signal);
+
+        // A version bump changes the filename; drop the file it replaced, at
+        // whichever of the two names that file was under.
+        if (previous && previous.fileName !== resolved.fileName) {
+          try {
+            await fs.rm(modFilePath(modsDir, previous.fileName, enabled), { force: true });
+          } catch {
+            /* ok */
+          }
+        }
+        fetched++;
+      }
+
+      synced.push({
+        id: entry.id,
+        name: entry.name,
+        version: resolved.version,
+        source: entry.source,
+        fileName: resolved.fileName,
+        sha256: planned.hash,
+        required: entry.required,
+        side: entry.side,
+        enabled,
+        fromManifest: true,
+      });
+    }
+
+    // Config overrides, resolved relative to the profile's .minecraft directory.
+    const appliedConfigs: Record<string, string> = {};
+    let configsWritten = 0;
+
+    for (const { config, gameDir, dest, write } of plannedConfigs) {
+      if (write) {
+        throwIfCancelled(signal, 'Sync');
+        reportDownload({ text: config.path }, config.path);
+
         // Refuse a symlink already sitting in the game dir that would redirect
         // this write out of the tree: the parent is proven contained through
         // realpath here, and `noFollow` refuses a link at the file itself.
@@ -602,11 +700,11 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         await verifyDownload(dest, config, `config ${config.path}`);
         log.info(`Applied config override: ${config.path}`);
         configsWritten++;
+        fetched++;
       }
 
       const version = configVersion(config);
       if (version) appliedConfigs[config.path] = version;
-      done++;
     }
 
     const mcVersion = manifest.minecraftVersion;
@@ -620,7 +718,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     if (settings.autoRemoveOrphanedMods) {
       for (const stale of orphaned) {
         try {
-          await fs.rm(path.join(modsDir, stale.fileName), { force: true });
+          await fs.rm(modFilePath(modsDir, stale.fileName, stale.enabled), { force: true });
         } catch {
           /* ok */
         }
@@ -647,8 +745,8 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       operationId: profileId,
       progress: 1,
       message: { pluralKey: 'progress.msg.synced', count: synced.length },
-      filesCompleted: total,
-      filesTotal: total,
+      filesCompleted: checkTotal,
+      filesTotal: checkTotal,
     });
     log.info(
       `Manifest sync complete for ${profile.name}: ${synced.length} mods, ` +
@@ -901,9 +999,7 @@ export async function uninstallMod(profileId: string, modId: string): Promise<vo
   if (!mod) throw new Error(`Mod ${modId} not found in profile ${profileId}`);
 
   // Delete file
-  const filePath = mod.enabled
-    ? path.join(modsDir, mod.fileName)
-    : path.join(modsDir, `${mod.fileName}.disabled`);
+  const filePath = modFilePath(modsDir, mod.fileName, mod.enabled);
   try {
     await fs.rm(filePath, { force: true });
   } catch {
@@ -927,14 +1023,10 @@ export async function toggleModEnabled(
 
   if (mod.enabled === enabled) return;
 
-  const currentPath = mod.enabled
-    ? path.join(modsDir, mod.fileName)
-    : path.join(modsDir, `${mod.fileName}.disabled`);
-  const newPath = enabled
-    ? path.join(modsDir, mod.fileName)
-    : path.join(modsDir, `${mod.fileName}.disabled`);
-
-  await fs.rename(currentPath, newPath);
+  await fs.rename(
+    modFilePath(modsDir, mod.fileName, mod.enabled),
+    modFilePath(modsDir, mod.fileName, enabled),
+  );
   mod.enabled = enabled;
   await writeLockFile(profileId, mods);
   log.info(`${enabled ? 'Enabled' : 'Disabled'} mod ${mod.name} in profile ${profileId}`);

@@ -71,6 +71,10 @@ const config = {
     uninstallerIcon: 'assets/icons/icon.ico',
     installerSidebar: 'build/installer-sidebar.bmp',
     license: 'LICENSE',
+    // `deleteAppDataOnUninstall` is deliberately absent: it is all-or-nothing,
+    // and several gigabytes of worlds and mods deserve a question rather than a
+    // build-time default either way. build/installer.nsh asks it — that file is
+    // picked up by name from buildResources, so there is no key for it here.
   },
 
   // ── Linux ────────────────────────────────────────────────

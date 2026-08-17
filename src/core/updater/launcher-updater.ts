@@ -133,5 +133,12 @@ export function quitAndInstall(): void {
     app.quit();
     return;
   }
-  autoUpdater.quitAndInstall();
+  // Silent, and restarted afterwards. The default runs the NSIS installer with
+  // its full interface, which asks somebody who has already agreed to update
+  // for a destination they chose once and a licence they accepted once, and
+  // then leaves them on a Finish page to close by hand. Nothing on those pages
+  // is a decision an update needs: the destination is where the app already is.
+  // `isForceRunAfter` is what makes the second argument matter — a silent
+  // install would otherwise end with the launcher gone from the screen.
+  autoUpdater.quitAndInstall(true, true);
 }

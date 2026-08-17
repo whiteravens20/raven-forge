@@ -1,10 +1,11 @@
 /**
  * Azure application (client) ID baked in at build time.
  *
- * The literal below is rewritten inside `dist/` by `scripts/inject-client-id.mjs`
- * when `RAVENFORGE_CLIENT_ID` is set for the build. It is deliberately the only
- * injectable value in the tree, so the rewrite has exactly one target and cannot
- * clobber the sentinel `microsoft-auth.ts` compares against.
+ * The literal below is rewritten inside `dist/` by `scripts/inject-build-ids.mjs`
+ * when `RAVENFORGE_CLIENT_ID` is set for the build. This placeholder appears in
+ * exactly one file and nowhere else in the tree, so the rewrite cannot clobber
+ * the sentinel `microsoft-auth.ts` compares against. The Discord application ID
+ * is injected the same way, from its own file — see `core/discord/build-config.ts`.
  *
  * This identifier is **not a secret**. Raven Forge is a native OAuth *public*
  * client: it holds no client secret, because anything shipped in a downloadable

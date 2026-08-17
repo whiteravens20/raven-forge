@@ -164,6 +164,7 @@ export const pl: Translations = {
   'profiles.emptyHint': 'Dodaj pierwszy profil przyciskiem +',
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
   'profiles.copyName': '{name} (kopia)',
+  'profiles.openFolder': 'Otwórz folder profilu',
   // ── Usuwanie profilu ─────────────────────────────────────
   'delete.title': 'Usuń profil „{name}”',
   'delete.intro':
@@ -377,6 +378,11 @@ export const pl: Translations = {
   'settings.offlineModeHint':
     'Nigdy nie łączy się z serwerami logowania. Tylko singleplayer i LAN — serwery w trybie online odrzucą sesję offline.',
   'settings.autoRemoveOrphans': 'Automatycznie usuwaj osierocone mody',
+  'settings.discordPresence': 'Pokazuj grę na statusie Discorda',
+  'settings.discordPresenceHint':
+    'Kiedy gra działa, Twój status widzi nazwę profilu, wersję i loader — bez adresu serwera. ' +
+    'Widzą go wszyscy, którzy widzą Twój profil na Discordzie. Mody pokazujące status ' +
+    '(np. CraftPresence) będą się z tym gryzły: Discord pokazuje jedną aktywność naraz.',
   'settings.concurrency': 'Jednoczesne pobierania (1–8)',
   'settings.concurrencyInvalid': 'Podaj liczbę od 1 do 8.',
   'settings.proxy': 'Proxy URL (opcjonalnie)',
@@ -440,6 +446,8 @@ export const pl: Translations = {
 
   // Komunikaty postępu nazywane przez proces główny — zob. `ProgressKey`.
   'progress.msg.downloading': 'Pobieranie…',
+  'progress.msg.checkingFiles': 'Sprawdzanie zainstalowanych plików…',
+  'progress.msg.downloadingFile': 'Pobieranie {name}…',
   'progress.msg.downloadComplete': 'Pobieranie zakończone',
   'progress.msg.libraries': 'Biblioteki Minecraft {version}',
   'progress.msg.assets': 'Zasoby gry',

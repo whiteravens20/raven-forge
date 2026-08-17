@@ -20,5 +20,6 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   trustedPublicKeys: [],
   autoRemoveOrphanedMods: false,
   showLiveConsole: false,
+  discordRichPresence: false,
   offlineMode: false,
 };

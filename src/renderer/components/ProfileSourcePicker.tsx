@@ -289,7 +289,7 @@ function SourceCard({
       onClick={onClick}
       className="flex w-full items-start gap-3 rounded-lg border border-rf-border p-4 text-left transition-colors hover:border-rf-accent hover:bg-rf-accent/5"
     >
-      <span className="mt-0.5 shrink-0 text-rf-accent">{icon}</span>
+      <span className="mt-0.5 shrink-0 text-rf-accent-text">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2 text-sm font-medium text-rf-text">
           {title}

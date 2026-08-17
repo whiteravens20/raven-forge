@@ -12,7 +12,7 @@ interface BadgeProps {
 }
 
 const styles: Record<BadgeType, string> = {
-  info: 'bg-rf-accent/10 border-rf-accent/30 text-rf-accent',
+  info: 'bg-rf-accent/10 border-rf-accent/30 text-rf-accent-text',
   warning: 'bg-rf-warning/10 border-rf-warning/30 text-rf-warning',
   urgent: 'bg-rf-danger/10 border-rf-danger/30 text-rf-danger',
   success: 'bg-rf-success/10 border-rf-success/30 text-rf-success',

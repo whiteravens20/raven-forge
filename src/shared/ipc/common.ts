@@ -34,6 +34,8 @@ export type IpcErrorCode = 'AUTH_UNREACHABLE';
  */
 export type ProgressKey =
   | 'progress.msg.downloading'
+  | 'progress.msg.downloadingFile'
+  | 'progress.msg.checkingFiles'
   | 'progress.msg.downloadComplete'
   | 'progress.msg.libraries'
   | 'progress.msg.assets'

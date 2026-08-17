@@ -33,7 +33,7 @@ function ExtLink({ href, children }: { href: string; children: ReactNode }) {
     <button
       type="button"
       onClick={() => void api.system.openUrl(href)}
-      className="underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent hover:decoration-rf-accent/60"
+      className="underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent-text hover:decoration-rf-accent-text/60"
     >
       {children}
     </button>
@@ -74,10 +74,10 @@ export function AboutPage() {
             className="rf-chronicle-trigger relative"
             aria-label={t('about.secret')}
           >
-            <InlineSvg markup={iconMono} className="h-9 text-rf-accent" />
+            <InlineSvg markup={iconMono} className="h-9 text-rf-accent-text" />
             <span className="rf-chronicle-spark" aria-hidden />
           </button>
-          <h1 className="font-display text-3xl font-bold tracking-wider text-rf-accent">
+          <h1 className="font-display text-3xl font-bold tracking-wider text-rf-accent-text">
             {APP_NAME}
           </h1>
         </div>
@@ -105,7 +105,7 @@ export function AboutPage() {
             data" should not itself require opening a browser. */}
         <Link
           to="/privacy"
-          className="underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent hover:decoration-rf-accent/60"
+          className="underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent-text hover:decoration-rf-accent-text/60"
         >
           {t('about.privacy')}
         </Link>

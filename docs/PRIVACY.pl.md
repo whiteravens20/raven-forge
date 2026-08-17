@@ -192,6 +192,23 @@ sprawdzanie.
 
 ---
 
+## Status na Discordzie
+
+Domyślnie wyłączony. Po włączeniu w **Ustawieniach → Zachowanie** launcher pisze
+do gniazda Discorda na Twoim komputerze, dopóki gra działa, a Discord pokazuje na
+Twoim statusie nazwę profilu, wersję Minecrafta i loader.
+
+- Przez Raven Forge nic nie opuszcza Twojego komputera. Gniazdo jest lokalne; co
+  Discord robi ze statusem dalej, to już zachowanie Discorda — widzi go każdy,
+  kto widzi Twój profil.
+- **Adres serwera nie jest wysyłany**, choć launcher go zna. Trafiłby do całej
+  Twojej listy znajomych, a ten adres nie jest wyłącznie Twój.
+- Status znika, gdy gra się kończy, wywala albo nie startuje.
+- Przy wyłączonym ustawieniu żadne gniazdo nie jest otwierane i nic nie jest
+  wysyłane.
+
+---
+
 ## Gra to osobny program
 
 Kiedy Minecraft już wystartuje, jest własnym procesem, a Raven Forge nie pośredniczy
@@ -241,6 +258,7 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 | **Tryb offline** (Ustawienia → Zachowanie)                          | Nigdy nie kontaktuje się z serwerami uwierzytelniania. Tylko gra jednoosobowa i LAN. |
 | **Adres kanału wiadomości / ogłoszeń** (Ustawienia → Źródła treści) | Wyczyść pole, a dany kanał nie będzie już pobierany.                                 |
 | **Proxy** (Ustawienia → Sieć i pobieranie)                          | Kieruje każde żądanie launchera przez proxy, które kontrolujesz.                     |
+| **Status na Discordzie** (Ustawienia → Zachowanie)                  | Domyślnie wyłączony. Włączony — Twój profil na Discordzie pokazuje, w co grasz.      |
 | Nieużywanie strony Mody                                             | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz lub nie zainstalujesz.        |
 | Konto offline                                                       | Żaden serwer Microsoftu ani Xboxa nie jest w ogóle dotykany.                         |
 
@@ -253,6 +271,9 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 - **Wszystkie dane launchera:** zamknij launcher i usuń wymieniony wyżej folder
   danych. Poza nim nie zostaje nic oprócz wpisów w magazynie poświadczeń
   systemu, które znikają, jeśli najpierw się wylogujesz.
+- **Odinstalowanie:** usunięcie launchera i usunięcie danych to dwie osobne
+  rzeczy. Na Windows deinstalator pyta, co zrobić; na Linuksie pakiet w ogóle nie
+  rusza katalogu domowego. Opisuje to [UNINSTALL.md](UNINSTALL.md).
 - **Po naszej stronie:** nie ma czego usuwać. Nie mamy niczego.
 
 ---

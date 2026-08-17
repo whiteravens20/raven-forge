@@ -100,7 +100,9 @@ async function downloadFile(
         throw new CancelledError('Download');
       }
       if (attempt === retries)
-        throw new Error(`Failed to download ${url} after ${retries} attempts: ${err}`);
+        throw new Error(`Failed to download ${url} after ${retries} attempts: ${err}`, {
+          cause: err,
+        });
       log.warn(`Download attempt ${attempt} failed for ${url}: ${err}`);
     }
   }

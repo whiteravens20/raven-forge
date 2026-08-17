@@ -79,7 +79,7 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
           <footer className="border-t border-rf-border px-5 py-2.5">
             <button
               onClick={() => void api.system.openUrl(article.url!)}
-              className="inline-flex items-center gap-1.5 text-xs text-rf-accent hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs text-rf-accent-text hover:underline"
             >
               <ExternalLink size={13} />
               {t('news.openInBrowser')}
@@ -146,7 +146,7 @@ function SpanView({ span }: { span: Span }) {
       return (
         <button
           onClick={() => void api.system.openUrl(span.href)}
-          className="text-rf-accent hover:underline"
+          className="text-rf-accent-text hover:underline"
         >
           {span.text}
         </button>
