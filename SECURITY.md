@@ -45,9 +45,9 @@ already posted one publicly, sign out and back in — that invalidates the sessi
 ## Supported Versions
 
 The project is in early development and there is no LTS line. Only the latest
-release receives security fixes; there are no backports to earlier tags. No
-release has been published yet — until the first tag, the supported version is
-whatever is on `main`.
+release receives security fixes; there are no backports to earlier tags. The
+launcher updates itself, so "update first" is usually a restart rather than a
+download.
 
 | Version        | Supported         |
 | -------------- | ----------------- |

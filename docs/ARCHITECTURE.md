@@ -5,7 +5,7 @@
 | Layer          | Choice                                  | Rationale                                                                                                                                                                                                                                                                                                                                                             |
 | -------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shell          | **Electron 41**                         | Mature ecosystem, first-class Windows + Linux packaging via electron-builder, signed auto-updates via electron-updater, and predictable Node integration for game-launching subprocesses. Tauri was considered but its Rust toolchain raises the contributor bar and its WebView2/WebKitGTK story complicates spawning Java with full stdio capture across platforms. |
-| Renderer       | **React 19 + Vite 7**                   | Strict typing, fast HMR, broad ecosystem (Zustand, Framer Motion, react-router).                                                                                                                                                                                                                                                                                      |
+| Renderer       | **React 19 + Vite 8**                   | Strict typing, fast HMR, broad ecosystem (Zustand, react-router).                                                                                                                                                                                                                                                                                                     |
 | Styling        | **Tailwind v4 + CSS custom properties** | Theming via `--rf-*` variables on `[data-theme]`, atomic utility classes for the dark gaming aesthetic. The Vite plugin (`@tailwindcss/vite`) is the supported v4 integration; PostCSS is intentionally not configured.                                                                                                                                               |
 | State          | **Zustand**                             | Tiny, no providers, easy to share between pages.                                                                                                                                                                                                                                                                                                                      |
 | Validation     | **Zod**                                 | Runtime validation at IPC + manifest boundaries; types inferred via `z.infer`.                                                                                                                                                                                                                                                                                        |
@@ -17,40 +17,46 @@
 
 ```
 raven-forge/
-├── PLAN.md                       # original brief, preserved as work plan
 ├── README.md                     # dev setup + feature overview
 ├── docs/
 │   ├── ARCHITECTURE.md           # this document
 │   ├── AZURE-SETUP.md            # registering the Azure app + Mojang approval
+│   ├── DISCORD-SETUP.md          # registering the app behind the optional status
 │   ├── MANIFEST-SCHEMA.md        # remote manifest spec
 │   ├── PRIVACY.md                # what is stored and sent (EN — canonical pair)
 │   ├── PRIVACY.pl.md             # the same, in Polish; both are maintained
-│   └── SIGNING.md                # Ed25519 manifest signing
+│   ├── SIGNING.md                # Ed25519 manifest signing
+│   └── UNINSTALL.md              # what each platform's uninstaller removes
+├── build/installer.nsh           # the NSIS uninstaller's keep-or-delete question
 ├── electron-builder.config.js    # NSIS + .deb + AppImage targets
 ├── eslint.config.mjs             # flat-config, react-hooks + @typescript-eslint
 ├── tsconfig.json                 # umbrella project for typecheck-all
 ├── tsconfig.main.json            # main + preload + core + shared (Node ESM)
 ├── tsconfig.renderer.json        # renderer (DOM)
-├── tailwind.config.ts            # design tokens + custom animations
 ├── vite.config.ts                # renderer build + path aliases
 ├── .github/workflows/
-│   ├── build.yml                 # PR / push CI
-│   └── release.yml               # tag-triggered, signs + drafts release
+│   ├── build.yml                 # PR / push CI — lint, typecheck, test, build
+│   ├── codeql.yml                # CodeQL analysis
+│   ├── package.yml               # nightly: install the built packages on a clean box
+│   ├── release.yml               # tag-triggered, builds + drafts the release
+│   └── security.yml              # npm audit + Trivy secret & config scan
 └── src/
     ├── main/                     # Electron main process
     │   ├── index.ts              # entry — single-instance, lifecycle, IPC bootstrap
     │   ├── window.ts             # BrowserWindow factory (frameless, secure defaults)
     │   ├── ipc-handlers.ts       # all ipcMain.handle registrations
     │   ├── init.ts               # data-directory bootstrap
+    │   ├── security.ts           # navigation, window-open and permission policy
     │   └── logger.ts             # electron-log setup
     ├── preload/
     │   └── index.ts              # contextBridge — exposes typed RavenForgeAPI
     ├── renderer/                 # React SPA
     │   ├── main.tsx, App.tsx
     │   ├── pages/                # one per route
-    │   ├── components/           # ui/ (Button, Input, Banner, Select) + layout/
+    │   ├── components/           # ui/ (Button, Input, Select, Switch, Banner, …) + layout/
     │   ├── stores/               # Zustand stores (auth, profiles, news, settings, launch)
-    │   └── styles/global.css     # @import "tailwindcss" + CSS variables
+    │   ├── i18n/                 # UI string dictionaries (pl, en) + the t() helper
+    │   └── styles/global.css     # @import "tailwindcss", @theme tokens, per-theme --rf-*
     ├── core/                     # business logic, runs in main process
     │   ├── auth/                 # MS OAuth → Xbox → XSTS → MC chain, keytar token store
     │   ├── diagnostics/          # crash-report.ts — one redacted file per crash
@@ -59,15 +65,19 @@ raven-forge/
     │   ├── minecraft/            # version manifest, asset/library download, game launcher
     │   ├── modloader/            # Fabric, Quilt, Forge and NeoForge installers
     │   ├── mods/                 # manifest sync, Modrinth API, content (shaders/RP) manager
+    │   ├── packs/                # .mrpack reader, pack catalogue, profile-from-pack
+    │   ├── net/                  # proxy dispatcher + the shared download helper
     │   ├── updater/              # electron-updater wiring, manifest signature verification
     │   ├── profiles/             # profile CRUD + import/export
     │   ├── news/                 # news + announcement fetcher with mock fallback
+    │   ├── util/                 # atomic writes, cancellation, path containment
     │   └── config/               # paths.ts, settings-manager.ts, defaults.ts
     └── shared/                   # types + validators consumed by both processes
         ├── ipc-types.ts          # InvokeChannels, EventChannels, RavenForgeAPI
         ├── ipc/                  # payload shapes, one file per domain
         ├── validators.ts         # Zod schemas for settings + profiles
         ├── manifest-schema.ts    # Zod schema for remote manifests
+        ├── branding.ts           # the launcher's own names and addresses
         └── constants.ts          # endpoints, defaults, MC→Java mapping
 ```
 

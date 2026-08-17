@@ -56,8 +56,11 @@ npm install
 npm run dev
 ```
 
-> **Note:** On Windows, you may need to install Visual Studio Build Tools for native modules (keytar):
-> `npm install --global windows-build-tools` or install the "Desktop development with C++" workload from Visual Studio Installer.
+> **Note:** On Windows, `keytar` is a native module and needs a C++ toolchain to
+> build. The Node.js installer offers to set one up ("Tools for Native Modules");
+> otherwise install the **Desktop development with C++** workload from the Visual
+> Studio Installer. The old `windows-build-tools` package is deprecated — npm
+> itself now says Node ships what it used to provide.
 
 ### Debian / Ubuntu
 
@@ -111,7 +114,8 @@ src/
 │   ├── pages/      # Route pages
 │   ├── stores/     # Zustand state stores
 │   ├── i18n/       # UI string dictionaries (pl, en) + tiny t() helper
-│   └── styles/     # Tailwind entry + backdrop animations
+│   ├── assets/     # bundled fonts
+│   └── styles/     # Tailwind entry + theme tokens + backdrop animations
 ├── core/           # Business logic (runs in main process)
 │   ├── auth/       # Microsoft OAuth + offline auth
 │   ├── config/     # Settings + paths
@@ -125,7 +129,8 @@ src/
 │   ├── news/       # News + announcement feeds
 │   ├── packs/      # .mrpack reader, pack catalogue, profile-from-pack install
 │   ├── profiles/   # Profile CRUD + import/export
-│   └── updater/    # electron-updater + Ed25519 manifest verification
+│   ├── updater/    # electron-updater + Ed25519 manifest verification
+│   └── util/       # Atomic writes, cancellation, path containment
 └── shared/         # Types shared between main + renderer
     ├── ipc-types.ts    # the channel contract
     └── ipc/            # payload shapes, one file per domain
