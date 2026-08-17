@@ -10,9 +10,68 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; connect-src 'self' https:"
     />
     <title>Raven Forge Launcher</title>
+    <!-- The holding screen below, inline because the point of it is to be on
+         screen before anything else has been fetched or parsed. Its colours are
+         literals rather than theme tokens for the same reason: the stylesheet
+         that defines those arrives with the bundle this is covering for. They
+         are the default theme's `--rf-bg`, `--rf-text-secondary`, `--rf-border`
+         and `--rf-accent`. -->
+    <style>
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #0f0f13;
+        color: #a8a8be;
+        font:
+          500 12px/1 system-ui,
+          sans-serif;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      #boot span {
+        width: 132px;
+        height: 2px;
+        overflow: hidden;
+        border-radius: 2px;
+        background: #2e2e3e;
+      }
+      #boot span::after {
+        content: '';
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: 2px;
+        background: #7c3aed;
+        animation: boot-sweep 1.2s ease-in-out infinite;
+      }
+      @keyframes boot-sweep {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(250%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot span::after {
+          width: 100%;
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body class="bg-rf-bg text-rf-text font-body overflow-hidden">
-    <div id="root"></div>
+    <!-- Replaced the moment React mounts — `createRoot` clears its container —
+         so this is what fills the window for exactly as long as the renderer
+         takes to start, and never competes with the app for the same pixels. -->
+    <div id="root">
+      <div id="boot">Raven Forge<span></span></div>
+    </div>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import { initLogger, log } from './logger';
-import { createMainWindow } from './window';
+import { createMainWindow, getMainWindow } from './window';
 import { installContentSecurityPolicy } from './security';
 import { registerAllIpcHandlers } from './ipc-handlers';
 import { loadSettings } from '../core/config/settings-manager';
@@ -16,15 +16,30 @@ if (!gotTheLock) {
 }
 
 app.on('second-instance', () => {
-  const win = BrowserWindow.getAllWindows()[0];
+  // The launcher's own window, not whichever one happens to be first: a sign-in
+  // is a second BrowserWindow, and raising that instead would answer a click on
+  // the desktop icon by focusing a Microsoft login page.
+  const win = getMainWindow();
   if (win) {
     if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
     win.focus();
   }
 });
 
 app.whenReady().then(async () => {
   initLogger();
+
+  // The window is opened before any of the setup below it. None of that setup
+  // is slow — six mkdirs and a settings file — but all of it used to run with
+  // nothing on screen, on top of the seconds Electron itself takes to boot on a
+  // cold install. What the user saw was a desktop that did not react.
+  //
+  // CSP first regardless: it has to be installed before the very first
+  // document, and handlers have to exist before the renderer can invoke one.
+  installContentSecurityPolicy();
+  registerAllIpcHandlers();
+  createMainWindow();
 
   try {
     await ensureDataDirectories();
@@ -33,12 +48,6 @@ app.whenReady().then(async () => {
   } catch (err) {
     log.error('Failed to initialize:', err);
   }
-
-  // Before the window exists, so the very first document is already covered.
-  installContentSecurityPolicy();
-
-  registerAllIpcHandlers();
-  createMainWindow();
 
   initUpdater();
   void checkForUpdates();
