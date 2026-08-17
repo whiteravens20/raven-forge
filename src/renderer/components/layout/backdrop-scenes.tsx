@@ -106,12 +106,6 @@ export function OverworldScene() {
             <VoxelTerrain />
           </g>
         </g>
-        <rect
-          y="380"
-          width="1920"
-          height="700"
-          style={{ fill: 'var(--rf-bg)', opacity: 'var(--bd-terrain-wash)' }}
-        />
       </g>
     </g>
   );

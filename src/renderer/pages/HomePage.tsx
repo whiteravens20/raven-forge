@@ -151,36 +151,52 @@ export function HomePage() {
           a banner that opens a dialog repeating its own single sentence teaches
           people the click is not worth making. */}
       {announcement && (
-        <Banner
-          type={announcement.type}
-          dismissible={announcement.dismissible}
-          onDismiss={() => dismiss(announcement.id)}
-        >
-          {announcement.body || announcement.url ? (
-            <button
-              onClick={() =>
-                setReading({
-                  title: announcement.title ?? announcement.message,
-                  subtitle: announcement.title ? announcement.message : undefined,
-                  body: announcement.body,
-                  excerpt: announcement.message,
-                  url: announcement.url,
-                })
-              }
-              className="text-left underline decoration-current/40 underline-offset-2 hover:decoration-current"
-            >
-              {announcement.message}
-            </button>
-          ) : (
-            announcement.message
-          )}
-        </Banner>
+        // Everywhere else a banner sits on a page background; here it sits on
+        // the backdrop, and its own `/10` tint is far too thin to be a surface
+        // — over the Nether scene the text came out at 1.7:1. The wrapper is
+        // the surface, so the tint has something known to be a tint *of*.
+        <div className="rounded-lg bg-rf-bg">
+          <Banner
+            type={announcement.type}
+            dismissible={announcement.dismissible}
+            onDismiss={() => dismiss(announcement.id)}
+          >
+            {announcement.body || announcement.url ? (
+              <button
+                onClick={() =>
+                  setReading({
+                    title: announcement.title ?? announcement.message,
+                    subtitle: announcement.title ? announcement.message : undefined,
+                    body: announcement.body,
+                    excerpt: announcement.message,
+                    url: announcement.url,
+                  })
+                }
+                className="text-left underline decoration-current/40 underline-offset-2 hover:decoration-current"
+              >
+                {announcement.message}
+              </button>
+            ) : (
+              announcement.message
+            )}
+          </Banner>
+        </div>
       )}
 
       {reading && <ArticleReader article={reading} onClose={() => setReading(null)} />}
 
       {/* Main launch area */}
-      <div className="flex flex-1 flex-col items-center justify-center gap-6">
+      <div className="relative flex flex-1 flex-col items-center justify-center gap-6">
+        {/* The only text in the app with artwork behind it rather than a
+            surface, and the artwork is four scenes on a 45-second rotation —
+            pale overworld, lava, cave, workshop — so there is no such thing as
+            "the" background colour here to check a token against. Measured on
+            the light theme's overworld, the loader/RAM line came out at 3.0:1.
+            This pool of `--rf-bg` is what the column is read against instead;
+            `-z-[5]` puts it over the backdrop's own -z-10 and under every
+            sibling in normal flow. */}
+        <div aria-hidden className="rf-launch-scrim pointer-events-none absolute inset-0 -z-[5]" />
+
         {/* Account display */}
         <div className="text-center">
           {activeAccount ? (
@@ -269,7 +285,7 @@ export function HomePage() {
         {/* Say it before the click, not after the restart. Someone who presses
             Play and gets a relaunching launcher deserves to have been told. */}
         {pendingUpdate && updateStage !== 'failed' && (
-          <p className="text-xs text-rf-accent">
+          <p className="text-xs text-rf-accent-text">
             {t('home.updateBeforePlay', { version: pendingUpdate.version })}
           </p>
         )}

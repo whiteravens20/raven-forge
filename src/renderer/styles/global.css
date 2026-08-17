@@ -223,7 +223,7 @@ body {
   --bd-grid: 0.17;
   --bd-ember: 0.85;
   --bd-noise: 0.055;
-  --bd-terrain-wash: 0;
+  --bd-scene-wash: 0;
 }
 
 /* Pure black swallows soft light — push the sources harder. */
@@ -234,8 +234,15 @@ body {
   --bd-noise: 0.045;
 }
 
-/* On a light field the glow must whisper, the grid carries more of the
-   depth, and the voxel map gets washed toward pastel. */
+/* On a light field the glow must whisper, the grid carries more of the depth,
+   and every scene is washed toward pastel — see `--bd-scene-wash` in
+   ForgeBackdrop.
+
+   0.72 is measured, not chosen: wash a black pixel with that much `--rf-bg`
+   and `--rf-text-secondary` still reads against it at 4.5:1 (the minimum is
+   0.694). `--rf-text-muted` would need 0.89, which is why the one place muted
+   text sits on the backdrop — the home page's launch column — has a scrim of
+   its own instead of the whole picture being flattened for it. */
 [data-theme='light'] .rf-backdrop {
   --bd-aurora-a: 0.16;
   --bd-aurora-b: 0.1;
@@ -243,7 +250,26 @@ body {
   --bd-grid: 0.12;
   --bd-ember: 0.55;
   --bd-noise: 0.03;
-  --bd-terrain-wash: 0.32;
+  --bd-scene-wash: 0.72;
+}
+
+/* The home page's launch column reads against this rather than against
+   whichever scene is up: the backdrop paints a scrim of its own, but that one
+   is a vertical gradient for the page as a whole, and its weakest point is the
+   middle — exactly where this column sits.
+
+   Full strength across the middle and faded to nothing well before the edges,
+   so it reads as depth behind the button rather than as a panel with an edge.
+   `--rf-bg` rather than a literal, so it lightens the light theme's overworld
+   and darkens the dark themes' lava with the same rule. */
+.rf-launch-scrim {
+  background: radial-gradient(
+    ellipse 44% 58% at 50% 50%,
+    var(--rf-bg) 0%,
+    var(--rf-bg) 52%,
+    transparent 100%
+  );
+  opacity: 0.88;
 }
 
 .rf-backdrop .rf-bd-aurora-a {

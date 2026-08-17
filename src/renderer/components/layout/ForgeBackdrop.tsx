@@ -289,6 +289,19 @@ export function ForgeBackdrop({ ambient = false }: ForgeBackdropProps) {
           </g>
         )}
 
+        {/* Every scene is painted in its own materials — basalt, deepslate,
+            steel — and three of the four are dark whatever theme is running.
+            In the light theme that put the launcher's own dark text on a dark
+            picture: the line under the play button measured 1.3:1 over the
+            Nether forge, and the announcement banner 1.7:1. This is the wash
+            that keeps a light theme light; it is zero in the dark themes,
+            where the scenes are already the right end of the scale. */}
+        <rect
+          width="1920"
+          height="1080"
+          style={{ fill: 'var(--rf-bg)', opacity: 'var(--bd-scene-wash)' }}
+        />
+
         {/* Ambient ember field, over every scene. */}
         <g style={{ opacity: 'var(--bd-ember)' }}>
           {EMBERS.map((e, i) => (
