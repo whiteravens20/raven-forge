@@ -446,6 +446,8 @@ export const pl: Translations = {
 
   // Komunikaty postępu nazywane przez proces główny — zob. `ProgressKey`.
   'progress.msg.downloading': 'Pobieranie…',
+  'progress.msg.checkingFiles': 'Sprawdzanie zainstalowanych plików…',
+  'progress.msg.downloadingFile': 'Pobieranie {name}…',
   'progress.msg.downloadComplete': 'Pobieranie zakończone',
   'progress.msg.libraries': 'Biblioteki Minecraft {version}',
   'progress.msg.assets': 'Zasoby gry',

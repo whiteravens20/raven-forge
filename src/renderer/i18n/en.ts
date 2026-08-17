@@ -436,6 +436,10 @@ export const en = {
 
   // Progress lines named by the main process — see `ProgressKey` in ipc-types.
   'progress.msg.downloading': 'Downloading…',
+  // Two lines for the two halves of a pack sync, so the counter under the bar
+  // says which one it is counting.
+  'progress.msg.checkingFiles': 'Checking the installed files…',
+  'progress.msg.downloadingFile': 'Downloading {name}…',
   'progress.msg.downloadComplete': 'Download complete',
   'progress.msg.libraries': 'Minecraft libraries {version}',
   'progress.msg.assets': 'Game assets',
