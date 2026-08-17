@@ -2,7 +2,7 @@
 
 [English](PRIVACY.md) · **Polski**
 
-**Ostatnia aktualizacja: 2026-08-07**
+**Ostatnia aktualizacja: 2026-08-17**
 
 Ten dokument opisuje każdą daną, którą Raven Forge przechowuje, każdy serwer, z
 którym się łączy, i to, co tam wysyła. Powstał na podstawie kodu źródłowego, a
@@ -76,7 +76,7 @@ W środku:
 | `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, instalatory loaderów i zbuforowane metadane. Nic osobistego.                                                                                                     |
 
 Chromium trzyma w tym folderze także własne dane, w tym ciasteczka z okna
-logowania Microsoftu — patrz „Znane luki”.
+logowania Microsoftu. Są kasowane, gdy wylogujesz konto Microsoft.
 
 ### Gdzie leżą poświadczenia
 
@@ -190,6 +190,22 @@ Ten, kto prowadzi tamten adres, widzi Twoje IP.
 Patrz „Znane luki” — obecnie nie ma przełącznika wyłączającego automatyczne
 sprawdzanie.
 
+### Odnośniki, które przekazują Cię przeglądarce
+
+Część przycisków sama z niczym się nie łączy — otwiera adres w Twojej zwykłej
+przeglądarce i w tym momencie przestaje być sprawą launchera. Ta strona widzi
+wtedy wizytę Twojej przeglądarki, z wszystkimi ciasteczkami i historią, które
+ona już ma.
+
+| Gdzie                                       | Otwiera                                     |
+| ------------------------------------------- | ------------------------------------------- |
+| Konta → Ustawienia konta Minecraft          | `minecraft.net`                             |
+| Informacja o Bedrock Edition                | `minecraft.net`                             |
+| Info → O programie oraz raporter awarii     | `github.com` i `whiteravens.net`            |
+| „Przeczytaj na stronie” przy aktualnościach | Adres, pod którym opublikowano dany artykuł |
+
+Launcher nigdy nie otwiera żadnego z nich sam z siebie.
+
 ---
 
 ## Status na Discordzie
@@ -282,11 +298,6 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 Wymienione celowo. Uczciwa lista jest lepsza niż taka, która ładnie wygląda.
 
-- **Okno logowania Microsoftu współdzieli sesję przeglądarki z launcherem**, i
-  musi, żeby stosowało się do niego Twoje ustawienie proxy. Jego ciasteczka
-  zostają w folderze danych i **nie** są czyszczone przy wylogowaniu — kolejne
-  logowanie może rozpoznać Twoje konto Microsoft, choć zawsze pyta, którego
-  konta użyć. Usunięcie folderu danych je kasuje.
 - **Sprawdzania aktualizacji przy starcie nie da się wyłączyć** z Ustawień. To
   jedno żądanie do GitHub Releases przy każdym uruchomieniu. Przy zablokowanej
   sieci po prostu cicho zawodzi.

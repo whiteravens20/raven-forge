@@ -2,7 +2,7 @@
 
 **English** · [Polski](PRIVACY.pl.md)
 
-**Last updated: 2026-08-07**
+**Last updated: 2026-08-17**
 
 This document describes every piece of data Raven Forge stores, every server it
 contacts, and what it sends there. It is written from the source code, not from
@@ -184,6 +184,22 @@ Whoever operates that address sees your IP.
 | GitHub Releases | **Automatically, on every start**, and whenever you press "Check for updates" | Nothing but the request. It reveals your IP, the launcher version and your platform to GitHub. |
 
 See "Known gaps" — there is currently no switch to disable the automatic check.
+
+### Links that hand you to your browser
+
+Some buttons do not connect to anything themselves — they open an address in
+your normal browser and stop being the launcher's business at that point. What
+that site then sees is a visit from your browser, with whatever cookies and
+history it already carries.
+
+| Where                                 | Opens                                           |
+| ------------------------------------- | ----------------------------------------------- |
+| Accounts → Minecraft account settings | `minecraft.net`                                 |
+| The Bedrock Edition notice            | `minecraft.net`                                 |
+| Info → About, and the crash reporter  | `github.com` and `whiteravens.net`              |
+| A news article's "read on the site"   | Whichever address that article was published at |
+
+The launcher never opens one of these on its own.
 
 ---
 
