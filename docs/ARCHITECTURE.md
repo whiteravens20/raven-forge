@@ -27,7 +27,7 @@ raven-forge/
 │   ├── PRIVACY.pl.md             # the same, in Polish; both are maintained
 │   └── SIGNING.md                # Ed25519 manifest signing
 ├── electron-builder.config.js    # NSIS + .deb + AppImage targets
-├── eslint.config.mjs             # flat-config, react + @typescript-eslint
+├── eslint.config.mjs             # flat-config, react-hooks + @typescript-eslint
 ├── tsconfig.json                 # umbrella project for typecheck-all
 ├── tsconfig.main.json            # main + preload + core + shared (Node ESM)
 ├── tsconfig.renderer.json        # renderer (DOM)
