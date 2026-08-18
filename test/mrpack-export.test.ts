@@ -69,6 +69,14 @@ const { readMrpack } = await import('../src/core/packs/mrpack');
 
 const run = promisify(execFile);
 
+/**
+ * Whether this machine has `unzip`. Ubuntu, macOS and most Linux desktops do;
+ * Windows does not ship one, and the tests run there too.
+ */
+const hasUnzip = await run('unzip', ['-v'])
+  .then(() => true)
+  .catch(() => false);
+
 function mod(over: Partial<InstalledMod> & { id: string; fileName: string }): InstalledMod {
   return {
     name: over.id,
@@ -160,7 +168,7 @@ describe('exportProfileAsMrpack', () => {
     expect(pack.files[0].downloads).toEqual(['https://cdn.modrinth.com/sodium.jar']);
   });
 
-  it('produces an archive an unrelated zip implementation accepts', async () => {
+  it.skipIf(!hasUnzip)('produces an archive an unrelated zip implementation accepts', async () => {
     await write('mods/private.jar', 'a jar nobody publishes');
     await write('config/example.toml', 'setting = true');
     await lock([mod({ id: 'local-1', fileName: 'private.jar', source: 'local' })]);
