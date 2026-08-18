@@ -18,6 +18,8 @@ import { resolveLaunchMeta } from '../modloader/loader-profile';
 import { getVersionMeta } from './version-manifest';
 import { ensureClientJar, ensureLibraries, ensureAssets } from './asset-downloader';
 import { beginJob, endJob, isCancellation, throwIfCancelled } from '../util/cancellation';
+import { machineMemoryMb } from '../util/machine-memory';
+import { formatRamGb, ramAdvice, recommendedRamMb } from '../../shared/memory';
 import {
   isShutdownWatchdogCrash,
   readMinecraftCrash,
@@ -116,6 +118,33 @@ function launchFeatures(profile: Profile): Record<string, boolean> {
  * path — a throw between `beginJob` and the spawn would otherwise leave a dead
  * controller behind, and the UI would keep offering to cancel nothing.
  */
+/**
+ * Refuse a `-Xmx` the machine cannot back, before anything is downloaded.
+ *
+ * A heap larger than physical memory is not a configuration that runs: on
+ * Windows the JVM will not even reserve it and dies with "Could not reserve
+ * enough space for object heap"; on Linux it starts and the OOM killer collects
+ * the game once it grows in. Both arrive minutes and several gigabytes of
+ * downloads later, as a crash with nothing in it about RAM — and a profile can
+ * carry a number this machine never agreed to, having come from an import, a
+ * pack, or a machine with twice the memory. So it is checked here, first, and
+ * named.
+ *
+ * Only the impossible is refused. Merely optimistic — more than the machine can
+ * comfortably spare — is the profile editor's warning to make and the player's
+ * to overrule; a launcher that argued with every ambitious setting would be
+ * wrong more often than it was right.
+ */
+function assertRamFits(profile: Profile): void {
+  const totalMb = machineMemoryMb();
+  if (ramAdvice(profile.allocatedRamMb, totalMb) !== 'over') return;
+  throw new Error(
+    `This profile allocates ${formatRamGb(profile.allocatedRamMb)} of RAM and this machine has ` +
+      `${formatRamGb(totalMb)}. Minecraft cannot start with more memory than the machine has — ` +
+      `lower it in the profile editor, where ${formatRamGb(recommendedRamMb(totalMb))} suits this one.`,
+  );
+}
+
 async function runLaunch(options: LaunchOptions): Promise<void> {
   const profile = await getProfile(options.profileId);
   if (!profile) throw new Error(`Profile ${options.profileId} not found`);
@@ -123,6 +152,8 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   if (runningProcesses.has(options.profileId)) {
     throw new Error('Game is already running for this profile');
   }
+
+  assertRamFits(profile);
 
   log.info(`Launching game for profile: ${profile.name} (MC ${profile.minecraftVersion})`);
 

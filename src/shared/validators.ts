@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DEFAULT_NEWS_FEED_URL, DEFAULT_ANNOUNCEMENT_FEED_URL } from './branding';
+import { MAX_RAM_MB, MIN_RAM_MB } from './constants';
 import { isSafeFileName } from './manifest-schema';
 
 // ── Runtime validators for IPC payloads ───────────────────
@@ -133,7 +134,7 @@ export const profileSchema = z.object({
   serverIp: z.string().optional(),
   serverPort: z.number().min(1).max(65535).optional(),
   javaArgs: z.string().optional(),
-  allocatedRamMb: z.number().min(512).max(32768),
+  allocatedRamMb: z.number().min(MIN_RAM_MB).max(MAX_RAM_MB),
   customJavaPath: z.string().optional(),
   windowWidth: z.number().optional(),
   windowHeight: z.number().optional(),

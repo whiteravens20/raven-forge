@@ -76,6 +76,7 @@ import {
 import { launchGame, killGame, isGameRunning, getLogTail } from '../core/minecraft/game-launcher';
 import { getVersionManifest } from '../core/minecraft/version-manifest';
 import { cancelJob } from '../core/util/cancellation';
+import { machineMemoryMb } from '../core/util/machine-memory';
 import {
   loginMicrosoft,
   loginOffline,
@@ -173,7 +174,7 @@ export function registerAllIpcHandlers(): void {
       launcherVersion: app.getVersion(),
       platform: process.platform as SystemInfo['platform'],
       arch: process.arch,
-      totalMemoryMb: Math.round(os.totalmem() / 1024 / 1024),
+      totalMemoryMb: machineMemoryMb(),
       freeMemoryMb: Math.round(os.freemem() / 1024 / 1024),
       dataDirectory: paths.root,
       crashReportsDirectory: paths.crashReportsDir,

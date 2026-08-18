@@ -6,7 +6,8 @@ import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { profileSchema } from '../../shared/validators';
-import { DEFAULT_RAM_MB } from '../../shared/constants';
+import { recommendedRamMb } from '../../shared/memory';
+import { machineMemoryMb } from '../util/machine-memory';
 import type { OrphanedProfile, Profile, ProfileFileSummary } from '../../shared/ipc-types';
 
 // ── Profiles index persistence ─────────────────────────────
@@ -84,7 +85,11 @@ export async function createProfile(
   const profile: Profile = profileSchema.parse({
     ...data,
     id: crypto.randomUUID(),
-    allocatedRamMb: data.allocatedRamMb ?? DEFAULT_RAM_MB,
+    // The last word on RAM for callers that express no preference — profile
+    // import, and anything that grows a profile out of something other than the
+    // form. A machine is under it to ask, so it is asked; only when it cannot
+    // be measured does this land on the flat default.
+    allocatedRamMb: data.allocatedRamMb ?? recommendedRamMb(machineMemoryMb()),
     createdAt: now,
     updatedAt: now,
   });

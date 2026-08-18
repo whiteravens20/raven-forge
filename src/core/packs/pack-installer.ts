@@ -8,6 +8,8 @@ import { createProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
 import { readMrpack, applyOverrides, type MrpackContents, type MrpackFile } from './mrpack';
 import { assertSecureContentUrl } from '../../shared/validators';
+import { formatRamGb, recommendedRamMb, safeMaxRamMb } from '../../shared/memory';
+import { machineMemoryMb } from '../util/machine-memory';
 import type { ModManifest } from '../../shared/manifest-schema';
 import type { Profile } from '../../shared/ipc-types';
 
@@ -127,19 +129,32 @@ export function mrpackToManifest(pack: MrpackContents): ModManifest {
   return manifest;
 }
 
-/** A profile created for a pack, before its files arrive. */
 /**
- * The pack's RAM recommendation, if it made one worth acting on.
+ * The pack's RAM recommendation, if it made one worth acting on, brought down
+ * to what this machine can actually spare.
  *
  * Read here from the manifest as fetched, before the schema has run, so it is
- * attacker-controlled and gets the same bounds the schema applies — it lands on
- * a `-Xmx` line, and a pack that asks for 2 TB should leave the profile on the
- * default rather than produce a JVM that cannot start.
+ * attacker-controlled and gets bounds of its own — it lands on a `-Xmx` line,
+ * and a pack that asks for 2 TB should leave the profile on the default rather
+ * than produce a JVM that cannot start. The upper bound is the machine's, not a
+ * constant: a pack built around a 32 GB desktop recommending 16 GB is being
+ * helpful, and installing it on an 8 GB laptop should not write a number that
+ * machine cannot honour. Clamped rather than warned about because nobody typed
+ * it — the log says what happened, and the profile editor shows the result.
  */
 function recommendedRam(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isInteger(value)) return undefined;
-  return value >= 512 && value <= 65536 ? value : undefined;
+  if (value < 512 || value > 65536) return undefined;
+  const ceiling = safeMaxRamMb(machineMemoryMb());
+  if (value <= ceiling) return value;
+  log.info(
+    `Pack recommends ${formatRamGb(value)} of RAM; this machine can spare ` +
+      `${formatRamGb(ceiling)} — using that instead`,
+  );
+  return ceiling;
 }
+
+/** A profile created for a pack, before its files arrive. */
 
 async function profileForPack(
   name: string,
@@ -154,7 +169,7 @@ async function profileForPack(
     ...extras,
     // After the spread, not before: a caller that has no recommendation passes
     // the key as undefined, and spreading that over a default erases it.
-    allocatedRamMb: extras.allocatedRamMb ?? 4096,
+    allocatedRamMb: extras.allocatedRamMb ?? recommendedRamMb(machineMemoryMb()),
   } as Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>);
 }
 

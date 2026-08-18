@@ -130,5 +130,22 @@ export const DEFAULT_WINDOW_HEIGHT = 800;
 export const MIN_WINDOW_WIDTH = 900;
 export const MIN_WINDOW_HEIGHT = 600;
 
-// ── Default RAM ───────────────────────────────────────────
+// ── RAM allocation ────────────────────────────────────────
+// The bounds a profile's `-Xmx` may take. Named rather than typed out at each
+// site because there are three of them — the profile schema, the form control
+// and the pack installer — and a cap that disagrees with the schema is a form
+// that accepts a number the save then rejects.
+
+/** Below this the game does not start at all, whatever the machine has. */
+export const MIN_RAM_MB = 512;
+/**
+ * 32 GB. Not a claim about what machines have — an upper bound on what is ever
+ * worth handing to a Minecraft heap. Past a few gigabytes the collector's
+ * pauses grow faster than the extra room helps, and a number this side of
+ * absurd keeps a typo out of `-Xmx`.
+ */
+export const MAX_RAM_MB = 32768;
+/** Half a gigabyte. Finer than this is precision nobody can feel. */
+export const RAM_STEP_MB = 512;
+/** What a profile that does not say gets. See `recommendedRamMb` for what a *new* one gets. */
 export const DEFAULT_RAM_MB = 4096;
