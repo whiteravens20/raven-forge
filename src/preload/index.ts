@@ -54,6 +54,8 @@ const api: RavenForgeAPI = {
     uninstall: (profileId, modId) => ipcRenderer.invoke('mods:uninstall', profileId, modId),
     toggleEnabled: (profileId, modId, enabled) =>
       ipcRenderer.invoke('mods:toggle-enabled', profileId, modId, enabled),
+    checkUpdates: (profileId) => ipcRenderer.invoke('mods:check-updates', profileId),
+    update: (profileId, modIds) => ipcRenderer.invoke('mods:update', profileId, modIds),
     search: (filters) => ipcRenderer.invoke('mods:search', filters),
     getFacets: (projectType) => ipcRenderer.invoke('mods:get-facets', projectType),
   },

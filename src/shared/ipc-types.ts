@@ -41,6 +41,8 @@ import type {
   ModInstallResult,
   ModSearchFilters,
   ModSearchResult,
+  ModUpdateResult,
+  ModUpdateSummary,
   ShaderLoaderResult,
   ShaderLoaderState,
 } from './ipc/mods';
@@ -133,6 +135,13 @@ export interface InvokeChannels {
     modId: string,
     enabled: boolean,
   ) => Promise<IpcResult<void>>;
+  /**
+   * Ask Modrinth whether anything installed by hand has a newer build, and write
+   * the answer into the lock file. Manifest-managed mods are the pack's to move.
+   */
+  'mods:check-updates': (profileId: string) => Promise<IpcResult<ModUpdateSummary>>;
+  /** Install the builds the last check found, for the mods named. */
+  'mods:update': (profileId: string, modIds: string[]) => Promise<IpcResult<ModUpdateResult>>;
   'mods:search': (filters: ModSearchFilters) => Promise<IpcResult<ModSearchResult[]>>;
   /** Modrinth's live facet list for a project type, grouped as Modrinth groups it. */
   'mods:get-facets': (projectType: ContentProjectType) => Promise<IpcResult<FacetGroups>>;
@@ -338,6 +347,8 @@ export interface RavenForgeAPI {
     installFromFile: InvokeChannels['mods:install-from-file'];
     uninstall: InvokeChannels['mods:uninstall'];
     toggleEnabled: InvokeChannels['mods:toggle-enabled'];
+    checkUpdates: InvokeChannels['mods:check-updates'];
+    update: InvokeChannels['mods:update'];
     search: InvokeChannels['mods:search'];
     getFacets: InvokeChannels['mods:get-facets'];
   };

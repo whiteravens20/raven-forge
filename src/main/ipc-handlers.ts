@@ -38,6 +38,7 @@ import {
   uninstallMod,
   toggleModEnabled,
 } from '../core/mods/mod-sync';
+import { checkModUpdates, updateMods } from '../core/mods/mod-updates';
 import { searchMods, getSearchFacets } from '../core/mods/modrinth-api';
 import { planModInstall, planContentInstall } from '../core/mods/compatibility';
 import { listCataloguePacks } from '../core/packs/catalogue';
@@ -623,6 +624,20 @@ export function registerAllIpcHandlers(): void {
       }
     },
   );
+  handle('mods:check-updates', async (_event, profileId: string) => {
+    try {
+      return ok(await checkModUpdates(profileId));
+    } catch (err) {
+      return fail(`Could not check for mod updates: ${reason(err)}`);
+    }
+  });
+  handle('mods:update', async (_event, profileId: string, modIds: string[]) => {
+    try {
+      return ok(await updateMods(profileId, modIds));
+    } catch (err) {
+      return fail(`Failed to update mods: ${reason(err)}`);
+    }
+  });
   handle('mods:search', async (_event, filters) => {
     try {
       return ok(await searchMods(filters));

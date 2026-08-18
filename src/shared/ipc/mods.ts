@@ -18,6 +18,44 @@ export interface InstalledMod {
   enabled: boolean;
   /** true = from server manifest, false = user-installed */
   fromManifest: boolean;
+  /** Set by an update check, cleared by the next one. */
+  updateAvailable?: ModUpdate;
+}
+
+/**
+ * A newer build of an installed mod, as the last check found it.
+ *
+ * Recorded in `installed.lock` rather than held in memory, so the badge
+ * survives a restart and so installing quotes the id back — the player gets the
+ * build they were shown, not whatever became newest since.
+ *
+ * `projectId` is here because the lock entry may not carry it: a jar dropped
+ * into `mods/` by hand is recognised by its hash, and this is where the project
+ * it turned out to belong to is written down.
+ */
+export interface ModUpdate {
+  versionId: string;
+  versionNumber: string;
+  projectId: string;
+}
+
+/** What an update check found, for the UI to summarise in one line. */
+export interface ModUpdateSummary {
+  /** Installed mods the check could ask about — enabled, and not a manifest's. */
+  checked: number;
+  /** How many of those have a newer build for this profile. */
+  updates: number;
+  /** Files Modrinth has never seen: a private build, or a jar compiled locally. */
+  unknown: number;
+}
+
+/**
+ * The outcome of installing updates. One mod failing does not stop the others,
+ * so both halves are reported.
+ */
+export interface ModUpdateResult {
+  updated: string[];
+  failed: Array<{ name: string; error: string }>;
 }
 
 export interface ModSearchResult {
