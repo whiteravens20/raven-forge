@@ -55,6 +55,7 @@ raven-forge/
     │   ├── pages/                # one per route
     │   ├── components/           # ui/ (Button, Input, Select, Switch, Banner, …) + layout/
     │   ├── stores/               # Zustand stores (auth, profiles, news, settings, launch)
+    │   ├── hooks/                # cross-page React hooks (e.g. the machine's memory)
     │   ├── i18n/                 # UI string dictionaries (pl, en) + the t() helper
     │   └── styles/global.css     # @import "tailwindcss", @theme tokens, per-theme --rf-*
     ├── core/                     # business logic, runs in main process
@@ -70,12 +71,13 @@ raven-forge/
     │   ├── updater/              # electron-updater wiring, manifest signature verification
     │   ├── profiles/             # profile CRUD, import/export, world backups
     │   ├── news/                 # news + announcement fetcher with mock fallback
-    │   ├── util/                 # atomic writes, cancellation, path containment
+    │   ├── util/                 # atomic writes, cancellation, path containment, machine memory
     │   └── config/               # paths.ts, settings-manager.ts, defaults.ts
     └── shared/                   # types + validators consumed by both processes
         ├── ipc-types.ts          # InvokeChannels, EventChannels, RavenForgeAPI
         ├── ipc/                  # payload shapes, one file per domain
         ├── validators.ts         # Zod schemas for settings + profiles
+        ├── memory.ts             # what of the machine's RAM a profile may take
         ├── manifest-schema.ts    # Zod schema for remote manifests
         ├── branding.ts           # the launcher's own names and addresses
         └── constants.ts          # endpoints, defaults, MC→Java mapping
