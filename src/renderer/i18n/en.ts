@@ -357,7 +357,7 @@ export const en = {
   'mods.updatesFound.one': '{count} mod has a newer build.',
   'mods.updatesFound.other': '{count} mods have newer builds.',
   'mods.upToDate': 'Everything installed by hand is current.',
-  'mods.noneToCheck': 'Nothing here to check â this profile’s mods come from its manifest.',
+  'mods.noneToCheck': 'Nothing here to check — this profile’s mods come from its manifest.',
   'mods.unknownToModrinth.one': '{count} file is not on Modrinth and cannot be checked.',
   'mods.unknownToModrinth.other': '{count} files are not on Modrinth and cannot be checked.',
   'mods.updateAll': 'Update all',
