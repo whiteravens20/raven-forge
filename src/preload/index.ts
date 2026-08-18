@@ -37,6 +37,14 @@ const api: RavenForgeAPI = {
     setIcon: (profileId, sourcePath) =>
       ipcRenderer.invoke('profiles:set-icon', profileId, sourcePath),
     getIcon: (profileId) => ipcRenderer.invoke('profiles:get-icon', profileId),
+    listWorlds: (profileId) => ipcRenderer.invoke('profiles:list-worlds', profileId),
+    listBackups: (profileId) => ipcRenderer.invoke('profiles:list-backups', profileId),
+    backupWorlds: (profileId, reason) =>
+      ipcRenderer.invoke('profiles:backup-worlds', profileId, reason),
+    restoreBackup: (profileId, backupId) =>
+      ipcRenderer.invoke('profiles:restore-backup', profileId, backupId),
+    deleteBackup: (profileId, backupId) =>
+      ipcRenderer.invoke('profiles:delete-backup', profileId, backupId),
   },
   packs: {
     listCatalogue: () => ipcRenderer.invoke('packs:list-catalogue'),

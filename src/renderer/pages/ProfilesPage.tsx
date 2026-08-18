@@ -24,6 +24,8 @@ import { ProfileAvatar } from '@components/ProfileAvatar';
 import { ProfileIconPicker } from '@components/ProfileIconPicker';
 import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
 import { ProfileSourcePicker } from '@components/ProfileSourcePicker';
+import { WorldBackupCard } from '@components/WorldBackupCard';
+import { VersionChangeDialog } from '@components/VersionChangeDialog';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useLocale, useT } from '@renderer/i18n';
@@ -33,6 +35,7 @@ import type {
   MrpackExport,
   OrphanedProfile,
   Profile,
+  ProfileFileSummary,
   ProfileSyncStatus,
   ManifestVerification,
   LoaderVersion,
@@ -99,8 +102,10 @@ export function ProfilesPage() {
   const [orphans, setOrphans] = useState<OrphanedProfile[]>([]);
   /** The last pack export, so its result can be reported instead of vanishing. */
   const [exported, setExported] = useState<MrpackExport | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [exportingPack, setExportingPack] = useState(false);
+  /** Set while a Minecraft version change is waiting to be confirmed. */
+  const [versionChange, setVersionChange] = useState<ProfileFileSummary | null>(null);
 
   const refreshOrphans = useCallback(async () => {
     const result = await api.profiles.listOrphaned();
@@ -184,9 +189,39 @@ export function ProfilesPage() {
 
   const save = async () => {
     if (!draft.name.trim()) return;
+    // Changing the Minecraft version is not an edit like the others: the mods
+    // stay behind at the version they were built for, and a world opened by a
+    // newer Minecraft is upgraded in place and will not open on the old one
+    // again. Ask, but only where this profile actually has something to lose.
+    if (
+      mode === 'edit' &&
+      selectedProfile &&
+      draft.minecraftVersion !== selectedProfile.minecraftVersion
+    ) {
+      const r = await api.profiles.getFileSummary(selectedProfile.id);
+      const summary = r.success ? r.data : undefined;
+      if (summary && (summary.mods > 0 || summary.worlds > 0)) {
+        setVersionChange(summary);
+        return;
+      }
+    }
+    await commit();
+  };
+
+  /** Write the draft out. Split from `save` so the dialog can call it too. */
+  const commit = async (backupFirst = false) => {
     if (mode === 'create') {
       await createProfile(draft);
     } else if (mode === 'edit' && selectedProfile) {
+      if (backupFirst) {
+        // Before the profile moves, not after: a failed copy must leave the
+        // profile exactly as it was rather than half-changed.
+        const backup = await api.profiles.backupWorlds(selectedProfile.id, 'version-change');
+        if (!backup.success) {
+          setActionError(backup.error ?? t('versionChange.backupFailed'));
+          return;
+        }
+      }
       await updateProfile(selectedProfile.id, draft);
     }
     setMode('view');
@@ -242,11 +277,11 @@ export function ProfilesPage() {
   const handleExportPack = async () => {
     if (!selectedId) return;
     setExported(null);
-    setExportError(null);
+    setActionError(null);
     setExportingPack(true);
     try {
       const r = await api.profiles.exportPack(selectedId);
-      if (!r.success) setExportError(r.error ?? t('profiles.exportPackFailed'));
+      if (!r.success) setActionError(r.error ?? t('profiles.exportPackFailed'));
       else if (r.data) setExported(r.data);
     } finally {
       setExportingPack(false);
@@ -361,6 +396,36 @@ export function ProfilesPage() {
 
       {/* Detail / form */}
       <div className="flex-1 overflow-y-auto p-6">
+        {/* Above the pane switch on purpose: a save that fails leaves the form
+            open, and a notice rendered inside the detail view would never be
+            seen by the person who caused it. */}
+        {actionError && (
+          <div className="mx-auto mb-4 max-w-2xl">
+            <Banner type="urgent">{actionError}</Banner>
+          </div>
+        )}
+        {exported && (
+          <div className="mx-auto mb-4 max-w-2xl">
+            <Banner
+              type="info"
+              dismissible
+              onDismiss={() => {
+                setExported(null);
+                setActionError(null);
+              }}
+            >
+              {t.plural('profiles.exportPackDone', exported.files, { path: exported.path })}
+              {/* Bundled files are why a 20 KB pack is sometimes 300 MB, and why
+                  a recipient with no network still gets those. Worth a sentence. */}
+              {exported.bundled > 0 &&
+                ` ${t.plural('profiles.exportPackBundled', exported.bundled, {
+                  size: formatBytes(exported.bundledBytes),
+                })}`}
+              {exported.skippedDisabled > 0 &&
+                ` ${t.plural('profiles.exportPackSkipped', exported.skippedDisabled)}`}
+            </Banner>
+          </div>
+        )}
         {mode !== 'view' ? (
           <ProfileForm
             draft={draft}
@@ -388,12 +453,6 @@ export function ProfilesPage() {
             onExport={handleExport}
             onExportPack={handleExportPack}
             exportingPack={exportingPack}
-            exported={exported}
-            exportError={exportError}
-            onDismissExport={() => {
-              setExported(null);
-              setExportError(null);
-            }}
             onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
             onSync={handleSync}
             onQuickConnect={handleQuickConnect}
@@ -414,6 +473,19 @@ export function ProfilesPage() {
           onCreated={(profileId) => {
             setChoosingSource(false);
             void reload().then(() => select(profileId));
+          }}
+        />
+      )}
+
+      {versionChange && selectedProfile && (
+        <VersionChangeDialog
+          from={selectedProfile.minecraftVersion}
+          to={draft.minecraftVersion}
+          summary={versionChange}
+          onCancel={() => setVersionChange(null)}
+          onConfirm={(backupFirst) => {
+            setVersionChange(null);
+            void commit(backupFirst);
           }}
         />
       )}
@@ -448,9 +520,6 @@ interface DetailProps {
   onExport: () => void;
   onExportPack: () => void;
   exportingPack: boolean;
-  exported: MrpackExport | null;
-  exportError: string | null;
-  onDismissExport: () => void;
   onOpenFolder: () => void;
   onSync: () => void;
   onQuickConnect: () => void;
@@ -470,9 +539,6 @@ function ProfileDetail({
   onExport,
   onExportPack,
   exportingPack,
-  exported,
-  exportError,
-  onDismissExport,
   onOpenFolder,
   onSync,
   onQuickConnect,
@@ -533,21 +599,6 @@ function ProfileDetail({
           />
         </div>
       </div>
-
-      {exportError && <Banner type="urgent">{exportError}</Banner>}
-      {exported && (
-        <Banner type="info" dismissible onDismiss={onDismissExport}>
-          {t.plural('profiles.exportPackDone', exported.files, { path: exported.path })}
-          {/* Bundled files are why a 20 KB pack is sometimes 300 MB, and why a
-              recipient with no network still gets those. Worth a sentence. */}
-          {exported.bundled > 0 &&
-            ` ${t.plural('profiles.exportPackBundled', exported.bundled, {
-              size: formatBytes(exported.bundledBytes),
-            })}`}
-          {exported.skippedDisabled > 0 &&
-            ` ${t.plural('profiles.exportPackSkipped', exported.skippedDisabled)}`}
-        </Banner>
-      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Field label={t('profiles.fieldMinecraft')} value={profile.minecraftVersion} />
@@ -611,6 +662,8 @@ function ProfileDetail({
           <p className="text-sm text-rf-text-secondary whitespace-pre-wrap">{profile.notes}</p>
         </div>
       )}
+
+      <WorldBackupCard profileId={profile.id} />
 
       {profile.lastPlayed && (
         <p className="text-xs text-rf-text-muted">

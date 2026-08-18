@@ -185,6 +185,41 @@ export const en = {
     'Another {count} files ({size}) are not on Modrinth, so they were written into the pack itself.',
   'profiles.exportPackSkipped.one': 'Left out one item that is switched off.',
   'profiles.exportPackSkipped.other': 'Left out {count} items that are switched off.',
+
+  // ── Worlds and backups ───────────────────────────────────
+  'worlds.title': 'Worlds',
+  'worlds.none': 'This profile has no worlds yet.',
+  'worlds.backupNow': 'Back up',
+  'worlds.backedUp': 'The worlds were copied aside.',
+  'worlds.backupFailed': 'Could not back up the worlds.',
+  'worlds.noBackups': 'No copies yet. One is taken automatically before a version change.',
+  'worlds.restore': 'Restore this copy',
+  'worlds.confirmRestore': 'Replace the current worlds?',
+  'worlds.confirmRestoreYes': 'Replace',
+  'worlds.restored': 'The worlds were restored.',
+  'worlds.restoredWithSafety':
+    'The worlds were restored. What was there before is now a copy of its own, so this is undoable.',
+  'worlds.restoreFailed': 'Could not restore that copy.',
+  'worlds.deleteFailed': 'Could not delete that copy.',
+  'worlds.reason.manual': 'taken by hand',
+  'worlds.reason.version-change': 'before a version change',
+  'worlds.reason.before-restore': 'before a restore',
+
+  // ── Changing the Minecraft version ───────────────────────
+  'versionChange.title': 'Move this profile from {from} to {to}?',
+  'versionChange.mods.one':
+    'Its one installed mod was built for {from} and will probably not load.',
+  'versionChange.mods.other':
+    'Its {count} installed mods were built for {from} and will probably not load. Update or remove them afterwards.',
+  'versionChange.worlds.one':
+    'It has a world. Opening a world with a newer Minecraft upgrades its format, and the older version cannot open it again.',
+  'versionChange.worlds.other':
+    'It has {count} worlds. Opening a world with a newer Minecraft upgrades its format, and the older version cannot open it again.',
+  'versionChange.backupFirst': 'Copy the worlds aside first',
+  'versionChange.backupHint':
+    'The copy stays inside the profile and can be restored from the profile page.',
+  'versionChange.confirm': 'Change the version',
+  'versionChange.backupFailed': 'The worlds could not be copied, so nothing was changed.',
   // ── Deleting a profile ───────────────────────────────────
   'delete.title': 'Delete profile "{name}"',
   'delete.intro':

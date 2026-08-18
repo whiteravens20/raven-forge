@@ -29,6 +29,13 @@ import {
   clearProfileIcon,
   getProfileIconDataUrl,
 } from '../core/profiles/profile-icon';
+import {
+  listWorlds,
+  listBackups,
+  backupWorlds,
+  restoreBackup,
+  deleteBackup,
+} from '../core/profiles/world-backup';
 import { getProfileSyncStatus, getLastManifestVerification } from '../core/mods/mod-sync';
 import {
   getInstalledMods,
@@ -82,6 +89,7 @@ import type {
   IpcErrorCode,
   GlobalSettings,
   TrustedKey,
+  WorldBackupReason,
   SystemInfo,
   ShaderLoaderResult,
 } from '../shared/ipc-types';
@@ -558,6 +566,55 @@ export function registerAllIpcHandlers(): void {
       return ok(await getProfileIconDataUrl(profileId));
     } catch (err) {
       return fail(`Failed to read icon: ${reason(err)}`);
+    }
+  });
+
+  handle('profiles:list-worlds', async (_event, profileId: string) => {
+    try {
+      return ok(await listWorlds(profileId));
+    } catch (err) {
+      return fail(`Failed to list worlds: ${reason(err)}`);
+    }
+  });
+  handle('profiles:list-backups', async (_event, profileId: string) => {
+    try {
+      return ok(await listBackups(profileId));
+    } catch (err) {
+      return fail(`Failed to list backups: ${reason(err)}`);
+    }
+  });
+  handle('profiles:backup-worlds', async (_event, profileId: string, why?: WorldBackupReason) => {
+    try {
+      // Copying a world the game has open produces a copy of a half-written
+      // region file, which restores as corruption. There is no way to take a
+      // consistent one from out here, so this refuses instead of pretending.
+      if (isGameRunning(profileId)) {
+        return fail('Close the game first — a world cannot be copied while it is open.');
+      }
+      // A reason from the renderer only decides pruning, and `before-restore`
+      // is not its to claim — anything unexpected is treated as a
+      // deliberate copy, which is the choice that keeps files.
+      return ok(await backupWorlds(profileId, why === 'version-change' ? why : 'manual'));
+    } catch (err) {
+      return fail(`Could not back up the worlds: ${reason(err)}`);
+    }
+  });
+  handle('profiles:restore-backup', async (_event, profileId: string, backupId: string) => {
+    try {
+      if (isGameRunning(profileId)) {
+        return fail('Close the game first — its worlds cannot be replaced while it is running.');
+      }
+      return ok(await restoreBackup(profileId, backupId));
+    } catch (err) {
+      return fail(`Could not restore that backup: ${reason(err)}`);
+    }
+  });
+  handle('profiles:delete-backup', async (_event, profileId: string, backupId: string) => {
+    try {
+      await deleteBackup(profileId, backupId);
+      return ok(undefined);
+    } catch (err) {
+      return fail(`Could not delete that backup: ${reason(err)}`);
     }
   });
 

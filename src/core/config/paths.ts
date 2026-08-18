@@ -104,6 +104,18 @@ export const paths = {
     return path.join(getDataRoot(), DIR_PROFILES, profileId, 'manifest.cache.json');
   },
 
+  /**
+   * Per-profile world backups, one directory per backup.
+   *
+   * Inside the profile on purpose: a backup belongs to the profile it came from,
+   * follows it around, and goes when it goes. What it protects against is the
+   * launcher — a version change, a restore — and not a failing disk, which is a
+   * different problem and needs somewhere else entirely.
+   */
+  profileBackupsDir(profileId: string) {
+    return path.join(getDataRoot(), DIR_PROFILES, profileId, 'backups');
+  },
+
   /** Per-profile shaderpacks directory */
   profileShadersDir(profileId: string) {
     return path.join(getDataRoot(), DIR_PROFILES, profileId, '.minecraft', 'shaderpacks');

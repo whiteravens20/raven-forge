@@ -140,7 +140,7 @@ async function listDir(dir: string): Promise<Dirent[]> {
  * is a dialog that visibly hangs on exactly the profiles whose deletion is
  * worth thinking about.
  */
-async function directorySize(dir: string): Promise<number> {
+export async function directorySize(dir: string): Promise<number> {
   const sizes = await Promise.all(
     (await listDir(dir)).map(async (entry) => {
       const full = path.join(dir, entry.name);

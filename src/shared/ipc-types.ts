@@ -29,6 +29,8 @@ import type {
   ModLoaderType,
   MrpackExport,
   OrphanedProfile,
+  WorldBackup,
+  WorldBackupReason,
   Profile,
   ProfileFileSummary,
   ProfileSyncStatus,
@@ -106,6 +108,30 @@ export interface InvokeChannels {
   ) => Promise<IpcResult<Profile>>;
   /** The profile's icon as a `data:` URL, or `null` if it has none. */
   'profiles:get-icon': (profileId: string) => Promise<IpcResult<string | null>>;
+  /** World folder names in this profile's `saves/`. */
+  'profiles:list-worlds': (profileId: string) => Promise<IpcResult<string[]>>;
+  /** Copies of `saves/`, newest first. */
+  'profiles:list-backups': (profileId: string) => Promise<IpcResult<WorldBackup[]>>;
+  /**
+   * Copy the worlds aside. Refused while the game holds them open.
+   *
+   * The reason is recorded because it decides what happens later: automatic
+   * copies are pruned to the newest few, a copy taken by hand never is.
+   * `before-restore` is not offered — only `restoreBackup` may claim that one.
+   */
+  'profiles:backup-worlds': (
+    profileId: string,
+    reason?: Exclude<WorldBackupReason, 'before-restore'>,
+  ) => Promise<IpcResult<WorldBackup>>;
+  /**
+   * Put a backup's worlds back. Whatever is in `saves/` now is copied aside
+   * first, and that copy comes back so the UI can say a restore is undoable.
+   */
+  'profiles:restore-backup': (
+    profileId: string,
+    backupId: string,
+  ) => Promise<IpcResult<WorldBackup | null>>;
+  'profiles:delete-backup': (profileId: string, backupId: string) => Promise<IpcResult<void>>;
 
   // -- Packs --
   /** The White Ravens catalogue, from the address compiled into the launcher. */
@@ -339,6 +365,11 @@ export interface RavenForgeAPI {
     getSyncStatus: InvokeChannels['profiles:get-sync-status'];
     setIcon: InvokeChannels['profiles:set-icon'];
     getIcon: InvokeChannels['profiles:get-icon'];
+    listWorlds: InvokeChannels['profiles:list-worlds'];
+    listBackups: InvokeChannels['profiles:list-backups'];
+    backupWorlds: InvokeChannels['profiles:backup-worlds'];
+    restoreBackup: InvokeChannels['profiles:restore-backup'];
+    deleteBackup: InvokeChannels['profiles:delete-backup'];
   };
   packs: {
     listCatalogue: InvokeChannels['packs:list-catalogue'];

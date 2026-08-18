@@ -182,6 +182,48 @@ export const pl: Translations = {
   'profiles.exportPackSkipped.few': 'Pominięto {count} dodatki, które są wyłączone.',
   'profiles.exportPackSkipped.many': 'Pominięto {count} dodatków, które są wyłączone.',
   'profiles.exportPackSkipped.other': 'Pominięto {count} dodatków, które są wyłączone.',
+
+  // ── Światy i kopie ───────────────────────────────────────
+  'worlds.title': 'Światy',
+  'worlds.none': 'Ten profil nie ma jeszcze żadnego świata.',
+  'worlds.backupNow': 'Zrób kopię',
+  'worlds.backedUp': 'Światy zostały skopiowane.',
+  'worlds.backupFailed': 'Nie udało się zrobić kopii światów.',
+  'worlds.noBackups': 'Brak kopii. Jedna powstaje automatycznie przed zmianą wersji.',
+  'worlds.restore': 'Przywróć tę kopię',
+  'worlds.confirmRestore': 'Zastąpić obecne światy?',
+  'worlds.confirmRestoreYes': 'Zastąp',
+  'worlds.restored': 'Światy zostały przywrócone.',
+  'worlds.restoredWithSafety':
+    'Światy zostały przywrócone. To, co było wcześniej, jest teraz osobną kopią — da się to cofnąć.',
+  'worlds.restoreFailed': 'Nie udało się przywrócić tej kopii.',
+  'worlds.deleteFailed': 'Nie udało się usunąć tej kopii.',
+  'worlds.reason.manual': 'zrobiona ręcznie',
+  'worlds.reason.version-change': 'przed zmianą wersji',
+  'worlds.reason.before-restore': 'przed przywracaniem',
+
+  // ── Zmiana wersji Minecrafta ─────────────────────────────
+  'versionChange.title': 'Przenieść ten profil z {from} na {to}?',
+  'versionChange.mods.one':
+    'Jedyny zainstalowany mod powstał dla {from} i najpewniej się nie wczyta.',
+  'versionChange.mods.few':
+    'Zainstalowane {count} mody powstały dla {from} i najpewniej się nie wczytają. Zaktualizuj je albo usuń.',
+  'versionChange.mods.many':
+    'Zainstalowanych {count} modów powstało dla {from} i najpewniej się nie wczyta. Zaktualizuj je albo usuń.',
+  'versionChange.mods.other':
+    'Zainstalowane mody powstały dla {from} i najpewniej się nie wczytają. Zaktualizuj je albo usuń.',
+  'versionChange.worlds.one':
+    'Jest tu świat. Otwarcie świata nowszym Minecraftem przebudowuje jego format i starsza wersja już go nie otworzy.',
+  'versionChange.worlds.few':
+    'Są tu {count} światy. Otwarcie świata nowszym Minecraftem przebudowuje jego format i starsza wersja już go nie otworzy.',
+  'versionChange.worlds.many':
+    'Jest tu {count} światów. Otwarcie świata nowszym Minecraftem przebudowuje jego format i starsza wersja już go nie otworzy.',
+  'versionChange.worlds.other':
+    'Są tu światy. Otwarcie świata nowszym Minecraftem przebudowuje jego format i starsza wersja już go nie otworzy.',
+  'versionChange.backupFirst': 'Najpierw skopiuj światy',
+  'versionChange.backupHint': 'Kopia zostaje w profilu i można ją przywrócić ze strony profilu.',
+  'versionChange.confirm': 'Zmień wersję',
+  'versionChange.backupFailed': 'Nie udało się skopiować światów, więc nic nie zmieniono.',
   // ── Usuwanie profilu ─────────────────────────────────────
   'delete.title': 'Usuń profil „{name}”',
   'delete.intro':

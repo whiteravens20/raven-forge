@@ -96,3 +96,28 @@ export interface MrpackExport {
   /** Content left out because it is switched off in the profile. */
   skippedDisabled: number;
 }
+
+/**
+ * A copy of a profile's `saves/` directory, taken at a point in time.
+ *
+ * Worlds are the one thing in a profile that exists nowhere else — mods and
+ * packs download again, a world does not — and until this the launcher would
+ * happily change a profile's Minecraft version underneath one.
+ */
+export interface WorldBackup {
+  /** The directory it lives in: a timestamp, which also orders them. */
+  id: string;
+  createdAt: string;
+  /** Why it was taken. Automatic ones are pruned; a manual one is never touched. */
+  reason: WorldBackupReason;
+  /** World folder names, so a backup can be recognised without opening it. */
+  worlds: string[];
+  bytes: number;
+}
+
+/**
+ * `manual` is a player pressing the button. The other two are the launcher
+ * protecting itself: before a Minecraft version change, and before a restore
+ * overwrites whatever is in `saves/` now.
+ */
+export type WorldBackupReason = 'manual' | 'version-change' | 'before-restore';
