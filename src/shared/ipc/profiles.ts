@@ -77,9 +77,22 @@ export interface OrphanedProfile {
 }
 
 /**
- * One pack in the White Ravens catalogue, as the picker needs it.
+ * What exporting a profile as a `.mrpack` produced.
  *
- * `manifestUrl` is the whole point — a profile created from this follows that
- * URL and keeps updating, rather than being a snapshot. Entries without one are
- * dropped before they reach here.
+ * The counts are the point: a pack is references, not jars, so the difference
+ * between `files` and `bundled` is the difference between a 20 KB file anyone
+ * can install and a 300 MB one carrying somebody's hand-built mods. Reporting
+ * both is what lets the player see which they got, and why.
  */
+export interface MrpackExport {
+  path: string;
+  /** Entries the recipient downloads from Modrinth. */
+  files: number;
+  /** Files carried inside the archive because Modrinth does not host them. */
+  bundled: number;
+  bundledBytes: number;
+  /** Config files and `options.txt` carried along in `overrides/`. */
+  overrides: number;
+  /** Content left out because it is switched off in the profile. */
+  skippedDisabled: number;
+}

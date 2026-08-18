@@ -165,6 +165,23 @@ export const pl: Translations = {
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
   'profiles.copyName': '{name} (kopia)',
   'profiles.openFolder': 'Otwórz folder profilu',
+  'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
+  'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',
+  'profiles.exportPackDone.one': 'Zapisano do {path}. Paczka odsyła do 1 pliku na Modrinth.',
+  'profiles.exportPackDone.other':
+    'Zapisano do {path}. Paczka odsyła do {count} plików na Modrinth.',
+  'profiles.exportPackBundled.one':
+    'Jeszcze jednego pliku ({size}) nie ma na Modrinth, więc został zapisany w samej paczce.',
+  'profiles.exportPackBundled.few':
+    'Kolejnych {count} plików ({size}) nie ma na Modrinth, więc zostały zapisane w samej paczce.',
+  'profiles.exportPackBundled.many':
+    'Kolejnych {count} plików ({size}) nie ma na Modrinth, więc zostały zapisane w samej paczce.',
+  'profiles.exportPackBundled.other':
+    'Kolejnych {count} plików ({size}) nie ma na Modrinth, więc zostały zapisane w samej paczce.',
+  'profiles.exportPackSkipped.one': 'Pominięto jeden dodatek, który jest wyłączony.',
+  'profiles.exportPackSkipped.few': 'Pominięto {count} dodatki, które są wyłączone.',
+  'profiles.exportPackSkipped.many': 'Pominięto {count} dodatków, które są wyłączone.',
+  'profiles.exportPackSkipped.other': 'Pominięto {count} dodatków, które są wyłączone.',
   // ── Usuwanie profilu ─────────────────────────────────────
   'delete.title': 'Usuń profil „{name}”',
   'delete.intro':

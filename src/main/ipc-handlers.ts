@@ -47,6 +47,7 @@ import {
   createProfileFromManifest,
   createProfileFromUrl,
 } from '../core/packs/pack-installer';
+import { exportProfileAsMrpack } from '../core/packs/mrpack-export';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
 import {
   listContent,
@@ -502,6 +503,30 @@ export function registerAllIpcHandlers(): void {
       return ok(await exportProfile(profileId));
     } catch (err) {
       return fail(`Failed to export profile: ${reason(err)}`);
+    }
+  });
+  handle('profiles:export-pack', async (_event, profileId: string) => {
+    try {
+      const win = getMainWindow();
+      if (!win) return fail('No window available');
+      const profile = await getProfile(profileId);
+      if (!profile) return fail('Profile not found');
+
+      // The dialog runs in main, so the renderer never names a destination — it
+      // asks for an export and the person at the keyboard says where it goes.
+      // `defaultPath` needs a directory as well as a name: given a bare file
+      // name the picker opens wherever the process happens to have been
+      // started, which for a packaged app is nowhere anybody keeps files.
+      const suggested = `${profile.name.replace(/[^\p{L}\p{N} ._-]/gu, '_')}.mrpack`;
+      const chosen = await dialog.showSaveDialog(win, {
+        defaultPath: path.join(app.getPath('downloads'), suggested),
+        filters: [{ name: 'Modrinth modpack', extensions: ['mrpack'] }],
+      });
+      if (chosen.canceled || !chosen.filePath) return ok(null);
+
+      return ok(await exportProfileAsMrpack(profileId, chosen.filePath));
+    } catch (err) {
+      return fail(`Could not export that profile as a pack: ${reason(err)}`);
     }
   });
   handle('profiles:import', async (_event, json: string) => {

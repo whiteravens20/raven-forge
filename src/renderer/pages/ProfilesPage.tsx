@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ShieldCheck,
   ShieldAlert,
+  Package,
 } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { useGameStore } from '@stores/game-store';
@@ -23,11 +24,13 @@ import { ProfileAvatar } from '@components/ProfileAvatar';
 import { ProfileIconPicker } from '@components/ProfileIconPicker';
 import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
 import { ProfileSourcePicker } from '@components/ProfileSourcePicker';
+import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import type {
   ModLoaderType,
+  MrpackExport,
   OrphanedProfile,
   Profile,
   ProfileSyncStatus,
@@ -94,6 +97,10 @@ export function ProfilesPage() {
   const [choosingSource, setChoosingSource] = useState(false);
   /** Profile files left on disk by a "delete, keep files". */
   const [orphans, setOrphans] = useState<OrphanedProfile[]>([]);
+  /** The last pack export, so its result can be reported instead of vanishing. */
+  const [exported, setExported] = useState<MrpackExport | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportingPack, setExportingPack] = useState(false);
 
   const refreshOrphans = useCallback(async () => {
     const result = await api.profiles.listOrphaned();
@@ -223,6 +230,27 @@ export function ProfilesPage() {
     link.download = `${selectedProfile?.name ?? 'profile'}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Export the profile as a `.mrpack` — the mods, not just the settings.
+   *
+   * Where it goes is asked in the main process, so nothing here names a path.
+   * A `null` result is the player closing that dialog, which is not a failure
+   * and should say nothing at all.
+   */
+  const handleExportPack = async () => {
+    if (!selectedId) return;
+    setExported(null);
+    setExportError(null);
+    setExportingPack(true);
+    try {
+      const r = await api.profiles.exportPack(selectedId);
+      if (!r.success) setExportError(r.error ?? t('profiles.exportPackFailed'));
+      else if (r.data) setExported(r.data);
+    } finally {
+      setExportingPack(false);
+    }
   };
 
   const handleImport = async () => {
@@ -358,6 +386,14 @@ export function ProfilesPage() {
             }
             onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
+            onExportPack={handleExportPack}
+            exportingPack={exportingPack}
+            exported={exported}
+            exportError={exportError}
+            onDismissExport={() => {
+              setExported(null);
+              setExportError(null);
+            }}
             onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
             onSync={handleSync}
             onQuickConnect={handleQuickConnect}
@@ -410,6 +446,11 @@ interface DetailProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onExport: () => void;
+  onExportPack: () => void;
+  exportingPack: boolean;
+  exported: MrpackExport | null;
+  exportError: string | null;
+  onDismissExport: () => void;
   onOpenFolder: () => void;
   onSync: () => void;
   onQuickConnect: () => void;
@@ -427,6 +468,11 @@ function ProfileDetail({
   onDuplicate,
   onDelete,
   onExport,
+  onExportPack,
+  exportingPack,
+  exported,
+  exportError,
+  onDismissExport,
   onOpenFolder,
   onSync,
   onQuickConnect,
@@ -466,6 +512,14 @@ function ProfileDetail({
           <Button
             variant="ghost"
             size="sm"
+            icon={<Package size={14} />}
+            loading={exportingPack}
+            onClick={onExportPack}
+            title={t('profiles.exportPack')}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
             icon={<FolderOpen size={14} />}
             onClick={onOpenFolder}
             title={t('profiles.openFolder')}
@@ -479,6 +533,21 @@ function ProfileDetail({
           />
         </div>
       </div>
+
+      {exportError && <Banner type="urgent">{exportError}</Banner>}
+      {exported && (
+        <Banner type="info" dismissible onDismiss={onDismissExport}>
+          {t.plural('profiles.exportPackDone', exported.files, { path: exported.path })}
+          {/* Bundled files are why a 20 KB pack is sometimes 300 MB, and why a
+              recipient with no network still gets those. Worth a sentence. */}
+          {exported.bundled > 0 &&
+            ` ${t.plural('profiles.exportPackBundled', exported.bundled, {
+              size: formatBytes(exported.bundledBytes),
+            })}`}
+          {exported.skippedDisabled > 0 &&
+            ` ${t.plural('profiles.exportPackSkipped', exported.skippedDisabled)}`}
+        </Banner>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Field label={t('profiles.fieldMinecraft')} value={profile.minecraftVersion} />

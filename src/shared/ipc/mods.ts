@@ -122,6 +122,13 @@ export type ShaderLoaderResult =
   | { status: 'no-build'; mcVersion: string; modLoader: ModLoaderType }
   | { status: 'failed'; error: string };
 
+/**
+ * One pack in the White Ravens catalogue, as the picker needs it.
+ *
+ * `manifestUrl` is the whole point — a profile created from this follows that
+ * URL and keeps updating, rather than being a snapshot. Entries without one are
+ * dropped before they reach here.
+ */
 export interface CataloguePack {
   slug: string;
   name: string;

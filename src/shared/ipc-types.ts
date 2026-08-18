@@ -27,6 +27,7 @@ import type { AuthState, MinecraftAccount } from './ipc/auth';
 import type {
   LoaderVersion,
   ModLoaderType,
+  MrpackExport,
   OrphanedProfile,
   Profile,
   ProfileFileSummary,
@@ -91,6 +92,11 @@ export interface InvokeChannels {
   'profiles:duplicate': (profileId: string, name?: string) => Promise<IpcResult<Profile>>;
   'profiles:open-folder': (profileId: string) => Promise<IpcResult<void>>;
   'profiles:export': (profileId: string) => Promise<IpcResult<string>>; // returns JSON string
+  /**
+   * Write the profile out as a Modrinth modpack — the mods, not just the
+   * settings. Asks where to put it; `null` means the player closed the dialog.
+   */
+  'profiles:export-pack': (profileId: string) => Promise<IpcResult<MrpackExport | null>>;
   'profiles:import': (json: string) => Promise<IpcResult<Profile>>;
   'profiles:get-sync-status': (profileId: string) => Promise<IpcResult<ProfileSyncStatus>>;
   /** Copy an image in as the profile's icon; `null` source clears it. */
@@ -328,6 +334,7 @@ export interface RavenForgeAPI {
     duplicate: InvokeChannels['profiles:duplicate'];
     openFolder: InvokeChannels['profiles:open-folder'];
     export: InvokeChannels['profiles:export'];
+    exportPack: InvokeChannels['profiles:export-pack'];
     import: InvokeChannels['profiles:import'];
     getSyncStatus: InvokeChannels['profiles:get-sync-status'];
     setIcon: InvokeChannels['profiles:set-icon'];

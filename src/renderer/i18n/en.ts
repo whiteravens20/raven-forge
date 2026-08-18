@@ -175,6 +175,16 @@ export const en = {
   'profiles.pickOrCreate': 'Select a profile, or create a new one',
   'profiles.copyName': '{name} (copy)',
   'profiles.openFolder': 'Open profile folder',
+  'profiles.exportPack': 'Export as a modpack (.mrpack)',
+  'profiles.exportPackFailed': 'Could not export that profile as a pack.',
+  'profiles.exportPackDone.one': 'Saved to {path}. The pack links to one file on Modrinth.',
+  'profiles.exportPackDone.other': 'Saved to {path}. The pack links to {count} files on Modrinth.',
+  'profiles.exportPackBundled.one':
+    'One more file ({size}) is not on Modrinth, so it was written into the pack itself.',
+  'profiles.exportPackBundled.other':
+    'Another {count} files ({size}) are not on Modrinth, so they were written into the pack itself.',
+  'profiles.exportPackSkipped.one': 'Left out one item that is switched off.',
+  'profiles.exportPackSkipped.other': 'Left out {count} items that are switched off.',
   // ── Deleting a profile ───────────────────────────────────
   'delete.title': 'Delete profile "{name}"',
   'delete.intro':
