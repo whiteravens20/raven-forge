@@ -2,7 +2,7 @@
 
 **English** · [Polski](PRIVACY.pl.md)
 
-**Last updated: 2026-08-17**
+**Last updated: 2026-08-18**
 
 This document describes every piece of data Raven Forge stores, every server it
 contacts, and what it sends there. It is written from the source code, not from
@@ -151,10 +151,11 @@ your Microsoft account.
 
 ### To find and install content
 
-| Host                                    | When                                                 | What is sent                                                                                                                                                                                              |
-| --------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api.modrinth.com`, `cdn.modrinth.com`  | Browsing or installing mods, shaders, resource packs | **Your search terms and filters.** Modrinth's API terms require an identifying User-Agent, so requests carry `whiteravens20/raven-forge/<version> (<repo URL>)` — the launcher name and version, not you. |
-| Whatever hosts a mod icon or news image | Displaying them                                      | The request goes to that host. Images are loaded straight from wherever a project publishes them.                                                                                                         |
+| Host                                    | When                                                                  | What is sent                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api.modrinth.com`, `cdn.modrinth.com`  | Browsing or installing mods, shaders, resource packs                  | **Your search terms and filters.** Modrinth's API terms require an identifying User-Agent, so requests carry `whiteravens20/raven-forge/<version> (<repo URL>)` — the launcher name and version, not you.                                                                                                                                             |
+| `api.modrinth.com`                      | Checking installed mods for updates, or exporting a profile as a pack | **A SHA-512 hash of each mod file in that profile.** That is how Modrinth is asked what a file is and what has replaced it, and it is what lets a jar you added by hand be recognised at all. A hash names a file, not you — but the set of them describes which mods that profile holds, so it is only sent when you press one of those two buttons. |
+| Whatever hosts a mod icon or news image | Displaying them                                                       | The request goes to that host. Images are loaded straight from wherever a project publishes them.                                                                                                                                                                                                                                                     |
 
 ### To White Ravens
 
@@ -261,14 +262,14 @@ read a report through before attaching it to a public issue.
 
 ## What you can turn off
 
-| Setting                                                       | Effect                                                               |
-| ------------------------------------------------------------- | -------------------------------------------------------------------- |
-| **Offline mode** (Settings → Behaviour)                       | Never contacts any authentication server. Singleplayer and LAN only. |
-| **News / announcement feed URL** (Settings → Content sources) | Clear the field and that feed is never fetched.                      |
-| **Proxy** (Settings → Network)                                | Routes every launcher request through a proxy you control.           |
-| **Discord status** (Settings → Behaviour)                     | Off by default. On, your Discord profile shows what you are playing. |
-| Not using the Mods page                                       | Nothing is sent to Modrinth unless you search or install.            |
-| Using an offline account                                      | No Microsoft or Xbox server is ever contacted.                       |
+| Setting                                                       | Effect                                                                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Offline mode** (Settings → Behaviour)                       | Never contacts any authentication server. Singleplayer and LAN only.                        |
+| **News / announcement feed URL** (Settings → Content sources) | Clear the field and that feed is never fetched.                                             |
+| **Proxy** (Settings → Network)                                | Routes every launcher request through a proxy you control.                                  |
+| **Discord status** (Settings → Behaviour)                     | Off by default. On, your Discord profile shows what you are playing.                        |
+| Not using the Mods page                                       | Nothing is sent to Modrinth unless you search, install, check for updates or export a pack. |
+| Using an offline account                                      | No Microsoft or Xbox server is ever contacted.                                              |
 
 ---
 

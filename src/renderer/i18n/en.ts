@@ -588,9 +588,9 @@ export const en = {
   'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge and Quilt',
   'privacy.dest.loaders.when': 'when installing what mods need to run',
   'privacy.dest.modrinth.who': 'Modrinth',
-  'privacy.dest.modrinth.when': 'when you look for mods',
+  'privacy.dest.modrinth.when': 'when you look for mods, or check the ones you have',
   'privacy.dest.modrinth.sends':
-    'What you type into the search box, and the filters you set. Nothing that says who you are — the request names the launcher that is asking, not the person.',
+    'What you type into the search box, and the filters you set. Checking for updates or exporting a pack also sends a hash of each mod file in that profile, which is how Modrinth is asked what those files are. Nothing that says who you are — the request names the launcher that is asking, not the person.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'news, and the list of server packs',
   'privacy.dest.updates.who': 'GitHub',

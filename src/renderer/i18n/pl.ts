@@ -617,9 +617,9 @@ export const pl: Translations = {
   'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge i Quilt',
   'privacy.dest.loaders.when': 'przy instalacji tego, czego mody potrzebują do działania',
   'privacy.dest.modrinth.who': 'Modrinth',
-  'privacy.dest.modrinth.when': 'gdy szukasz modów',
+  'privacy.dest.modrinth.when': 'gdy szukasz modów albo sprawdzasz te, które masz',
   'privacy.dest.modrinth.sends':
-    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
+    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu — tak pyta się Modrinth, czym te pliki są. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'wiadomości i lista paczek serwerowych',
   'privacy.dest.updates.who': 'GitHub',

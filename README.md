@@ -19,6 +19,9 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Mod Auto-Sync** — fetch server manifest → check its signature → diff → parallel download → verify each hash → install
 - **Mod Browser** — search Modrinth from the launcher, filtered to your profile
 - **Compatibility Checks** — warns before an install that does not fit the profile, and pulls in required dependencies
+- **Mod Updates** — checks what you installed by hand against Modrinth by file hash, so a jar you dropped in yourself is recognised too, and updates them in place
+- **Pack Export** — write a profile back out as a `.mrpack`: a small file of references, with anything Modrinth does not host carried inside it
+- **World Backups** — copy a profile's worlds aside, restore them again, and get asked before a Minecraft version change touches them
 - **Bilingual UI** — Polish and English, switchable in Settings
 - **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla
 - **Microsoft Auth** — full OAuth 2.0 → Xbox Live → Minecraft JWT chain + offline mode

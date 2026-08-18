@@ -64,11 +64,11 @@ raven-forge/
     │   ├── java/                 # Adoptium Temurin download + version selection
     │   ├── minecraft/            # version manifest, asset/library download, game launcher
     │   ├── modloader/            # Fabric, Quilt, Forge and NeoForge installers
-    │   ├── mods/                 # manifest sync, Modrinth API, content (shaders/RP) manager
-    │   ├── packs/                # .mrpack reader, pack catalogue, profile-from-pack
+    │   ├── mods/                 # manifest sync, Modrinth API, update checks, content manager
+    │   ├── packs/                # .mrpack reader and writer, pack catalogue, profile-from-pack
     │   ├── net/                  # proxy dispatcher + the shared download helper
     │   ├── updater/              # electron-updater wiring, manifest signature verification
-    │   ├── profiles/             # profile CRUD + import/export
+    │   ├── profiles/             # profile CRUD, import/export, world backups
     │   ├── news/                 # news + announcement fetcher with mock fallback
     │   ├── util/                 # atomic writes, cancellation, path containment
     │   └── config/               # paths.ts, settings-manager.ts, defaults.ts

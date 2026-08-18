@@ -2,7 +2,7 @@
 
 [English](PRIVACY.md) · **Polski**
 
-**Ostatnia aktualizacja: 2026-08-17**
+**Ostatnia aktualizacja: 2026-08-18**
 
 Ten dokument opisuje każdą daną, którą Raven Forge przechowuje, każdy serwer, z
 którym się łączy, i to, co tam wysyła. Powstał na podstawie kodu źródłowego, a
@@ -154,10 +154,11 @@ na Twoim koncie Microsoft.
 
 ### Żeby znaleźć i zainstalować zawartość
 
-| Host                                                     | Kiedy                                                          | Co jest wysyłane                                                                                                                                                                                                      |
-| -------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api.modrinth.com`, `cdn.modrinth.com`                   | Przeglądanie lub instalowanie modów, shaderów i paczek zasobów | **Twoje frazy wyszukiwania i filtry.** Regulamin API Modrinth wymaga identyfikującego się User-Agenta, więc żądania niosą `whiteravens20/raven-forge/<wersja> (<adres repo>)` — nazwę i wersję launchera, nie Ciebie. |
-| Serwer, na którym leży ikona moda lub obrazek wiadomości | Przy ich wyświetlaniu                                          | Żądanie idzie do tego serwera. Obrazki ładują się prosto stamtąd, gdzie projekt je opublikował.                                                                                                                       |
+| Host                                                     | Kiedy                                                                           | Co jest wysyłane                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api.modrinth.com`, `cdn.modrinth.com`                   | Przeglądanie lub instalowanie modów, shaderów i paczek zasobów                  | **Twoje frazy wyszukiwania i filtry.** Regulamin API Modrinth wymaga identyfikującego się User-Agenta, więc żądania niosą `whiteravens20/raven-forge/<wersja> (<adres repo>)` — nazwę i wersję launchera, nie Ciebie.                                                                                                                       |
+| `api.modrinth.com`                                       | Sprawdzanie aktualizacji zainstalowanych modów albo eksport profilu jako paczki | **Skrót SHA-512 każdego pliku moda w tym profilu.** Tak właśnie pyta się Modrinth, czym jest dany plik i co go zastąpiło — i tylko dzięki temu da się rozpoznać jar wrzucony ręcznie. Skrót nazywa plik, nie Ciebie, ale ich zestaw opisuje, jakie mody ma ten profil, więc idzie wyłącznie po naciśnięciu jednego z tych dwóch przycisków. |
+| Serwer, na którym leży ikona moda lub obrazek wiadomości | Przy ich wyświetlaniu                                                           | Żądanie idzie do tego serwera. Obrazki ładują się prosto stamtąd, gdzie projekt je opublikował.                                                                                                                                                                                                                                             |
 
 ### Do White Ravens
 
@@ -269,14 +270,14 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 ## Co możesz wyłączyć
 
-| Ustawienie                                                          | Efekt                                                                                |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **Tryb offline** (Ustawienia → Zachowanie)                          | Nigdy nie kontaktuje się z serwerami uwierzytelniania. Tylko gra jednoosobowa i LAN. |
-| **Adres kanału wiadomości / ogłoszeń** (Ustawienia → Źródła treści) | Wyczyść pole, a dany kanał nie będzie już pobierany.                                 |
-| **Proxy** (Ustawienia → Sieć i pobieranie)                          | Kieruje każde żądanie launchera przez proxy, które kontrolujesz.                     |
-| **Status na Discordzie** (Ustawienia → Zachowanie)                  | Domyślnie wyłączony. Włączony — Twój profil na Discordzie pokazuje, w co grasz.      |
-| Nieużywanie strony Mody                                             | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz lub nie zainstalujesz.        |
-| Konto offline                                                       | Żaden serwer Microsoftu ani Xboxa nie jest w ogóle dotykany.                         |
+| Ustawienie                                                          | Efekt                                                                                                                                 |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tryb offline** (Ustawienia → Zachowanie)                          | Nigdy nie kontaktuje się z serwerami uwierzytelniania. Tylko gra jednoosobowa i LAN.                                                  |
+| **Adres kanału wiadomości / ogłoszeń** (Ustawienia → Źródła treści) | Wyczyść pole, a dany kanał nie będzie już pobierany.                                                                                  |
+| **Proxy** (Ustawienia → Sieć i pobieranie)                          | Kieruje każde żądanie launchera przez proxy, które kontrolujesz.                                                                      |
+| **Status na Discordzie** (Ustawienia → Zachowanie)                  | Domyślnie wyłączony. Włączony — Twój profil na Discordzie pokazuje, w co grasz.                                                       |
+| Nieużywanie strony Mody                                             | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz, nie zainstalujesz, nie sprawdzisz aktualizacji ani nie wyeksportujesz paczki. |
+| Konto offline                                                       | Żaden serwer Microsoftu ani Xboxa nie jest w ogóle dotykany.                                                                          |
 
 ---
 
