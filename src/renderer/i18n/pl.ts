@@ -330,7 +330,13 @@ export const pl: Translations = {
   'profileForm.loaderUnstable': 'niestabilna',
   'profileForm.loaderVersionLatest': 'Najnowsza',
   'profileForm.loaderVersion': 'Wersja Loadera (opcjonalnie)',
-  'profileForm.ram': 'RAM (MB)',
+  'profileForm.ram': 'Przydzielony RAM',
+  'profileForm.ramMachine': 'Ten komputer ma {total}. Zalecane dla niego: {recommended}.',
+  'profileForm.ramTight':
+    '{value} zostawia temu komputerowi ({total}) bardzo mało na resztę — gra może się zacinać albo zostać zamknięta w trakcie.',
+  'profileForm.ramOver':
+    '{value} to więcej, niż ten komputer ma ({total}). Minecraft się z tym nie uruchomi.',
+  'profileForm.ramUseRecommended': 'Ustaw {recommended}',
   'profileForm.manifestUrl': 'Manifest URL (opcjonalnie)',
   'profileForm.serverIp': 'Serwer IP',
   'profileForm.serverPort': 'Port',

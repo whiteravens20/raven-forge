@@ -313,7 +313,13 @@ export const en = {
   'profileForm.loaderUnstable': 'unstable',
   'profileForm.loaderVersionLatest': 'Latest',
   'profileForm.loaderVersion': 'Loader version (optional)',
-  'profileForm.ram': 'RAM (MB)',
+  'profileForm.ram': 'Allocated RAM',
+  'profileForm.ramMachine': 'This machine has {total}. Recommended for it: {recommended}.',
+  'profileForm.ramTight':
+    '{value} leaves this machine ({total}) very little for anything else — the game may stutter, or be shut down while it runs.',
+  'profileForm.ramOver':
+    '{value} is more than this machine has ({total}). Minecraft will not start with it.',
+  'profileForm.ramUseRecommended': 'Use {recommended}',
   'profileForm.manifestUrl': 'Manifest URL (optional)',
   'profileForm.serverIp': 'Server IP',
   'profileForm.serverPort': 'Port',

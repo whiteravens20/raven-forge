@@ -26,10 +26,13 @@ import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
 import { ProfileSourcePicker } from '@components/ProfileSourcePicker';
 import { WorldBackupCard } from '@components/WorldBackupCard';
 import { VersionChangeDialog } from '@components/VersionChangeDialog';
+import { RamField } from '@components/RamField';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
+import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 import { useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
+import { recommendedRamMb } from '@shared/memory';
 import type {
   ModLoaderType,
   MrpackExport,
@@ -53,7 +56,8 @@ const LOADER_OPTIONS = [
 
 type DraftProfile = Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>;
 
-function emptyDraft(): DraftProfile {
+/** `totalMb` is the machine's memory, or undefined when it could not be read. */
+function emptyDraft(totalMb: number | undefined): DraftProfile {
   return {
     name: '',
     minecraftVersion: '1.21.4',
@@ -63,7 +67,7 @@ function emptyDraft(): DraftProfile {
     serverIp: undefined,
     serverPort: undefined,
     javaArgs: undefined,
-    allocatedRamMb: 4096,
+    allocatedRamMb: recommendedRamMb(totalMb),
     customJavaPath: undefined,
     windowWidth: undefined,
     windowHeight: undefined,
@@ -90,8 +94,9 @@ export function ProfilesPage() {
   const reload = useProfileStore((s) => s.load);
 
   const t = useT();
+  const machineMemoryMb = useMachineMemoryMb();
   const [mode, setMode] = useState<'view' | 'create' | 'edit'>('view');
-  const [draft, setDraft] = useState<DraftProfile>(emptyDraft);
+  const [draft, setDraft] = useState<DraftProfile>(() => emptyDraft(undefined));
   const [syncStatus, setSyncStatus] = useState<ProfileSyncStatus | null>(null);
   const [verification, setVerification] = useState<ManifestVerification | null>(null);
   /** The profile whose delete confirmation is open. */
@@ -175,7 +180,7 @@ export function ProfilesPage() {
   /** The by-hand route, reached from the source picker. */
   const startFromScratch = () => {
     setChoosingSource(false);
-    setDraft(emptyDraft());
+    setDraft(emptyDraft(machineMemoryMb));
     setMode('create');
   };
 
@@ -434,6 +439,7 @@ export function ProfilesPage() {
             onSave={save}
             isCreate={mode === 'create'}
             profile={mode === 'edit' ? selectedProfile : undefined}
+            machineMemoryMb={machineMemoryMb}
           />
         ) : selectedProfile ? (
           <ProfileDetail
@@ -757,9 +763,19 @@ interface FormProps {
   isCreate: boolean;
   /** The saved profile being edited; absent while creating a new one. */
   profile?: Profile;
+  /** The machine's physical memory, or undefined while unknown or unreadable. */
+  machineMemoryMb?: number;
 }
 
-function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: FormProps) {
+function ProfileForm({
+  draft,
+  onChange,
+  onCancel,
+  onSave,
+  isCreate,
+  profile,
+  machineMemoryMb,
+}: FormProps) {
   // Closed lists rather than free text: a typo in either field only surfaces
   // minutes later as a failed download. Both fall back to a text input if the
   // list cannot be fetched, so a first run without network is still usable.
@@ -908,14 +924,10 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
             error={loaderVersionsFailed ? t('profileForm.versionsFailed') : undefined}
           />
         )}
-        <Input
-          label={t('profileForm.ram')}
-          type="number"
-          value={draft.allocatedRamMb}
-          onChange={(e) => set('allocatedRamMb', Number(e.target.value))}
-          min={512}
-          max={32768}
-          step={512}
+        <RamField
+          valueMb={draft.allocatedRamMb}
+          onChange={(mb) => set('allocatedRamMb', mb)}
+          totalMb={machineMemoryMb}
         />
         <Input
           label={t('profileForm.manifestUrl')}
