@@ -465,11 +465,41 @@ export const en = {
   'settings.trustedKeyAdd': 'Add key',
   'settings.trustedKeyFailed': 'Could not add the key',
   'settings.dataFolder': 'Data folder',
+  'settings.dataFolderHint':
+    'Profiles, mods, game files and the managed Java runtimes. Several gigabytes once a pack is installed.',
+  'settings.dataFolderChange': 'Move…',
+  'settings.dataFolderRestore': 'Back to the default',
+  'settings.dataFolderEnv':
+    'Set for this install by RAVENFORGE_DATA_DIR, so it cannot be changed here.',
+  'settings.dataFolderUnavailable':
+    'The chosen folder {path} could not be reached, so the launcher is using the default one. Anything you had there is still there.',
   'settings.crashReportsFolder': 'Crash reports',
   'settings.logs': 'Logs',
   'settings.showLogs': 'Show logs',
   'settings.reset': 'Reset settings',
   'settings.confirmReset': 'Reset all settings to their defaults?',
+
+  // ── Data folder ──────────────────────────────────────────
+  'dataRoot.title': 'Move the data folder',
+  'dataRoot.from': 'Now',
+  'dataRoot.to': 'New location',
+  'dataRoot.move': '{size} moves across. Nothing is left behind in the old location.',
+  'dataRoot.adopt':
+    'That folder already holds launcher data, so it will be used as it is — nothing is copied, and what is in the current folder stays there.',
+  'dataRoot.free': 'Free at the destination: {free}',
+  'dataRoot.restartNotice': 'The launcher restarts once the move is done.',
+  'dataRoot.confirm': 'Move and restart',
+  'dataRoot.confirmAdopt': 'Use this folder and restart',
+  'dataRoot.moving': 'Moving data…',
+  'dataRoot.restarting': 'Done — restarting the launcher…',
+  'dataRoot.failed': 'The data folder could not be moved: {error}',
+  'dataRoot.problem.same': 'That is already the folder in use.',
+  'dataRoot.problem.nested': 'That folder is inside the current one — pick one outside it.',
+  'dataRoot.problem.notWritable': 'Nothing can be written to that folder.',
+  'dataRoot.problem.noSpace': 'Not enough room: {size} to move, {free} free.',
+  'dataRoot.problem.envLocked':
+    'RAVENFORGE_DATA_DIR decides where the data lives for this install.',
+  'dataRoot.problem.gameRunning': 'Close the game first — it is running out of this folder.',
 
   // ── Log viewer ───────────────────────────────────────────
   'logs.title': 'Launcher logs',
@@ -520,6 +550,7 @@ export const en = {
   'progress.msg.runningInstaller': 'Running the {loader} installer — this can take a few minutes…',
   'progress.msg.savingProfile': 'Saving the profile…',
   'progress.msg.updateDownloading': 'Downloading update… {percent}%',
+  'progress.msg.movingData': 'Moving data…',
 
   // ── Updater ──────────────────────────────────────────────
   'update.ready': 'Update ready',

@@ -113,6 +113,10 @@ const api: RavenForgeAPI = {
     reset: () => ipcRenderer.invoke('settings:reset'),
     addTrustedKey: (key) => ipcRenderer.invoke('settings:add-trusted-key', key),
     removeTrustedKey: (publicKey) => ipcRenderer.invoke('settings:remove-trusted-key', publicKey),
+    getDataRoot: () => ipcRenderer.invoke('settings:get-data-root'),
+    chooseDataRoot: () => ipcRenderer.invoke('settings:choose-data-root'),
+    planDataRoot: (target) => ipcRenderer.invoke('settings:plan-data-root', target),
+    applyDataRoot: (target) => ipcRenderer.invoke('settings:apply-data-root', target),
   },
   news: {
     get: () => ipcRenderer.invoke('news:get'),

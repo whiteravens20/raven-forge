@@ -49,7 +49,8 @@ export type ProgressKey =
   | 'progress.msg.preparingJava'
   | 'progress.msg.runningInstaller'
   | 'progress.msg.savingProfile'
-  | 'progress.msg.updateDownloading';
+  | 'progress.msg.updateDownloading'
+  | 'progress.msg.movingData';
 
 /** Counted keys, which need a plural variant chosen for them. */
 export type ProgressPluralKey = 'progress.msg.synced';

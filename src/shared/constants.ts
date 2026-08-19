@@ -14,6 +14,7 @@ export const DIR_CRASH_REPORTS = 'crash-reports';
 // ── File names ────────────────────────────────────────────
 export const FILE_SETTINGS = 'settings.json';
 export const FILE_PROFILES = 'profiles.json';
+export const FILE_AUTH = 'auth.json';
 
 // ── Modrinth API ──────────────────────────────────────────
 export const MODRINTH_API_BASE = 'https://api.modrinth.com/v2';

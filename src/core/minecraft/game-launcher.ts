@@ -586,6 +586,15 @@ export function isGameRunning(profileId: string): boolean {
   return runningProcesses.has(profileId);
 }
 
+/**
+ * Any profile at all. Asked before the data directory moves: the game holds
+ * open handles all over the profile it is running from, and on Windows that
+ * alone makes the directory unmovable.
+ */
+export function anyGameRunning(): boolean {
+  return runningProcesses.size > 0;
+}
+
 export async function launchGame(options: LaunchOptions): Promise<void> {
   try {
     await runLaunch(options);

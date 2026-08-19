@@ -6,6 +6,7 @@ import { Select } from '@components/ui/Select';
 import { Input } from '@components/ui/Input';
 import { Button } from '@components/ui/Button';
 import { LogViewer } from '@components/LogViewer';
+import { DataFolderCard } from '@components/DataFolderCard';
 import { Spinner } from '@components/ui/Spinner';
 import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
 import { isBuiltInKey, trustedKeyRing } from '@shared/branding';
@@ -245,15 +246,7 @@ export function SettingsPage() {
       </Section>
 
       <Section title={t('settings.section.data')}>
-        <PathRow
-          label={t('settings.dataFolder')}
-          onOpen={async () => {
-            const result = await api.system.getInfo();
-            if (result.success && result.data) {
-              await api.system.openPath(result.data.dataDirectory);
-            }
-          }}
-        />
+        <DataFolderCard />
         <PathRow
           label={t('settings.crashReportsFolder')}
           onOpen={async () => {

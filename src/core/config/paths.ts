@@ -10,14 +10,28 @@ import {
   FILE_SETTINGS,
   FILE_PROFILES,
 } from '../../shared/constants';
+import { dataRoot } from './data-root';
 
 /**
  * Centralized path resolver for all launcher data directories.
- * Base: electron app.getPath('userData') → typically:
- *   Windows: %APPDATA%/Raven Forge Launcher
- *   Linux:   ~/.config/Raven Forge Launcher
+ *
+ * The base is `data-root.ts`, not `app.getPath('userData')` directly, because
+ * the root is movable — see that file. Everything here is a getter for the same
+ * reason: they are read after the root is known, not baked in at import.
+ *
+ * Two things stay behind in `userData` whatever the root is doing, and both are
+ * diagnostics rather than data: the log the app is writing while it runs, which
+ * on Windows cannot be moved out from under its own open handle, and the crash
+ * reports. Pinning them also means the log viewer and the crash reporter still
+ * work on the day the drive holding the games is not plugged in — which is
+ * exactly the day someone needs to read them.
  */
 function getDataRoot(): string {
+  return dataRoot();
+}
+
+/** Electron's own per-user directory. Diagnostics live here, not under the root. */
+function getDiagnosticsRoot(): string {
   return app.getPath('userData');
 }
 
@@ -57,9 +71,9 @@ export const paths = {
     return path.join(getDataRoot(), DIR_CACHE);
   },
 
-  /** logs/ — application logs (electron-log) */
+  /** logs/ — application logs (electron-log). Pinned; see the note above. */
   get logsDir() {
-    return path.join(getDataRoot(), DIR_LOGS);
+    return path.join(getDiagnosticsRoot(), DIR_LOGS);
   },
 
   /**
@@ -68,7 +82,7 @@ export const paths = {
    * each profile's game directory; these quote from those.
    */
   get crashReportsDir() {
-    return path.join(getDataRoot(), DIR_CRASH_REPORTS);
+    return path.join(getDiagnosticsRoot(), DIR_CRASH_REPORTS);
   },
 
   /** Per-profile directory */

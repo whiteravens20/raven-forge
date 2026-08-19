@@ -8,6 +8,8 @@ import { assertTrustedSender } from './security';
 import { getSettings, updateSettings, resetSettings } from '../core/config/settings-manager';
 import { applyProxySettings } from '../core/net/proxy';
 import { paths } from '../core/config/paths';
+import { dataRootSource, dataRootUnavailable, defaultDataRoot } from '../core/config/data-root';
+import { applyDataRoot, planDataRootChange } from '../core/config/data-root-move';
 import { fetchNews, fetchAnnouncements } from '../core/news/news-fetcher';
 import {
   getAllProfiles,
@@ -331,6 +333,63 @@ export function registerAllIpcHandlers(): void {
     } catch (err) {
       return fail(`Failed to remove trusted key: ${reason(err)}`);
     }
+  });
+
+  // ── Data directory ──────────────────────────────────────
+  handle('settings:get-data-root', () => {
+    try {
+      return ok({
+        path: paths.root,
+        defaultPath: defaultDataRoot(),
+        source: dataRootSource(),
+        unavailable: dataRootUnavailable(),
+      });
+    } catch (err) {
+      return fail(`Failed to read the data directory: ${reason(err)}`);
+    }
+  });
+  handle('settings:choose-data-root', async () => {
+    const win = getMainWindow();
+    if (!win) return fail('No window available');
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: paths.root,
+    });
+    if (result.canceled || result.filePaths.length === 0) return ok(null);
+    try {
+      return ok(await planDataRootChange(result.filePaths[0]));
+    } catch (err) {
+      return fail(`Failed to inspect ${result.filePaths[0]}: ${reason(err)}`);
+    }
+  });
+  handle('settings:plan-data-root', async (_event, target: string) => {
+    try {
+      return ok(await planDataRootChange(target));
+    } catch (err) {
+      return fail(`Failed to inspect ${target}: ${reason(err)}`);
+    }
+  });
+  /**
+   * The restart is not a convenience. Every module that has already read a path
+   * — the settings cache, the java manager, an in-flight download — is holding
+   * the old root, and there is no version of re-pointing them all that is worth
+   * trusting with somebody's saves. Coming back up is the one way that is.
+   */
+  handle('settings:apply-data-root', async (_event, target: string) => {
+    try {
+      await applyDataRoot(target, (event) => {
+        getMainWindow()?.webContents.send('progress:data-root', event);
+      });
+    } catch (err) {
+      return fail(`Failed to move the data directory: ${reason(err)}`);
+    }
+    // Long enough for this reply to reach the renderer, which is showing the
+    // restart notice it is about to be replaced by.
+    setTimeout(() => {
+      app.relaunch();
+      app.quit();
+    }, 600);
+    return ok(undefined);
   });
 
   // ── News & Announcements ────────────────────────────────

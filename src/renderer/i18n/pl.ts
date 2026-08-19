@@ -487,6 +487,14 @@ export const pl: Translations = {
   'settings.trustedKeyAdd': 'Dodaj klucz',
   'settings.trustedKeyFailed': 'Nie udało się dodać klucza',
   'settings.dataFolder': 'Folder danych',
+  'settings.dataFolderHint':
+    'Profile, mody, pliki gry i pobrane wersje Javy. Po instalacji paczki to kilka gigabajtów.',
+  'settings.dataFolderChange': 'Przenieś…',
+  'settings.dataFolderRestore': 'Wróć do domyślnego',
+  'settings.dataFolderEnv':
+    'Dla tej instalacji ustawia go RAVENFORGE_DATA_DIR, więc nie zmienisz go tutaj.',
+  'settings.dataFolderUnavailable':
+    'Nie udało się otworzyć wybranego folderu {path}, więc launcher korzysta z domyślnego. To, co tam było, dalej tam jest.',
   'settings.crashReportsFolder': 'Raporty z awarii',
   'settings.logs': 'Logi',
   'settings.showLogs': 'Pokaż logi',
@@ -549,6 +557,7 @@ export const pl: Translations = {
     'Uruchamianie instalatora {loader} — to może potrwać kilka minut…',
   'progress.msg.savingProfile': 'Zapisywanie profilu…',
   'progress.msg.updateDownloading': 'Pobieranie aktualizacji… {percent}%',
+  'progress.msg.movingData': 'Przenoszenie danych…',
 
   // ── Updater ──────────────────────────────────────────────
   'update.ready': 'Aktualizacja gotowa',
@@ -682,4 +691,26 @@ export const pl: Translations = {
     'Zakon dawno rozsypał się w proch, piec wystygł, góra zapadła się w siebie. Ale pod warstwą szkła i światła, przed którą teraz siedzisz, wciąż tli się ta sama iskra. Czeka tylko, aż ktoś powie: *graj*.',
   'chronicle.colophon1': 'Kto znalazł ten zwój, znalazł go przypadkiem.',
   'chronicle.colophon2': 'Zwoje nie dają się znaleźć przypadkiem.',
+
+  // ── Folder danych ────────────────────────────────────────
+  'dataRoot.title': 'Przenieś folder danych',
+  'dataRoot.from': 'Teraz',
+  'dataRoot.to': 'Nowe miejsce',
+  'dataRoot.move': 'Przeniesione zostanie {size}. W starym miejscu nic nie zostaje.',
+  'dataRoot.adopt':
+    'W tym folderze są już dane launchera, więc zostaną użyte tak, jak są — nic nie jest kopiowane, a to, co w obecnym folderze, tam zostaje.',
+  'dataRoot.free': 'Wolne miejsce w miejscu docelowym: {free}',
+  'dataRoot.restartNotice': 'Po przeniesieniu launcher uruchomi się ponownie.',
+  'dataRoot.confirm': 'Przenieś i uruchom ponownie',
+  'dataRoot.confirmAdopt': 'Użyj tego folderu i uruchom ponownie',
+  'dataRoot.moving': 'Przenoszenie danych…',
+  'dataRoot.restarting': 'Gotowe — ponowne uruchomienie launchera…',
+  'dataRoot.failed': 'Nie udało się przenieść folderu danych: {error}',
+  'dataRoot.problem.same': 'To już jest używany folder.',
+  'dataRoot.problem.nested': 'Ten folder jest wewnątrz obecnego — wybierz taki spoza niego.',
+  'dataRoot.problem.notWritable': 'Do tego folderu nie da się nic zapisać.',
+  'dataRoot.problem.noSpace': 'Za mało miejsca: do przeniesienia {size}, wolne {free}.',
+  'dataRoot.problem.envLocked':
+    'O miejscu na dane dla tej instalacji decyduje RAVENFORGE_DATA_DIR.',
+  'dataRoot.problem.gameRunning': 'Najpierw zamknij grę — działa z tego folderu.',
 };

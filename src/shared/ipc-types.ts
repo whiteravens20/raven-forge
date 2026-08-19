@@ -50,7 +50,7 @@ import type {
   ShaderLoaderState,
 } from './ipc/mods';
 import type { JavaInstallation } from './ipc/java';
-import type { GlobalSettings, TrustedKey } from './ipc/settings';
+import type { GlobalSettings, TrustedKey, DataRootInfo, DataRootPlan } from './ipc/settings';
 import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
 import type { ManifestVerification, UpdateCheck, UpdateInfo } from './ipc/updater';
@@ -255,6 +255,12 @@ export interface InvokeChannels {
   'settings:reset': () => Promise<IpcResult<GlobalSettings>>;
   'settings:add-trusted-key': (key: TrustedKey) => Promise<IpcResult<void>>;
   'settings:remove-trusted-key': (publicKey: string) => Promise<IpcResult<void>>;
+  'settings:get-data-root': () => Promise<IpcResult<DataRootInfo>>;
+  /** Opens a directory picker; `null` when it was dismissed. */
+  'settings:choose-data-root': () => Promise<IpcResult<DataRootPlan | null>>;
+  'settings:plan-data-root': (target: string) => Promise<IpcResult<DataRootPlan>>;
+  /** Moves the data and restarts the launcher into the new location. */
+  'settings:apply-data-root': (target: string) => Promise<IpcResult<void>>;
 
   // -- News & Announcements --
   'news:get': () => Promise<IpcResult<FeedResult<NewsItem>>>;
@@ -302,6 +308,7 @@ export interface EventChannels {
   'progress:java-download': (event: ProgressEvent) => void;
   'progress:game-assets': (event: ProgressEvent) => void;
   'progress:launcher-update': (event: ProgressEvent) => void;
+  'progress:data-root': (event: ProgressEvent) => void;
 
   // -- Game Events --
   'game:log': (profileId: string, line: GameLogLine) => void;
@@ -426,6 +433,10 @@ export interface RavenForgeAPI {
     reset: InvokeChannels['settings:reset'];
     addTrustedKey: InvokeChannels['settings:add-trusted-key'];
     removeTrustedKey: InvokeChannels['settings:remove-trusted-key'];
+    getDataRoot: InvokeChannels['settings:get-data-root'];
+    chooseDataRoot: InvokeChannels['settings:choose-data-root'];
+    planDataRoot: InvokeChannels['settings:plan-data-root'];
+    applyDataRoot: InvokeChannels['settings:apply-data-root'];
   };
   news: {
     get: InvokeChannels['news:get'];
