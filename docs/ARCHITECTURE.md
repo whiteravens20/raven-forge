@@ -240,7 +240,7 @@ sequenceDiagram
     Boot->>App: requestSingleInstanceLock()
     App->>App: app.whenReady()
     App->>Boot: initLogger() (electron-log → userData/logs)
-    App->>Root: dataRoot() — RAVENFORGE_DATA_DIR, else userData/data-root.json, else userData
+    App->>Root: dataRoot() — RAVENFORGE_DATA_DIR, else userData/data-root.txt, else userData
     App->>Init: ensureDataDirectories() (profiles, loaders, java, cache, logs, crash-reports)
     App->>Settings: loadSettings() — Zod-validated, defaults written if missing
     App->>IPC: registerAllIpcHandlers()

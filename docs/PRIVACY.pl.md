@@ -69,8 +69,9 @@ dysk, bo pliki gry to gigabajty. Launcher przenosi zawartość i uruchamia się
 ponownie już w nowym miejscu. Dwie rzeczy zostają w folderze powyżej, bo są
 diagnostyką launchera, a nie danymi o Tobie — i bo chcesz je móc przeczytać w
 dniu, w którym tamten dysk nie jest podpięty: `logs/` i `crash-reports/`.
-Zostaje tam też jednolinijkowy `data-root.json` z informacją, dokąd poszła
-reszta.
+Zostaje tam też jednolinijkowy `data-root.txt` z informacją, dokąd poszła
+reszta — czyta go deinstalator Windows, żeby „usuń moje dane" nadal znaczyło
+wszystkie.
 
 W środku:
 
@@ -83,7 +84,7 @@ W środku:
 | `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                             |
 | `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                |
 | `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, instalatory loaderów i zbuforowane metadane. Nic osobistego.                                                                                                     |
-| `data-root.json`              | Jest tylko wtedy, gdy przeniosłeś folder danych: ścieżka, pod którą go przeniosłeś, i nic poza tym. Zostaje w lokalizacji powyżej.                                                        |
+| `data-root.txt`               | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, pod którą go przeniosłeś, i nic poza tym. Zostaje w lokalizacji powyżej.                                         |
 
 Chromium trzyma w tym folderze także własne dane, w tym ciasteczka z okna
 logowania Microsoftu. Są kasowane, gdy wylogujesz konto Microsoft.

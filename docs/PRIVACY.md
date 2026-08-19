@@ -65,8 +65,9 @@ since the game files run to gigabytes. The launcher carries the contents across
 and restarts into the new location. Two things stay behind in the folder above,
 because they are diagnostics about the launcher rather than data about you, and
 because you want them readable on a day the other drive is not plugged in:
-`logs/` and `crash-reports/`. A one-line `data-root.json` stays there too,
-naming where the rest went.
+`logs/` and `crash-reports/`. A one-line `data-root.txt` stays there too,
+naming where the rest went — the Windows uninstaller reads it, so that "delete
+my data" still means all of it.
 
 Inside it:
 
@@ -79,7 +80,7 @@ Inside it:
 | `logs/main.log`               | The launcher's log, rotated at 5 MB. See "What ends up in the log".                                                                                                                               |
 | `crash-reports/`              | One file per crash, redacted, newest 20 kept. See "Crash reports".                                                                                                                                |
 | `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loader installers, and cached metadata. Nothing personal.                                                                                                           |
-| `data-root.json`              | Present only if you moved the data folder: the path you moved it to, and nothing else. Stays in the location above.                                                                               |
+| `data-root.txt`               | Present only if you moved the data folder: one line naming where you moved it, and nothing else. Stays in the location above.                                                                     |
 
 Chromium also keeps its own storage in that folder, including cookies from the
 Microsoft sign-in window. Those are cleared when you log a Microsoft account out.
