@@ -27,13 +27,14 @@ the Java runtimes. [PRIVACY.md](PRIVACY.md) breaks it down file by file.
 hand — as long as the launcher is still installed. Open it before you uninstall
 if you plan to keep anything.
 
-> **If you moved the data folder, no uninstaller will find it.**
-> **Settings → Data → Move…** puts the data anywhere you like, and every
-> uninstaller below — including the Windows "delete my data" option and
-> `apt purge` — only ever looks at the default location. A moved folder is left
-> exactly where you put it, with everything in it. Read the path from
-> **Settings → Data** (or from `data-root.json`, which stays behind in the
-> default folder and names it) and delete it by hand if you want it gone.
+> **If you moved the data folder, nothing here will find it.**
+> **Settings → Data → Move…** puts the data anywhere you like, and the paths
+> below are the only ones any uninstaller knows. On Linux that changes nothing —
+> nothing removes your data there in the first place, moved or not, for the
+> reason given under Debian below. On Windows it does: the uninstaller offers to
+> delete your data, and that offer only reaches the default location. Read the
+> real path from **Settings → Data** (or from `data-root.json`, which stays
+> behind in the default folder and names it) and delete it by hand.
 
 Two smaller things live outside it:
 
