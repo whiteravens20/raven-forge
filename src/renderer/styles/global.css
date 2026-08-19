@@ -258,18 +258,41 @@ body {
    is a vertical gradient for the page as a whole, and its weakest point is the
    middle — exactly where this column sits.
 
-   Full strength across the middle and faded to nothing well before the edges,
-   so it reads as depth behind the button rather than as a panel with an edge.
-   `--rf-bg` rather than a literal, so it lightens the light theme's overworld
-   and darkens the dark themes' lava with the same rule. */
+   Every ending shape has to land inside the box, and that is the whole trick.
+   A 58% vertical radius does not: the ellipse ran past the top and bottom of
+   the launch area and was cut off there mid-gradient, so a quarter-opaque wash
+   of `--rf-bg` stopped dead in one pixel row. On the light theme's overworld
+   that step measured a 436px band immediately above the news heading — slight
+   per pixel, and the eye finds it at once, because nothing else in a soft
+   gradient has an edge to find.
+
+   Two ellipses rather than one: a small opaque core over the text and a wide
+   faint pool around it. That is the falloff a single gradient needs extra stops
+   to fake, and each layer reaches zero on its own boundary instead of on the
+   box's. `--rf-bg` rather than a literal, so it lightens the light theme's
+   overworld and darkens the dark themes' lava with the same rule.
+
+   The size is the smallest that still works, found by measuring the rendered
+   pixels behind each string on all four scenes. The light theme needs this most,
+   which is not obvious — the picture there is already washed toward `--rf-bg`,
+   so it looks like the pool has nothing left to do. It has: the wash is a flat
+   mix and leaves the cave and the workshop plenty of dark structure exactly
+   where the loader/RAM line sits. Without the pool that line reads at 2.5:1; at
+   half strength 3.9:1; as written, 5.5:1. */
 .rf-launch-scrim {
-  background: radial-gradient(
-    ellipse 44% 58% at 50% 50%,
-    var(--rf-bg) 0%,
-    var(--rf-bg) 52%,
-    transparent 100%
-  );
-  opacity: 0.88;
+  background:
+    radial-gradient(
+      ellipse 28% 44% at 50% 50%,
+      var(--rf-bg) 0%,
+      var(--rf-bg) 50%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 40% 50% at 50% 50%,
+      color-mix(in srgb, var(--rf-bg) 62%, transparent) 0%,
+      transparent 100%
+    );
+  opacity: 0.94;
 }
 
 .rf-backdrop .rf-bd-aurora-a {
