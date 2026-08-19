@@ -238,19 +238,27 @@ body {
    and every scene is washed toward pastel — see `--bd-scene-wash` in
    ForgeBackdrop.
 
-   0.72 is measured, not chosen: wash a black pixel with that much `--rf-bg`
-   and `--rf-text-secondary` still reads against it at 4.5:1 (the minimum is
-   0.694). `--rf-text-muted` would need 0.89, which is why the one place muted
-   text sits on the backdrop — the home page's launch column — has a scrim of
-   its own instead of the whole picture being flattened for it. */
+   The wash used to be 0.72, derived on paper: enough `--rf-bg` over a *black*
+   pixel for `--rf-text-secondary` to clear 4.5:1 anywhere in the frame. Nothing
+   in this app is anywhere in the frame. The only strings that sit on the raw
+   picture are the news heading and its refresh icon, both at the bottom, where
+   the backdrop's own vertical scrim is already carrying most of the load — so
+   the paper figure was flattening the whole animation to protect a case that
+   never comes up, and the light theme's scenes were barely legible as scenes.
+
+   0.55 is measured on screen instead, against the pixels actually behind each
+   string on all four scenes: the news heading lands at 6.1:1 and the refresh
+   icon at 9.2:1. Muted text over the middle of the picture is a different
+   problem and has `.rf-launch-scrim` for it, rather than being a reason to
+   flatten the picture. */
 [data-theme='light'] .rf-backdrop {
-  --bd-aurora-a: 0.16;
-  --bd-aurora-b: 0.1;
-  --bd-aurora-c: 0.05;
-  --bd-grid: 0.12;
-  --bd-ember: 0.55;
+  --bd-aurora-a: 0.24;
+  --bd-aurora-b: 0.15;
+  --bd-aurora-c: 0.08;
+  --bd-grid: 0.16;
+  --bd-ember: 0.75;
   --bd-noise: 0.03;
-  --bd-scene-wash: 0.72;
+  --bd-scene-wash: 0.55;
 }
 
 /* The home page's launch column reads against this rather than against
