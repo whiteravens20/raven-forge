@@ -55,13 +55,22 @@ tego, co launcher robił, oraz raporty z awarii.
 
 Nie musisz szukać tego folderu ręcznie: **Ustawienia → Dane → Folder danych**
 otwiera go na każdym systemie, a strona prywatności w apce (Informacje →
-Prywatność) pokazuje dokładną ścieżkę tej instalacji. Dla orientacji:
+Prywatność) pokazuje dokładną ścieżkę tej instalacji. Jeśli go nie przeniosłeś,
+jest to:
 
 | System  | Lokalizacja                                          |
 | ------- | ---------------------------------------------------- |
 | Windows | `%APPDATA%\Raven Forge Launcher`                     |
 | Linux   | `~/.config/Raven Forge Launcher`                     |
 | macOS   | `~/Library/Application Support/Raven Forge Launcher` |
+
+**Ustawienia → Dane → Przenieś…** przenosi go, gdzie chcesz — zwykle na inny
+dysk, bo pliki gry to gigabajty. Launcher przenosi zawartość i uruchamia się
+ponownie już w nowym miejscu. Dwie rzeczy zostają w folderze powyżej, bo są
+diagnostyką launchera, a nie danymi o Tobie — i bo chcesz je móc przeczytać w
+dniu, w którym tamten dysk nie jest podpięty: `logs/` i `crash-reports/`.
+Zostaje tam też jednolinijkowy `data-root.json` z informacją, dokąd poszła
+reszta.
 
 W środku:
 
@@ -74,6 +83,7 @@ W środku:
 | `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                             |
 | `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                |
 | `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, instalatory loaderów i zbuforowane metadane. Nic osobistego.                                                                                                     |
+| `data-root.json`              | Jest tylko wtedy, gdy przeniosłeś folder danych: ścieżka, pod którą go przeniosłeś, i nic poza tym. Zostaje w lokalizacji powyżej.                                                        |
 
 Chromium trzyma w tym folderze także własne dane, w tym ciasteczka z okna
 logowania Microsoftu. Są kasowane, gdy wylogujesz konto Microsoft.

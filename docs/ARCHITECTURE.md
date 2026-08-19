@@ -72,7 +72,7 @@ raven-forge/
     │   ├── profiles/             # profile CRUD, import/export, world backups
     │   ├── news/                 # news + announcement fetcher with mock fallback
     │   ├── util/                 # atomic writes, cancellation, path containment, machine memory
-    │   └── config/               # paths.ts, settings-manager.ts, defaults.ts
+    │   └── config/               # paths.ts, data-root.ts, data-root-move.ts, settings-manager.ts, defaults.ts
     └── shared/                   # types + validators consumed by both processes
         ├── ipc-types.ts          # InvokeChannels, EventChannels, RavenForgeAPI
         ├── ipc/                  # payload shapes, one file per domain
@@ -230,6 +230,7 @@ window, so its logout leaves the jar alone.
 sequenceDiagram
     participant Boot as electron main
     participant App as app
+    participant Root as data-root
     participant Init as init.ts
     participant Settings as settings-manager
     participant IPC as ipc-handlers
@@ -239,6 +240,7 @@ sequenceDiagram
     Boot->>App: requestSingleInstanceLock()
     App->>App: app.whenReady()
     App->>Boot: initLogger() (electron-log → userData/logs)
+    App->>Root: dataRoot() — RAVENFORGE_DATA_DIR, else userData/data-root.json, else userData
     App->>Init: ensureDataDirectories() (profiles, loaders, java, cache, logs, crash-reports)
     App->>Settings: loadSettings() — Zod-validated, defaults written if missing
     App->>IPC: registerAllIpcHandlers()
@@ -256,7 +258,7 @@ sequenceDiagram
 - The preload script is the only bridge — every renderer-callable function goes through `ipcRenderer.invoke` against a known channel name.
 - `system:open-url` rejects anything that isn't `http://` / `https://`.
 - `setWindowOpenHandler` denies `window.open`, and a `will-navigate` handler denies top-level navigation; both route external links to the OS browser.
-- `system:open-path` is confined to the launcher's own data and log directories. It runs whatever the OS associates with the target, so an unrestricted one is a way to execute an arbitrary file.
+- `system:open-path` is confined to the launcher's own data, log and crash-report directories (`paths.isInsideLauncherData`). It runs whatever the OS associates with the target, so an unrestricted one is a way to execute an arbitrary file. The three are listed separately rather than derived from the root: once the data folder can be moved, the logs and crash reports stay in `userData` and are no longer inside it.
 - The Content-Security-Policy is served as a response header (`src/main/security.ts`) as well as in a `<meta>` tag. Only the header cannot be outrun by markup injected ahead of the tag.
 - Every `ipcMain.handle` goes through a sender check, so a handler added later cannot be the first one to forget it.
 - The Microsoft OAuth flow uses PKCE (S256) and a `state` value, and accepts a code only from the exact redirect URI it asked for.

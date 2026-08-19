@@ -22,6 +22,7 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Mod Updates** — checks what you installed by hand against Modrinth by file hash, so a jar you dropped in yourself is recognised too, and updates them in place
 - **Pack Export** — write a profile back out as a `.mrpack`: a small file of references, with anything Modrinth does not host carried inside it
 - **World Backups** — copy a profile's worlds aside, restore them again, and get asked before a Minecraft version change touches them
+- **Data Folder You Choose** — profiles, assets and the managed JREs are gigabytes; point them at another drive from Settings and the launcher carries what is already there, or picks up a folder it used before. `RAVENFORGE_DATA_DIR` decides instead for a portable install
 - **RAM That Fits The Machine** — the allocation slider is bounded by the memory this computer actually has, recommends a size for it, and the launcher refuses a heap the machine cannot back rather than failing later
 - **Bilingual UI** — Polish and English, switchable in Settings
 - **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla
@@ -122,7 +123,7 @@ src/
 │   └── styles/     # Tailwind entry + theme tokens + backdrop animations
 ├── core/           # Business logic (runs in main process)
 │   ├── auth/       # Microsoft OAuth + offline auth
-│   ├── config/     # Settings + paths
+│   ├── config/     # Settings, paths, and the movable data root
 │   ├── diagnostics/# Crash reports — one redacted file per crash
 │   ├── discord/    # Rich Presence over Discord's local IPC socket (opt-in)
 │   ├── java/       # Adoptium JRE management
