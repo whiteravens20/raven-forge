@@ -51,6 +51,7 @@ const {
 } = await import('../src/core/config/data-root');
 const { planDataRootChange, applyDataRoot, movableSize } =
   await import('../src/core/config/data-root-move');
+const { paths } = await import('../src/core/config/paths');
 
 let tmp: string;
 
@@ -273,5 +274,32 @@ describe('applying it', () => {
     expect(await exists(path.join(userData, 'profiles', 'p1', '.minecraft', 'mods', 'a.jar'))).toBe(
       true,
     );
+  });
+});
+
+describe("what counts as the launcher's own directory", () => {
+  beforeEach(() => seedLauncherData(userData));
+
+  /**
+   * `system:open-path` runs whatever the OS associates with the target, so it is
+   * confined to the launcher's own folders. Moving the root broke that quietly:
+   * logs and crash reports stay in `userData` and stopped being inside `root`,
+   * so Settings' own "open the crash reports folder" button became a refusal.
+   */
+  it('covers the root, the logs and the crash reports once they are no longer nested', async () => {
+    await applyDataRoot(path.join(tmp, 'games'));
+
+    expect(paths.isInsideLauncherData(paths.root)).toBe(true);
+    expect(paths.isInsideLauncherData(path.join(paths.root, 'profiles', 'p1'))).toBe(true);
+    expect(paths.isInsideLauncherData(paths.logsDir)).toBe(true);
+    expect(paths.isInsideLauncherData(paths.crashReportsDir)).toBe(true);
+    // The three sit in two different places now, and neither contains the other.
+    expect(path.relative(paths.root, paths.crashReportsDir).startsWith('..')).toBe(true);
+  });
+
+  it('still refuses everything else', () => {
+    expect(paths.isInsideLauncherData(path.join(tmp, 'elsewhere'))).toBe(false);
+    expect(paths.isInsideLauncherData(path.join(paths.root, '..', '..', 'etc'))).toBe(false);
+    expect(paths.isInsideLauncherData('')).toBe(false);
   });
 });

@@ -85,6 +85,24 @@ export const paths = {
     return path.join(getDiagnosticsRoot(), DIR_CRASH_REPORTS);
   },
 
+  /**
+   * Is `target` one of the launcher's own directories?
+   *
+   * `system:open-path` runs whatever the OS associates with what it is given,
+   * so it is confined to these. All three are named because they stopped being
+   * nested when the root became movable: move the data to another drive and the
+   * logs and crash reports stay in `userData`, outside `root` — which silently
+   * made "open the crash reports folder" a refusal.
+   */
+  isInsideLauncherData(target: string): boolean {
+    if (typeof target !== 'string' || target === '') return false;
+    const resolved = path.resolve(target);
+    return [paths.root, paths.logsDir, paths.crashReportsDir].some((base) => {
+      const relative = path.relative(base, resolved);
+      return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+    });
+  },
+
   /** Per-profile directory */
   profileDir(profileId: string) {
     return path.join(getDataRoot(), DIR_PROFILES, profileId);
