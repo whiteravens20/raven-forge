@@ -18,12 +18,19 @@ import type { DataRootSource } from '../../shared/ipc/settings';
  * moved, apart from the diagnostics `paths.ts` deliberately pins (see the note
  * on `logsDir` there).
  *
+ * One line of plain text, not JSON, and that is a deliberate choice about a
+ * *second* reader: Windows' uninstaller has to follow this file to make good on
+ * "delete my data", and reading a path out of JSON in NSIS means hunting for a
+ * key with `StrLoc` and then undoing the backslash escaping by hand. A single
+ * line is three instructions there and `readFileSync().trim()` here, and a
+ * person who finds the file can read it too.
+ *
  * `RAVENFORGE_DATA_DIR` outranks the pointer and is not written by the UI: it
  * exists so a portable install can carry its data on the same stick as the
  * binary, where nothing may be written to the host machine at all.
  */
 
-const POINTER_FILE = 'data-root.json';
+const POINTER_FILE = 'data-root.txt';
 
 export const DATA_DIR_ENV = 'RAVENFORGE_DATA_DIR';
 
@@ -59,13 +66,8 @@ function readPointer(): string | null {
   } catch {
     return null;
   }
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    const dir = (parsed as { path?: unknown })?.path;
-    return typeof dir === 'string' && path.isAbsolute(dir) ? path.resolve(dir) : null;
-  } catch {
-    return null;
-  }
+  const dir = raw.trim();
+  return dir !== '' && path.isAbsolute(dir) ? path.resolve(dir) : null;
 }
 
 function usable(dir: string): boolean {
@@ -137,7 +139,7 @@ export async function writeDataRootPointer(dir: string | null): Promise<void> {
   if (dir === null || path.resolve(dir) === path.resolve(defaultDataRoot())) {
     await fsp.rm(file, { force: true });
   } else {
-    await fsp.writeFile(file, `${JSON.stringify({ path: path.resolve(dir) }, null, 2)}\n`, 'utf-8');
+    await fsp.writeFile(file, `${path.resolve(dir)}\n`, 'utf-8');
   }
   reloadDataRoot();
 }

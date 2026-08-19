@@ -118,6 +118,29 @@ describe('resolving the root', () => {
     expect(await exists(dataRootPointerFile())).toBe(false);
   });
 
+  /**
+   * The file has a second reader with no JSON parser and no forgiveness:
+   * `build/installer.nsh` follows it to make good on Windows' "delete my data",
+   * with `FileRead` + `TrimNewLines` and then `RMDir /r`. A second line, or a
+   * `{`, and that either misses the folder or points at the wrong one.
+   */
+  it('writes the pointer as the one line the uninstaller reads', async () => {
+    const elsewhere = path.join(tmp, 'games');
+    await realFs.mkdir(elsewhere);
+    await writeDataRootPointer(elsewhere);
+
+    const raw = await realFs.readFile(dataRootPointerFile(), 'utf-8');
+    expect(raw).not.toContain('{');
+    expect(raw.trimEnd().split('\n')).toEqual([elsewhere]);
+  });
+
+  it('ignores a pointer that is not an absolute path', async () => {
+    await realFs.writeFile(dataRootPointerFile(), 'games\n');
+    reloadDataRoot();
+    expect(dataRoot()).toBe(userData);
+    expect(dataRootSource()).toBe('default');
+  });
+
   it('writes no pointer for the default path, so the state survives being copied', async () => {
     await writeDataRootPointer(userData);
     expect(await exists(dataRootPointerFile())).toBe(false);
@@ -225,7 +248,7 @@ describe('applying it', () => {
       expect(await exists(dataRootPointerFile())).toBe(true);
       expect(await exists(path.join(target, 'Cookies'))).toBe(false);
       expect(await exists(path.join(target, 'logs'))).toBe(false);
-      expect(await exists(path.join(target, 'data-root.json'))).toBe(false);
+      expect(await exists(path.join(target, 'data-root.txt'))).toBe(false);
     });
   }
 
