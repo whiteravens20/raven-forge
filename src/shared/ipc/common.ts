@@ -42,6 +42,7 @@ export type IpcErrorCode = 'AUTH_UNREACHABLE';
  */
 export type ErrorKey =
   | 'launchError.alreadyRunning'
+  | 'launchError.alreadyPreparing'
   | 'launchError.ramTooBig'
   | 'launchError.javaNotRuntime'
   | 'launchError.javaTooOld';

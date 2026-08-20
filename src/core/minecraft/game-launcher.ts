@@ -153,13 +153,6 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   const profile = await getProfile(options.profileId);
   if (!profile) throw new Error(`Profile ${options.profileId} not found`);
 
-  if (runningProcesses.has(options.profileId)) {
-    throw new LaunchRefusedError(
-      { key: 'launchError.alreadyRunning' },
-      'Game is already running for this profile',
-    );
-  }
-
   assertRamFits(profile);
 
   log.info(`Launching game for profile: ${profile.name} (MC ${profile.minecraftVersion})`);
@@ -213,7 +206,12 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     );
     if (!installed) {
       log.info(`Loader ${profile.modLoader} ${profile.modLoaderVersion} missing — installing...`);
-      await installLoader(profile.modLoader, profile.modLoaderVersion, profile.minecraftVersion);
+      await installLoader(
+        profile.modLoader,
+        profile.modLoaderVersion,
+        profile.minecraftVersion,
+        signal,
+      );
     }
   }
 
@@ -228,7 +226,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   const javaVersion = requiredJavaFor(profile.minecraftVersion, meta);
   const java = profile.customJavaPath
     ? await resolveChosenJava(profile.customJavaPath, javaVersion)
-    : await ensureJavaVersion(javaVersion);
+    : await ensureJavaVersion(javaVersion, signal);
 
   // Download game files
   log.info('Ensuring client jar...');
@@ -595,7 +593,34 @@ export function anyGameRunning(): boolean {
   return runningProcesses.size > 0;
 }
 
+/**
+ * Profiles between "launch pressed" and `spawn`.
+ *
+ * `runningProcesses` cannot answer this: it is only populated after the process
+ * exists, so it says whether a profile is *playing*, never whether one is
+ * already being got ready. The guard that used to consult it therefore let two
+ * launches of the same profile through whenever the second arrived during the
+ * first's prepare phase — and those two are not merely redundant. The second
+ * one's `beginJob` aborts the first one's signal, while both go on writing the
+ * same JRE directory, which `extractArchive` begins by deleting.
+ */
+const preparing = new Set<string>();
+
 export async function launchGame(options: LaunchOptions): Promise<void> {
+  if (runningProcesses.has(options.profileId)) {
+    throw new LaunchRefusedError(
+      { key: 'launchError.alreadyRunning' },
+      'Game is already running for this profile',
+    );
+  }
+  if (preparing.has(options.profileId)) {
+    throw new LaunchRefusedError(
+      { key: 'launchError.alreadyPreparing' },
+      'This profile is already being prepared',
+    );
+  }
+
+  preparing.add(options.profileId);
   try {
     await runLaunch(options);
   } catch (err) {
@@ -606,5 +631,7 @@ export async function launchGame(options: LaunchOptions): Promise<void> {
       return;
     }
     throw err;
+  } finally {
+    preparing.delete(options.profileId);
   }
 }

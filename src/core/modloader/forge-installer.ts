@@ -30,6 +30,10 @@ import {
 import { getVersionMeta } from '../minecraft/version-manifest';
 import { verifyDownload, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion } from '../java/java-manager';
+import { loaderCacheDir } from './loader-paths';
+import { downloadToFile } from '../net/download';
+import { getSettings } from '../config/settings-manager';
+import { throwIfCancelled, withTimeout } from '../util/cancellation';
 import { requiredJavaFor } from '../minecraft/java-requirement';
 import type { LoaderVersion, ProgressMessage } from '../../shared/ipc-types';
 import type { VersionMeta } from '../minecraft/types';
@@ -197,12 +201,12 @@ function installerUrl(loader: ForgeLikeLoader, loaderVersion: string, mcVersion:
   return `${NEOFORGE_MAVEN_ROOT}/${loaderVersion}/neoforge-${loaderVersion}-installer.jar`;
 }
 
-export function loaderInstallDir(
+function loaderInstallDir(
   loader: ForgeLikeLoader,
   loaderVersion: string,
   mcVersion: string,
 ): string {
-  return path.join(paths.loadersDir, loader, `${mcVersion}-${loaderVersion}`);
+  return loaderCacheDir(loader, mcVersion, loaderVersion);
 }
 
 /** Read one entry out of a zip into memory. Returns null when it is not there. */
@@ -256,10 +260,10 @@ const MAVEN_CHECKSUMS: Array<{ ext: string; algorithm: HashAlgorithm }> = [
  * is a real possibility for an old artifact and not a reason to refuse the
  * install — HTTPS is still underneath.
  */
-async function mavenChecksum(url: string): Promise<HashedEntry | null> {
+async function mavenChecksum(url: string, signal?: AbortSignal): Promise<HashedEntry | null> {
   for (const { ext, algorithm } of MAVEN_CHECKSUMS) {
     try {
-      const res = await fetch(`${url}${ext}`, { signal: AbortSignal.timeout(15_000) });
+      const res = await fetch(`${url}${ext}`, { signal: withTimeout(signal, 15_000) });
       if (!res.ok) continue;
       // The file is the hex digest, sometimes followed by the filename.
       const value = (await res.text()).trim().split(/\s+/)[0]?.toLowerCase();
@@ -271,17 +275,33 @@ async function mavenChecksum(url: string): Promise<HashedEntry | null> {
   return null;
 }
 
-async function downloadInstaller(url: string, dest: string, label: string): Promise<void> {
+async function downloadInstaller(
+  url: string,
+  dest: string,
+  label: string,
+  signal?: AbortSignal,
+): Promise<void> {
   // Asked for first, so a repository serving a good checksum and a bad jar
   // cannot be answered in the other order.
-  const expected = await mavenChecksum(url);
+  const expected = await mavenChecksum(url, signal);
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
-  if (!res.ok) {
-    throw new Error(`Installer download failed: ${res.status} ${res.statusText} (${url})`);
+  // Refused before a byte is fetched. This jar is executed as a Java process a
+  // few lines below, which is the same argument that makes an unverifiable JRE
+  // fatal in `java-manager.ts`; it used to be a `log.warn` and an install. The
+  // setting exists because a genuinely old artefact may predate its
+  // repository's sidecars, and that is a call for the person installing it.
+  if (!expected && !(await getSettings()).allowUnverifiedLoaderInstaller) {
+    throw new Error(
+      `${label} publishes no checksum beside ${url}, so the installer cannot be verified — ` +
+        'and it is executed. Enable "allow unverified loader installers" in Settings to ' +
+        'install it anyway.',
+    );
   }
-  await fs.mkdir(path.dirname(dest), { recursive: true });
-  await fs.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+
+  // Through the shared downloader: stall timeout, backpressure, and the file
+  // removed on any failure. This used to be `res.arrayBuffer()`, which held the
+  // whole installer in memory and left a partial file behind when it failed.
+  await downloadToFile(url, dest, { signal });
 
   if (expected) {
     // Deletes the file and throws on mismatch — this jar is about to be run.
@@ -314,6 +334,7 @@ async function ensureVanillaClientForInstaller(
   installRoot: string,
   mcVersion: string,
   meta: VersionMeta,
+  signal?: AbortSignal,
 ): Promise<void> {
   const versionDir = path.join(installRoot, 'versions', mcVersion);
   await fs.mkdir(versionDir, { recursive: true });
@@ -331,9 +352,10 @@ async function ensureVanillaClientForInstaller(
   }
 
   log.info(`Downloading vanilla client jar ${mcVersion} for the installer...`);
-  const res = await fetch(meta.downloads.client.url, { signal: AbortSignal.timeout(300_000) });
-  if (!res.ok) throw new Error(`Could not download the vanilla client jar: ${res.status}`);
-  await fs.writeFile(jarPath, Buffer.from(await res.arrayBuffer()));
+  // Streamed, not `arrayBuffer()`: this jar is around 26 MB and used to be
+  // fully resident in memory on its way to disk — the same waste `integrity.ts`
+  // removed from hashing and did not remove from here.
+  await downloadToFile(meta.downloads.client.url, jarPath, { signal });
 
   // Mojang's own sha1 is already in hand, and the normal launch path checks the
   // very same file against it. This copy is the one a Java installer is about
@@ -355,6 +377,7 @@ export async function installForgeLike(
   loaderVersion: string,
   mcVersion: string,
   onProgress: (fraction: number, message: ProgressMessage) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const label = loader === 'forge' ? 'Forge' : 'NeoForge';
   const destDir = loaderInstallDir(loader, loaderVersion, mcVersion);
@@ -366,7 +389,13 @@ export async function installForgeLike(
 
   onProgress(0.05, { key: 'progress.msg.installerDownloading', vars: { loader: label } });
   const installerPath = path.join(destDir, 'installer.jar');
-  await downloadInstaller(installerUrl(loader, loaderVersion, mcVersion), installerPath, label);
+  throwIfCancelled(signal, 'Loader install');
+  await downloadInstaller(
+    installerUrl(loader, loaderVersion, mcVersion),
+    installerPath,
+    label,
+    signal,
+  );
 
   // Read the profile out of the installer before running it: it names the
   // version id the installer is about to produce, so nothing below has to guess.
@@ -382,13 +411,13 @@ export async function installForgeLike(
 
   onProgress(0.15, { key: 'progress.msg.preparingGameFiles' });
   const vanillaMeta = await getVersionMeta(mcVersion);
-  await ensureVanillaClientForInstaller(installRoot, mcVersion, vanillaMeta);
+  await ensureVanillaClientForInstaller(installRoot, mcVersion, vanillaMeta, signal);
   await ensureLauncherProfilesStub(installRoot);
 
   // The installer is a modern Java application in its own right; the JRE the
   // *game* needs is the right floor for it too.
   onProgress(0.25, { key: 'progress.msg.preparingJava' });
-  const java = await ensureJavaVersion(requiredJavaFor(mcVersion, vanillaMeta));
+  const java = await ensureJavaVersion(requiredJavaFor(mcVersion, vanillaMeta), signal);
 
   onProgress(0.35, { key: 'progress.msg.runningInstaller', vars: { loader: label } });
   log.info(`Running ${label} installer: ${installerPath} --installClient ${installRoot}`);
@@ -397,7 +426,10 @@ export async function installForgeLike(
     const { stdout, stderr } = await execFileAsync(
       java.path,
       ['-jar', installerPath, '--installClient', installRoot],
-      { timeout: INSTALLER_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 },
+      // `signal` as well as the timeout: the installer is the longest opaque
+      // step in a launch, and without it a cancel sat and waited out the full
+      // ten minutes.
+      { timeout: INSTALLER_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, signal },
     );
     log.info(`${label} installer finished.\n${stdout}`);
     if (stderr.trim()) log.warn(`${label} installer stderr:\n${stderr}`);

@@ -3,7 +3,6 @@ import fss from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createWriteStream } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { ADOPTIUM_API } from '../../shared/constants';
@@ -11,6 +10,8 @@ import { verifyDownload } from '../mods/integrity';
 import { parseJavaVersion } from '../minecraft/java-requirement';
 import { LaunchRefusedError } from '../minecraft/launch-errors';
 import { getMainWindow } from '../../main/window';
+import { downloadToFile } from '../net/download';
+import { throwIfCancelled, withTimeout } from '../util/cancellation';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
 
 const execFileAsync = promisify(execFile);
@@ -198,38 +199,6 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
   return installations;
 }
 
-// ── List managed installations ─────────────────────────────
-
-export async function getJavaInstallations(): Promise<JavaInstallation[]> {
-  const managed: JavaInstallation[] = [];
-
-  try {
-    const entries = await fs.readdir(paths.javaDir);
-    for (const entry of entries) {
-      const match = entry.match(/^jre-(\d+)$/);
-      if (!match) continue;
-      const majorVersion = parseInt(match[1], 10);
-      const javaPath = getManagedJavaPath(majorVersion);
-      try {
-        await fs.access(javaPath, fss.constants.X_OK);
-        managed.push({
-          version: majorVersion,
-          path: javaPath,
-          vendor: 'Adoptium Temurin',
-          managed: true,
-        });
-      } catch {
-        /* not valid */
-      }
-    }
-  } catch {
-    /* dir doesn't exist yet */
-  }
-
-  const system = await detectSystemJava();
-  return [...managed, ...system];
-}
-
 function emitJavaProgress(event: ProgressEvent): void {
   getMainWindow()?.webContents.send('progress:java-download', event);
 }
@@ -261,6 +230,7 @@ async function resolveAdoptiumBinary(
   majorVersion: number,
   platform: string,
   arch: string,
+  signal?: AbortSignal,
 ): Promise<{ url: string; sha256: string }> {
   const query = new URLSearchParams({
     architecture: arch,
@@ -269,7 +239,7 @@ async function resolveAdoptiumBinary(
     vendor: 'eclipse',
   });
   const res = await fetch(`${ADOPTIUM_API}/assets/latest/${majorVersion}/hotspot?${query}`, {
-    signal: AbortSignal.timeout(15_000),
+    signal: withTimeout(signal, 15_000),
   });
   if (!res.ok) {
     throw new Error(`Could not reach Adoptium to resolve JRE ${majorVersion}: HTTP ${res.status}`);
@@ -290,12 +260,12 @@ async function resolveAdoptiumBinary(
   return { url: pkg.link, sha256: pkg.checksum };
 }
 
-async function downloadAdoptium(majorVersion: number): Promise<string> {
+async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Promise<string> {
   const platform = getPlatformForAdoptium();
   const arch = getArchForAdoptium();
   const ext = platform === 'windows' ? 'zip' : 'tar.gz';
 
-  const { url, sha256 } = await resolveAdoptiumBinary(majorVersion, platform, arch);
+  const { url, sha256 } = await resolveAdoptiumBinary(majorVersion, platform, arch, signal);
 
   log.info(`Downloading Adoptium JRE ${majorVersion} from ${url}`);
 
@@ -305,57 +275,35 @@ async function downloadAdoptium(majorVersion: number): Promise<string> {
     message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
   });
 
-  const res = await fetch(url, { redirect: 'follow' });
-  if (!res.ok || !res.body) {
-    throw new Error(`Failed to download JRE ${majorVersion}: ${res.status} ${res.statusText}`);
-  }
-
-  const contentLength = Number(res.headers.get('content-length')) || 0;
-
   const tmpFile = path.join(paths.cacheDir, `jre-${majorVersion}.${ext}`);
   await fs.mkdir(paths.cacheDir, { recursive: true });
 
-  const writable = createWriteStream(tmpFile);
-  const reader = res.body.getReader();
-
-  let bytesDownloaded = 0;
+  // Through the shared downloader, which is where the stall timeout, the
+  // backpressure and the delete-on-failure live. This had its own loop with no
+  // timeout and no signal of any kind: a link that went quiet mid-archive left
+  // `reader.read()` unresolved forever, so the launch hung on a step nobody
+  // could cancel and the only way out was to kill the launcher.
   let lastReported = 0;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      // Both other download paths do this and this one did not: without waiting
-      // for `drain` the whole archive — around 45 MB compressed — buffers in
-      // memory whenever the link outruns the disk.
-      if (!writable.write(value)) {
-        await new Promise<void>((resolve) => writable.once('drain', resolve));
-      }
-      bytesDownloaded += value.length;
-
+  let received = 0;
+  let total: number | undefined;
+  await downloadToFile(url, tmpFile, {
+    signal,
+    onProgress: (bytes, declared) => {
+      received = bytes;
+      total = declared;
       // Throttle progress updates to every 5%
-      const pct = contentLength > 0 ? bytesDownloaded / contentLength : 0;
-      if (pct - lastReported >= 0.05) {
-        lastReported = pct;
-        emitJavaProgress({
-          operationId: `java-${majorVersion}`,
-          progress: Math.min(0.95, pct),
-          message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
-          bytesDownloaded,
-          bytesTotal: contentLength > 0 ? contentLength : undefined,
-        });
-      }
-    }
-    writable.end();
-    await new Promise<void>((resolve, reject) => {
-      writable.on('finish', resolve);
-      writable.on('error', reject);
-    });
-  } catch (err) {
-    writable.destroy();
-    await fs.rm(tmpFile, { force: true });
-    throw err;
-  }
+      const pct = declared ? bytes / declared : 0;
+      if (pct - lastReported < 0.05) return;
+      lastReported = pct;
+      emitJavaProgress({
+        operationId: `java-${majorVersion}`,
+        progress: Math.min(0.95, pct),
+        message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
+        bytesDownloaded: bytes,
+        bytesTotal: declared,
+      });
+    },
+  });
 
   // Deletes the archive and throws on mismatch. Everything inside it is about
   // to be extracted and then run as the JVM for every launch, and the resolver
@@ -366,15 +314,19 @@ async function downloadAdoptium(majorVersion: number): Promise<string> {
     operationId: `java-${majorVersion}`,
     progress: 1,
     message: { key: 'progress.msg.javaReady', vars: { version: majorVersion } },
-    bytesDownloaded,
-    bytesTotal: contentLength > 0 ? contentLength : bytesDownloaded,
+    bytesDownloaded: received,
+    bytesTotal: total ?? received,
   });
 
   log.info(`Downloaded JRE ${majorVersion} to ${tmpFile}`);
   return tmpFile;
 }
 
-async function extractArchive(archivePath: string, destDir: string): Promise<void> {
+async function extractArchive(
+  archivePath: string,
+  destDir: string,
+  signal?: AbortSignal,
+): Promise<void> {
   await fs.rm(destDir, { recursive: true, force: true });
   await fs.mkdir(destDir, { recursive: true });
 
@@ -384,9 +336,13 @@ async function extractArchive(archivePath: string, destDir: string): Promise<voi
   // failure surfaced several steps later as "installed JRE but failed to
   // verify", which points at the wrong thing entirely.
   if (archivePath.endsWith('.tar.gz')) {
-    await execFileAsync('tar', ['-xzf', archivePath, '-C', destDir, '--strip-components=1']);
+    await execFileAsync('tar', ['-xzf', archivePath, '-C', destDir, '--strip-components=1'], {
+      signal,
+    });
   } else if (archivePath.endsWith('.zip')) {
-    await execFileAsync('tar', ['-xf', archivePath, '-C', destDir, '--strip-components=1']);
+    await execFileAsync('tar', ['-xf', archivePath, '-C', destDir, '--strip-components=1'], {
+      signal,
+    });
   } else {
     throw new Error(`Cannot extract ${path.basename(archivePath)}: unrecognised archive type`);
   }
@@ -411,43 +367,57 @@ async function extractArchive(archivePath: string, destDir: string): Promise<voi
  * Downloads from Adoptium if not already installed.
  * Returns the installation info.
  */
-export async function ensureJavaVersion(majorVersion: number): Promise<JavaInstallation> {
+/**
+ * Ensure a specific Java major version is available, downloading it from
+ * Adoptium when it is not.
+ *
+ * "Already installed" used to mean nothing more than `bin/java` being present
+ * and executable, and the `-version` check ran only on the freshly-extracted
+ * path. But `extractArchive` starts by deleting the destination, so an
+ * interrupted extraction can leave exactly that: the launcher binary in place
+ * and half the runtime missing. Every later launch then took the short path,
+ * said "already installed", and died inside the JVM with an error naming none of
+ * this. Proving the runtime actually starts costs one short subprocess per
+ * launch and is the only way to tell the two states apart.
+ */
+export async function ensureJavaVersion(
+  majorVersion: number,
+  signal?: AbortSignal,
+): Promise<JavaInstallation> {
   const dir = getManagedJavaDir(majorVersion);
   const javaPath = getManagedJavaPath(majorVersion);
-
-  // Check if already installed
-  try {
-    await fs.access(javaPath, fss.constants.X_OK);
-    log.info(`Java ${majorVersion} already installed at ${javaPath}`);
-    return {
-      version: majorVersion,
-      path: javaPath,
-      vendor: 'Adoptium Temurin',
-      managed: true,
-    };
-  } catch {
-    /* not installed */
-  }
-
-  // Download and extract
-  const archivePath = await downloadAdoptium(majorVersion);
-  await extractArchive(archivePath, dir);
-
-  // Verify
-  try {
-    const { stderr } = await execFileAsync(javaPath, ['-version'], { timeout: 10000 });
-    const detectedVersion = parseJavaVersion(stderr);
-    log.info(`Verified Java ${detectedVersion} at ${javaPath}`);
-  } catch (err) {
-    throw new Error(`Installed JRE ${majorVersion} but failed to verify: ${err}`, {
-      cause: err,
-    });
-  }
-
-  return {
+  const installation: JavaInstallation = {
     version: majorVersion,
     path: javaPath,
     vendor: 'Adoptium Temurin',
     managed: true,
   };
+
+  if (await runtimeWorks(javaPath)) {
+    log.info(`Java ${majorVersion} already installed at ${javaPath}`);
+    return installation;
+  }
+
+  throwIfCancelled(signal, 'Java install');
+  const archivePath = await downloadAdoptium(majorVersion, signal);
+  throwIfCancelled(signal, 'Java install');
+  await extractArchive(archivePath, dir, signal);
+
+  if (!(await runtimeWorks(javaPath))) {
+    throw new Error(`Installed JRE ${majorVersion} but it does not run`);
+  }
+  return installation;
+}
+
+/** Does this path start a JVM? The one question that separates a usable runtime
+ * from a directory that merely contains a file called `java`. */
+async function runtimeWorks(javaPath: string): Promise<boolean> {
+  try {
+    await fs.access(javaPath, fss.constants.X_OK);
+    const { stderr } = await execFileAsync(javaPath, ['-version'], { timeout: 10000 });
+    log.info(`Verified Java ${parseJavaVersion(stderr)} at ${javaPath}`);
+    return true;
+  } catch {
+    return false;
+  }
 }

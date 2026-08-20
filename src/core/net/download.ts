@@ -29,6 +29,14 @@ export interface DownloadOptions {
    * directory tree.
    */
   noFollow?: boolean;
+  /**
+   * Called as the body arrives, with what has been written so far and what the
+   * server declared — `undefined` when it declared nothing. Here rather than in
+   * a caller's own copy of this loop: a progress bar was the only reason the JRE
+   * download had a second implementation of all of this, and that copy had no
+   * timeout at all.
+   */
+  onProgress?: (received: number, total: number | undefined) => void;
 }
 
 /**
@@ -48,7 +56,7 @@ export async function downloadToFile(
   dest: string,
   options: DownloadOptions = {},
 ): Promise<void> {
-  const { signal, maxBytes, noFollow } = options;
+  const { signal, maxBytes, noFollow, onProgress } = options;
   await fs.mkdir(path.dirname(dest), { recursive: true });
 
   const controller = new AbortController();
@@ -74,6 +82,7 @@ export async function downloadToFile(
     // A server that declares a length over the cap is refused before the body is
     // read at all; the running count below still catches one that lies.
     const declared = Number(res.headers.get('content-length')) || 0;
+    onProgress?.(0, declared > 0 ? declared : undefined);
     if (maxBytes && declared > maxBytes) {
       tooBig = true;
       throw new Error(
@@ -103,6 +112,7 @@ export async function downloadToFile(
           throw new Error(`Download exceeded the ${maxBytes}-byte limit: ${new URL(url).host}`);
         }
         await handle.write(value);
+        onProgress?.(received, declared > 0 ? declared : undefined);
       }
     } finally {
       await handle.close();

@@ -138,6 +138,7 @@ export const en = {
     'The launcher update could not be downloaded — the game will start anyway.',
   'home.launchFailed': 'Could not start the game',
   'launchError.alreadyRunning': 'This profile is already running.',
+  'launchError.alreadyPreparing': 'This profile is already being prepared for launch.',
   'launchError.ramTooBig':
     'This profile allocates {allocated} of RAM and this machine has {total}. Minecraft cannot start with more memory than the machine has — lower it in the profile editor, where {recommended} suits this one.',
   'launchError.javaNotRuntime':

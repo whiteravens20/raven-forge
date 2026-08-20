@@ -4,12 +4,8 @@ import { createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import yauzl from 'yauzl';
 import { log } from '../../main/logger';
-import {
-  CancelledError,
-  isCancellation,
-  throwIfCancelled,
-  withTimeout,
-} from '../util/cancellation';
+import { CancelledError, isCancellation, throwIfCancelled } from '../util/cancellation';
+import { downloadToFile } from '../net/download';
 import { MOJANG_RESOURCES } from '../../shared/constants';
 import { hashFile } from '../mods/integrity';
 import { getSettings } from '../config/settings-manager';
@@ -24,6 +20,17 @@ async function sha1File(filePath: string): Promise<string> {
   return hashFile(filePath, 'sha1');
 }
 
+/**
+ * Is the file already there and right?
+ *
+ * With no published sha1 or size — which is the case for a library named only
+ * by Maven coordinates — this can do no better than "a file exists". That is
+ * sound only because `downloadFile` never puts a partial file at this path: it
+ * receives into a `.part` beside it and renames on success, so anything sitting
+ * here arrived complete. Before that, a download killed halfway left a truncated
+ * jar which this then accepted for good, and the profile went on failing to
+ * launch with a corrupt loader library that nothing would replace.
+ */
 async function fileExistsAndValid(
   filePath: string,
   expectedSha1?: string,
@@ -44,6 +51,22 @@ async function fileExistsAndValid(
 
 // ── Download with retry ────────────────────────────────────
 
+/**
+ * Fetch one game file, retrying, and never leave a partial one behind.
+ *
+ * The transfer itself is `downloadToFile`, which is the launcher's one download
+ * policy: a stall timeout that resets on every chunk, backpressure by awaiting
+ * each write, and the destination removed on any failure at all. This used to be
+ * a second implementation with an absolute `AbortSignal.timeout(60_000)`, and
+ * that is the mistake `download.ts` already documents at length — the signal
+ * governs the body stream, so the 26 MB client jar was simply unfetchable below
+ * about 3.5 Mbit/s, three identical times in a row.
+ *
+ * The cleanup matters as much. The old final attempt threw without deleting, so
+ * a truncated file stayed on disk; the next launch saw a library with no
+ * published sha1 or size, found *a* file there, and called it installed for
+ * good.
+ */
 async function downloadFile(
   url: string,
   dest: string,
@@ -51,54 +74,30 @@ async function downloadFile(
   retries = 3,
   signal?: AbortSignal,
 ): Promise<void> {
-  await fs.mkdir(path.dirname(dest), { recursive: true });
+  // Received beside the target and renamed onto it, so the destination only ever
+  // exists complete. `rename` within a directory is atomic, and a process killed
+  // mid-transfer leaves a `.part` that the next run overwrites rather than a
+  // short file that `fileExistsAndValid` would accept as installed.
+  const part = `${dest}.part`;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     throwIfCancelled(signal, 'Download');
     try {
-      const res = await fetch(url, {
-        redirect: 'follow',
-        signal: withTimeout(signal, 60000),
-      });
+      await downloadToFile(url, part, { signal });
 
-      if (!res.ok || !res.body) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-
-      const writable = createWriteStream(dest);
-      const reader = res.body.getReader();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const canContinue = writable.write(value);
-        if (!canContinue) {
-          await new Promise<void>((r) => writable.once('drain', r));
-        }
-      }
-      writable.end();
-      await new Promise<void>((resolve, reject) => {
-        writable.on('finish', resolve);
-        writable.on('error', reject);
-      });
-
-      // Verify hash
       if (sha1) {
-        const hash = await sha1File(dest);
-        if (hash !== sha1) {
-          await fs.rm(dest, { force: true });
-          throw new Error(`SHA1 mismatch: expected ${sha1}, got ${hash}`);
-        }
+        const hash = await sha1File(part);
+        if (hash !== sha1) throw new Error(`SHA1 mismatch: expected ${sha1}, got ${hash}`);
       }
 
+      await fs.rename(part, dest);
       return; // success
     } catch (err) {
+      // Whatever went wrong, nothing half-written survives this function.
+      await fs.rm(part, { force: true });
       // A cancelled job must not be retried — that would keep downloading for
       // another three rounds after the user asked us to stop.
-      if (signal?.aborted || isCancellation(err)) {
-        await fs.rm(dest, { force: true });
-        throw new CancelledError('Download');
-      }
+      if (signal?.aborted || isCancellation(err)) throw new CancelledError('Download');
       if (attempt === retries)
         throw new Error(`Failed to download ${url} after ${retries} attempts: ${err}`, {
           cause: err,
@@ -117,24 +116,42 @@ interface DownloadTask {
   size?: number;
 }
 
-/** Run `work` over every item, with at most `concurrency` in flight. */
+/**
+ * Run `work` over every item, with at most `concurrency` in flight.
+ *
+ * The first failure stops the rest. `Promise.all` rejects on it either way, but
+ * the other workers went on draining the queue regardless — so a launch that had
+ * already failed carried on pulling the remaining few thousand assets in the
+ * background, for nobody.
+ */
 async function forEachConcurrently<T>(
   items: T[],
   concurrency: number,
   work: (item: T) => Promise<void>,
 ): Promise<void> {
   const queue = [...items];
+  let failed = false;
   const workers: Promise<void>[] = [];
   for (let i = 0; i < Math.max(1, concurrency); i++) {
     workers.push(
       (async () => {
-        while (queue.length > 0) {
-          await work(queue.shift()!);
+        while (queue.length > 0 && !failed) {
+          try {
+            await work(queue.shift()!);
+          } catch (err) {
+            failed = true;
+            throw err;
+          }
         }
       })(),
     );
   }
-  await Promise.all(workers);
+  // `allSettled` first, so every worker has finished before this returns: with
+  // `all` the losers stayed in flight past the rejection, writing into a
+  // directory the caller believes it is done with.
+  const results = await Promise.allSettled(workers);
+  const firstRejection = results.find((r) => r.status === 'rejected');
+  if (firstRejection) throw (firstRejection as PromiseRejectedResult).reason;
 }
 
 /**
@@ -283,7 +300,23 @@ async function extractNatives(
     });
   });
 
-  await new Promise<void>((resolve, reject) => {
+  // `finally`, because every path out of the promise below other than the happy
+  // one used to leave the archive open: an unreadable entry rejected and the
+  // descriptor stayed held for as long as the launcher ran.
+  try {
+    await extractNativeEntries(zipFile, jarPath, nativesDir, excludes);
+  } finally {
+    zipFile.close();
+  }
+}
+
+function extractNativeEntries(
+  zipFile: yauzl.ZipFile,
+  jarPath: string,
+  nativesDir: string,
+  excludes: string[],
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     zipFile.on('entry', (entry: yauzl.Entry) => {
       const name = entry.fileName;
 

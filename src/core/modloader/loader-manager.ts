@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { log } from '../../main/logger';
-import { paths } from '../config/paths';
 import { FABRIC_META_API, QUILT_META_API } from '../../shared/constants';
 import { getMainWindow } from '../../main/window';
 import {
@@ -10,6 +9,8 @@ import {
   installForgeLike,
   isForgeLikeInstalled,
 } from './forge-installer';
+import { loaderCacheDir } from './loader-paths';
+import { withTimeout } from '../util/cancellation';
 import type { ModLoaderType, ProgressEvent, LoaderVersion } from '../../shared/ipc-types';
 
 function emitLoaderProgress(event: ProgressEvent): void {
@@ -34,7 +35,11 @@ async function getFabricVersions(mcVersion: string): Promise<LoaderVersion[]> {
   }));
 }
 
-async function installFabric(loaderVersion: string, mcVersion: string): Promise<void> {
+async function installFabric(
+  loaderVersion: string,
+  mcVersion: string,
+  signal?: AbortSignal,
+): Promise<void> {
   const profileJsonUrl = `${FABRIC_META_API}/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
   const opId = `loader-fabric-${mcVersion}-${loaderVersion}`;
 
@@ -45,11 +50,11 @@ async function installFabric(loaderVersion: string, mcVersion: string): Promise<
   });
 
   log.info(`Fetching Fabric profile JSON for MC ${mcVersion} / loader ${loaderVersion}`);
-  const res = await fetch(profileJsonUrl, { signal: AbortSignal.timeout(15000) });
+  const res = await fetch(profileJsonUrl, { signal: withTimeout(signal, 15000) });
   if (!res.ok) throw new Error(`Failed to fetch Fabric profile: ${res.status}`);
 
   const profileJson = await res.json();
-  const destDir = path.join(paths.loadersDir, 'fabric', `${mcVersion}-${loaderVersion}`);
+  const destDir = loaderCacheDir('fabric', mcVersion, loaderVersion);
   await fs.mkdir(destDir, { recursive: true });
   await fs.writeFile(
     path.join(destDir, 'fabric-profile.json'),
@@ -67,9 +72,7 @@ async function installFabric(loaderVersion: string, mcVersion: string): Promise<
 
 function isFabricInstalled(loaderVersion: string, mcVersion: string): Promise<boolean> {
   const profilePath = path.join(
-    paths.loadersDir,
-    'fabric',
-    `${mcVersion}-${loaderVersion}`,
+    loaderCacheDir('fabric', mcVersion, loaderVersion),
     'fabric-profile.json',
   );
   return fs
@@ -96,7 +99,11 @@ async function getQuiltVersions(mcVersion: string): Promise<LoaderVersion[]> {
   }));
 }
 
-async function installQuilt(loaderVersion: string, mcVersion: string): Promise<void> {
+async function installQuilt(
+  loaderVersion: string,
+  mcVersion: string,
+  signal?: AbortSignal,
+): Promise<void> {
   const profileJsonUrl = `${QUILT_META_API}/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
   const opId = `loader-quilt-${mcVersion}-${loaderVersion}`;
 
@@ -107,11 +114,11 @@ async function installQuilt(loaderVersion: string, mcVersion: string): Promise<v
   });
 
   log.info(`Fetching Quilt profile JSON for MC ${mcVersion} / loader ${loaderVersion}`);
-  const res = await fetch(profileJsonUrl, { signal: AbortSignal.timeout(15000) });
+  const res = await fetch(profileJsonUrl, { signal: withTimeout(signal, 15000) });
   if (!res.ok) throw new Error(`Failed to fetch Quilt profile: ${res.status}`);
 
   const profileJson = await res.json();
-  const destDir = path.join(paths.loadersDir, 'quilt', `${mcVersion}-${loaderVersion}`);
+  const destDir = loaderCacheDir('quilt', mcVersion, loaderVersion);
   await fs.mkdir(destDir, { recursive: true });
   await fs.writeFile(
     path.join(destDir, 'quilt-profile.json'),
@@ -129,9 +136,7 @@ async function installQuilt(loaderVersion: string, mcVersion: string): Promise<v
 
 function isQuiltInstalled(loaderVersion: string, mcVersion: string): Promise<boolean> {
   const profilePath = path.join(
-    paths.loadersDir,
-    'quilt',
-    `${mcVersion}-${loaderVersion}`,
+    loaderCacheDir('quilt', mcVersion, loaderVersion),
     'quilt-profile.json',
   );
   return fs
@@ -166,20 +171,26 @@ export async function installLoader(
   loader: ModLoaderType,
   loaderVersion: string,
   mcVersion: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   switch (loader) {
     case 'fabric':
-      return installFabric(loaderVersion, mcVersion);
+      return installFabric(loaderVersion, mcVersion, signal);
     case 'quilt':
-      return installQuilt(loaderVersion, mcVersion);
+      return installQuilt(loaderVersion, mcVersion, signal);
     case 'forge':
     case 'neoforge':
-      return installForgeLike(loader, loaderVersion, mcVersion, (progress, message) =>
-        emitLoaderProgress({
-          operationId: `loader-${loader}-${mcVersion}-${loaderVersion}`,
-          progress,
-          message,
-        }),
+      return installForgeLike(
+        loader,
+        loaderVersion,
+        mcVersion,
+        (progress, message) =>
+          emitLoaderProgress({
+            operationId: `loader-${loader}-${mcVersion}-${loaderVersion}`,
+            progress,
+            message,
+          }),
+        signal,
       );
     case 'vanilla':
       return; // nothing to install
