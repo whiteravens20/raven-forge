@@ -100,9 +100,9 @@ npm run dev
 | `npm run dist:win`     | Build + package NSIS installer (Windows)                         |
 | `npm run dist:linux`   | Build + package .deb + AppImage (Linux)                          |
 | `npm run icons`        | Rasterise `icon.svg` → `icon.png`, `icon.ico`, installer sidebar |
-| `npm run lint`         | Run ESLint                                                       |
+| `npm run lint`         | Run ESLint over `src/` and `test/`                               |
 | `npm run lint:fix`     | Run ESLint with auto-fix                                         |
-| `npm run typecheck`    | TypeScript type checking (all projects)                          |
+| `npm run typecheck`    | TypeScript type checking (main, renderer, tests)                 |
 | `npm test`             | Run the Vitest suite once                                        |
 | `npm run test:watch`   | Vitest in watch mode                                             |
 | `npm run format`       | Format code with Prettier                                        |
@@ -144,8 +144,8 @@ src/
     └── ipc/            # payload shapes, one file per domain
 
 test/               # Vitest suites — pure logic, the state files over a real
-                    # temporary data root, and the download policy over a real
-                    # socket + Electron/keytar stubs
+                    # temporary data root, the download policy over a real socket,
+                    # and real subprocesses (tar, unzip) + Electron/keytar stubs
 ```
 
 ---

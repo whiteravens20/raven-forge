@@ -293,18 +293,27 @@ real module, not a mock of one.
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Pure logic             | Called directly — launch arguments, hash selection, canonicalization, version merging, loader compatibility, contrast ratios                                                |
 | State files            | Real files under a temporary root named by `RAVENFORGE_DATA_DIR` — `profiles.json`, `settings.json`, `auth.json`, `installed.lock`, the content indexes, icons, path guards |
-| Network                | A `node:http` server on an ephemeral port stands in for Mojang, Modrinth and a pack host                                                                                    |
+| Network                | A `node:http` server on an ephemeral port stands in for Mojang, Modrinth, Adoptium and a pack host                                                                          |
 | Keychain               | `secret-store` is substituted to model both a working keyring and a machine with none, which is the case that actually fails in the field                                   |
-| Renderer-facing checks | The CSP header, the IPC sender guard, and the progress labels the overlay resolves                                                                                          |
+| Subprocesses           | Real ones: `tar` unpacks a real archive, `unzip -t` reads back an export, and a shell script that prints a version banner stands in for a JVM                               |
+| Build tooling          | `inject-build-ids.mjs` is run over a staged `dist/`, because otherwise it runs for the first time during a release                                                          |
+| The IPC contract       | Preload and main are both loaded and their channel names compared, which is the one half of that contract the types cannot state                                            |
+| Renderer-facing checks | The CSP header, the IPC sender guard, the progress labels the overlay resolves, and the two dictionaries against each other                                                 |
 
-Two properties are asserted rather than assumed, because both failed silently
-before they were: **overlapping writes** — every serialized state file has a test
-that fires several mutations at once and checks that none of them was lost — and
-**a refusal actually refusing** — a path that leaves its directory, a hash that
-does not match, a profile export carrying `javaArgs`, an IPC call from the wrong
-frame.
+Three properties are asserted rather than assumed, because each of them failed
+silently before it was: **overlapping writes** — every serialized state file has
+a test that fires several mutations at once and checks that none of them was
+lost; **a refusal actually refusing** — a path that leaves its directory, a hash
+that does not match, a JRE with no checksum to verify it against, a profile
+export carrying `javaArgs`, an IPC call from the wrong frame; and **the launcher
+saying what it is really doing** — the labels it names, the variables it hands
+them, and the fact that a checking pass never reports a finished download.
 
-What needs a JVM, a real Microsoft account or a published release is out of
+The suite is held to what it checks: `npm run lint` and `npm run typecheck` both
+cover `test/` (`tsconfig.test.json`), and a test may not be left `.only`, which
+ESLint refuses.
+
+What needs a real JVM, a real Microsoft account or a published release is out of
 scope and verified by hand; the gap list below records what was proven that way
 and when.
 

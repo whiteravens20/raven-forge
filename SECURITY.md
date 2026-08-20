@@ -74,10 +74,16 @@ download.
   `test/` — hash selection and comparison, canonicalization, launch-argument
   assembly, offline UUID derivation, and every refusal that has to hold: a path
   that leaves its directory, a downloaded file whose hash is not the published
-  one, a profile export carrying `javaArgs`, an IPC call from a frame that is not
-  the launcher's own page. The canonicalization suite exists because of a real
-  bug of exactly that shape: nested objects serialized as `{}`, so a manifest
-  whose every mod had been swapped for a different jar still verified.
+  one, a Java runtime the download server quoted no checksum for, a profile
+  export carrying `javaArgs`, an IPC call from a frame that is not the
+  launcher's own page. The canonicalization suite exists because of a real bug
+  of exactly that shape: nested objects serialized as `{}`, so a manifest whose
+  every mod had been swapped for a different jar still verified.
+- **The managed JRE is verified before it is unpacked.** It is executed on every
+  launch from that point on, so `test/java-manager.test.ts` runs the install path
+  against a real archive over a real socket and asserts the three refusals that
+  matter: a hash that does not match, a download the API quoted no checksum for
+  at all, and a runtime that unpacked but does not start.
 
 ### Credentials
 

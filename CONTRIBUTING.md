@@ -105,7 +105,7 @@ src/
   preload/       # the ONLY bridge between main and renderer
   renderer/      # React UI — pages/, components/, stores/ (zustand), i18n/, styles/
   shared/        # types and Zod schemas used on both sides of the bridge
-test/            # Vitest suites + Electron/keytar stubs
+test/            # Vitest suites + Electron/keytar stubs (linted and typechecked like src/)
 ```
 
 Two boundaries worth respecting:
@@ -175,8 +175,8 @@ UI strings live in `src/renderer/i18n/`. Polish (`pl.ts`) is the reference local
 Five gates run in CI ([`build.yml`](.github/workflows/build.yml)) and must pass locally first:
 
 ```bash
-npm run lint         # zero errors
-npm run typecheck    # main + renderer projects, zero errors
+npm run lint         # src/ and test/, zero errors
+npm run typecheck    # main, renderer and test projects, zero errors
 npm test             # vitest, test/**/*.test.ts
 npm run format:check # prettier
 npm run build        # must produce a clean dist/
@@ -184,8 +184,11 @@ npm run build        # must produce a clean dist/
 
 Tests live in `test/` and run under Vitest in a plain Node environment. Electron
 and `keytar` are aliased to stubs (`test/stubs/electron.ts`), so anything needing
-a window, a keyring daemon or a child process is faked at that seam — and
-everything below the seam is the real code. Three kinds of suite:
+a window or a keyring daemon is faked at that seam — and everything below the
+seam is the real code. The suite is held to the same standard as what it checks:
+`eslint` and `tsc` (`tsconfig.test.json`) both cover `test/`, and a `.only` left
+in a file fails the lint rather than quietly switching off everything around it.
+Five kinds of suite:
 
 - **Pure logic.** Launch-argument assembly, hash selection, manifest
   canonicalization, offline UUIDs, version merging, feed parsing, loader
@@ -197,11 +200,20 @@ everything below the seam is the real code. Three kinds of suite:
   exercised rather than assumed — several of these fire overlapping writes and
   assert that neither one is lost.
 - **Real sockets.** A `node:http` server on an ephemeral port stands in for
-  Mojang, Modrinth and a pack host, so the download policy, the size caps and
-  the hash refusals are tested against an actual response instead of a mock of
-  one.
+  Mojang, Modrinth, Adoptium and a pack host, so the download policy, the size
+  caps and the hash refusals are tested against an actual response instead of a
+  mock of one.
+- **Real subprocesses.** `tar` unpacks a JRE archive the suite built a moment
+  earlier, `unzip -t` reads back an exported `.mrpack`, and a shell script that
+  prints a version banner stands in for a JVM — enough for `java-manager.ts` to
+  be tested end to end on a machine with no Java on it at all.
+- **Contracts between two files.** Things the type system cannot state and
+  nothing else would notice: that every channel the preload can invoke has a
+  handler registered for it, that every message key the main process names
+  exists in both dictionaries with the variables it was handed, and that the
+  build-time ID injector still finds the literal it rewrites.
 
-Out of scope is what needs a JVM, a real Microsoft account or a published
+Out of scope is what needs a real JVM, a real Microsoft account or a published
 release: launching the game, the OAuth chain end to end, and self-update. Those
 are verified by hand, and
 [ARCHITECTURE.md](docs/ARCHITECTURE.md#open-implementation-gaps) records what was
