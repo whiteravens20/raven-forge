@@ -22,7 +22,7 @@
 # setuid bit on chrome-sandbox. Highest-privilege file in the repository.
 /build/ @pavlojs
 
-# Build-time scripts that rewrite what ships: inject-client-id.mjs edits
+# Build-time scripts that rewrite what ships: inject-build-ids.mjs edits
 # compiled output in dist/, make-icons.cjs generates the installer artwork.
 /scripts/ @pavlojs
 

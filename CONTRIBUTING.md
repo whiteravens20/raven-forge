@@ -211,7 +211,7 @@ State in the PR description what you actually ran. "Typechecks" is not a test re
 ### Integrity
 
 - **Do not relax hash verification.** A file whose hash does not match is deleted, not installed. There is no "continue anyway" path and there should not be one.
-- The manifest canonicalization in `manifest-verify.ts` must stay **byte-identical** to `scripts/lib/canonical.mjs` in the `raven-packs` repository. Any divergence silently breaks every signature. If you change one, change both in the same PR and say so.
+- The manifest canonicalization in `src/core/updater/canonical.ts` must stay **byte-identical** to `scripts/lib/canonical.mjs` in the `raven-packs` repository. Any divergence silently breaks every signature. If you change one, change both in the same PR and say so.
 - Treat everything in a manifest as attacker-controlled input: file names become paths, URLs become requests. Validate before use.
 
 ### Process boundary

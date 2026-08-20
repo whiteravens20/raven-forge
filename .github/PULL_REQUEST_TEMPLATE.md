@@ -55,7 +55,7 @@ Details:
 - [ ] `contextIsolation`, `nodeIntegration`, `webSecurity` and the CSP are unchanged (or the change is justified below)
 - [ ] Hash verification and manifest signature checks are not weakened, and nothing added a "continue anyway" path
 - [ ] Manifest fields are treated as untrusted input where they become paths or URLs
-- [ ] If `manifest-verify.ts` canonicalization changed, `scripts/lib/canonical.mjs` in `raven-packs` changed identically
+- [ ] If `canonical.ts` changed, `scripts/lib/canonical.mjs` in `raven-packs` changed identically
 - [ ] `npm audit` clean at the gate the CI enforces (moderate for production deps, high overall)
 
 ## New Dependencies

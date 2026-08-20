@@ -57,7 +57,7 @@ Include the exact error message shown in the app, if any.
 - [ ] Login (Microsoft or offline)
 - [ ] Profile creation or editing
 - [ ] Manifest sync (mods, configs, resource packs, shaders)
-- [ ] Mod search / install (Modrinth or CurseForge)
+- [ ] Mod search / install (Modrinth)
 - [ ] Java download or selection
 - [ ] Game launch
 - [ ] The game starts but behaves wrongly (wrong mods, wrong version)

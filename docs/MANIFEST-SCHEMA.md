@@ -102,19 +102,27 @@ nobody installed.
 
 The key ring is the user's `Settings → Trusted Keys` plus the **White Ravens
 publisher key compiled into the launcher**, which is why a first-party pack
-reads "Verified" on an install where nothing has been configured. Only the
-user's own keys switch enforcement on.
+reads "Verified" on an install where nothing has been configured — and why one
+that fails to verify is refused there too.
 
-What happens next depends on whether the user trusts any key:
+What happens next depends on where the manifest came from and on whether the
+user trusts any key:
 
-| Trusted keys    | Signed and valid           | Signed but unmatched | Unsigned                     |
-| --------------- | -------------------------- | -------------------- | ---------------------------- |
-| none configured | installs, badge "Verified" | installs, flagged    | installs, flagged "Unsigned" |
-| one or more     | installs, badge "Verified" | **refused**          | **refused**                  |
+| Manifest                        | Signed and valid           | Signed but unmatched | Unsigned                     |
+| ------------------------------- | -------------------------- | -------------------- | ---------------------------- |
+| first-party (White Ravens)      | installs, badge "Verified" | **refused**          | **refused**                  |
+| third-party, no keys configured | installs, badge "Verified" | installs, flagged    | installs, flagged "Unsigned" |
+| third-party, one or more keys   | installs, badge "Verified" | **refused**          | **refused**                  |
 
-Refusing the unsigned case once keys exist is the point of the scheme: if
-deleting the `signature` field were enough to skip the check, anyone able to
-rewrite the manifest would simply delete it.
+**A first-party pack is enforced whatever the settings say.** It is served from a
+White Ravens address and the key that signs it ships inside the launcher, so
+there is no case in which an unverifiable copy of one is genuine — it has been
+tampered with in transit, or it is not ours. Configuring a trusted key of your
+own extends the same treatment to everything else.
+
+Refusing the unsigned case is the point of the scheme: if deleting the
+`signature` field were enough to skip the check, anyone able to rewrite the
+manifest would simply delete it.
 
 ### Canonical form
 

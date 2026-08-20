@@ -32,6 +32,7 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Snapshots** — Mojang's weekly test builds are one toggle away in the version picker, off by default, and a profile already on one opens with them shown
 - **Shaders & Resource Packs** — first-class content management per profile
 - **Auto-Update** — launcher self-updates via GitHub Releases (electron-updater)
+- **Stop The Game** — a running profile can be stopped from the launcher: SIGTERM first, SIGKILL after ten seconds, and it does not report success until the process has actually gone
 - **Crash Reports** — one file per crash with versions, mods and the game's own report, written with tokens and account details already stripped out
 - **Discord Status** — optional, off by default: shows the running profile, version and loader on your Discord status, never the server address ([setup](docs/DISCORD-SETUP.md))
 - **No Telemetry** — nothing is measured, nothing is sent; the app itself lists what it stores and every server it contacts ([privacy policy](docs/PRIVACY.md))
@@ -137,12 +138,13 @@ src/
 │   ├── packs/      # .mrpack reader, pack catalogue, profile-from-pack install
 │   ├── profiles/   # Profile CRUD + import/export
 │   ├── updater/    # electron-updater + Ed25519 manifest verification
-│   └── util/       # Atomic writes, cancellation, path containment
+│   └── util/       # Atomic writes, cancellation, per-file serialization, path containment
 └── shared/         # Types shared between main + renderer
     ├── ipc-types.ts    # the channel contract
     └── ipc/            # payload shapes, one file per domain
 
-test/               # Vitest suites (pure logic) + Electron/keytar stubs
+test/               # Vitest suites (pure logic, plus the state and download layer
+                    # over real files and a real socket) + Electron/keytar stubs
 ```
 
 ---
@@ -228,10 +230,14 @@ rewrite one can rewrite the other.
 labelled as shipped with the launcher, because it is the reason a White Ravens
 pack reads Verified on an install where you added nothing.
 
-Adding a key of your own does something stronger than the badge: from then on
+A White Ravens pack is held to that key whatever you have configured: one whose
+signature does not verify is refused, not flagged. There is no honest reason for
+a first-party manifest to fail the check.
+
+Adding a key of your own extends the same rule to everything else: from then on
 the launcher refuses to install any manifest not signed by a key you trust,
-unsigned ones included. Until you add one, signatures are reported but not
-enforced, which is what keeps packs from anywhere else installable.
+unsigned ones included. Until you add one, third-party signatures are reported
+but not enforced, which is what keeps packs from anywhere else installable.
 
 ### Forking
 
@@ -384,7 +390,7 @@ Unsigned builds trip SmartScreen; see [docs/SIGNING.md](docs/SIGNING.md).
 **Debian / Ubuntu (.deb)** — recommended:
 
 ```bash
-sudo apt install ./raven-forge-launcher_0.1.0_amd64.deb
+sudo apt install ./raven-forge-launcher_<version>_amd64.deb
 ```
 
 Use `apt`, not `dpkg -i` — `dpkg` installs the package without resolving
