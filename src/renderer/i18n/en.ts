@@ -324,6 +324,15 @@ export const en = {
   'profileForm.serverIp': 'Server IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Java arguments (optional)',
+  'profileForm.java': 'Java runtime',
+  'profileForm.javaManaged': 'The one the launcher installs',
+  'profileForm.javaBrowse': 'Choose a file…',
+  'profileForm.javaChecking': 'Checking…',
+  'profileForm.javaFound': 'Java {version}.',
+  'profileForm.javaTooOld': 'Java {version} — this Minecraft version needs Java {required}.',
+  'profileForm.javaNotJava': 'That file is not a Java runtime.',
+  'profileForm.javaHint':
+    'The launcher installs and keeps the right runtime for each Minecraft version. Choose one here only if this profile needs a particular JVM.',
   'profileForm.showSnapshots': 'Show snapshots',
   'profileForm.snapshotHint':
     'Snapshots are Mojang’s weekly test builds. Most mods have no build for one, and a world made in a snapshot may not open in the release that follows it.',

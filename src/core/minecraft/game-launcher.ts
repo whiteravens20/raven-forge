@@ -11,7 +11,7 @@ import { getProfile, recordPlaySession } from '../profiles/profile-manager';
 import { setGamePresence, clearGamePresence } from '../discord/rich-presence';
 import { loaderLabel } from '../../shared/labels';
 import { syncManifest } from '../mods/mod-sync';
-import { ensureJavaVersion } from '../java/java-manager';
+import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
 import { installLoader, isLoaderInstalled } from '../modloader/loader-manager';
 import { resolveLaunchMeta } from '../modloader/loader-profile';
 import { getVersionMeta } from './version-manifest';
@@ -219,7 +219,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   // Ensure Java
   const javaVersion = requiredJavaFor(profile.minecraftVersion, meta);
   const java = profile.customJavaPath
-    ? { path: profile.customJavaPath }
+    ? await resolveChosenJava(profile.customJavaPath, javaVersion)
     : await ensureJavaVersion(javaVersion);
 
   // Download game files

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { requiredJavaFor } from '../src/core/minecraft/java-requirement';
+import { parseJavaVersion, requiredJavaFor } from '../src/core/minecraft/java-requirement';
 
 /**
  * The version meta is JSON fetched from Mojang, and `requiredJavaFor` is the
@@ -59,5 +59,49 @@ describe('requiredJavaFor', () => {
     // value reaching the path is not the value the meta contained.
     const meta = { javaVersion: { component: 'java-runtime', majorVersion: '21abc' } } as never;
     expect(requiredJavaFor('1.20.4', meta)).toBe(17);
+  });
+});
+
+/**
+ * What a binary says it is, read from real `java -version` output.
+ *
+ * Two eras with two shapes — `1.8.0_392` and `21.0.5` — and the launcher has to
+ * accept both, since a 1.8 profile wants the first and a 1.21 profile the
+ * second. Getting the old form wrong reads Java 8 as Java 1, which is a version
+ * no check would ever be satisfied by.
+ */
+describe('parseJavaVersion', () => {
+  it('reads the modern form', () => {
+    expect(
+      parseJavaVersion(
+        'openjdk version "21.0.5" 2024-10-15\nOpenJDK Runtime Environment Temurin-21.0.5+11',
+      ),
+    ).toBe(21);
+    expect(parseJavaVersion('java version "17.0.9" 2023-10-17 LTS')).toBe(17);
+  });
+
+  it('reads the 1.x form as the version after the dot', () => {
+    expect(
+      parseJavaVersion(
+        'openjdk version "1.8.0_392"\nOpenJDK Runtime Environment (build 1.8.0_392-b08)',
+      ),
+    ).toBe(8);
+  });
+
+  it('does not care which JVM it is', () => {
+    expect(
+      parseJavaVersion(
+        'openjdk version "21.0.2" 2024-01-16\nOpenJDK Runtime Environment GraalVM CE 21.0.2+13.1',
+      ),
+    ).toBe(21);
+  });
+
+  it('says nothing when the output is not a Java runtime announcing itself', () => {
+    expect(parseJavaVersion('')).toBeNull();
+    expect(parseJavaVersion('bash: java: command not found')).toBeNull();
+    expect(parseJavaVersion('Python 3.13.1')).toBeNull();
+    // A quoted version that is not a number at all: `parseInt` would answer
+    // NaN, which would then be compared against the requirement and lose.
+    expect(parseJavaVersion('openjdk version "x.y.z"')).toBeNull();
   });
 });

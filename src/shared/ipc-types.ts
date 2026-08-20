@@ -49,7 +49,7 @@ import type {
   ShaderLoaderResult,
   ShaderLoaderState,
 } from './ipc/mods';
-import type { JavaInstallation } from './ipc/java';
+import type { JavaInstallation, JavaProbe } from './ipc/java';
 import type { GlobalSettings, TrustedKey, DataRootInfo, DataRootPlan } from './ipc/settings';
 import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
@@ -216,6 +216,7 @@ export interface InvokeChannels {
 
   // -- Java --
   'java:detect-system': () => Promise<IpcResult<JavaInstallation[]>>;
+  'java:probe': (binPath: string, minecraftVersion: string) => Promise<IpcResult<JavaProbe>>;
 
   // -- Mod Loaders --
   'loaders:install': (
@@ -409,6 +410,7 @@ export interface RavenForgeAPI {
   };
   java: {
     detectSystem: InvokeChannels['java:detect-system'];
+    probe: InvokeChannels['java:probe'];
   };
   loaders: {
     install: InvokeChannels['loaders:install'];

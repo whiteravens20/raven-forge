@@ -88,6 +88,8 @@ const api: RavenForgeAPI = {
   },
   java: {
     detectSystem: () => ipcRenderer.invoke('java:detect-system'),
+    probe: (binPath, minecraftVersion) =>
+      ipcRenderer.invoke('java:probe', binPath, minecraftVersion),
   },
   loaders: {
     install: (loader, loaderVersion, mcVersion) =>

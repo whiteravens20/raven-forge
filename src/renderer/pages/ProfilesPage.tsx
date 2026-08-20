@@ -44,9 +44,20 @@ import type {
   ProfileSyncStatus,
   ManifestVerification,
   LoaderVersion,
+  JavaInstallation,
+  JavaProbe,
 } from '@shared/ipc-types';
 
 const api = window.ravenforge;
+
+/**
+ * The "choose a file…" row of the Java picker.
+ *
+ * Not a path, and cannot be mistaken for one: the file dialog only ever hands
+ * back an absolute path, and no absolute path starts with a question mark on
+ * either platform.
+ */
+const BROWSE_FOR_JAVA = '?browse';
 
 const LOADER_OPTIONS = [
   { value: 'vanilla', label: 'Vanilla' },
@@ -801,6 +812,8 @@ function ProfileForm({
   const [mcVersions, setMcVersions] = useState<string[]>([]);
   const [mcVersionsFailed, setMcVersionsFailed] = useState(false);
   const [showSnapshots, setShowSnapshots] = useState(false);
+  const [systemJavas, setSystemJavas] = useState<JavaInstallation[]>([]);
+  const [javaProbe, setJavaProbe] = useState<JavaProbe | 'checking' | null>(null);
   /** Whether the "is this profile already on a snapshot?" question has been asked. */
   const snapshotsConsidered = useRef(false);
   const [loaderVersions, setLoaderVersions] = useState<LoaderVersion[]>([]);
@@ -841,6 +854,34 @@ function ProfileForm({
       cancelled = true;
     };
   }, [showSnapshots]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.java.detectSystem().then((r) => {
+      if (!cancelled && r.success && r.data) setSystemJavas(r.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Re-run on the Minecraft version too: the same JVM is fine for one version
+  // of the game and too old for the next, so the answer belongs to the pair.
+  useEffect(() => {
+    const chosen = draft.customJavaPath;
+    if (!chosen) {
+      setJavaProbe(null);
+      return;
+    }
+    let cancelled = false;
+    setJavaProbe('checking');
+    void api.java.probe(chosen, draft.minecraftVersion).then((r) => {
+      if (!cancelled) setJavaProbe(r.success && r.data ? r.data : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.customJavaPath, draft.minecraftVersion]);
 
   useEffect(() => {
     setLoaderVersions([]);
@@ -907,6 +948,51 @@ function ProfileForm({
           })
         : undefined;
   const heightAtFault = sizeProblem === 'incomplete' && draft.windowHeight === undefined;
+
+  // Same rule as the version list: whatever the profile is already set to is
+  // always one of the options, so the control cannot show a runtime other than
+  // the one that will actually be used.
+  const javaOptions = [
+    { value: '', label: t('profileForm.javaManaged') },
+    ...(draft.customJavaPath && !systemJavas.some((j) => j.path === draft.customJavaPath)
+      ? [{ value: draft.customJavaPath, label: draft.customJavaPath }]
+      : []),
+    ...systemJavas.map((j) => ({ value: j.path, label: `Java ${j.version} — ${j.path}` })),
+    { value: BROWSE_FOR_JAVA, label: t('profileForm.javaBrowse') },
+  ];
+
+  const chooseJava = async (value: string) => {
+    if (value !== BROWSE_FOR_JAVA) {
+      set('customJavaPath', value || undefined);
+      return;
+    }
+    const picked = await api.system.selectFile();
+    // Cancelling leaves the profile as it was; the select is driven by the
+    // draft, so it snaps back to what is really set without being told to.
+    if (picked.success && picked.data) set('customJavaPath', picked.data);
+  };
+
+  // A file that cannot be checked is reported, not refused: the drive it lives
+  // on may simply not be plugged in today, and a profile that cannot be saved
+  // is a worse answer than one that says what is wrong with it. The launch
+  // checks again and refuses there, where it matters.
+  const javaMessage =
+    javaProbe === null
+      ? undefined
+      : javaProbe === 'checking'
+        ? t('profileForm.javaChecking')
+        : javaProbe.version === null
+          ? t('profileForm.javaNotJava')
+          : javaProbe.version < javaProbe.requiredVersion
+            ? t('profileForm.javaTooOld', {
+                version: javaProbe.version,
+                required: javaProbe.requiredVersion,
+              })
+            : t('profileForm.javaFound', { version: javaProbe.version });
+  const javaAtFault =
+    javaProbe !== null &&
+    javaProbe !== 'checking' &&
+    (javaProbe.version === null || javaProbe.version < javaProbe.requiredVersion);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -1084,6 +1170,19 @@ function ProfileForm({
             }
           />
           <p className="col-span-2 text-xs text-rf-text-muted">{t('profileForm.windowModeHint')}</p>
+          <div className="col-span-2 flex flex-col gap-1">
+            <Select
+              label={t('profileForm.java')}
+              options={javaOptions}
+              value={draft.customJavaPath ?? ''}
+              onChange={(e) => void chooseJava(e.target.value)}
+              error={javaAtFault ? javaMessage : undefined}
+            />
+            {!javaAtFault && javaMessage && (
+              <span className="text-xs text-rf-text-muted">{javaMessage}</span>
+            )}
+            <p className="text-xs text-rf-text-muted">{t('profileForm.javaHint')}</p>
+          </div>
         </div>
       </details>
 

@@ -341,6 +341,15 @@ export const pl: Translations = {
   'profileForm.serverIp': 'Serwer IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Argumenty Java (opcjonalnie)',
+  'profileForm.java': 'Środowisko Java',
+  'profileForm.javaManaged': 'To, które instaluje launcher',
+  'profileForm.javaBrowse': 'Wskaż plik…',
+  'profileForm.javaChecking': 'Sprawdzanie…',
+  'profileForm.javaFound': 'Java {version}.',
+  'profileForm.javaTooOld': 'Java {version} — ta wersja Minecrafta potrzebuje Javy {required}.',
+  'profileForm.javaNotJava': 'Ten plik nie jest środowiskiem Java.',
+  'profileForm.javaHint':
+    'Launcher sam instaluje i utrzymuje właściwe środowisko dla każdej wersji Minecrafta. Wybierz tutaj coś innego tylko wtedy, gdy ten profil potrzebuje konkretnej maszyny wirtualnej.',
   'profileForm.showSnapshots': 'Pokaż snapshoty',
   'profileForm.snapshotHint':
     'Snapshoty to cotygodniowe wersje testowe Mojanga. Większość modów nie ma pod nie buildów, a świat stworzony w snapshocie może się nie otworzyć w kolejnym wydaniu.',

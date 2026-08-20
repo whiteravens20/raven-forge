@@ -64,7 +64,8 @@ import {
   reorderResourcePacks,
 } from '../core/mods/content-manager';
 import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater/launcher-updater';
-import { detectSystemJava } from '../core/java/java-manager';
+import { detectSystemJava, probeJava } from '../core/java/java-manager';
+import { requiredJavaFor } from '../core/minecraft/java-requirement';
 import {
   installLoader,
   getLoaderVersions,
@@ -888,6 +889,20 @@ export function registerAllIpcHandlers(): void {
       return ok(await detectSystemJava());
     } catch (err) {
       return fail(`Failed to detect system Java: ${reason(err)}`);
+    }
+  });
+  handle('java:probe', async (_event, binPath: string, minecraftVersion: string) => {
+    try {
+      // The requirement without a version meta: the table in `requiredJavaFor`
+      // is enough to say "too old" in the editor, and fetching Mojang's meta
+      // for a field somebody is still typing in would be a network round trip
+      // per keystroke.
+      return ok({
+        version: await probeJava(binPath),
+        requiredVersion: requiredJavaFor(minecraftVersion),
+      });
+    } catch (err) {
+      return fail(`Failed to check ${binPath}: ${reason(err)}`);
     }
   });
 
