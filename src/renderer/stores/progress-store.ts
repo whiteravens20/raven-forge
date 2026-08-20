@@ -12,9 +12,18 @@ type Channel =
 
 interface ProgressEntry extends ProgressEvent {
   channel: Channel;
-  /** Wallclock time of last update, used to auto-clear stale entries. */
-  updatedAt: number;
+  /**
+   * Which update this entry is, counted rather than timed.
+   *
+   * A clock would do for showing staleness and not for the delayed clear below,
+   * which has to ask "is this still the entry I was set for" — and two updates
+   * within the same millisecond are ordinary when the answer decides whether a
+   * live progress bar is deleted.
+   */
+  stamp: number;
 }
+
+let stamps = 0;
 
 interface ProgressStore {
   entries: Map<string, ProgressEntry>;
@@ -46,15 +55,22 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
         const next = new Map(get().entries);
         if (event.progress >= 1) {
           // Auto-remove completed entries after a short hold
-          next.set(event.operationId, { ...event, channel, updatedAt: Date.now() });
+          const stamp = ++stamps;
+          next.set(event.operationId, { ...event, channel, stamp });
           set({ entries: next, hasActive: hasInflight(next) });
           setTimeout(() => {
             const after = new Map(get().entries);
+            // Only if it is still the entry this timeout was set for. Operation
+            // ids are deterministic and reused — `java-21`, `assets-<version>`,
+            // the profile id itself — so relaunching within the hold used to
+            // have the first launch's timeout delete the second launch's live
+            // progress, leaving the overlay blank while work carried on.
+            if (after.get(event.operationId)?.stamp !== stamp) return;
             after.delete(event.operationId);
             set({ entries: after, hasActive: hasInflight(after) });
           }, 1500);
         } else {
-          next.set(event.operationId, { ...event, channel, updatedAt: Date.now() });
+          next.set(event.operationId, { ...event, channel, stamp: ++stamps });
           set({ entries: next, hasActive: true });
         }
       };
