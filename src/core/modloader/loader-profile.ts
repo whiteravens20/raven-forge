@@ -1,12 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { log } from '../../main/logger';
-import { paths } from '../config/paths';
 import {
   getVersionMeta,
   mergeVersionMeta,
   resolveVersionChain,
 } from '../minecraft/version-manifest';
+import { loaderCacheDir } from './loader-paths';
 import type { VersionMeta } from '../minecraft/types';
 import type { ModLoaderType } from '../../shared/ipc-types';
 
@@ -19,14 +19,14 @@ const PROFILE_FILES: Partial<Record<ModLoaderType, string>> = {
   neoforge: 'neoforge-profile.json',
 };
 
-export function getLoaderProfilePath(
+function getLoaderProfilePath(
   loader: ModLoaderType,
   loaderVersion: string,
   mcVersion: string,
 ): string | null {
   const fileName = PROFILE_FILES[loader];
   if (!fileName) return null;
-  return path.join(paths.loadersDir, loader, `${mcVersion}-${loaderVersion}`, fileName);
+  return path.join(loaderCacheDir(loader, mcVersion, loaderVersion), fileName);
 }
 
 /**

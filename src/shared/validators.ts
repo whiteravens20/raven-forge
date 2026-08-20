@@ -146,7 +146,13 @@ export const profileSchema = z.object({
     message: 'minecraftVersion must be a plain version id',
   }),
   modLoader: z.enum(['vanilla', 'forge', 'neoforge', 'fabric', 'quilt']),
-  modLoaderVersion: z.string().optional(),
+  // The same rule, for the same reason: this one becomes a directory under
+  // `loaders/<loader>/` and part of the loader profile's file name, and that
+  // file is read back as the version metadata the game is launched from.
+  modLoaderVersion: z
+    .string()
+    .refine(isSafeFileName, { message: 'modLoaderVersion must be a plain version id' })
+    .optional(),
   manifestUrl: z.string().url().optional(),
   serverIp: z.string().optional(),
   serverPort: z.number().min(1).max(65535).optional(),

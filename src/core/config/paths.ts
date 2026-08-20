@@ -11,6 +11,7 @@ import {
   FILE_PROFILES,
 } from '../../shared/constants';
 import { dataRoot } from './data-root';
+import { isSafeFileName } from '../../shared/manifest-schema';
 
 /**
  * Centralized path resolver for all launcher data directories.
@@ -33,6 +34,30 @@ function getDataRoot(): string {
 /** Electron's own per-user directory. Diagnostics live here, not under the root. */
 function getDiagnosticsRoot(): string {
   return app.getPath('userData');
+}
+
+/**
+ * A profile id on its way to becoming a directory name, checked rather than
+ * trusted.
+ *
+ * Every builder below joins the id straight onto the data root, and ids arrive
+ * over IPC: nothing between the renderer and here parses them, because
+ * `profileSchema` only ever sees a whole profile and the handlers take the id as
+ * a bare string. An id of `../../..` therefore used to resolve to a path outside
+ * the launcher's data entirely, and `discardOrphanedProfile` would then delete
+ * it recursively.
+ *
+ * Ids the launcher makes are UUIDs, but this is deliberately the weaker rule —
+ * "a single path component" — so that a directory adopted from an older build,
+ * or one restored by hand, is still reachable. Containment is what matters, and
+ * a name with no separator, no `.`/`..` and no NUL cannot leave the directory it
+ * is joined to.
+ */
+function segment(profileId: string): string {
+  if (typeof profileId !== 'string' || !isSafeFileName(profileId)) {
+    throw new Error(`Not a profile id: ${JSON.stringify(profileId)}`);
+  }
+  return profileId;
 }
 
 export const paths = {
@@ -105,27 +130,27 @@ export const paths = {
 
   /** Per-profile directory */
   profileDir(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId);
+    return path.join(getDataRoot(), DIR_PROFILES, segment(profileId));
   },
 
   /** Per-profile .minecraft game directory */
   profileGameDir(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId, '.minecraft');
+    return path.join(getDataRoot(), DIR_PROFILES, segment(profileId), '.minecraft');
   },
 
   /** Per-profile mods directory */
   profileModsDir(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId, '.minecraft', 'mods');
+    return path.join(getDataRoot(), DIR_PROFILES, segment(profileId), '.minecraft', 'mods');
   },
 
   /** Per-profile installed.lock */
   profileLockFile(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId, 'installed.lock');
+    return path.join(getDataRoot(), DIR_PROFILES, segment(profileId), 'installed.lock');
   },
 
   /** Per-profile manifest sync state (ETag, last sync result) */
   profileSyncStateFile(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId, 'sync-state.json');
+    return path.join(getDataRoot(), DIR_PROFILES, segment(profileId), 'sync-state.json');
   },
 
   /**
@@ -133,7 +158,7 @@ export const paths = {
    * reconcile against and so a sync without network can still work.
    */
   profileManifestCacheFile(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId, 'manifest.cache.json');
+    return path.join(getDataRoot(), DIR_PROFILES, segment(profileId), 'manifest.cache.json');
   },
 
   /**
@@ -145,16 +170,22 @@ export const paths = {
    * different problem and needs somewhere else entirely.
    */
   profileBackupsDir(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId, 'backups');
+    return path.join(getDataRoot(), DIR_PROFILES, segment(profileId), 'backups');
   },
 
   /** Per-profile shaderpacks directory */
   profileShadersDir(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId, '.minecraft', 'shaderpacks');
+    return path.join(getDataRoot(), DIR_PROFILES, segment(profileId), '.minecraft', 'shaderpacks');
   },
 
   /** Per-profile resourcepacks directory */
   profileResourcePacksDir(profileId: string) {
-    return path.join(getDataRoot(), DIR_PROFILES, profileId, '.minecraft', 'resourcepacks');
+    return path.join(
+      getDataRoot(),
+      DIR_PROFILES,
+      segment(profileId),
+      '.minecraft',
+      'resourcepacks',
+    );
   },
 };

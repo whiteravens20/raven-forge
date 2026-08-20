@@ -102,7 +102,7 @@ export const modEntrySchema = z.object({
   side: z.enum(['client', 'server', 'both']).default('client'),
 });
 
-export const resourcePackEntrySchema = z.object({
+const resourcePackEntrySchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   version: z.string().optional(),
@@ -113,7 +113,7 @@ export const resourcePackEntrySchema = z.object({
   ...integrityFields,
 });
 
-export const shaderEntrySchema = z.object({
+const shaderEntrySchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   version: z.string().optional(),
@@ -124,7 +124,7 @@ export const shaderEntrySchema = z.object({
   ...integrityFields,
 });
 
-export const configFileEntrySchema = z.object({
+const configFileEntrySchema = z.object({
   path: z.string().min(1),
   url: z.string().url(),
   ...integrityFields,
@@ -138,7 +138,15 @@ export const modManifestSchema = z.object({
     message: 'minecraftVersion must be a plain version id',
   }),
   modLoader: z.enum(['vanilla', 'forge', 'neoforge', 'fabric', 'quilt']),
-  modLoaderVersion: z.string().optional(),
+  // And so does this one, which the line above it had and this one had not:
+  // `loaderInstallDir`, the Fabric and Quilt cache directories and
+  // `getLoaderProfilePath` all build a path out of it, and the last of those is
+  // then read back and parsed as version metadata — which is what supplies
+  // `mainClass` and the JVM arguments.
+  modLoaderVersion: z
+    .string()
+    .refine(isSafeFileName, { message: 'modLoaderVersion must be a plain version id' })
+    .optional(),
   /**
    * What the pack author says this pack needs, in MB. Used only when the
    * profile is first created — a later sync must not overwrite a number the
@@ -158,5 +166,4 @@ export const modManifestSchema = z.object({
 export type ModEntry = z.infer<typeof modEntrySchema>;
 export type ResourcePackEntry = z.infer<typeof resourcePackEntrySchema>;
 export type ShaderEntry = z.infer<typeof shaderEntrySchema>;
-export type ConfigFileEntry = z.infer<typeof configFileEntrySchema>;
 export type ModManifest = z.infer<typeof modManifestSchema>;

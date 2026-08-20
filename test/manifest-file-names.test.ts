@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import { isSafeFileName, fileNameFromUrl, modEntrySchema } from '../src/shared/manifest-schema';
+import { primaryFile } from '../src/core/mods/modrinth-api';
 
 /**
  * A manifest says *what* to fetch. Where it lands is the launcher's decision.
@@ -82,5 +83,40 @@ describe('fileNameFromUrl', () => {
     const name = fileNameFromUrl('https://cdn/x/', '../../evil', '.jar');
     expect(isSafeFileName(name)).toBe(true);
     expect(name).not.toContain('/');
+  });
+});
+
+/**
+ * The one route that used to take a remote API at its word.
+ *
+ * `primaryFile` is where every Modrinth install — mods, shaders, resource packs
+ * — learns what to call the file, and the answer goes straight into
+ * `path.join`. A manifest is held to `isSafeFileName` and a local install to
+ * `path.basename`; this was the gap in an otherwise consistent rule.
+ */
+describe('primaryFile', () => {
+  const version = (filename: string, primary = true) => ({
+    id: 'v1',
+    project_id: 'p1',
+    version_number: '1.0.0',
+    name: '1.0.0',
+    game_versions: ['1.21.4'],
+    loaders: ['fabric'],
+    dependencies: [],
+    files: [{ filename, url: 'https://example.invalid/f', primary, hashes: { sha512: 'x' } }],
+  });
+
+  it('returns a plain file name', () => {
+    expect(primaryFile(version('sodium-0.6.5.jar')).filename).toBe('sodium-0.6.5.jar');
+  });
+
+  it('refuses a name that is really a path', () => {
+    for (const bad of ['../evil.jar', 'a/b.jar', 'a\\b.jar', '..', '']) {
+      expect(() => primaryFile(version(bad))).toThrow(/not a plain file name/);
+    }
+  });
+
+  it('still refuses when the file is only there as a fallback', () => {
+    expect(() => primaryFile(version('../evil.jar', false))).toThrow(/not a plain file name/);
   });
 });
