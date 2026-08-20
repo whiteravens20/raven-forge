@@ -72,8 +72,6 @@ function emptyDraft(totalMb: number | undefined): DraftProfile {
     windowWidth: undefined,
     windowHeight: undefined,
     fullscreen: undefined,
-    gameDirectory: undefined,
-    preLaunchCommand: undefined,
     notes: undefined,
   };
 }

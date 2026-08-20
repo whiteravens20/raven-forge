@@ -215,8 +215,6 @@ export interface InvokeChannels {
   ) => Promise<IpcResult<void>>;
 
   // -- Java --
-  'java:get-installations': () => Promise<IpcResult<JavaInstallation[]>>;
-  'java:ensure-version': (majorVersion: number) => Promise<IpcResult<JavaInstallation>>;
   'java:detect-system': () => Promise<IpcResult<JavaInstallation[]>>;
 
   // -- Mod Loaders --
@@ -410,8 +408,6 @@ export interface RavenForgeAPI {
     reorderResourcePacks: InvokeChannels['content:reorder-resourcepacks'];
   };
   java: {
-    getInstallations: InvokeChannels['java:get-installations'];
-    ensureVersion: InvokeChannels['java:ensure-version'];
     detectSystem: InvokeChannels['java:detect-system'];
   };
   loaders: {

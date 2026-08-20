@@ -30,11 +30,13 @@ vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 vi.mock('../src/core/config/paths', () => ({
-  paths: { profileBackupsDir: () => path.join(root, 'backups') },
+  paths: {
+    profileBackupsDir: () => path.join(root, 'backups'),
+    profileGameDir: () => gameDir,
+  },
 }));
 vi.mock('../src/core/profiles/profile-manager', () => ({
   getProfile: async () => profile,
-  resolveGameDir: () => gameDir,
   directorySize: async (dir: string): Promise<number> => {
     let total = 0;
     for (const entry of await fs.readdir(dir, { withFileTypes: true })) {

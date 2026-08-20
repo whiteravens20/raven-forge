@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
-import { getProfile, resolveGameDir } from '../profiles/profile-manager';
+import { getProfile } from '../profiles/profile-manager';
 import { getLoaderVersions } from '../modloader/loader-manager';
 import { hashFile } from '../mods/integrity';
 import { readLockFile } from '../mods/lock-file';
@@ -228,7 +228,7 @@ export async function exportProfileAsMrpack(
     });
   }
 
-  const gameDir = resolveGameDir(profile);
+  const gameDir = paths.profileGameDir(profile.id);
   const overrides = await configOverrides(gameDir);
 
   const index = {

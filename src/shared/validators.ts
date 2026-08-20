@@ -139,8 +139,6 @@ export const profileSchema = z.object({
   windowWidth: z.number().optional(),
   windowHeight: z.number().optional(),
   fullscreen: z.boolean().optional(),
-  gameDirectory: z.string().optional(),
-  preLaunchCommand: z.string().optional(),
   notes: z.string().optional(),
   lastPlayed: z.string().optional(),
   totalPlayTimeMinutes: z.number().optional(),

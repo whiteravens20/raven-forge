@@ -3,7 +3,7 @@ import path from 'node:path';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
-import { getProfile, resolveGameDir, directorySize } from './profile-manager';
+import { getProfile, directorySize } from './profile-manager';
 import type { WorldBackup, WorldBackupReason } from '../../shared/ipc-types';
 
 /**
@@ -54,7 +54,7 @@ function backupDir(profileId: string, backupId: string): string {
 async function savesDirFor(profileId: string): Promise<string> {
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
-  return path.join(resolveGameDir(profile), 'saves');
+  return path.join(paths.profileGameDir(profile.id), 'saves');
 }
 
 /** World folder names in a `saves/` directory; `[]` when there is no such thing. */

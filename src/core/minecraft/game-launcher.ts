@@ -1,6 +1,5 @@
 import { app } from 'electron';
-import { spawn, exec, type ChildProcess } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { log } from '../../main/logger';
@@ -8,7 +7,7 @@ import { paths } from '../config/paths';
 import { getMainWindow } from '../../main/window';
 import { getSettings } from '../config/settings-manager';
 import { getAuthState, getMinecraftAccessToken } from '../auth/microsoft-auth';
-import { getProfile, recordPlaySession, resolveGameDir } from '../profiles/profile-manager';
+import { getProfile, recordPlaySession } from '../profiles/profile-manager';
 import { setGamePresence, clearGamePresence } from '../discord/rich-presence';
 import { loaderLabel } from '../../shared/labels';
 import { syncManifest } from '../mods/mod-sync';
@@ -26,7 +25,6 @@ import {
   writeCrashReport,
 } from '../diagnostics/crash-report';
 
-const execAsync = promisify(exec);
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
 import { resolveConditionalArgs, substituteVars } from './launch-args';
 import { requiredJavaFor } from './java-requirement';
@@ -183,7 +181,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   const signal = beginJob(profile.id);
 
   // Resolve paths
-  const gameDir = resolveGameDir(profile);
+  const gameDir = paths.profileGameDir(profile.id);
   const versionsDir = path.join(paths.cacheDir, 'versions');
   const librariesDir = path.join(paths.cacheDir, 'libraries');
   const assetsDir = path.join(paths.cacheDir, 'assets');
@@ -353,24 +351,6 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   }
 
   const finalArgs = [...jvmArgs, ...gameArgs];
-
-  // Pre-launch hook — a failing hook aborts the launch so the user isn't left
-  // guessing why the game started without whatever the hook was meant to set up.
-  if (profile.preLaunchCommand) {
-    log.info(`Running pre-launch command for ${profile.name}: ${profile.preLaunchCommand}`);
-    try {
-      const { stdout, stderr } = await execAsync(profile.preLaunchCommand, {
-        cwd: gameDir,
-        timeout: 120000,
-      });
-      if (stdout.trim()) log.info(`[pre-launch] ${stdout.trim()}`);
-      if (stderr.trim()) log.warn(`[pre-launch] ${stderr.trim()}`);
-    } catch (err) {
-      throw new Error(`Pre-launch command failed: ${err instanceof Error ? err.message : err}`, {
-        cause: err,
-      });
-    }
-  }
 
   log.info(`Launching: ${java.path} ${finalArgs.join(' ').substring(0, 200)}...`);
 

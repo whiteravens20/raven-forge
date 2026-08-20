@@ -225,20 +225,6 @@ export async function deleteProfile(profileId: string, deleteFiles = true): Prom
   log.info(`Deleted profile: ${name} (${profileId})`);
 }
 
-/**
- * The directory the game actually runs in.
- *
- * Normally the profile's own `.minecraft`, but a profile may point somewhere
- * else entirely. Everything that shows the player "their" files — the launcher
- * spawning the JVM, the button that opens the folder — has to resolve it the
- * same way, or the launcher opens a directory the game has never written to.
- */
-export function resolveGameDir(profile: Profile): string {
-  return profile.gameDirectory
-    ? path.resolve(profile.gameDirectory)
-    : paths.profileGameDir(profile.id);
-}
-
 /** Where a kept-behind profile leaves its identity. */
 function orphanRecordPath(profileId: string): string {
   return path.join(paths.profileDir(profileId), 'profile.json');
@@ -362,34 +348,28 @@ export async function exportProfile(profileId: string): Promise<string> {
  * Fields an imported profile never keeps.
  *
  * A profile export is a file that gets passed around — posted in a Discord
- * channel, attached to a forum reply — and four of its fields reach a process
- * or the filesystem the next time it launches:
+ * channel, attached to a forum reply — and two of its fields reach a process
+ * the next time it launches:
  *
- * - `preLaunchCommand` is handed to a *shell*;
  * - `customJavaPath` chooses the binary `spawn` runs;
  * - `javaArgs` is split straight into the JVM's own argument list, and JVM
  *   arguments are an execution surface in their own right — `-XX:OnOutOfMemoryError=…`
  *   and `-XX:OnError=…` run a shell command, `-javaagent`/`-agentpath` load code
  *   at startup — so a token with no whitespace in it (a literal `$IFS` does the
  *   rest) is a command the moment the game OOMs or crashes, which a modded
- *   instance does routinely;
- * - `gameDirectory` becomes the JVM's working directory and is `mkdir`'d first,
- *   so a hostile export writes a directory tree, and redirects the game's saves
- *   and configs, anywhere the user can write.
+ *   instance does routinely.
  *
- * All four make an innocuous-looking "here's my profile" attachment a way to
- * run whatever the sender likes — or scribble wherever they like — on the
- * machine that opens it, with no step at which anyone is asked. They stay
- * available as features; they are simply set by the person at the keyboard, in
- * the profile editor, rather than arriving inside a file. That is the
- * difference between configuring a hook and receiving one.
+ * Both make an innocuous-looking "here's my profile" attachment a way to run
+ * whatever the sender likes on the machine that opens it, with no step at which
+ * anyone is asked. They stay available as features; they are simply set by the
+ * person at the keyboard, in the profile editor, rather than arriving inside a
+ * file. That is the difference between configuring a hook and receiving one.
+ *
+ * Only fields the schema declares can get this far, so this list needs an entry
+ * only for the ones the launcher does honour. A field it has never heard of —
+ * or no longer has — is dropped by the parse below without being named here.
  */
-export const NOT_IMPORTED = [
-  'preLaunchCommand',
-  'customJavaPath',
-  'javaArgs',
-  'gameDirectory',
-] as const;
+export const NOT_IMPORTED = ['customJavaPath', 'javaArgs'] as const;
 
 /** A profile export, reduced to what may safely be turned into a new profile. */
 export interface ImportedProfile {
@@ -432,10 +412,8 @@ export function readImportedProfile(json: string): ImportedProfile {
     updatedAt: _ua,
     lastPlayed: _lp,
     totalPlayTimeMinutes: _tp,
-    preLaunchCommand: _pre,
     customJavaPath: _java,
     javaArgs: _jargs,
-    gameDirectory: _gdir,
     ...data
   } = parsed.data;
 

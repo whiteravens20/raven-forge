@@ -42,10 +42,10 @@ vi.mock('../src/main/logger', () => ({
 }));
 vi.mock('../src/core/profiles/profile-manager', () => ({
   getProfile: async () => current,
-  resolveGameDir: () => gameDir,
 }));
 vi.mock('../src/core/config/paths', () => ({
   paths: {
+    profileGameDir: () => gameDir,
     profileModsDir: () => path.join(gameDir, 'mods'),
     profileShadersDir: () => path.join(gameDir, 'shaderpacks'),
     profileResourcePacksDir: () => path.join(gameDir, 'resourcepacks'),

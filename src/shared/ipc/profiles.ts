@@ -29,8 +29,6 @@ export interface Profile {
   windowWidth?: number;
   windowHeight?: number;
   fullscreen?: boolean;
-  gameDirectory?: string;
-  preLaunchCommand?: string;
   notes?: string;
   lastPlayed?: string;
   totalPlayTimeMinutes?: number;

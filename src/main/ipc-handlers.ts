@@ -24,7 +24,6 @@ import {
   listOrphanedProfiles,
   adoptOrphanedProfile,
   discardOrphanedProfile,
-  resolveGameDir,
 } from '../core/profiles/profile-manager';
 import {
   setProfileIcon,
@@ -65,11 +64,7 @@ import {
   reorderResourcePacks,
 } from '../core/mods/content-manager';
 import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater/launcher-updater';
-import {
-  getJavaInstallations,
-  ensureJavaVersion,
-  detectSystemJava,
-} from '../core/java/java-manager';
+import { detectSystemJava } from '../core/java/java-manager';
 import {
   installLoader,
   getLoaderVersions,
@@ -540,7 +535,7 @@ export function registerAllIpcHandlers(): void {
     try {
       const profile = await getProfile(profileId);
       if (!profile) return fail('Profile not found');
-      const dir = resolveGameDir(profile);
+      const dir = paths.profileGameDir(profile.id);
       // A profile that has never been launched has no game directory yet, and
       // opening a path that does not exist only produces an error the player
       // cannot act on. Create it: this is where the launcher would put it.
@@ -888,20 +883,6 @@ export function registerAllIpcHandlers(): void {
   );
 
   // ── Java ─────────────────────────────────────────────────
-  handle('java:get-installations', async () => {
-    try {
-      return ok(await getJavaInstallations());
-    } catch (err) {
-      return fail(`Failed to get Java installations: ${reason(err)}`);
-    }
-  });
-  handle('java:ensure-version', async (_event, majorVersion: number) => {
-    try {
-      return ok(await ensureJavaVersion(majorVersion));
-    } catch (err) {
-      return fail(`Failed to ensure Java version: ${reason(err)}`);
-    }
-  });
   handle('java:detect-system', async () => {
     try {
       return ok(await detectSystemJava());

