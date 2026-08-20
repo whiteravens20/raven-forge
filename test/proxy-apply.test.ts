@@ -15,7 +15,7 @@ import type { GlobalSettings } from '../src/shared/ipc-types';
  * and log it besides.
  */
 
-const setProxy = vi.fn(async () => undefined);
+const setProxy = vi.fn(async (_config: { proxyRules: string }) => undefined);
 const setGlobalDispatcher = vi.fn();
 const socksDispatcher = { kind: 'socks' };
 const proxyAgent = { kind: 'proxy-agent' };
@@ -85,7 +85,7 @@ describe('applyProxySettings', () => {
   it('does not hand Chromium credentials it would ignore', async () => {
     await applyProxySettings(settings('http://user:hunter2@proxy.example.net:8080'));
 
-    const rules = setProxy.mock.calls[0][0] as { proxyRules: string };
+    const rules = setProxy.mock.calls[0][0];
     expect(rules.proxyRules).toBe('http://proxy.example.net:8080');
     expect(rules.proxyRules).not.toContain('hunter2');
   });

@@ -103,7 +103,15 @@ describe('primaryFile', () => {
     game_versions: ['1.21.4'],
     loaders: ['fabric'],
     dependencies: [],
-    files: [{ filename, url: 'https://example.invalid/f', primary, hashes: { sha512: 'x' } }],
+    files: [
+      {
+        filename,
+        url: 'https://example.invalid/f',
+        primary,
+        size: 1024,
+        hashes: { sha1: 'y', sha512: 'x' },
+      },
+    ],
   });
 
   it('returns a plain file name', () => {
