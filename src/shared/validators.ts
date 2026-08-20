@@ -49,7 +49,7 @@ export function assertSecureContentUrl(value: string): void {
   }
 }
 
-export const trustedKeySchema = z.object({
+const trustedKeySchema = z.object({
   name: z.string().min(1),
   publicKey: z.string().min(1),
   addedAt: z.string(),
