@@ -86,6 +86,7 @@ import {
 import type {
   IpcResult,
   IpcErrorCode,
+  ErrorMessage,
   GlobalSettings,
   TrustedKey,
   WorldBackupReason,
@@ -93,6 +94,7 @@ import type {
   ShaderLoaderResult,
 } from '../shared/ipc-types';
 import { AuthServersUnreachableError } from '../core/auth/auth-errors';
+import { launchRefusal } from '../core/minecraft/launch-errors';
 
 /** Log tail limits — enough to diagnose a crash, small enough to ship over IPC. */
 const LOG_TAIL_DEFAULT_LINES = 500;
@@ -103,8 +105,13 @@ function ok<T>(data: T): IpcResult<T> {
   return { success: true, data };
 }
 
-function fail<T>(error: string, code?: IpcErrorCode): IpcResult<T> {
-  return { success: false, error, ...(code ? { code } : {}) };
+function fail<T>(error: string, code?: IpcErrorCode, errorMessage?: ErrorMessage): IpcResult<T> {
+  return {
+    success: false,
+    error,
+    ...(code ? { code } : {}),
+    ...(errorMessage ? { errorMessage } : {}),
+  };
 }
 
 /**
@@ -942,7 +949,9 @@ export function registerAllIpcHandlers(): void {
       if (err instanceof AuthServersUnreachableError) {
         return fail(`Failed to launch game: ${reason(err)}`, 'AUTH_UNREACHABLE');
       }
-      return fail(`Failed to launch game: ${reason(err)}`);
+      // A refusal carries the same sentence twice: English here for the log,
+      // and a key the renderer says in the player's language.
+      return fail(`Failed to launch game: ${reason(err)}`, undefined, launchRefusal(err));
     }
   });
   handle('game:kill', async (_event, profileId: string) => {

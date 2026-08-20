@@ -11,6 +11,12 @@ export interface IpcResult<T> {
    * rewords it, and it is translated.
    */
   code?: IpcErrorCode;
+  /**
+   * The same failure in a form the renderer can translate, for the failures
+   * that have one. `error` is always set as well, in English, because that is
+   * what gets logged and quoted — see {@link ErrorKey}.
+   */
+  errorMessage?: ErrorMessage;
 }
 
 /**
@@ -19,6 +25,32 @@ export interface IpcResult<T> {
  * recoverable by launching offline, rejected is not.
  */
 export type IpcErrorCode = 'AUTH_UNREACHABLE';
+
+/**
+ * Failure messages the main process may name for the renderer to say.
+ *
+ * The same rule as {@link ProgressKey}, for the same reason: `src/core/` has no
+ * locale. The list is deliberately short. It covers the failures the launcher
+ * itself raises about something the player can go and change — those are read
+ * as instructions, and an instruction in a language the reader did not choose
+ * is not one. Everything else keeps its English `error` text: a wrapped network
+ * or filesystem fault is a diagnostic, a key per cause would be a dictionary of
+ * things nobody can act on, and the log wants the original words in any case.
+ *
+ * Every member must exist in the dictionaries — the renderer hands them to
+ * `t()`, so one that is not a `TranslationKey` is a type error there.
+ */
+export type ErrorKey =
+  | 'launchError.alreadyRunning'
+  | 'launchError.ramTooBig'
+  | 'launchError.javaNotRuntime'
+  | 'launchError.javaTooOld';
+
+/** A failure the renderer can say in the user's language. */
+export interface ErrorMessage {
+  key: ErrorKey;
+  vars?: ProgressVars;
+}
 
 /**
  * Translation keys the main process is allowed to name in a progress event.

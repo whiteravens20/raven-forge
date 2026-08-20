@@ -29,6 +29,7 @@ import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../sh
 import { customResolution, resolveConditionalArgs, substituteVars } from './launch-args';
 import { requiredJavaFor } from './java-requirement';
 import { applyFullscreen } from './options-file';
+import { LaunchRefusedError } from './launch-errors';
 
 // Track running processes by profileId
 const runningProcesses = new Map<string, ChildProcess>();
@@ -137,10 +138,14 @@ function launchFeatures(profile: Profile): Record<string, boolean> {
 function assertRamFits(profile: Profile): void {
   const totalMb = machineMemoryMb();
   if (ramAdvice(profile.allocatedRamMb, totalMb) !== 'over') return;
-  throw new Error(
-    `This profile allocates ${formatRamGb(profile.allocatedRamMb)} of RAM and this machine has ` +
-      `${formatRamGb(totalMb)}. Minecraft cannot start with more memory than the machine has — ` +
-      `lower it in the profile editor, where ${formatRamGb(recommendedRamMb(totalMb))} suits this one.`,
+  const allocated = formatRamGb(profile.allocatedRamMb);
+  const total = formatRamGb(totalMb);
+  const recommended = formatRamGb(recommendedRamMb(totalMb));
+  throw new LaunchRefusedError(
+    { key: 'launchError.ramTooBig', vars: { allocated, total, recommended } },
+    `This profile allocates ${allocated} of RAM and this machine has ${total}. Minecraft cannot ` +
+      `start with more memory than the machine has — lower it in the profile editor, where ` +
+      `${recommended} suits this one.`,
   );
 }
 
@@ -149,7 +154,10 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   if (!profile) throw new Error(`Profile ${options.profileId} not found`);
 
   if (runningProcesses.has(options.profileId)) {
-    throw new Error('Game is already running for this profile');
+    throw new LaunchRefusedError(
+      { key: 'launchError.alreadyRunning' },
+      'Game is already running for this profile',
+    );
   }
 
   assertRamFits(profile);

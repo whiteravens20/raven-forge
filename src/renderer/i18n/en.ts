@@ -137,6 +137,13 @@ export const en = {
   'home.updateFailedPlayAnyway':
     'The launcher update could not be downloaded — the game will start anyway.',
   'home.launchFailed': 'Could not start the game',
+  'launchError.alreadyRunning': 'This profile is already running.',
+  'launchError.ramTooBig':
+    'This profile allocates {allocated} of RAM and this machine has {total}. Minecraft cannot start with more memory than the machine has — lower it in the profile editor, where {recommended} suits this one.',
+  'launchError.javaNotRuntime':
+    'This profile is set to launch with {path}, and that is not a Java runtime this machine can run. Point it somewhere else in the profile editor, or clear the field to use the runtime the launcher installs itself.',
+  'launchError.javaTooOld':
+    'This profile is set to launch with {path}, which is Java {found}, and this version of Minecraft needs Java {required}. It would start and then stop with an error about class file versions. Clear the field to use the runtime the launcher installs itself.',
   'home.launchError': 'Error while starting the game',
   'home.showConsole': 'Show console',
   'home.hideConsole': 'Hide console',

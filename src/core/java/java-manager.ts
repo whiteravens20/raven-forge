@@ -9,6 +9,7 @@ import { paths } from '../config/paths';
 import { ADOPTIUM_API } from '../../shared/constants';
 import { verifyDownload } from '../mods/integrity';
 import { parseJavaVersion } from '../minecraft/java-requirement';
+import { LaunchRefusedError } from '../minecraft/launch-errors';
 import { getMainWindow } from '../../main/window';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
 
@@ -97,14 +98,19 @@ export async function resolveChosenJava(
 ): Promise<JavaInstallation> {
   const version = await probeJava(binPath);
   if (version === null) {
-    throw new Error(
+    throw new LaunchRefusedError(
+      { key: 'launchError.javaNotRuntime', vars: { path: binPath } },
       `This profile is set to launch with ${binPath}, and that is not a Java runtime this ` +
         `machine can run. Point it somewhere else in the profile editor, or clear the field to ` +
         `use the runtime the launcher installs itself.`,
     );
   }
   if (version < requiredVersion) {
-    throw new Error(
+    throw new LaunchRefusedError(
+      {
+        key: 'launchError.javaTooOld',
+        vars: { path: binPath, found: version, required: requiredVersion },
+      },
       `This profile is set to launch with ${binPath}, which is Java ${version}, and this ` +
         `version of Minecraft needs Java ${requiredVersion}. It would start and then stop with ` +
         `an error about class file versions. Clear the field to use the runtime the launcher ` +
