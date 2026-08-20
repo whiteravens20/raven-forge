@@ -341,6 +341,19 @@ export const pl: Translations = {
   'profileForm.serverIp': 'Serwer IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Argumenty Java (opcjonalnie)',
+  'profileForm.advanced': 'Zaawansowane',
+  'profileForm.windowWidth': 'Szerokość okna gry',
+  'profileForm.windowHeight': 'Wysokość okna gry',
+  'profileForm.windowSizeHint': 'Zostaw oba pola puste, aby gra sama wybrała rozmiar okna.',
+  'profileForm.windowSizeBoth':
+    'Ustaw oba albo żadnego — gra przyjmuje rozmiar okna tylko w parze.',
+  'profileForm.windowSizeRange': 'Od {minWidth}×{minHeight} do {max}×{max}.',
+  'profileForm.windowMode': 'Tryb okna',
+  'profileForm.windowModeGame': 'Tak jak zostawiła gra',
+  'profileForm.windowModeWindowed': 'W oknie',
+  'profileForm.windowModeFullscreen': 'Pełny ekran',
+  'profileForm.windowModeHint':
+    'Ustawienie inne niż „tak jak zostawiła gra” trafia przy każdym uruchomieniu do ustawień samej gry, więc unieważnia też F11 z poprzedniej sesji.',
   'profileForm.notes': 'Notatki',
   'profileForm.notesPlaceholder': 'Dowolne notatki o tym profilu',
 

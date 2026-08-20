@@ -324,6 +324,19 @@ export const en = {
   'profileForm.serverIp': 'Server IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Java arguments (optional)',
+  'profileForm.advanced': 'Advanced',
+  'profileForm.windowWidth': 'Game window width',
+  'profileForm.windowHeight': 'Game window height',
+  'profileForm.windowSizeHint': 'Leave both empty to let the game choose its own window size.',
+  'profileForm.windowSizeBoth':
+    'Set both or neither — the game only takes a window size as a pair.',
+  'profileForm.windowSizeRange': 'Between {minWidth}×{minHeight} and {max}×{max}.',
+  'profileForm.windowMode': 'Window mode',
+  'profileForm.windowModeGame': 'However the game left it',
+  'profileForm.windowModeWindowed': 'Windowed',
+  'profileForm.windowModeFullscreen': 'Fullscreen',
+  'profileForm.windowModeHint':
+    'Anything other than “however the game left it” is written into the game’s own settings at every launch, so it also overrules an F11 from the last session.',
   'profileForm.notes': 'Notes',
   'profileForm.notesPlaceholder': 'Any notes about this profile',
 

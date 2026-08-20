@@ -125,11 +125,31 @@ export const JAVA_VERSION_MAP: Record<string, number> = {
   '1.23': 21,
 };
 
-// ── Window defaults ───────────────────────────────────────
+// ── Launcher window ───────────────────────────────────────
+// The launcher's own window, not the game's — see the block below for that.
 export const DEFAULT_WINDOW_WIDTH = 1280;
 export const DEFAULT_WINDOW_HEIGHT = 800;
 export const MIN_WINDOW_WIDTH = 900;
 export const MIN_WINDOW_HEIGHT = 600;
+
+// ── Game window ───────────────────────────────────────────
+// The bounds a profile's custom resolution may take. Named for the same reason
+// as the RAM bounds: the schema and the form both police this, and a form that
+// accepts a number the save then drops is worse than no form.
+
+/**
+ * The smallest window Minecraft will make. It sets that floor itself, so a
+ * smaller number here is not a small window — it is a setting that does
+ * nothing, which is the one outcome a preference must never have.
+ */
+export const MIN_GAME_WIDTH = 320;
+export const MIN_GAME_HEIGHT = 240;
+/**
+ * Three 5K displays side by side, and nobody plays on more. Past this the
+ * number is a typo rather than a resolution, and a window wider than the
+ * desktop is one whose own controls cannot be reached.
+ */
+export const MAX_GAME_DIMENSION = 15360;
 
 // ── RAM allocation ────────────────────────────────────────
 // The bounds a profile's `-Xmx` may take. Named rather than typed out at each

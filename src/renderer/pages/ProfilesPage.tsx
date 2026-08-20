@@ -31,6 +31,7 @@ import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 import { useLocale, useT } from '@renderer/i18n';
+import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '@shared/constants';
 import { loaderLabel } from '@shared/labels';
 import { recommendedRamMb } from '@shared/memory';
 import type {
@@ -74,6 +75,25 @@ function emptyDraft(totalMb: number | undefined): DraftProfile {
     fullscreen: undefined,
     notes: undefined,
   };
+}
+
+/**
+ * What is wrong with the window size, if anything.
+ *
+ * The pair is the unit. `customResolution` in the launcher applies a size only
+ * when both halves are there and both are usable, because Mojang's own
+ * argument rule gates them together — so an editor that accepted a lone width
+ * would be storing a number the game is never given, with nothing on screen
+ * saying so.
+ */
+function windowSizeProblem(draft: DraftProfile): 'incomplete' | 'range' | null {
+  const { windowWidth: width, windowHeight: height } = draft;
+  if (width === undefined && height === undefined) return null;
+  if (width === undefined || height === undefined) return 'incomplete';
+  if (!Number.isInteger(width) || !Number.isInteger(height)) return 'range';
+  if (width < MIN_GAME_WIDTH || height < MIN_GAME_HEIGHT) return 'range';
+  if (width > MAX_GAME_DIMENSION || height > MAX_GAME_DIMENSION) return 'range';
+  return null;
 }
 
 function profileToDraft(p: Profile): DraftProfile {
@@ -841,6 +861,21 @@ function ProfileForm({
     onChange({ ...draft, [key]: value });
   };
 
+  // One message, on the field that is actually wrong: a pair of identical red
+  // lines under two adjacent boxes reads as two faults rather than one.
+  const sizeProblem = windowSizeProblem(draft);
+  const sizeMessage =
+    sizeProblem === 'incomplete'
+      ? t('profileForm.windowSizeBoth')
+      : sizeProblem === 'range'
+        ? t('profileForm.windowSizeRange', {
+            minWidth: MIN_GAME_WIDTH,
+            minHeight: MIN_GAME_HEIGHT,
+            max: MAX_GAME_DIMENSION,
+          })
+        : undefined;
+  const heightAtFault = sizeProblem === 'incomplete' && draft.windowHeight === undefined;
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h2 className="text-lg font-display font-semibold text-rf-text">
@@ -957,6 +992,56 @@ function ProfileForm({
         />
       </div>
 
+      {/* Folded away rather than absent: none of it is needed to make a profile
+          that works, and all of it is needed by somebody. */}
+      <details className="rounded-lg border border-rf-border bg-rf-surface/40 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-rf-text-secondary">
+          {t('profileForm.advanced')}
+        </summary>
+        <div className="grid grid-cols-2 gap-3 pt-3">
+          <Input
+            label={t('profileForm.windowWidth')}
+            type="number"
+            value={draft.windowWidth ?? ''}
+            onChange={(e) =>
+              set('windowWidth', e.target.value ? Number(e.target.value) : undefined)
+            }
+            placeholder="854"
+            min={MIN_GAME_WIDTH}
+            max={MAX_GAME_DIMENSION}
+            error={heightAtFault ? undefined : sizeMessage}
+          />
+          <Input
+            label={t('profileForm.windowHeight')}
+            type="number"
+            value={draft.windowHeight ?? ''}
+            onChange={(e) =>
+              set('windowHeight', e.target.value ? Number(e.target.value) : undefined)
+            }
+            placeholder="480"
+            min={MIN_GAME_HEIGHT}
+            max={MAX_GAME_DIMENSION}
+            error={heightAtFault ? sizeMessage : undefined}
+          />
+          <p className="col-span-2 -mt-1 text-xs text-rf-text-muted">
+            {t('profileForm.windowSizeHint')}
+          </p>
+          <Select
+            label={t('profileForm.windowMode')}
+            options={[
+              { value: '', label: t('profileForm.windowModeGame') },
+              { value: 'false', label: t('profileForm.windowModeWindowed') },
+              { value: 'true', label: t('profileForm.windowModeFullscreen') },
+            ]}
+            value={draft.fullscreen === undefined ? '' : String(draft.fullscreen)}
+            onChange={(e) =>
+              set('fullscreen', e.target.value === '' ? undefined : e.target.value === 'true')
+            }
+          />
+          <p className="col-span-2 text-xs text-rf-text-muted">{t('profileForm.windowModeHint')}</p>
+        </div>
+      </details>
+
       <div className="space-y-2">
         <label className="text-xs font-medium text-rf-text-secondary">
           {t('profileForm.notes')}
@@ -971,7 +1056,11 @@ function ProfileForm({
       </div>
 
       <div className="flex gap-2 pt-2">
-        <Button onClick={onSave} icon={<Save size={14} />} disabled={!draft.name.trim()}>
+        <Button
+          onClick={onSave}
+          icon={<Save size={14} />}
+          disabled={!draft.name.trim() || sizeProblem !== null}
+        >
           {t('common.save')}
         </Button>
         <Button variant="ghost" onClick={onCancel} icon={<X size={14} />}>

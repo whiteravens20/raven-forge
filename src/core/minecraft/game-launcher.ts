@@ -26,8 +26,9 @@ import {
 } from '../diagnostics/crash-report';
 
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
-import { resolveConditionalArgs, substituteVars } from './launch-args';
+import { customResolution, resolveConditionalArgs, substituteVars } from './launch-args';
 import { requiredJavaFor } from './java-requirement';
+import { applyFullscreen } from './options-file';
 
 // Track running processes by profileId
 const runningProcesses = new Map<string, ChildProcess>();
@@ -99,7 +100,7 @@ function emitLogLine(profileId: string, rawLine: string): void {
 function launchFeatures(profile: Profile): Record<string, boolean> {
   return {
     is_demo_user: false,
-    has_custom_resolution: profile.windowWidth != null && profile.windowHeight != null,
+    has_custom_resolution: customResolution(profile.windowWidth, profile.windowHeight) !== null,
     has_quick_plays_support: false,
     is_quick_play_singleplayer: false,
     is_quick_play_multiplayer: false,
@@ -268,6 +269,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   }
 
   // Build arguments
+  const resolution = customResolution(profile.windowWidth, profile.windowHeight);
   const templateVars: Record<string, string> = {
     auth_player_name: username,
     // The Minecraft version, not the merged profile id. Forge and NeoForge
@@ -296,9 +298,11 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     // module-resolution error that names none of this.
     library_directory: librariesDir,
     classpath_separator: cpSep,
-    // Resolution
-    resolution_width: String(profile.windowWidth ?? 854),
-    resolution_height: String(profile.windowHeight ?? 480),
+    // Resolution. The defaults are the game's own, and are what the feature
+    // gate above leaves unused: with no custom size these variables are never
+    // substituted into anything.
+    resolution_width: String(resolution?.width ?? 854),
+    resolution_height: String(resolution?.height ?? 480),
   };
 
   const features = launchFeatures(profile);
@@ -335,6 +339,13 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   } else if (meta.minecraftArguments) {
     // Legacy format
     gameArgs.push(...substituteVars(meta.minecraftArguments.split(/\s+/), templateVars));
+    // The pre-1.13 argument string has no conditional section, so nothing in it
+    // ever carried the resolution — the feature flag above reaches modern
+    // metas only. Without this the setting silently does nothing on the older
+    // versions, which are exactly the ones people run in a small window.
+    if (resolution) {
+      gameArgs.push('--width', String(resolution.width), '--height', String(resolution.height));
+    }
   }
 
   // Quick connect
@@ -345,12 +356,13 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     }
   }
 
-  // Fullscreen
-  if (profile.fullscreen) {
-    gameArgs.push('--fullscreen');
-  }
-
   const finalArgs = [...jvmArgs, ...gameArgs];
+
+  // Stated in options.txt rather than passed as `--fullscreen`, because that
+  // argument has no opposite. See `applyFullscreen`.
+  if (profile.fullscreen !== undefined) {
+    await applyFullscreen(gameDir, profile.fullscreen);
+  }
 
   log.info(`Launching: ${java.path} ${finalArgs.join(' ').substring(0, 200)}...`);
 
