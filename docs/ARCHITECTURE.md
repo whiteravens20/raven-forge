@@ -85,7 +85,7 @@ raven-forge/
 
 ## IPC contract
 
-All renderer → main calls go through typed channels declared in [`src/shared/ipc-types.ts`](../src/shared/ipc-types.ts) and exposed as `window.ravenforge.<domain>.<method>` via the preload contextBridge. Returns `IpcResult<T> = { success, data?, error? }` so renderer code never throws on cross-process errors.
+All renderer → main calls go through typed channels declared in [`src/shared/ipc-types.ts`](../src/shared/ipc-types.ts) and exposed as `window.ravenforge.<domain>.<method>` via the preload contextBridge. Returns `IpcResult<T> = { success, data?, error?, code?, errorMessage? }` so renderer code never throws on cross-process errors. `error` is always English — it is what the log keeps and what a bug report quotes. `code` tags a failure the UI has to _react_ to rather than merely show (`AUTH_UNREACHABLE` is the one), and `errorMessage` carries a translation key plus its variables for the failures the launcher raises about something the player can go and change, since `src/core/` has no locale. Progress lines travel the same way — see `ProgressKey`.
 
 Channels are grouped by domain: `auth`, `profiles`, `mods`, `content` (shaders + resource packs), `java`, `loaders`, `game`, `settings`, `news`, `announcements`, `manifest` (verification), `updater`, `system`, `window`.
 
@@ -324,7 +324,7 @@ post-main` description, and that exit is logged but not reported as a crash.
 - No Mica/acrylic backdrop on Windows 11; no one-click rollback to the previous
   launcher version; no warning when a user-installed mod collides with a manifest
   mod.
-- Dead IPC surface: `java:*`, `game:kill`, `game:is-running` and
-  `announcements:dismiss` are declared, handled and exposed but never called from
-  the renderer. `game:kill` is the one that costs the user something — there is
-  no way to stop a running game from the launcher.
+- Dead IPC surface: `game:kill`, `game:is-running` and `announcements:dismiss`
+  are declared, handled and exposed but never called from the renderer.
+  `game:kill` is the one that costs the user something — there is no way to stop
+  a running game from the launcher.
