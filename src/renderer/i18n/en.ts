@@ -489,6 +489,9 @@ export const en = {
   'settings.announcementFeed': 'Announcement feed URL',
   'settings.trustedKeysHint':
     'The White Ravens key is built into the launcher, which is why White Ravens packs verify on a fresh install. Until you add a key of your own the launcher reports what it verified but blocks nothing. Adding one switches enforcement on: only a signed manifest that verifies is installed.',
+  'settings.allowUnverifiedInstaller': 'Allow unverified loader installers',
+  'settings.allowUnverifiedInstallerHint':
+    'A Forge or NeoForge installer is a Java program the launcher runs. Normally it is checked against the checksum its repository publishes, and refused when there is none. Turn this on only if an older version you need publishes no checksum.',
   'settings.trustedKeyBuiltIn': 'Built into the launcher — always trusted',
   'settings.trustedKeyAdded': 'Added: {date}',
   'settings.trustedKeyName': 'Key name',

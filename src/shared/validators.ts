@@ -118,6 +118,17 @@ export const globalSettingsSchema = z.object({
    * A single launch can override this either way.
    */
   offlineMode: z.boolean().default(false),
+  /**
+   * Whether a loader installer with no published checksum may still be run.
+   *
+   * Off, because the launcher already refuses an unverifiable JRE for exactly
+   * this reason and the Forge installer is the same kind of artefact: a jar this
+   * process executes. Maven publishes `.sha1`/`.sha256` sidecars beside almost
+   * everything, so the case this covers is a genuinely old artefact whose
+   * repository never wrote one — rare, real, and the player's call rather than
+   * a silent log line.
+   */
+  allowUnverifiedLoaderInstaller: z.boolean().default(false),
 });
 
 export const profileSchema = z.object({

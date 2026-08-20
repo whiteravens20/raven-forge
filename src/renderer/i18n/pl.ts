@@ -511,6 +511,9 @@ export const pl: Translations = {
   'settings.announcementFeed': 'Announcement Feed URL',
   'settings.trustedKeysHint':
     'Klucz White Ravens jest wbudowany w launcher, dlatego paczki White Ravens są weryfikowane od pierwszego uruchomienia. Dopóki nie dodasz własnego klucza, launcher pokazuje wynik weryfikacji, ale niczego nie blokuje. Dodanie klucza włącza wymuszanie: instalowane będą wyłącznie podpisane manifesty, które da się zweryfikować.',
+  'settings.allowUnverifiedInstaller': 'Pozwól na niezweryfikowane instalatory loadera',
+  'settings.allowUnverifiedInstallerHint':
+    'Instalator Forge albo NeoForge to program w Javie, który launcher uruchamia. Normalnie jest sprawdzany sumą kontrolną publikowaną przez repozytorium i odrzucany, gdy jej nie ma. Włącz to tylko wtedy, gdy potrzebna starsza wersja żadnej nie publikuje.',
   'settings.trustedKeyBuiltIn': 'Wbudowany w launcher — zawsze zaufany',
   'settings.trustedKeyAdded': 'Dodano: {date}',
   'settings.trustedKeyName': 'Nazwa klucza',

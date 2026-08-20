@@ -216,6 +216,13 @@ export function SettingsPage() {
           })}
         </div>
 
+        <CheckboxRow
+          checked={settings.allowUnverifiedLoaderInstaller}
+          onChange={(v) => update({ allowUnverifiedLoaderInstaller: v })}
+          label={t('settings.allowUnverifiedInstaller')}
+        />
+        <p className="text-xs text-rf-text-muted">{t('settings.allowUnverifiedInstallerHint')}</p>
+
         <div className="grid grid-cols-2 gap-2 rounded-lg border border-rf-border bg-rf-surface p-3">
           <Input
             label={t('settings.trustedKeyName')}
