@@ -561,7 +561,7 @@ export const en = {
   'progress.modSync': 'Syncing mods',
   'progress.loaderInstall': 'Installing mod loader',
   'progress.javaDownload': 'Downloading Java',
-  'progress.gameAssets': 'Downloading game assets',
+  'progress.gameAssets': 'Game files',
   'progress.launcherUpdate': 'Updating the launcher',
   'progress.files.one': '{done}/{total} file',
   'progress.files.other': '{done}/{total} files',
@@ -572,9 +572,16 @@ export const en = {
   // says which one it is counting.
   'progress.msg.checkingFiles': 'Checking the installed files…',
   'progress.msg.downloadingFile': 'Downloading {name}…',
+  // Checking is its own phase and gets its own wording. On a launch with the
+  // game fully installed it is the only phase there is, and calling it a
+  // download made the launcher look like it was re-fetching Minecraft every
+  // time somebody pressed Play.
+  'progress.msg.checkingLibraries': 'Checking the Minecraft {version} libraries…',
+  'progress.msg.checkingAssets': 'Checking the game assets…',
   'progress.msg.downloadComplete': 'Download complete',
-  'progress.msg.libraries': 'Minecraft libraries {version}',
-  'progress.msg.assets': 'Game assets',
+  'progress.msg.gameFilesReady': 'Game files ready — nothing to download',
+  'progress.msg.libraries': 'Downloading the Minecraft {version} libraries…',
+  'progress.msg.assets': 'Downloading the game assets…',
   'progress.msg.javaDownloading': 'Downloading Java {version}…',
   'progress.msg.javaReady': 'Java {version} downloaded',
   'progress.msg.syncing': 'Syncing {name}…',

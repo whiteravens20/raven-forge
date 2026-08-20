@@ -154,6 +154,9 @@ async function forEachConcurrently<T>(
   if (firstRejection) throw (firstRejection as PromiseRejectedResult).reason;
 }
 
+/** How often the checking pass is allowed to say where it has got to. */
+const CHECK_EMIT_INTERVAL_MS = 100;
+
 /**
  * Fetch whatever is missing or wrong, and leave the rest alone.
  *
@@ -163,43 +166,91 @@ async function forEachConcurrently<T>(
  * passes over roughly four thousand assets plus every library and the client
  * jar, purely to conclude that nothing needed doing. The check itself is also
  * run at the download concurrency now rather than one file at a time.
+ *
+ * Both passes report, and each says what it is. Checking is the *whole* of a
+ * launch with nothing to fetch — several seconds of SHA-1 over every asset —
+ * and it used to run behind a bar frozen at zero, under the words "Downloading
+ * game assets", which was the one thing that was certainly not happening. The
+ * same correction the pack sync already got.
  */
 async function downloadBatch(
   tasks: DownloadTask[],
   concurrency: number,
-  opts?: { operationId: string; label?: ProgressMessage; signal?: AbortSignal },
+  opts?: {
+    operationId: string;
+    /** Said while the files already on disk are being checked. */
+    checkLabel?: ProgressMessage;
+    /** Said while the ones that failed that check are being fetched. */
+    downloadLabel?: ProgressMessage;
+    signal?: AbortSignal;
+  },
 ): Promise<void> {
   const total = tasks.length;
 
-  const report = (completed: number, message?: ProgressMessage) => {
+  const emit = (progress: number, message: ProgressMessage, done: number) => {
     if (!opts) return;
     emitAssetProgress({
       operationId: opts.operationId,
-      progress: total > 0 ? completed / total : 1,
-      message: message ?? opts.label ?? { key: 'progress.msg.downloading' },
-      filesCompleted: completed,
+      progress,
+      message,
+      filesCompleted: done,
       filesTotal: total,
     });
   };
 
-  report(0);
+  const checkLabel: ProgressMessage = opts?.checkLabel ?? { key: 'progress.msg.checkingFiles' };
+  const downloadLabel: ProgressMessage = opts?.downloadLabel ?? { key: 'progress.msg.downloading' };
+
+  // ── Pass one: which of these are already here and correct ──
+
+  emit(0, checkLabel, 0);
+  let checked = 0;
+  let lastCheckEmit = Date.now();
 
   const pending: DownloadTask[] = [];
   await forEachConcurrently(tasks, concurrency, async (task) => {
     throwIfCancelled(opts?.signal, 'Download');
+    // Counted on entry rather than on completion, so this pass can never report
+    // a full bar: the renderer clears an operation that says it has finished,
+    // and the downloads this pass exists to find are still to come.
+    //
+    // Rate-limited because checking runs at disk speed. Emitting per file would
+    // be thousands of IPC messages and renderer updates inside a couple of
+    // seconds, for a bar that has a hundred distinct positions. The downloads
+    // below space themselves out on the network and need no such limit.
+    const now = Date.now();
+    if (now - lastCheckEmit >= CHECK_EMIT_INTERVAL_MS) {
+      lastCheckEmit = now;
+      emit(total > 0 ? checked / total : 0, checkLabel, checked);
+    }
+    checked++;
     if (!(await fileExistsAndValid(task.dest, task.sha1, task.size))) pending.push(task);
   });
 
+  // ── Pass two: fetch what pass one turned down ──
+
   let completed = total - pending.length;
-  if (completed > 0) report(completed);
+  const reportDownload = () => emit(total > 0 ? completed / total : 1, downloadLabel, completed);
+
+  // Announced only when there is something to announce. Seeding the counter
+  // unconditionally put the download line on screen — at 100%, on a launch with
+  // nothing missing — for the one tick before the completion event replaced it.
+  if (pending.length > 0) reportDownload();
 
   await forEachConcurrently(pending, concurrency, async (task) => {
     await downloadFile(task.url, task.dest, task.sha1, 3, opts?.signal);
     completed++;
-    report(completed);
+    reportDownload();
   });
 
-  report(total, { key: 'progress.msg.downloadComplete' });
+  // Only a batch that actually fetched something says a download finished.
+  emit(
+    1,
+    pending.length > 0
+      ? { key: 'progress.msg.downloadComplete' }
+      : { key: 'progress.msg.gameFilesReady' },
+    total,
+  );
 }
 
 // ── Download client JAR ────────────────────────────────────
@@ -400,7 +451,8 @@ export async function ensureLibraries(
   log.info(`Ensuring ${tasks.length} libraries...`);
   await downloadBatch(tasks, concurrency, {
     operationId: `libraries-${meta.id}`,
-    label: { key: 'progress.msg.libraries', vars: { version: meta.id } },
+    checkLabel: { key: 'progress.msg.checkingLibraries', vars: { version: meta.id } },
+    downloadLabel: { key: 'progress.msg.libraries', vars: { version: meta.id } },
     signal,
   });
 
@@ -452,7 +504,8 @@ export async function ensureAssets(
   log.info(`Ensuring ${tasks.length} assets...`);
   await downloadBatch(tasks, settings.downloadConcurrency, {
     operationId: `assets-${meta.id}`,
-    label: { key: 'progress.msg.assets' },
+    checkLabel: { key: 'progress.msg.checkingAssets' },
+    downloadLabel: { key: 'progress.msg.assets' },
     signal,
   });
 }
