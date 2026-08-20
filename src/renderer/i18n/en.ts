@@ -324,6 +324,9 @@ export const en = {
   'profileForm.serverIp': 'Server IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Java arguments (optional)',
+  'profileForm.showSnapshots': 'Show snapshots',
+  'profileForm.snapshotHint':
+    'Snapshots are Mojang’s weekly test builds. Most mods have no build for one, and a world made in a snapshot may not open in the release that follows it.',
   'profileForm.advanced': 'Advanced',
   'profileForm.windowWidth': 'Game window width',
   'profileForm.windowHeight': 'Game window height',

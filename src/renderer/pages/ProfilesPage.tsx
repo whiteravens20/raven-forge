@@ -19,6 +19,7 @@ import { useGameStore } from '@stores/game-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Select } from '@components/ui/Select';
+import { Switch } from '@components/ui/Switch';
 import { EmptyState } from '@components/ui/EmptyState';
 import { ProfileAvatar } from '@components/ProfileAvatar';
 import { ProfileIconPicker } from '@components/ProfileIconPicker';
@@ -799,6 +800,9 @@ function ProfileForm({
   // list cannot be fetched, so a first run without network is still usable.
   const [mcVersions, setMcVersions] = useState<string[]>([]);
   const [mcVersionsFailed, setMcVersionsFailed] = useState(false);
+  const [showSnapshots, setShowSnapshots] = useState(false);
+  /** Whether the "is this profile already on a snapshot?" question has been asked. */
+  const snapshotsConsidered = useRef(false);
   const [loaderVersions, setLoaderVersions] = useState<LoaderVersion[]>([]);
   const [loaderVersionsFailed, setLoaderVersionsFailed] = useState(false);
   const [noLoaderBuilds, setNoLoaderBuilds] = useState(false);
@@ -810,15 +814,33 @@ function ProfileForm({
 
   useEffect(() => {
     let cancelled = false;
-    void api.game.getVersions().then((r) => {
+    void api.game.getVersions(showSnapshots).then((r) => {
       if (cancelled) return;
-      if (r.success && r.data?.length) setMcVersions(r.data);
-      else setMcVersionsFailed(true);
+      if (!r.success || !r.data?.length) {
+        setMcVersionsFailed(true);
+        return;
+      }
+      setMcVersions(r.data);
+      // A profile already pinned to a snapshot opens with the toggle off, and
+      // its own version is then not among the options — which a <select>
+      // renders as whatever happens to be first. Turning the toggle on is the
+      // honest reading of a profile that is already on one.
+      //
+      // Once only, and that is the important part: the same test on every
+      // fetch would turn the toggle straight back on the moment its owner
+      // switched it off, since the profile is still on the snapshot they
+      // picked. After this first look the control belongs to the person
+      // using it.
+      if (snapshotsConsidered.current) return;
+      snapshotsConsidered.current = true;
+      if (!showSnapshots && !r.data.includes(latest.current.draft.minecraftVersion)) {
+        setShowSnapshots(true);
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showSnapshots]);
 
   useEffect(() => {
     setLoaderVersions([]);
@@ -861,6 +883,16 @@ function ProfileForm({
     onChange({ ...draft, [key]: value });
   };
 
+  // The version the profile is on is always among the options, even when the
+  // list being shown does not contain it — during the refetch the toggle above
+  // triggers, and for good in the case of a version Mojang has stopped
+  // publishing. A <select> whose value is not an option displays the first one
+  // instead, which is a screen that quietly disagrees with the profile.
+  const versionOptions =
+    draft.minecraftVersion && !mcVersions.includes(draft.minecraftVersion)
+      ? [draft.minecraftVersion, ...mcVersions]
+      : mcVersions;
+
   // One message, on the field that is actually wrong: a pair of identical red
   // lines under two adjacent boxes reads as two faults rather than one.
   const sizeProblem = windowSizeProblem(draft);
@@ -899,12 +931,25 @@ function ProfileForm({
           autoFocus
         />
         {mcVersions.length > 0 ? (
-          <Select
-            label={t('profileForm.mcVersion')}
-            options={mcVersions.map((v) => ({ value: v, label: v }))}
-            value={draft.minecraftVersion}
-            onChange={(e) => set('minecraftVersion', e.target.value)}
-          />
+          <div className="flex flex-col gap-1.5">
+            <Select
+              label={t('profileForm.mcVersion')}
+              options={versionOptions.map((v) => ({ value: v, label: v }))}
+              value={draft.minecraftVersion}
+              onChange={(e) => set('minecraftVersion', e.target.value)}
+            />
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={showSnapshots}
+                onChange={setShowSnapshots}
+                label={t('profileForm.showSnapshots')}
+              />
+              <span className="text-xs text-rf-text-muted">{t('profileForm.showSnapshots')}</span>
+            </div>
+            {showSnapshots && (
+              <p className="text-xs text-rf-text-muted">{t('profileForm.snapshotHint')}</p>
+            )}
+          </div>
         ) : (
           // Only reachable when Mojang's manifest could not be fetched and no
           // cached copy exists — a free field beats blocking profile creation.

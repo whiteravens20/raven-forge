@@ -341,6 +341,9 @@ export const pl: Translations = {
   'profileForm.serverIp': 'Serwer IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Argumenty Java (opcjonalnie)',
+  'profileForm.showSnapshots': 'Pokaż snapshoty',
+  'profileForm.snapshotHint':
+    'Snapshoty to cotygodniowe wersje testowe Mojanga. Większość modów nie ma pod nie buildów, a świat stworzony w snapshocie może się nie otworzyć w kolejnym wydaniu.',
   'profileForm.advanced': 'Zaawansowane',
   'profileForm.windowWidth': 'Szerokość okna gry',
   'profileForm.windowHeight': 'Wysokość okna gry',
