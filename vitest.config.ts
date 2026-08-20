@@ -14,16 +14,5 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/**/*.test.ts'],
-    // Anything that talks to the network, the keychain or a child process is
-    // out of scope here; these cover the pure logic where a silent wrong answer
-    // is worse than a crash.
-    coverage: {
-      include: [
-        'src/core/minecraft/launch-args.ts',
-        'src/core/mods/integrity.ts',
-        'src/core/updater/canonical.ts',
-        'src/core/auth/offline-uuid.ts',
-      ],
-    },
   },
 });
