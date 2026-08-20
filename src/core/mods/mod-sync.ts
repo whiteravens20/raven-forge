@@ -52,10 +52,7 @@ import type {
   TrustedKey,
 } from '../../shared/ipc-types';
 
-function emitProgress(
-  channel: 'progress:mod-sync' | 'progress:mod-download',
-  event: ProgressEvent,
-): void {
+function emitProgress(channel: 'progress:mod-sync', event: ProgressEvent): void {
   getMainWindow()?.webContents.send(channel, event);
 }
 

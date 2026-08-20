@@ -6,7 +6,6 @@ import type { ProgressMessage } from '@shared/ipc-types';
 
 const CHANNEL_LABELS: Record<string, TranslationKey> = {
   'progress:mod-sync': 'progress.modSync',
-  'progress:mod-download': 'progress.modDownload',
   'progress:loader-install': 'progress.loaderInstall',
   'progress:java-download': 'progress.javaDownload',
   'progress:game-assets': 'progress.gameAssets',

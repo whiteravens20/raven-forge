@@ -88,7 +88,7 @@ export function updateSupportFor(
   return null;
 }
 
-export function updateSupport(): UpdateUnsupportedReason | null {
+function updateSupport(): UpdateUnsupportedReason | null {
   return updateSupportFor(app.isPackaged, process.platform, Boolean(process.env.APPIMAGE));
 }
 

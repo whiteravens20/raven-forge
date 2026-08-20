@@ -65,11 +65,7 @@ import {
 import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater/launcher-updater';
 import { detectSystemJava, probeJava } from '../core/java/java-manager';
 import { requiredJavaFor } from '../core/minecraft/java-requirement';
-import {
-  installLoader,
-  getLoaderVersions,
-  isLoaderInstalled,
-} from '../core/modloader/loader-manager';
+import { getLoaderVersions } from '../core/modloader/loader-manager';
 import { launchGame, killGame, isGameRunning, getLogTail } from '../core/minecraft/game-launcher';
 import { getVersionManifest } from '../core/minecraft/version-manifest';
 import { cancelJob } from '../core/util/cancellation';
@@ -413,10 +409,6 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to refresh announcements: ${reason(err)}`);
     }
   });
-  handle('announcements:dismiss', async (_event, _id: string) => {
-    // Dismissal is handled client-side (stored in localStorage / zustand)
-    return ok(undefined);
-  });
 
   // ── Auth ─────────────────────────────────────────────────
   handle('auth:login-microsoft', async () => {
@@ -471,13 +463,6 @@ export function registerAllIpcHandlers(): void {
       return ok(await getAllProfiles());
     } catch (err) {
       return fail(`Failed to get profiles: ${reason(err)}`);
-    }
-  });
-  handle('profiles:get', async (_event, profileId: string) => {
-    try {
-      return ok(await getProfile(profileId));
-    } catch (err) {
-      return fail(`Failed to get profile: ${reason(err)}`);
     }
   });
   handle('profiles:create', async (_event, profile) => {
@@ -906,26 +891,11 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Mod Loaders ──────────────────────────────────────────
-  handle('loaders:install', async (_event, loader, loaderVersion, mcVersion) => {
-    try {
-      await installLoader(loader, loaderVersion, mcVersion);
-      return ok(undefined);
-    } catch (err) {
-      return fail(`Failed to install loader: ${reason(err)}`);
-    }
-  });
   handle('loaders:get-versions', async (_event, loader, mcVersion) => {
     try {
       return ok(await getLoaderVersions(loader, mcVersion));
     } catch (err) {
       return fail(`Failed to get loader versions: ${reason(err)}`);
-    }
-  });
-  handle('loaders:is-installed', async (_event, loader, loaderVersion, mcVersion) => {
-    try {
-      return ok(await isLoaderInstalled(loader, loaderVersion, mcVersion));
-    } catch (err) {
-      return fail(`Failed to check loader: ${reason(err)}`);
     }
   });
 
@@ -952,13 +922,6 @@ export function registerAllIpcHandlers(): void {
       return ok(undefined);
     } catch (err) {
       return fail(`Failed to kill game: ${reason(err)}`);
-    }
-  });
-  handle('game:is-running', async (_event, profileId: string) => {
-    try {
-      return ok(await isGameRunning(profileId));
-    } catch (err) {
-      return fail(`Failed to check game status: ${reason(err)}`);
     }
   });
   handle('game:get-log-tail', async (_event, profileId: string, lines?: number) => {

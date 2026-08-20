@@ -67,7 +67,7 @@ export async function getVersionManifest(forceRefresh = false): Promise<VersionM
 /**
  * Find a version entry by ID.
  */
-export async function findVersion(versionId: string): Promise<VersionEntry | undefined> {
+async function findVersion(versionId: string): Promise<VersionEntry | undefined> {
   const manifest = await getVersionManifest();
   return manifest.versions.find((v) => v.id === versionId);
 }

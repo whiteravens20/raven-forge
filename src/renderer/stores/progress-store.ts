@@ -5,7 +5,6 @@ const api = window.ravenforge;
 
 type Channel =
   | 'progress:mod-sync'
-  | 'progress:mod-download'
   | 'progress:loader-install'
   | 'progress:java-download'
   | 'progress:game-assets'
@@ -27,7 +26,6 @@ interface ProgressStore {
 
 const CHANNELS: Channel[] = [
   'progress:mod-sync',
-  'progress:mod-download',
   'progress:loader-install',
   'progress:java-download',
   'progress:game-assets',

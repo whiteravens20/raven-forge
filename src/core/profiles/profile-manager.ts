@@ -369,7 +369,7 @@ export async function exportProfile(profileId: string): Promise<string> {
  * only for the ones the launcher does honour. A field it has never heard of —
  * or no longer has — is dropped by the parse below without being named here.
  */
-export const NOT_IMPORTED = ['customJavaPath', 'javaArgs'] as const;
+const NOT_IMPORTED = ['customJavaPath', 'javaArgs'] as const;
 
 /** A profile export, reduced to what may safely be turned into a new profile. */
 export interface ImportedProfile {

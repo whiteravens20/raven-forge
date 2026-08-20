@@ -76,7 +76,6 @@ export interface InvokeChannels {
 
   // -- Profiles --
   'profiles:get-all': () => Promise<IpcResult<Profile[]>>;
-  'profiles:get': (profileId: string) => Promise<IpcResult<Profile>>;
   'profiles:create': (
     profile: Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>,
   ) => Promise<IpcResult<Profile>>;
@@ -157,10 +156,6 @@ export interface InvokeChannels {
     profileId: string,
     mod: ModSearchResult,
   ) => Promise<IpcResult<InstallPlan>>;
-  'mods:install-from-file': (
-    profileId: string,
-    filePath: string,
-  ) => Promise<IpcResult<InstalledMod>>;
   'mods:uninstall': (profileId: string, modId: string) => Promise<IpcResult<void>>;
   'mods:toggle-enabled': (
     profileId: string,
@@ -219,25 +214,14 @@ export interface InvokeChannels {
   'java:probe': (binPath: string, minecraftVersion: string) => Promise<IpcResult<JavaProbe>>;
 
   // -- Mod Loaders --
-  'loaders:install': (
-    loader: ModLoaderType,
-    loaderVersion: string,
-    mcVersion: string,
-  ) => Promise<IpcResult<void>>;
   'loaders:get-versions': (
     loader: ModLoaderType,
     mcVersion: string,
   ) => Promise<IpcResult<LoaderVersion[]>>;
-  'loaders:is-installed': (
-    loader: ModLoaderType,
-    loaderVersion: string,
-    mcVersion: string,
-  ) => Promise<IpcResult<boolean>>;
 
   // -- Game Launch --
   'game:launch': (options: LaunchOptions) => Promise<IpcResult<void>>;
   'game:kill': (profileId: string) => Promise<IpcResult<void>>;
-  'game:is-running': (profileId: string) => Promise<IpcResult<boolean>>;
   /** Recent stdout already buffered in main, so a console opened mid-game is not blank. */
   'game:get-log-tail': (profileId: string, lines?: number) => Promise<IpcResult<string[]>>;
   /** Minecraft version ids from Mojang, newest first. Releases only unless asked. */
@@ -266,7 +250,6 @@ export interface InvokeChannels {
   'news:refresh': () => Promise<IpcResult<FeedResult<NewsItem>>>;
   'announcements:get': () => Promise<IpcResult<FeedResult<Announcement>>>;
   'announcements:refresh': () => Promise<IpcResult<FeedResult<Announcement>>>;
-  'announcements:dismiss': (id: string) => Promise<IpcResult<void>>;
 
   // -- Manifest Verification --
   'manifest:verify': (profileId: string) => Promise<IpcResult<ManifestVerification>>;
@@ -302,7 +285,6 @@ export interface InvokeChannels {
 export interface EventChannels {
   // -- Progress Events --
   'progress:mod-sync': (event: ProgressEvent) => void;
-  'progress:mod-download': (event: ProgressEvent) => void;
   'progress:loader-install': (event: ProgressEvent) => void;
   'progress:java-download': (event: ProgressEvent) => void;
   'progress:game-assets': (event: ProgressEvent) => void;
@@ -316,17 +298,14 @@ export interface EventChannels {
 
   // -- Auth Events --
   'auth:state-changed': (state: AuthState) => void;
-  'auth:token-expired': (accountId: string) => void;
 
   // -- Profile Events --
   'profiles:sync-status-changed': (status: ProfileSyncStatus) => void;
-  'profiles:updated': (profile: Profile) => void;
 
   // -- Updater Events --
   'updater:update-available': (info: UpdateInfo) => void;
   'updater:update-downloaded': (info: UpdateInfo) => void;
   // -- Announcement Events --
-  'announcements:new': (announcement: Announcement) => void;
 
   // -- Window Events --
   'window:maximized-changed': (isMaximized: boolean) => void;
@@ -355,7 +334,6 @@ export interface RavenForgeAPI {
   };
   profiles: {
     getAll: InvokeChannels['profiles:get-all'];
-    get: InvokeChannels['profiles:get'];
     create: InvokeChannels['profiles:create'];
     update: InvokeChannels['profiles:update'];
     delete: InvokeChannels['profiles:delete'];
@@ -388,7 +366,6 @@ export interface RavenForgeAPI {
     syncManifest: InvokeChannels['mods:sync-manifest'];
     installFromSearch: InvokeChannels['mods:install-from-search'];
     checkInstall: InvokeChannels['mods:check-install'];
-    installFromFile: InvokeChannels['mods:install-from-file'];
     uninstall: InvokeChannels['mods:uninstall'];
     toggleEnabled: InvokeChannels['mods:toggle-enabled'];
     checkUpdates: InvokeChannels['mods:check-updates'];
@@ -413,14 +390,11 @@ export interface RavenForgeAPI {
     probe: InvokeChannels['java:probe'];
   };
   loaders: {
-    install: InvokeChannels['loaders:install'];
     getVersions: InvokeChannels['loaders:get-versions'];
-    isInstalled: InvokeChannels['loaders:is-installed'];
   };
   game: {
     launch: InvokeChannels['game:launch'];
     kill: InvokeChannels['game:kill'];
-    isRunning: InvokeChannels['game:is-running'];
     getLogTail: InvokeChannels['game:get-log-tail'];
     getVersions: InvokeChannels['game:get-versions'];
     cancel: InvokeChannels['game:cancel'];
@@ -443,7 +417,6 @@ export interface RavenForgeAPI {
   announcements: {
     get: InvokeChannels['announcements:get'];
     refresh: InvokeChannels['announcements:refresh'];
-    dismiss: InvokeChannels['announcements:dismiss'];
   };
   manifest: {
     verify: InvokeChannels['manifest:verify'];

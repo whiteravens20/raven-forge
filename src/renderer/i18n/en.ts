@@ -556,7 +556,6 @@ export const en = {
   // ── Progress overlay ─────────────────────────────────────
   'progress.title': 'Install progress',
   'progress.modSync': 'Syncing mods',
-  'progress.modDownload': 'Downloading mods',
   'progress.loaderInstall': 'Installing mod loader',
   'progress.javaDownload': 'Downloading Java',
   'progress.gameAssets': 'Downloading game assets',

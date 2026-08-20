@@ -560,7 +560,6 @@ export const pl: Translations = {
   // ── Progress overlay ─────────────────────────────────────
   'progress.title': 'Postęp instalacji',
   'progress.modSync': 'Synchronizacja modów',
-  'progress.modDownload': 'Pobieranie modów',
   'progress.loaderInstall': 'Instalacja mod loadera',
   'progress.javaDownload': 'Pobieranie Javy',
   'progress.gameAssets': 'Pobieranie zasobów gry',

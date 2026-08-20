@@ -16,7 +16,7 @@ import { useT, type TranslationKey, type TranslationVars } from './index';
 // `**strong**` first so its inner asterisks are consumed before `*em*` sees them.
 const MARKUP_RE = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
 
-export function renderRich(text: string): ReactNode {
+function renderRich(text: string): ReactNode {
   const parts = text.split(MARKUP_RE);
   if (parts.length === 1) return text;
 

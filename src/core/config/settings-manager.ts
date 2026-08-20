@@ -70,7 +70,7 @@ function safeJsonParse(raw: string): unknown {
 /**
  * Save settings to disk.
  */
-export async function saveSettings(settings: GlobalSettings): Promise<void> {
+async function saveSettings(settings: GlobalSettings): Promise<void> {
   await writeJsonAtomic(paths.settings, settings);
   cachedSettings = settings;
 }

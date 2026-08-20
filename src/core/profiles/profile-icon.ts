@@ -28,7 +28,7 @@ const ALLOWED_TYPES: Record<string, string> = {
 /** An avatar renders at 40px. Anything past this is a mistake, not a choice. */
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
 
-export const ALLOWED_ICON_EXTENSIONS = Object.keys(ALLOWED_TYPES).map((e) => e.slice(1));
+const ALLOWED_ICON_EXTENSIONS = Object.keys(ALLOWED_TYPES).map((e) => e.slice(1));
 
 function iconPathFor(profileId: string, ext: string): string {
   return path.join(paths.profileDir(profileId), `icon${ext}`);
