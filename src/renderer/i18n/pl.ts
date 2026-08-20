@@ -179,6 +179,12 @@ export const pl: Translations = {
   'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
   'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',
   'profiles.exportPackDone.one': 'Zapisano do {path}. Paczka odsyła do 1 pliku na Modrinth.',
+  // `do` governs the genitive, so `few` and `many` come out identical here.
+  // Two forms that happen to agree, not one form written twice — leaving them
+  // to fall back on `.other` is what a count of three used to do.
+  'profiles.exportPackDone.few': 'Zapisano do {path}. Paczka odsyła do {count} plików na Modrinth.',
+  'profiles.exportPackDone.many':
+    'Zapisano do {path}. Paczka odsyła do {count} plików na Modrinth.',
   'profiles.exportPackDone.other':
     'Zapisano do {path}. Paczka odsyła do {count} plików na Modrinth.',
   'profiles.exportPackBundled.one':
