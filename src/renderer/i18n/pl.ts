@@ -118,6 +118,9 @@ export const pl: Translations = {
   'home.running': 'Uruchomiona...',
   'home.preparing': 'Uruchamianie...',
   'home.cancelLaunch': 'Anuluj',
+  'home.stopGame': 'Zatrzymaj grę',
+  'home.stopping': 'Zatrzymywanie…',
+  'home.stopFailed': 'Nie udało się zatrzymać gry.',
   'home.authUnreachable':
     'Nie udało się połączyć z serwerami logowania Microsoft. Możesz zagrać offline — tylko singleplayer i LAN, serwery w trybie online odrzucą połączenie.',
   'home.launchOffline': 'Graj offline',

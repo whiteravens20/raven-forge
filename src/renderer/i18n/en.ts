@@ -129,6 +129,9 @@ export const en = {
   'home.running': 'Running…',
   'home.preparing': 'Starting…',
   'home.cancelLaunch': 'Cancel',
+  'home.stopGame': 'Stop the game',
+  'home.stopping': 'Stopping…',
+  'home.stopFailed': 'Could not stop the game.',
   'home.authUnreachable':
     'Could not reach the Microsoft sign-in servers. You can play offline — singleplayer and LAN only, and online-mode servers will refuse the connection.',
   'home.launchOffline': 'Play offline',
