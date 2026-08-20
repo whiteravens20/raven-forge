@@ -46,6 +46,18 @@ const OP_PONG = 4;
 /** Header: opcode and payload length, both int32 little-endian. */
 const HEADER_BYTES = 8;
 
+/**
+ * The largest frame this will assemble before giving up on the peer.
+ *
+ * Discord's replies here are a handshake acknowledgement and small event
+ * frames; nothing legitimate comes close. The cap is not about Discord. The
+ * socket path (`discord-ipc-0` … `-9`) is public and unauthenticated, and any
+ * local process may take it before Discord does — at which point the length
+ * field is simply a number an unknown program chose, and this loop would size a
+ * buffer from it.
+ */
+const MAX_FRAME_BYTES = 1 << 20;
+
 /** Discord numbers its sockets; a second running client takes the next index. */
 const SOCKET_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -167,12 +179,23 @@ function handshake(sock: net.Socket): Promise<boolean> {
     const onFailure = () => settle(false);
     const timer = setTimeout(() => settle(false), CONNECT_TIMEOUT_MS);
 
+    // Everything arriving here is bytes from a socket whose path anyone on this
+    // machine can claim, so it is parsed as untrusted input: a negative or
+    // absurd length is refused rather than used as a size, and a body that is
+    // not JSON ends the attempt instead of throwing out of an event handler —
+    // where, before the main process had a global handler, it took the launcher
+    // down with it.
     const onData = (chunk: Buffer) => {
       buffer = Buffer.concat([buffer, chunk]);
       // Discord may coalesce frames into one chunk, or split one across two.
       while (buffer.length >= HEADER_BYTES) {
         const op = buffer.readInt32LE(0);
         const length = buffer.readInt32LE(4);
+        if (length < 0 || length > MAX_FRAME_BYTES) {
+          log.warn(`Discord IPC sent a frame claiming ${length} bytes — dropping the connection`);
+          settle(false);
+          return;
+        }
         if (buffer.length < HEADER_BYTES + length) return;
         const body = buffer.subarray(HEADER_BYTES, HEADER_BYTES + length).toString('utf8');
         buffer = buffer.subarray(HEADER_BYTES + length);
@@ -181,13 +204,22 @@ function handshake(sock: net.Socket): Promise<boolean> {
           settle(false);
           return;
         }
+
+        let payload: unknown;
+        try {
+          payload = JSON.parse(body) as unknown;
+        } catch {
+          log.warn('Discord IPC sent a frame that is not JSON — dropping the connection');
+          settle(false);
+          return;
+        }
+
         if (op === OP_PING) {
-          sock.write(encodeFrame(OP_PONG, JSON.parse(body)));
+          sock.write(encodeFrame(OP_PONG, payload));
           continue;
         }
         if (op === OP_FRAME) {
-          const frame = JSON.parse(body) as { evt?: string };
-          if (frame.evt === 'READY') settle(true);
+          if ((payload as { evt?: string } | null)?.evt === 'READY') settle(true);
         }
       }
     };
