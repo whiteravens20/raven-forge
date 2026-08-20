@@ -371,6 +371,17 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
 });
 
 describe.skipIf(!posix)('detectSystemJava', () => {
+  /**
+   * However long every JVM on this machine takes to say what it is.
+   *
+   * The scan is not confined to the fixture and cannot be: it walks
+   * `/usr/lib/jvm` and starts each `java -version` it finds, one after another,
+   * which on a CI runner with four JDKs installed is comfortably past the
+   * default five seconds. Faking the probe would leave nothing here worth
+   * asserting, so the suite pays for what the host has instead.
+   */
+  const WHATEVER_IS_INSTALLED = 60_000;
+
   const javaHome = () => process.env.JAVA_HOME;
   let saved: string | undefined;
 
@@ -383,40 +394,52 @@ describe.skipIf(!posix)('detectSystemJava', () => {
     else process.env.JAVA_HOME = saved;
   });
 
-  it('finds the runtime JAVA_HOME points at', async () => {
-    const { detectSystemJava } = await loadModule();
-    const home = path.join(root, 'jdk21');
-    await writeFakeJava(path.join(home, 'bin', 'java'), '21.0.3');
-    process.env.JAVA_HOME = home;
+  it(
+    'finds the runtime JAVA_HOME points at',
+    async () => {
+      const { detectSystemJava } = await loadModule();
+      const home = path.join(root, 'jdk21');
+      await writeFakeJava(path.join(home, 'bin', 'java'), '21.0.3');
+      process.env.JAVA_HOME = home;
 
-    const found = await detectSystemJava();
-    expect(found).toContainEqual({
-      version: 21,
-      path: path.join(home, 'bin', 'java'),
-      vendor: 'system',
-      managed: false,
-    });
-  });
+      const found = await detectSystemJava();
+      expect(found).toContainEqual({
+        version: 21,
+        path: path.join(home, 'bin', 'java'),
+        vendor: 'system',
+        managed: false,
+      });
+    },
+    WHATEVER_IS_INSTALLED,
+  );
 
-  it('ignores a JAVA_HOME with no runtime under it', async () => {
-    const { detectSystemJava } = await loadModule();
-    const home = path.join(root, 'empty');
-    await fs.mkdir(home, { recursive: true });
-    process.env.JAVA_HOME = home;
+  it(
+    'ignores a JAVA_HOME with no runtime under it',
+    async () => {
+      const { detectSystemJava } = await loadModule();
+      const home = path.join(root, 'empty');
+      await fs.mkdir(home, { recursive: true });
+      process.env.JAVA_HOME = home;
 
-    const found = await detectSystemJava();
-    expect(found.some((i) => i.path.startsWith(home))).toBe(false);
-  });
+      const found = await detectSystemJava();
+      expect(found.some((i) => i.path.startsWith(home))).toBe(false);
+    },
+    WHATEVER_IS_INSTALLED,
+  );
 
-  it('lists no path twice, however many names lead to it', async () => {
-    const { detectSystemJava } = await loadModule();
-    const home = path.join(root, 'jdk-real');
-    await writeFakeJava(path.join(home, 'bin', 'java'), '21.0.3');
-    process.env.JAVA_HOME = path.join(root, 'jdk-link');
-    await fs.symlink(home, path.join(root, 'jdk-link'));
+  it(
+    'lists no path twice, however many names lead to it',
+    async () => {
+      const { detectSystemJava } = await loadModule();
+      const home = path.join(root, 'jdk-real');
+      await writeFakeJava(path.join(home, 'bin', 'java'), '21.0.3');
+      process.env.JAVA_HOME = path.join(root, 'jdk-link');
+      await fs.symlink(home, path.join(root, 'jdk-link'));
 
-    const found = await detectSystemJava();
-    const resolved = await Promise.all(found.map((i) => fs.realpath(i.path)));
-    expect(new Set(resolved).size).toBe(resolved.length);
-  });
+      const found = await detectSystemJava();
+      const resolved = await Promise.all(found.map((i) => fs.realpath(i.path)));
+      expect(new Set(resolved).size).toBe(resolved.length);
+    },
+    WHATEVER_IS_INSTALLED,
+  );
 });
