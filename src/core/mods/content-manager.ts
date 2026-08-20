@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
+import { serializeByKey } from '../util/serialize';
 import { getVersion, getModVersions, getProjectTitle, primaryFile } from './modrinth-api';
 import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
@@ -30,9 +31,11 @@ function indexPath(kind: ContentKind, profileId: string): string {
 }
 
 async function readIndex(kind: ContentKind, profileId: string): Promise<InstalledMod[]> {
+  // Outside the `try`, for the same reason as `readLockFile`: a missing file is
+  // an ordinary empty state, an id that is not a path component is not.
+  const file = indexPath(kind, profileId);
   try {
-    const raw = await fs.readFile(indexPath(kind, profileId), 'utf-8');
-    return JSON.parse(raw) as InstalledMod[];
+    return JSON.parse(await fs.readFile(file, 'utf-8')) as InstalledMod[];
   } catch {
     return [];
   }
@@ -44,6 +47,27 @@ async function writeIndex(
   items: InstalledMod[],
 ): Promise<void> {
   await writeJsonAtomic(indexPath(kind, profileId), items);
+}
+
+/**
+ * Read one of these indexes, change it, and write it back with nothing in
+ * between — the same guarantee `mutateLockFile` gives `installed.lock`.
+ *
+ * These files are written by the same overlapping paths: a manifest sync
+ * reconciling the whole list while the player installs a pack from the browser.
+ * Both used to read, download, and write the whole array back.
+ */
+function mutateIndex<T>(
+  kind: ContentKind,
+  profileId: string,
+  mutate: (items: InstalledMod[]) => T | Promise<T>,
+): Promise<T> {
+  return serializeByKey(indexPath(kind, profileId), async () => {
+    const items = await readIndex(kind, profileId);
+    const result = await mutate(items);
+    await writeIndex(kind, profileId, items);
+    return result;
+  });
 }
 
 export async function listContent(kind: ContentKind, profileId: string): Promise<InstalledMod[]> {
@@ -141,9 +165,7 @@ export async function installContent(
       enabled: true,
       fromManifest: false,
     };
-    const items = await readIndex(kind, profileId);
-    items.push(installed);
-    await writeIndex(kind, profileId, items);
+    await mutateIndex(kind, profileId, (items) => items.push(installed));
     if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
     log.info(`Installed ${kind.slice(0, -1)} from file: ${fileName}`);
     return installed;
@@ -169,19 +191,19 @@ export async function installContent(
     fromManifest: false,
   };
 
-  const items = await readIndex(kind, profileId);
-  const idx = items.findIndex((m) => m.id === installed.id);
-  if (idx >= 0) {
-    try {
-      await fs.rm(path.join(dir, items[idx].fileName), { force: true });
-    } catch {
-      /* ok */
+  await mutateIndex(kind, profileId, async (items) => {
+    const idx = items.findIndex((m) => m.id === installed.id);
+    if (idx >= 0) {
+      try {
+        await fs.rm(path.join(dir, items[idx].fileName), { force: true });
+      } catch {
+        /* ok */
+      }
+      items[idx] = installed;
+    } else {
+      items.push(installed);
     }
-    items[idx] = installed;
-  } else {
-    items.push(installed);
-  }
-  await writeIndex(kind, profileId, items);
+  });
   if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
   return installed;
 }
@@ -203,7 +225,6 @@ export async function syncContentFromManifest(
   await fs.mkdir(dir, { recursive: true });
 
   const existing = await readIndex(kind, profileId);
-  const userInstalled = existing.filter((item) => !item.fromManifest);
   const fromManifest: InstalledMod[] = [];
 
   for (const entry of entries) {
@@ -282,7 +303,14 @@ export async function syncContentFromManifest(
     log.info(`Removed orphaned ${kind.slice(0, -1)} ${stale.name} from profile ${profileId}`);
   }
 
-  await writeIndex(kind, profileId, [...fromManifest, ...userInstalled]);
+  // Read again under the lock rather than reusing `userInstalled`, which was
+  // taken before the downloads: only the manifest's half of this index is this
+  // function's to replace, and a pack installed by hand in the meantime belongs
+  // to the other half.
+  await mutateIndex(kind, profileId, (items) => {
+    const stillUserInstalled = items.filter((item) => !item.fromManifest);
+    items.splice(0, items.length, ...fromManifest, ...stillUserInstalled);
+  });
   if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
   return fromManifest.length;
 }
@@ -293,22 +321,21 @@ export async function removeContent(
   id: string,
 ): Promise<void> {
   const dir = targetDir(kind, profileId);
-  const items = await readIndex(kind, profileId);
-  const item = items.find((m) => m.id === id);
-  if (!item) throw new Error(`${kind.slice(0, -1)} ${id} not found`);
+  const name = await mutateIndex(kind, profileId, async (items) => {
+    const idx = items.findIndex((m) => m.id === id);
+    if (idx < 0) throw new Error(`${kind.slice(0, -1)} ${id} not found`);
+    const item = items[idx];
 
-  try {
-    await fs.rm(path.join(dir, item.fileName), { force: true });
-  } catch {
-    /* ok */
-  }
-  await writeIndex(
-    kind,
-    profileId,
-    items.filter((m) => m.id !== id),
-  );
+    try {
+      await fs.rm(path.join(dir, item.fileName), { force: true });
+    } catch {
+      /* ok */
+    }
+    items.splice(idx, 1);
+    return item.name;
+  });
   if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
-  log.info(`Removed ${kind.slice(0, -1)} ${item.name} from profile ${profileId}`);
+  log.info(`Removed ${kind.slice(0, -1)} ${name} from profile ${profileId}`);
 }
 
 /**
@@ -320,16 +347,18 @@ export async function removeContent(
  * way into the file.
  */
 export async function reorderResourcePacks(profileId: string, orderedIds: string[]): Promise<void> {
-  const items = await readIndex('resourcepacks', profileId);
-  const byId = new Map(items.map((m) => [m.id, m]));
-  const reordered = orderedIds
-    .map((id) => byId.get(id))
-    .filter((m): m is InstalledMod => Boolean(m));
-  // Append any missing items at the end
-  for (const item of items) {
-    if (!orderedIds.includes(item.id)) reordered.push(item);
-  }
-  await writeIndex('resourcepacks', profileId, reordered);
+  const count = await mutateIndex('resourcepacks', profileId, (items) => {
+    const byId = new Map(items.map((m) => [m.id, m]));
+    const reordered = orderedIds
+      .map((id) => byId.get(id))
+      .filter((m): m is InstalledMod => Boolean(m));
+    // Append any missing items at the end
+    for (const item of items) {
+      if (!orderedIds.includes(item.id)) reordered.push(item);
+    }
+    items.splice(0, items.length, ...reordered);
+    return reordered.length;
+  });
   await syncResourcePackSelection(profileId);
-  log.info(`Reordered ${reordered.length} resource packs for profile ${profileId}`);
+  log.info(`Reordered ${count} resource packs for profile ${profileId}`);
 }

@@ -42,7 +42,6 @@ import {
   getInstalledMods,
   syncManifest,
   installModFromSearch,
-  installModFromFile,
   uninstallMod,
   toggleModEnabled,
 } from '../core/mods/mod-sync';
@@ -731,13 +730,6 @@ export function registerAllIpcHandlers(): void {
       return ok(await planModInstall(profile, mod, await getInstalledMods(profileId)));
     } catch (err) {
       return fail(`Could not check compatibility: ${reason(err)}`);
-    }
-  });
-  handle('mods:install-from-file', async (_event, profileId: string, filePath: string) => {
-    try {
-      return ok(await installModFromFile(profileId, filePath));
-    } catch (err) {
-      return fail(`Failed to install mod from file: ${reason(err)}`);
     }
   });
   handle('mods:uninstall', async (_event, profileId: string, modId: string) => {

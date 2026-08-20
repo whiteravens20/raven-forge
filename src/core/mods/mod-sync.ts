@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import {
   beginJob,
@@ -19,7 +18,7 @@ import {
   primaryFile,
   type ModrinthVersion,
 } from './modrinth-api';
-import { readLockFile, writeLockFile, modFilePath } from './lock-file';
+import { readLockFile, mutateLockFile, modFilePath } from './lock-file';
 import { requiredDependencies } from './compatibility';
 import { acceptedLoaders } from '../../shared/constants';
 import { downloadToFile } from '../net/download';
@@ -501,7 +500,6 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     // Client-side sync: server-only mods are not installed into a player instance.
     const entries = manifest.mods.filter((m) => m.side === 'client' || m.side === 'both');
     const existing = await readLockFile(profileId);
-    const userInstalled = existing.filter((m) => !m.fromManifest);
     const synced: InstalledMod[] = [];
 
     // Checking comes first and downloading second, as two passes with two
@@ -682,8 +680,26 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
 
     // Mods that were installed from a previous manifest but are gone from this one.
     const keptIds = new Set(synced.map((m) => m.id));
-    const orphaned = existing.filter((m) => m.fromManifest && !keptIds.has(m.id));
 
+    // Read again here, under the lock, rather than reusing the snapshot taken
+    // before the downloads: minutes have passed, and a mod the player installed
+    // by hand in the meantime would otherwise be written out of existence by a
+    // list assembled before it arrived. Only the manifest's own half of the file
+    // is this function's to replace.
+    const orphaned = await mutateLockFile(profileId, (mods) => {
+      const userInstalled = mods.filter((m) => !m.fromManifest);
+      const stale = mods.filter((m) => m.fromManifest && !keptIds.has(m.id));
+      const next = settings.autoRemoveOrphanedMods
+        ? [...synced, ...userInstalled]
+        : // Keep them installed and surface the count so the UI can prompt.
+          [...synced, ...stale, ...userInstalled];
+      mods.splice(0, mods.length, ...next);
+      return stale;
+    });
+
+    // After the write, not before it: the lock file is what the next sync reads
+    // to decide what exists, so it is the thing that must be correct if the
+    // process dies between the two.
     if (settings.autoRemoveOrphanedMods) {
       for (const stale of orphaned) {
         try {
@@ -693,10 +709,6 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         }
         log.info(`Removed orphaned mod ${stale.name} from profile ${profile.name}`);
       }
-      await writeLockFile(profileId, [...synced, ...userInstalled]);
-    } else {
-      // Keep them installed and surface the count so the UI can prompt.
-      await writeLockFile(profileId, [...synced, ...orphaned, ...userInstalled]);
     }
 
     const pendingUpdates = settings.autoRemoveOrphanedMods ? 0 : orphaned.length;
@@ -837,21 +849,21 @@ export async function installResolvedMod(
     fromManifest: false,
   };
 
-  const mods = await readLockFile(profileId);
-  const previous = replaces ?? identity.id;
-  const idx = mods.findIndex((m) => m.id === previous);
-  if (idx >= 0) {
-    // Remove old file
-    try {
-      await fs.rm(path.join(modsDir, mods[idx].fileName), { force: true });
-    } catch {
-      /* ok */
+  await mutateLockFile(profileId, async (mods) => {
+    const previous = replaces ?? identity.id;
+    const idx = mods.findIndex((m) => m.id === previous);
+    if (idx >= 0) {
+      // Remove old file
+      try {
+        await fs.rm(path.join(modsDir, mods[idx].fileName), { force: true });
+      } catch {
+        /* ok */
+      }
+      mods[idx] = installed;
+    } else {
+      mods.push(installed);
     }
-    mods[idx] = installed;
-  } else {
-    mods.push(installed);
-  }
-  await writeLockFile(profileId, mods);
+  });
 
   return installed;
 }
@@ -939,56 +951,24 @@ export async function installRequiredDependencies(
   return added;
 }
 
-export async function installModFromFile(
-  profileId: string,
-  filePath: string,
-): Promise<InstalledMod> {
-  const modsDir = paths.profileModsDir(profileId);
-  await fs.mkdir(modsDir, { recursive: true });
-
-  const fileName = path.basename(filePath);
-  const destPath = path.join(modsDir, fileName);
-
-  await fs.copyFile(filePath, destPath);
-  const hash = await sha256File(destPath);
-
-  const installed: InstalledMod = {
-    id: `local-${crypto.randomUUID()}`,
-    name: fileName.replace(/\.jar$/i, ''),
-    version: 'local',
-    source: 'local',
-    fileName,
-    sha256: hash,
-    required: false,
-    side: 'both',
-    enabled: true,
-    fromManifest: false,
-  };
-
-  const mods = await readLockFile(profileId);
-  mods.push(installed);
-  await writeLockFile(profileId, mods);
-
-  return installed;
-}
-
 export async function uninstallMod(profileId: string, modId: string): Promise<void> {
   const modsDir = paths.profileModsDir(profileId);
-  const mods = await readLockFile(profileId);
-  const mod = mods.find((m) => m.id === modId);
-  if (!mod) throw new Error(`Mod ${modId} not found in profile ${profileId}`);
+  const name = await mutateLockFile(profileId, async (mods) => {
+    const idx = mods.findIndex((m) => m.id === modId);
+    if (idx < 0) throw new Error(`Mod ${modId} not found in profile ${profileId}`);
+    const mod = mods[idx];
 
-  // Delete file
-  const filePath = modFilePath(modsDir, mod.fileName, mod.enabled);
-  try {
-    await fs.rm(filePath, { force: true });
-  } catch {
-    /* ok */
-  }
+    // Delete file
+    try {
+      await fs.rm(modFilePath(modsDir, mod.fileName, mod.enabled), { force: true });
+    } catch {
+      /* ok */
+    }
 
-  const updatedMods = mods.filter((m) => m.id !== modId);
-  await writeLockFile(profileId, updatedMods);
-  log.info(`Uninstalled mod ${mod.name} from profile ${profileId}`);
+    mods.splice(idx, 1);
+    return mod.name;
+  });
+  log.info(`Uninstalled mod ${name} from profile ${profileId}`);
 }
 
 export async function toggleModEnabled(
@@ -997,17 +977,18 @@ export async function toggleModEnabled(
   enabled: boolean,
 ): Promise<void> {
   const modsDir = paths.profileModsDir(profileId);
-  const mods = await readLockFile(profileId);
-  const mod = mods.find((m) => m.id === modId);
-  if (!mod) throw new Error(`Mod ${modId} not found`);
+  const name = await mutateLockFile(profileId, async (mods) => {
+    const mod = mods.find((m) => m.id === modId);
+    if (!mod) throw new Error(`Mod ${modId} not found`);
+    if (mod.enabled === enabled) return null;
 
-  if (mod.enabled === enabled) return;
-
-  await fs.rename(
-    modFilePath(modsDir, mod.fileName, mod.enabled),
-    modFilePath(modsDir, mod.fileName, enabled),
-  );
-  mod.enabled = enabled;
-  await writeLockFile(profileId, mods);
-  log.info(`${enabled ? 'Enabled' : 'Disabled'} mod ${mod.name} in profile ${profileId}`);
+    await fs.rename(
+      modFilePath(modsDir, mod.fileName, mod.enabled),
+      modFilePath(modsDir, mod.fileName, enabled),
+    );
+    mod.enabled = enabled;
+    return mod.name;
+  });
+  if (name === null) return;
+  log.info(`${enabled ? 'Enabled' : 'Disabled'} mod ${name} in profile ${profileId}`);
 }

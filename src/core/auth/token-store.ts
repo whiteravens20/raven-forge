@@ -3,6 +3,7 @@ import path from 'node:path';
 import { paths } from '../config/paths';
 import { FILE_AUTH } from '../../shared/constants';
 import { writeJsonAtomic } from '../util/atomic-file';
+import { serializeByKey } from '../util/serialize';
 import { log } from '../../main/logger';
 import { setSecret, getSecret, deleteSecret } from './secret-store';
 import type { MinecraftAccount, AuthState } from '../../shared/ipc-types';
@@ -126,6 +127,24 @@ async function readStore(): Promise<AuthStoreData> {
 }
 
 /**
+ * Read `auth.json`, change it, and write it back with nothing in between.
+ *
+ * The same shape as `mutateLockFile`, and needed for the same reason: the three
+ * writers here each read the whole store, `await` a keychain round trip in the
+ * middle, and write the whole store back. The window is small — these run from
+ * clicks on the Accounts page — but a keychain that is slow to answer widens it,
+ * and what is at stake is a signed-in account disappearing from the list.
+ */
+function mutateStore<T>(mutate: (store: AuthStoreData) => T | Promise<T>): Promise<T> {
+  return serializeByKey(getAuthPath(), async () => {
+    const store = await readStore();
+    const result = await mutate(store);
+    await writeStore(store);
+    return result;
+  });
+}
+
+/**
  * True when a secret is currently sitting in `auth.json` instead of the keychain.
  *
  * Read from what is actually on disk rather than from whether `warnFallback`
@@ -158,58 +177,58 @@ export async function saveAccount(
   refreshToken?: string,
   mcSession?: McSession,
 ): Promise<void> {
-  const store = await readStore();
-  const idx = store.accounts.findIndex((a) => a.id === account.id);
-  if (idx >= 0) {
-    store.accounts[idx] = account;
-  } else {
-    store.accounts.push(account);
-  }
-
-  if (refreshToken) {
-    if (await setSecret(refreshKey(account.id), refreshToken)) {
-      delete store.refreshTokens[account.id];
+  await mutateStore(async (store) => {
+    const idx = store.accounts.findIndex((a) => a.id === account.id);
+    if (idx >= 0) {
+      store.accounts[idx] = account;
     } else {
-      warnFallback();
-      store.refreshTokens[account.id] = refreshToken;
+      store.accounts.push(account);
     }
-  }
 
-  if (mcSession) {
-    const stored: StoredMcSession = { expiresAt: mcSession.expiresAt };
-    if (!(await setSecret(sessionKey(account.id), mcSession.accessToken))) {
-      warnFallback();
-      stored.accessToken = mcSession.accessToken;
+    if (refreshToken) {
+      if (await setSecret(refreshKey(account.id), refreshToken)) {
+        delete store.refreshTokens[account.id];
+      } else {
+        warnFallback();
+        store.refreshTokens[account.id] = refreshToken;
+      }
     }
-    store.mcSessions = { ...store.mcSessions, [account.id]: stored };
-  }
 
-  if (!store.activeAccountId) {
-    store.activeAccountId = account.id;
-  }
-  await writeStore(store);
+    if (mcSession) {
+      const stored: StoredMcSession = { expiresAt: mcSession.expiresAt };
+      if (!(await setSecret(sessionKey(account.id), mcSession.accessToken))) {
+        warnFallback();
+        stored.accessToken = mcSession.accessToken;
+      }
+      store.mcSessions = { ...store.mcSessions, [account.id]: stored };
+    }
+
+    if (!store.activeAccountId) {
+      store.activeAccountId = account.id;
+    }
+  });
 }
 
 export async function removeAccount(accountId: string): Promise<void> {
-  const store = await readStore();
-  store.accounts = store.accounts.filter((a) => a.id !== accountId);
-  delete store.refreshTokens[accountId];
-  delete store.mcSessions?.[accountId];
-  if (store.activeAccountId === accountId) {
-    store.activeAccountId = store.accounts[0]?.id ?? null;
-  }
-  await writeStore(store);
+  await mutateStore((store) => {
+    store.accounts = store.accounts.filter((a) => a.id !== accountId);
+    delete store.refreshTokens[accountId];
+    delete store.mcSessions?.[accountId];
+    if (store.activeAccountId === accountId) {
+      store.activeAccountId = store.accounts[0]?.id ?? null;
+    }
+  });
   await deleteSecret(refreshKey(accountId));
   await deleteSecret(sessionKey(accountId));
 }
 
 export async function setActiveAccountId(accountId: string): Promise<void> {
-  const store = await readStore();
-  if (!store.accounts.some((a) => a.id === accountId)) {
-    throw new Error(`Account ${accountId} not found`);
-  }
-  store.activeAccountId = accountId;
-  await writeStore(store);
+  await mutateStore((store) => {
+    if (!store.accounts.some((a) => a.id === accountId)) {
+      throw new Error(`Account ${accountId} not found`);
+    }
+    store.activeAccountId = accountId;
+  });
 }
 
 export async function getRefreshToken(accountId: string): Promise<string | undefined> {
