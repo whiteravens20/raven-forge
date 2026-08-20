@@ -182,13 +182,36 @@ npm run format:check # prettier
 npm run build        # must produce a clean dist/
 ```
 
-Tests live in `test/` and run under Vitest in a plain Node environment —
-Electron and `keytar` are aliased to stubs (`test/stubs/electron.ts`), so the
-suite covers pure logic only: launch-argument assembly, hash selection, manifest
-canonicalization, offline UUIDs, version merging, feed parsing, loader
-compatibility. Anything that talks to the network, the keychain or a child
-process is deliberately out of scope. Add a test with your change when the logic
-is the kind that can be wrong quietly.
+Tests live in `test/` and run under Vitest in a plain Node environment. Electron
+and `keytar` are aliased to stubs (`test/stubs/electron.ts`), so anything needing
+a window, a keyring daemon or a child process is faked at that seam — and
+everything below the seam is the real code. Three kinds of suite:
+
+- **Pure logic.** Launch-argument assembly, hash selection, manifest
+  canonicalization, offline UUIDs, version merging, feed parsing, loader
+  compatibility, contrast ratios.
+- **Real filesystem.** Every state file and everything that writes one, under a
+  temporary data root named by `RAVENFORGE_DATA_DIR`: `profiles.json`,
+  `settings.json`, `auth.json`, `installed.lock`, the shader and resource-pack
+  indexes, profile icons, loader profiles, and path containment. Concurrency is
+  exercised rather than assumed — several of these fire overlapping writes and
+  assert that neither one is lost.
+- **Real sockets.** A `node:http` server on an ephemeral port stands in for
+  Mojang, Modrinth and a pack host, so the download policy, the size caps and
+  the hash refusals are tested against an actual response instead of a mock of
+  one.
+
+Out of scope is what needs a JVM, a real Microsoft account or a published
+release: launching the game, the OAuth chain end to end, and self-update. Those
+are verified by hand, and
+[ARCHITECTURE.md](docs/ARCHITECTURE.md#open-implementation-gaps) records what was
+proven that way and when.
+
+Add a test with your change when the logic is the kind that can be wrong
+quietly. A rule of thumb from this codebase: nearly everything that has cost a
+user something — a wiped `settings.json`, a launch that silently ran vanilla, a
+progress bar reading "downloading" while it was hashing — failed with no
+exception attached to it.
 
 **And then actually run it.** A change that typechecks is not a change that works:
 

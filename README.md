@@ -143,8 +143,9 @@ src/
     ├── ipc-types.ts    # the channel contract
     └── ipc/            # payload shapes, one file per domain
 
-test/               # Vitest suites (pure logic, plus the state and download layer
-                    # over real files and a real socket) + Electron/keytar stubs
+test/               # Vitest suites — pure logic, the state files over a real
+                    # temporary data root, and the download policy over a real
+                    # socket + Electron/keytar stubs
 ```
 
 ---
