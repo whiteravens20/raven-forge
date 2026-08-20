@@ -137,6 +137,13 @@ export const en = {
   'home.updateFailedPlayAnyway':
     'The launcher update could not be downloaded — the game will start anyway.',
   'home.launchFailed': 'Could not start the game',
+  'launchError.alreadyRunning': 'This profile is already running.',
+  'launchError.ramTooBig':
+    'This profile allocates {allocated} of RAM and this machine has {total}. Minecraft cannot start with more memory than the machine has — lower it in the profile editor, where {recommended} suits this one.',
+  'launchError.javaNotRuntime':
+    'This profile is set to launch with {path}, and that is not a Java runtime this machine can run. Point it somewhere else in the profile editor, or clear the field to use the runtime the launcher installs itself.',
+  'launchError.javaTooOld':
+    'This profile is set to launch with {path}, which is Java {found}, and this version of Minecraft needs Java {required}. It would start and then stop with an error about class file versions. Clear the field to use the runtime the launcher installs itself.',
   'home.launchError': 'Error while starting the game',
   'home.showConsole': 'Show console',
   'home.hideConsole': 'Hide console',
@@ -175,6 +182,51 @@ export const en = {
   'profiles.pickOrCreate': 'Select a profile, or create a new one',
   'profiles.copyName': '{name} (copy)',
   'profiles.openFolder': 'Open profile folder',
+  'profiles.exportPack': 'Export as a modpack (.mrpack)',
+  'profiles.exportPackFailed': 'Could not export that profile as a pack.',
+  'profiles.exportPackDone.one': 'Saved to {path}. The pack links to one file on Modrinth.',
+  'profiles.exportPackDone.other': 'Saved to {path}. The pack links to {count} files on Modrinth.',
+  'profiles.exportPackBundled.one':
+    'One more file ({size}) is not on Modrinth, so it was written into the pack itself.',
+  'profiles.exportPackBundled.other':
+    'Another {count} files ({size}) are not on Modrinth, so they were written into the pack itself.',
+  'profiles.exportPackSkipped.one': 'Left out one item that is switched off.',
+  'profiles.exportPackSkipped.other': 'Left out {count} items that are switched off.',
+
+  // ── Worlds and backups ───────────────────────────────────
+  'worlds.title': 'Worlds',
+  'worlds.none': 'This profile has no worlds yet.',
+  'worlds.backupNow': 'Back up',
+  'worlds.backedUp': 'The worlds were copied aside.',
+  'worlds.backupFailed': 'Could not back up the worlds.',
+  'worlds.noBackups': 'No copies yet. One is taken automatically before a version change.',
+  'worlds.restore': 'Restore this copy',
+  'worlds.confirmRestore': 'Replace the current worlds?',
+  'worlds.confirmRestoreYes': 'Replace',
+  'worlds.restored': 'The worlds were restored.',
+  'worlds.restoredWithSafety':
+    'The worlds were restored. What was there before is now a copy of its own, so this is undoable.',
+  'worlds.restoreFailed': 'Could not restore that copy.',
+  'worlds.deleteFailed': 'Could not delete that copy.',
+  'worlds.reason.manual': 'taken by hand',
+  'worlds.reason.version-change': 'before a version change',
+  'worlds.reason.before-restore': 'before a restore',
+
+  // ── Changing the Minecraft version ───────────────────────
+  'versionChange.title': 'Move this profile from {from} to {to}?',
+  'versionChange.mods.one':
+    'Its one installed mod was built for {from} and will probably not load.',
+  'versionChange.mods.other':
+    'Its {count} installed mods were built for {from} and will probably not load. Update or remove them afterwards.',
+  'versionChange.worlds.one':
+    'It has a world. Opening a world with a newer Minecraft upgrades its format, and the older version cannot open it again.',
+  'versionChange.worlds.other':
+    'It has {count} worlds. Opening a world with a newer Minecraft upgrades its format, and the older version cannot open it again.',
+  'versionChange.backupFirst': 'Copy the worlds aside first',
+  'versionChange.backupHint':
+    'The copy stays inside the profile and can be restored from the profile page.',
+  'versionChange.confirm': 'Change the version',
+  'versionChange.backupFailed': 'The worlds could not be copied, so nothing was changed.',
   // ── Deleting a profile ───────────────────────────────────
   'delete.title': 'Delete profile "{name}"',
   'delete.intro':
@@ -268,11 +320,42 @@ export const en = {
   'profileForm.loaderUnstable': 'unstable',
   'profileForm.loaderVersionLatest': 'Latest',
   'profileForm.loaderVersion': 'Loader version (optional)',
-  'profileForm.ram': 'RAM (MB)',
+  'profileForm.ram': 'Allocated RAM',
+  'profileForm.ramMachine': 'This machine has {total}. Recommended for it: {recommended}.',
+  'profileForm.ramTight':
+    '{value} leaves this machine ({total}) very little for anything else — the game may stutter, or be shut down while it runs.',
+  'profileForm.ramOver':
+    '{value} is more than this machine has ({total}). Minecraft will not start with it.',
+  'profileForm.ramUseRecommended': 'Use {recommended}',
   'profileForm.manifestUrl': 'Manifest URL (optional)',
   'profileForm.serverIp': 'Server IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Java arguments (optional)',
+  'profileForm.java': 'Java runtime',
+  'profileForm.javaManaged': 'The one the launcher installs',
+  'profileForm.javaBrowse': 'Choose a file…',
+  'profileForm.javaChecking': 'Checking…',
+  'profileForm.javaFound': 'Java {version}.',
+  'profileForm.javaTooOld': 'Java {version} — this Minecraft version needs Java {required}.',
+  'profileForm.javaNotJava': 'That file is not a Java runtime.',
+  'profileForm.javaHint':
+    'The launcher installs and keeps the right runtime for each Minecraft version. Choose one here only if this profile needs a particular JVM.',
+  'profileForm.showSnapshots': 'Show snapshots',
+  'profileForm.snapshotHint':
+    'Snapshots are Mojang’s weekly test builds. Most mods have no build for one, and a world made in a snapshot may not open in the release that follows it.',
+  'profileForm.advanced': 'Advanced',
+  'profileForm.windowWidth': 'Game window width',
+  'profileForm.windowHeight': 'Game window height',
+  'profileForm.windowSizeHint': 'Leave both empty to let the game choose its own window size.',
+  'profileForm.windowSizeBoth':
+    'Set both or neither — the game only takes a window size as a pair.',
+  'profileForm.windowSizeRange': 'Between {minWidth}×{minHeight} and {max}×{max}.',
+  'profileForm.windowMode': 'Window mode',
+  'profileForm.windowModeGame': 'However the game left it',
+  'profileForm.windowModeWindowed': 'Windowed',
+  'profileForm.windowModeFullscreen': 'Fullscreen',
+  'profileForm.windowModeHint':
+    'Anything other than “however the game left it” is written into the game’s own settings at every launch, so it also overrules an F11 from the last session.',
   'profileForm.notes': 'Notes',
   'profileForm.notesPlaceholder': 'Any notes about this profile',
 
@@ -301,6 +384,19 @@ export const en = {
   'mods.downloads.one': '{count} download',
   'mods.downloads.other': '{count} downloads',
   'mods.installedWithDeps': 'Installed {name}, along with what it needs: {deps}',
+  'mods.checkUpdates': 'Check for updates',
+  'mods.checkUpdatesFailed': 'Could not check for updates.',
+  'mods.updatesFound.one': '{count} mod has a newer build.',
+  'mods.updatesFound.other': '{count} mods have newer builds.',
+  'mods.upToDate': 'Everything installed by hand is current.',
+  'mods.noneToCheck': 'Nothing here to check — this profile’s mods come from its manifest.',
+  'mods.unknownToModrinth.one': '{count} file is not on Modrinth and cannot be checked.',
+  'mods.unknownToModrinth.other': '{count} files are not on Modrinth and cannot be checked.',
+  'mods.updateAll': 'Update all',
+  'mods.update': 'Update',
+  'mods.updateTo': 'new: {version}',
+  'mods.updated': 'Updated: {names}',
+  'mods.updateFailed': 'Could not update: {names}',
 
   // ── Compatibility ────────────────────────────────────────
   'compat.title': 'Does {name} fit this profile?',
@@ -401,11 +497,41 @@ export const en = {
   'settings.trustedKeyAdd': 'Add key',
   'settings.trustedKeyFailed': 'Could not add the key',
   'settings.dataFolder': 'Data folder',
+  'settings.dataFolderHint':
+    'Profiles, mods, game files and the managed Java runtimes. Several gigabytes once a pack is installed.',
+  'settings.dataFolderChange': 'Move…',
+  'settings.dataFolderRestore': 'Back to the default',
+  'settings.dataFolderEnv':
+    'Set for this install by RAVENFORGE_DATA_DIR, so it cannot be changed here.',
+  'settings.dataFolderUnavailable':
+    'The chosen folder {path} could not be reached, so the launcher is using the default one. Anything you had there is still there.',
   'settings.crashReportsFolder': 'Crash reports',
   'settings.logs': 'Logs',
   'settings.showLogs': 'Show logs',
   'settings.reset': 'Reset settings',
   'settings.confirmReset': 'Reset all settings to their defaults?',
+
+  // ── Data folder ──────────────────────────────────────────
+  'dataRoot.title': 'Move the data folder',
+  'dataRoot.from': 'Now',
+  'dataRoot.to': 'New location',
+  'dataRoot.move': '{size} moves across. Nothing is left behind in the old location.',
+  'dataRoot.adopt':
+    'That folder already holds launcher data, so it will be used as it is — nothing is copied, and what is in the current folder stays there.',
+  'dataRoot.free': 'Free at the destination: {free}',
+  'dataRoot.restartNotice': 'The launcher restarts once the move is done.',
+  'dataRoot.confirm': 'Move and restart',
+  'dataRoot.confirmAdopt': 'Use this folder and restart',
+  'dataRoot.moving': 'Moving data…',
+  'dataRoot.restarting': 'Done — restarting the launcher…',
+  'dataRoot.failed': 'The data folder could not be moved: {error}',
+  'dataRoot.problem.same': 'That is already the folder in use.',
+  'dataRoot.problem.nested': 'That folder is inside the current one — pick one outside it.',
+  'dataRoot.problem.notWritable': 'Nothing can be written to that folder.',
+  'dataRoot.problem.noSpace': 'Not enough room: {size} to move, {free} free.',
+  'dataRoot.problem.envLocked':
+    'RAVENFORGE_DATA_DIR decides where the data lives for this install.',
+  'dataRoot.problem.gameRunning': 'Close the game first — it is running out of this folder.',
 
   // ── Log viewer ───────────────────────────────────────────
   'logs.title': 'Launcher logs',
@@ -456,6 +582,7 @@ export const en = {
   'progress.msg.runningInstaller': 'Running the {loader} installer — this can take a few minutes…',
   'progress.msg.savingProfile': 'Saving the profile…',
   'progress.msg.updateDownloading': 'Downloading update… {percent}%',
+  'progress.msg.movingData': 'Moving data…',
 
   // ── Updater ──────────────────────────────────────────────
   'update.ready': 'Update ready',
@@ -530,9 +657,9 @@ export const en = {
   'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge and Quilt',
   'privacy.dest.loaders.when': 'when installing what mods need to run',
   'privacy.dest.modrinth.who': 'Modrinth',
-  'privacy.dest.modrinth.when': 'when you look for mods',
+  'privacy.dest.modrinth.when': 'when you look for mods, or check the ones you have',
   'privacy.dest.modrinth.sends':
-    'What you type into the search box, and the filters you set. Nothing that says who you are — the request names the launcher that is asking, not the person.',
+    'What you type into the search box, and the filters you set. Checking for updates or exporting a pack also sends a hash of each mod file in that profile, which is how Modrinth is asked what those files are. Nothing that says who you are — the request names the launcher that is asking, not the person.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'news, and the list of server packs',
   'privacy.dest.updates.who': 'GitHub',

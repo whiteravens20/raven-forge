@@ -2,7 +2,7 @@
 
 [English](PRIVACY.md) · **Polski**
 
-**Ostatnia aktualizacja: 2026-08-07**
+**Ostatnia aktualizacja: 2026-08-18**
 
 Ten dokument opisuje każdą daną, którą Raven Forge przechowuje, każdy serwer, z
 którym się łączy, i to, co tam wysyła. Powstał na podstawie kodu źródłowego, a
@@ -55,13 +55,23 @@ tego, co launcher robił, oraz raporty z awarii.
 
 Nie musisz szukać tego folderu ręcznie: **Ustawienia → Dane → Folder danych**
 otwiera go na każdym systemie, a strona prywatności w apce (Informacje →
-Prywatność) pokazuje dokładną ścieżkę tej instalacji. Dla orientacji:
+Prywatność) pokazuje dokładną ścieżkę tej instalacji. Jeśli go nie przeniosłeś,
+jest to:
 
 | System  | Lokalizacja                                          |
 | ------- | ---------------------------------------------------- |
 | Windows | `%APPDATA%\Raven Forge Launcher`                     |
 | Linux   | `~/.config/Raven Forge Launcher`                     |
 | macOS   | `~/Library/Application Support/Raven Forge Launcher` |
+
+**Ustawienia → Dane → Przenieś…** przenosi go, gdzie chcesz — zwykle na inny
+dysk, bo pliki gry to gigabajty. Launcher przenosi zawartość i uruchamia się
+ponownie już w nowym miejscu. Dwie rzeczy zostają w folderze powyżej, bo są
+diagnostyką launchera, a nie danymi o Tobie — i bo chcesz je móc przeczytać w
+dniu, w którym tamten dysk nie jest podpięty: `logs/` i `crash-reports/`.
+Zostaje tam też jednolinijkowy `data-root.txt` z informacją, dokąd poszła
+reszta — czyta go deinstalator Windows, żeby „usuń moje dane" nadal znaczyło
+wszystkie.
 
 W środku:
 
@@ -74,9 +84,10 @@ W środku:
 | `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                             |
 | `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                |
 | `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, instalatory loaderów i zbuforowane metadane. Nic osobistego.                                                                                                     |
+| `data-root.txt`               | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, pod którą go przeniosłeś, i nic poza tym. Zostaje w lokalizacji powyżej.                                         |
 
 Chromium trzyma w tym folderze także własne dane, w tym ciasteczka z okna
-logowania Microsoftu — patrz „Znane luki”.
+logowania Microsoftu. Są kasowane, gdy wylogujesz konto Microsoft.
 
 ### Gdzie leżą poświadczenia
 
@@ -154,10 +165,11 @@ na Twoim koncie Microsoft.
 
 ### Żeby znaleźć i zainstalować zawartość
 
-| Host                                                     | Kiedy                                                          | Co jest wysyłane                                                                                                                                                                                                      |
-| -------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api.modrinth.com`, `cdn.modrinth.com`                   | Przeglądanie lub instalowanie modów, shaderów i paczek zasobów | **Twoje frazy wyszukiwania i filtry.** Regulamin API Modrinth wymaga identyfikującego się User-Agenta, więc żądania niosą `whiteravens20/raven-forge/<wersja> (<adres repo>)` — nazwę i wersję launchera, nie Ciebie. |
-| Serwer, na którym leży ikona moda lub obrazek wiadomości | Przy ich wyświetlaniu                                          | Żądanie idzie do tego serwera. Obrazki ładują się prosto stamtąd, gdzie projekt je opublikował.                                                                                                                       |
+| Host                                                     | Kiedy                                                                           | Co jest wysyłane                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api.modrinth.com`, `cdn.modrinth.com`                   | Przeglądanie lub instalowanie modów, shaderów i paczek zasobów                  | **Twoje frazy wyszukiwania i filtry.** Regulamin API Modrinth wymaga identyfikującego się User-Agenta, więc żądania niosą `whiteravens20/raven-forge/<wersja> (<adres repo>)` — nazwę i wersję launchera, nie Ciebie.                                                                                                                       |
+| `api.modrinth.com`                                       | Sprawdzanie aktualizacji zainstalowanych modów albo eksport profilu jako paczki | **Skrót SHA-512 każdego pliku moda w tym profilu.** Tak właśnie pyta się Modrinth, czym jest dany plik i co go zastąpiło — i tylko dzięki temu da się rozpoznać jar wrzucony ręcznie. Skrót nazywa plik, nie Ciebie, ale ich zestaw opisuje, jakie mody ma ten profil, więc idzie wyłącznie po naciśnięciu jednego z tych dwóch przycisków. |
+| Serwer, na którym leży ikona moda lub obrazek wiadomości | Przy ich wyświetlaniu                                                           | Żądanie idzie do tego serwera. Obrazki ładują się prosto stamtąd, gdzie projekt je opublikował.                                                                                                                                                                                                                                             |
 
 ### Do White Ravens
 
@@ -189,6 +201,22 @@ Ten, kto prowadzi tamten adres, widzi Twoje IP.
 
 Patrz „Znane luki” — obecnie nie ma przełącznika wyłączającego automatyczne
 sprawdzanie.
+
+### Odnośniki, które przekazują Cię przeglądarce
+
+Część przycisków sama z niczym się nie łączy — otwiera adres w Twojej zwykłej
+przeglądarce i w tym momencie przestaje być sprawą launchera. Ta strona widzi
+wtedy wizytę Twojej przeglądarki, z wszystkimi ciasteczkami i historią, które
+ona już ma.
+
+| Gdzie                                       | Otwiera                                     |
+| ------------------------------------------- | ------------------------------------------- |
+| Konta → Ustawienia konta Minecraft          | `minecraft.net`                             |
+| Informacja o Bedrock Edition                | `minecraft.net`                             |
+| Info → O programie oraz raporter awarii     | `github.com` i `whiteravens.net`            |
+| „Przeczytaj na stronie” przy aktualnościach | Adres, pod którym opublikowano dany artykuł |
+
+Launcher nigdy nie otwiera żadnego z nich sam z siebie.
 
 ---
 
@@ -253,14 +281,14 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 ## Co możesz wyłączyć
 
-| Ustawienie                                                          | Efekt                                                                                |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **Tryb offline** (Ustawienia → Zachowanie)                          | Nigdy nie kontaktuje się z serwerami uwierzytelniania. Tylko gra jednoosobowa i LAN. |
-| **Adres kanału wiadomości / ogłoszeń** (Ustawienia → Źródła treści) | Wyczyść pole, a dany kanał nie będzie już pobierany.                                 |
-| **Proxy** (Ustawienia → Sieć i pobieranie)                          | Kieruje każde żądanie launchera przez proxy, które kontrolujesz.                     |
-| **Status na Discordzie** (Ustawienia → Zachowanie)                  | Domyślnie wyłączony. Włączony — Twój profil na Discordzie pokazuje, w co grasz.      |
-| Nieużywanie strony Mody                                             | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz lub nie zainstalujesz.        |
-| Konto offline                                                       | Żaden serwer Microsoftu ani Xboxa nie jest w ogóle dotykany.                         |
+| Ustawienie                                                          | Efekt                                                                                                                                 |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tryb offline** (Ustawienia → Zachowanie)                          | Nigdy nie kontaktuje się z serwerami uwierzytelniania. Tylko gra jednoosobowa i LAN.                                                  |
+| **Adres kanału wiadomości / ogłoszeń** (Ustawienia → Źródła treści) | Wyczyść pole, a dany kanał nie będzie już pobierany.                                                                                  |
+| **Proxy** (Ustawienia → Sieć i pobieranie)                          | Kieruje każde żądanie launchera przez proxy, które kontrolujesz.                                                                      |
+| **Status na Discordzie** (Ustawienia → Zachowanie)                  | Domyślnie wyłączony. Włączony — Twój profil na Discordzie pokazuje, w co grasz.                                                       |
+| Nieużywanie strony Mody                                             | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz, nie zainstalujesz, nie sprawdzisz aktualizacji ani nie wyeksportujesz paczki. |
+| Konto offline                                                       | Żaden serwer Microsoftu ani Xboxa nie jest w ogóle dotykany.                                                                          |
 
 ---
 
@@ -282,11 +310,6 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 Wymienione celowo. Uczciwa lista jest lepsza niż taka, która ładnie wygląda.
 
-- **Okno logowania Microsoftu współdzieli sesję przeglądarki z launcherem**, i
-  musi, żeby stosowało się do niego Twoje ustawienie proxy. Jego ciasteczka
-  zostają w folderze danych i **nie** są czyszczone przy wylogowaniu — kolejne
-  logowanie może rozpoznać Twoje konto Microsoft, choć zawsze pyta, którego
-  konta użyć. Usunięcie folderu danych je kasuje.
 - **Sprawdzania aktualizacji przy starcie nie da się wyłączyć** z Ustawień. To
   jedno żądanie do GitHub Releases przy każdym uruchomieniu. Przy zablokowanej
   sieci po prostu cicho zawodzi.

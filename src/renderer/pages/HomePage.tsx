@@ -113,12 +113,17 @@ export function HomePage() {
           setOfflineOffer(true);
           return;
         }
-        setLaunchError(result.error ?? t('home.launchFailed'));
-        setTimeout(() => setLaunchError(null), 8000);
+        // A refusal the launcher raised about the profile comes with a key,
+        // and is said in the player's language; anything else is a diagnostic
+        // and arrives in English, which is also what the log holds.
+        setLaunchError(
+          result.errorMessage
+            ? t(result.errorMessage.key, result.errorMessage.vars)
+            : (result.error ?? t('home.launchFailed')),
+        );
       }
     } catch {
       setLaunchError(t('home.launchError'));
-      setTimeout(() => setLaunchError(null), 8000);
     } finally {
       // `game:started` normally clears this; do it here too so a launch that
       // fails before spawning does not leave the button disabled forever.
@@ -298,7 +303,17 @@ export function HomePage() {
           </p>
         )}
 
-        {launchError && <p className="text-xs text-rf-danger">{launchError}</p>}
+        {/* No auto-dismiss, for the same reason as the offer below: most of
+            these sentences end with something to go and change, and eight
+            seconds is not long enough to read one and act on it. The next
+            launch clears it, and so does the ×. */}
+        {launchError && (
+          <div className="w-full max-w-xl">
+            <Banner type="urgent" dismissible onDismiss={() => setLaunchError(null)}>
+              {launchError}
+            </Banner>
+          </div>
+        )}
 
         {/* No auto-dismiss: this one asks a question, and a banner that
             disappears while being read cannot be answered. */}

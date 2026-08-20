@@ -1,12 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { paths } from '../config/paths';
+import { FILE_AUTH } from '../../shared/constants';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { log } from '../../main/logger';
 import { setSecret, getSecret, deleteSecret } from './secret-store';
 import type { MinecraftAccount, AuthState } from '../../shared/ipc-types';
 
-const AUTH_FILE = 'auth.json';
+const AUTH_FILE = FILE_AUTH;
 
 /** Fallback credentials must not be world-readable. */
 const AUTH_FILE_MODE = 0o600;

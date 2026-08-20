@@ -31,11 +31,20 @@ const api: RavenForgeAPI = {
     duplicate: (profileId, name) => ipcRenderer.invoke('profiles:duplicate', profileId, name),
     openFolder: (profileId) => ipcRenderer.invoke('profiles:open-folder', profileId),
     export: (profileId) => ipcRenderer.invoke('profiles:export', profileId),
+    exportPack: (profileId) => ipcRenderer.invoke('profiles:export-pack', profileId),
     import: (json) => ipcRenderer.invoke('profiles:import', json),
     getSyncStatus: (profileId) => ipcRenderer.invoke('profiles:get-sync-status', profileId),
     setIcon: (profileId, sourcePath) =>
       ipcRenderer.invoke('profiles:set-icon', profileId, sourcePath),
     getIcon: (profileId) => ipcRenderer.invoke('profiles:get-icon', profileId),
+    listWorlds: (profileId) => ipcRenderer.invoke('profiles:list-worlds', profileId),
+    listBackups: (profileId) => ipcRenderer.invoke('profiles:list-backups', profileId),
+    backupWorlds: (profileId, reason) =>
+      ipcRenderer.invoke('profiles:backup-worlds', profileId, reason),
+    restoreBackup: (profileId, backupId) =>
+      ipcRenderer.invoke('profiles:restore-backup', profileId, backupId),
+    deleteBackup: (profileId, backupId) =>
+      ipcRenderer.invoke('profiles:delete-backup', profileId, backupId),
   },
   packs: {
     listCatalogue: () => ipcRenderer.invoke('packs:list-catalogue'),
@@ -54,6 +63,8 @@ const api: RavenForgeAPI = {
     uninstall: (profileId, modId) => ipcRenderer.invoke('mods:uninstall', profileId, modId),
     toggleEnabled: (profileId, modId, enabled) =>
       ipcRenderer.invoke('mods:toggle-enabled', profileId, modId, enabled),
+    checkUpdates: (profileId) => ipcRenderer.invoke('mods:check-updates', profileId),
+    update: (profileId, modIds) => ipcRenderer.invoke('mods:update', profileId, modIds),
     search: (filters) => ipcRenderer.invoke('mods:search', filters),
     getFacets: (projectType) => ipcRenderer.invoke('mods:get-facets', projectType),
   },
@@ -76,9 +87,9 @@ const api: RavenForgeAPI = {
       ipcRenderer.invoke('content:reorder-resourcepacks', profileId, orderedIds),
   },
   java: {
-    getInstallations: () => ipcRenderer.invoke('java:get-installations'),
-    ensureVersion: (majorVersion) => ipcRenderer.invoke('java:ensure-version', majorVersion),
     detectSystem: () => ipcRenderer.invoke('java:detect-system'),
+    probe: (binPath, minecraftVersion) =>
+      ipcRenderer.invoke('java:probe', binPath, minecraftVersion),
   },
   loaders: {
     install: (loader, loaderVersion, mcVersion) =>
@@ -102,6 +113,10 @@ const api: RavenForgeAPI = {
     reset: () => ipcRenderer.invoke('settings:reset'),
     addTrustedKey: (key) => ipcRenderer.invoke('settings:add-trusted-key', key),
     removeTrustedKey: (publicKey) => ipcRenderer.invoke('settings:remove-trusted-key', publicKey),
+    getDataRoot: () => ipcRenderer.invoke('settings:get-data-root'),
+    chooseDataRoot: () => ipcRenderer.invoke('settings:choose-data-root'),
+    planDataRoot: (target) => ipcRenderer.invoke('settings:plan-data-root', target),
+    applyDataRoot: (target) => ipcRenderer.invoke('settings:apply-data-root', target),
   },
   news: {
     get: () => ipcRenderer.invoke('news:get'),

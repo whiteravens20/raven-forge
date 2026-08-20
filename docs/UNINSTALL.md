@@ -27,6 +27,13 @@ the Java runtimes. [PRIVACY.md](PRIVACY.md) breaks it down file by file.
 hand — as long as the launcher is still installed. Open it before you uninstall
 if you plan to keep anything.
 
+**Settings → Data → Move…** puts the data anywhere you like, and the tables here
+name the default. Moving it changes nothing on Linux, where nothing removes your
+data in the first place — see the Debian section for why. On Windows the
+uninstaller follows the move: `data-root.txt` stays in the folder above and
+names where the data went, and the uninstaller reads it, so both the folder it
+shows you and the folder it deletes are the real ones.
+
 Two smaller things live outside it:
 
 | Path                                                                                                     | What it is                                                                                              |
@@ -46,11 +53,16 @@ unless you chose another one during setup) — asks one question:
 > Profiles, mods, worlds, downloaded Minecraft files and Java runtimes live in:
 > `%APPDATA%\Raven Forge Launcher`
 
+If you moved the data folder, the path in that message is the one you moved it
+to — the uninstaller reads `data-root.txt` before it asks.
+
 - **Yes** — the program is removed, the data folder is left exactly as it is.
   Install Raven Forge again later and every profile, world and setting is back
   where it was; a reinstall reads the same folder and does not reset it.
 - **No** — the data folder is deleted, along with the updater's download cache.
-  There is no undo and it does not go through the Recycle Bin.
+  A moved folder is deleted too, and so is what stays behind in `%APPDATA%` —
+  the log, the crash reports and `data-root.txt` itself. There is no undo and it
+  does not go through the Recycle Bin.
 
 Either way the program files, the Start menu and desktop shortcuts and the
 registry entries go.
@@ -65,6 +77,8 @@ Two cases skip the question deliberately:
   ```
   "%LOCALAPPDATA%\Programs\Raven Forge Launcher\Uninstall Raven Forge Launcher.exe" /S --delete-app-data
   ```
+
+  That flag reaches a moved data folder as well.
 
 ## Linux — .deb
 

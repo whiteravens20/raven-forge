@@ -2,7 +2,7 @@
 
 **English** · [Polski](PRIVACY.pl.md)
 
-**Last updated: 2026-08-07**
+**Last updated: 2026-08-18**
 
 This document describes every piece of data Raven Forge stores, every server it
 contacts, and what it sends there. It is written from the source code, not from
@@ -52,13 +52,22 @@ accounts, a record of what the launcher has been doing, and crash reports.
 
 You never have to find that folder by hand: **Settings → Data → Data folder**
 opens it on any system, and the in-app privacy page (Info → Privacy) shows the
-exact path this install uses. For reference:
+exact path this install uses. Unless you have moved it, it is:
 
 | Platform | Location                                             |
 | -------- | ---------------------------------------------------- |
 | Windows  | `%APPDATA%\Raven Forge Launcher`                     |
 | Linux    | `~/.config/Raven Forge Launcher`                     |
 | macOS    | `~/Library/Application Support/Raven Forge Launcher` |
+
+**Settings → Data → Move…** puts it wherever you like — another drive, usually,
+since the game files run to gigabytes. The launcher carries the contents across
+and restarts into the new location. Two things stay behind in the folder above,
+because they are diagnostics about the launcher rather than data about you, and
+because you want them readable on a day the other drive is not plugged in:
+`logs/` and `crash-reports/`. A one-line `data-root.txt` stays there too,
+naming where the rest went — the Windows uninstaller reads it, so that "delete
+my data" still means all of it.
 
 Inside it:
 
@@ -71,6 +80,7 @@ Inside it:
 | `logs/main.log`               | The launcher's log, rotated at 5 MB. See "What ends up in the log".                                                                                                                               |
 | `crash-reports/`              | One file per crash, redacted, newest 20 kept. See "Crash reports".                                                                                                                                |
 | `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loader installers, and cached metadata. Nothing personal.                                                                                                           |
+| `data-root.txt`               | Present only if you moved the data folder: one line naming where you moved it, and nothing else. Stays in the location above.                                                                     |
 
 Chromium also keeps its own storage in that folder, including cookies from the
 Microsoft sign-in window. Those are cleared when you log a Microsoft account out.
@@ -151,10 +161,11 @@ your Microsoft account.
 
 ### To find and install content
 
-| Host                                    | When                                                 | What is sent                                                                                                                                                                                              |
-| --------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api.modrinth.com`, `cdn.modrinth.com`  | Browsing or installing mods, shaders, resource packs | **Your search terms and filters.** Modrinth's API terms require an identifying User-Agent, so requests carry `whiteravens20/raven-forge/<version> (<repo URL>)` — the launcher name and version, not you. |
-| Whatever hosts a mod icon or news image | Displaying them                                      | The request goes to that host. Images are loaded straight from wherever a project publishes them.                                                                                                         |
+| Host                                    | When                                                                  | What is sent                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api.modrinth.com`, `cdn.modrinth.com`  | Browsing or installing mods, shaders, resource packs                  | **Your search terms and filters.** Modrinth's API terms require an identifying User-Agent, so requests carry `whiteravens20/raven-forge/<version> (<repo URL>)` — the launcher name and version, not you.                                                                                                                                             |
+| `api.modrinth.com`                      | Checking installed mods for updates, or exporting a profile as a pack | **A SHA-512 hash of each mod file in that profile.** That is how Modrinth is asked what a file is and what has replaced it, and it is what lets a jar you added by hand be recognised at all. A hash names a file, not you — but the set of them describes which mods that profile holds, so it is only sent when you press one of those two buttons. |
+| Whatever hosts a mod icon or news image | Displaying them                                                       | The request goes to that host. Images are loaded straight from wherever a project publishes them.                                                                                                                                                                                                                                                     |
 
 ### To White Ravens
 
@@ -184,6 +195,22 @@ Whoever operates that address sees your IP.
 | GitHub Releases | **Automatically, on every start**, and whenever you press "Check for updates" | Nothing but the request. It reveals your IP, the launcher version and your platform to GitHub. |
 
 See "Known gaps" — there is currently no switch to disable the automatic check.
+
+### Links that hand you to your browser
+
+Some buttons do not connect to anything themselves — they open an address in
+your normal browser and stop being the launcher's business at that point. What
+that site then sees is a visit from your browser, with whatever cookies and
+history it already carries.
+
+| Where                                 | Opens                                           |
+| ------------------------------------- | ----------------------------------------------- |
+| Accounts → Minecraft account settings | `minecraft.net`                                 |
+| The Bedrock Edition notice            | `minecraft.net`                                 |
+| Info → About, and the crash reporter  | `github.com` and `whiteravens.net`              |
+| A news article's "read on the site"   | Whichever address that article was published at |
+
+The launcher never opens one of these on its own.
 
 ---
 
@@ -245,14 +272,14 @@ read a report through before attaching it to a public issue.
 
 ## What you can turn off
 
-| Setting                                                       | Effect                                                               |
-| ------------------------------------------------------------- | -------------------------------------------------------------------- |
-| **Offline mode** (Settings → Behaviour)                       | Never contacts any authentication server. Singleplayer and LAN only. |
-| **News / announcement feed URL** (Settings → Content sources) | Clear the field and that feed is never fetched.                      |
-| **Proxy** (Settings → Network)                                | Routes every launcher request through a proxy you control.           |
-| **Discord status** (Settings → Behaviour)                     | Off by default. On, your Discord profile shows what you are playing. |
-| Not using the Mods page                                       | Nothing is sent to Modrinth unless you search or install.            |
-| Using an offline account                                      | No Microsoft or Xbox server is ever contacted.                       |
+| Setting                                                       | Effect                                                                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Offline mode** (Settings → Behaviour)                       | Never contacts any authentication server. Singleplayer and LAN only.                        |
+| **News / announcement feed URL** (Settings → Content sources) | Clear the field and that feed is never fetched.                                             |
+| **Proxy** (Settings → Network)                                | Routes every launcher request through a proxy you control.                                  |
+| **Discord status** (Settings → Behaviour)                     | Off by default. On, your Discord profile shows what you are playing.                        |
+| Not using the Mods page                                       | Nothing is sent to Modrinth unless you search, install, check for updates or export a pack. |
+| Using an offline account                                      | No Microsoft or Xbox server is ever contacted.                                              |
 
 ---
 

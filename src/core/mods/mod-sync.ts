@@ -19,6 +19,7 @@ import {
   primaryFile,
   type ModrinthVersion,
 } from './modrinth-api';
+import { readLockFile, writeLockFile, modFilePath } from './lock-file';
 import { requiredDependencies } from './compatibility';
 import { acceptedLoaders } from '../../shared/constants';
 import { downloadToFile } from '../net/download';
@@ -57,38 +58,6 @@ function emitProgress(
   event: ProgressEvent,
 ): void {
   getMainWindow()?.webContents.send(channel, event);
-}
-
-// ── Lock file (installed.lock) ─────────────────────────────
-// JSON array of InstalledMod stored per-profile
-
-async function readLockFile(profileId: string): Promise<InstalledMod[]> {
-  const lockPath = paths.profileLockFile(profileId);
-  try {
-    const raw = await fs.readFile(lockPath, 'utf-8');
-    return JSON.parse(raw) as InstalledMod[];
-  } catch {
-    return [];
-  }
-}
-
-async function writeLockFile(profileId: string, mods: InstalledMod[]): Promise<void> {
-  await writeJsonAtomic(paths.profileLockFile(profileId), mods);
-}
-
-/**
- * Where a mod's jar sits, which depends on whether it is switched on.
- *
- * Switching a mod off renames its file rather than deleting it, so every piece
- * of code that goes looking for one has to ask the lock file first. Nothing did
- * during a sync, and the cost was quiet: the check looked for `<name>.jar`,
- * found only `<name>.jar.disabled`, called the mod missing and downloaded it
- * again — leaving both files in `mods/`. The game loads by extension, so a mod
- * the launcher showed as off was loaded anyway, on every sync, for as long as
- * the profile followed a pack.
- */
-function modFilePath(modsDir: string, fileName: string, enabled: boolean): string {
-  return path.join(modsDir, enabled ? fileName : `${fileName}.disabled`);
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -808,7 +777,7 @@ async function resolveInstallVersion(
 }
 
 /** A resolved build, as the download path wants it. */
-function downloadFor(version: ModrinthVersion): {
+export function downloadFor(version: ModrinthVersion): {
   url: string;
   fileName: string;
   version: string;
@@ -823,11 +792,21 @@ function downloadFor(version: ModrinthVersion): {
   };
 }
 
-/** Download, verify and record one already-resolved file. */
-async function installResolvedMod(
+/**
+ * Download, verify and record one already-resolved file.
+ *
+ * `replaces` names a lock entry to stand in for, where that is not simply the
+ * one with the same id. An update found by hashing the jar is exactly that
+ * case: a mod dropped into `mods/` by hand is recorded under a generated
+ * `local-…` id, and the build replacing it is a Modrinth project with a project
+ * id of its own. Without this the entry would be appended beside the old one,
+ * leaving the profile with two records and two jars of the same mod.
+ */
+export async function installResolvedMod(
   profileId: string,
   identity: { id: string; name: string; source: InstalledMod['source'] },
   resolved: { url: string; fileName: string; version: string; hashes: HashedEntry },
+  replaces?: string,
 ): Promise<InstalledMod> {
   const modsDir = paths.profileModsDir(profileId);
   await fs.mkdir(modsDir, { recursive: true });
@@ -859,7 +838,8 @@ async function installResolvedMod(
   };
 
   const mods = await readLockFile(profileId);
-  const idx = mods.findIndex((m) => m.id === identity.id);
+  const previous = replaces ?? identity.id;
+  const idx = mods.findIndex((m) => m.id === previous);
   if (idx >= 0) {
     // Remove old file
     try {

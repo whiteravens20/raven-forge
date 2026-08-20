@@ -5,7 +5,7 @@
 | Layer          | Choice                                  | Rationale                                                                                                                                                                                                                                                                                                                                                             |
 | -------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shell          | **Electron 41**                         | Mature ecosystem, first-class Windows + Linux packaging via electron-builder, signed auto-updates via electron-updater, and predictable Node integration for game-launching subprocesses. Tauri was considered but its Rust toolchain raises the contributor bar and its WebView2/WebKitGTK story complicates spawning Java with full stdio capture across platforms. |
-| Renderer       | **React 19 + Vite 7**                   | Strict typing, fast HMR, broad ecosystem (Zustand, Framer Motion, react-router).                                                                                                                                                                                                                                                                                      |
+| Renderer       | **React 19 + Vite 8**                   | Strict typing, fast HMR, broad ecosystem (Zustand, react-router).                                                                                                                                                                                                                                                                                                     |
 | Styling        | **Tailwind v4 + CSS custom properties** | Theming via `--rf-*` variables on `[data-theme]`, atomic utility classes for the dark gaming aesthetic. The Vite plugin (`@tailwindcss/vite`) is the supported v4 integration; PostCSS is intentionally not configured.                                                                                                                                               |
 | State          | **Zustand**                             | Tiny, no providers, easy to share between pages.                                                                                                                                                                                                                                                                                                                      |
 | Validation     | **Zod**                                 | Runtime validation at IPC + manifest boundaries; types inferred via `z.infer`.                                                                                                                                                                                                                                                                                        |
@@ -17,40 +17,47 @@
 
 ```
 raven-forge/
-├── PLAN.md                       # original brief, preserved as work plan
 ├── README.md                     # dev setup + feature overview
 ├── docs/
 │   ├── ARCHITECTURE.md           # this document
 │   ├── AZURE-SETUP.md            # registering the Azure app + Mojang approval
+│   ├── DISCORD-SETUP.md          # registering the app behind the optional status
 │   ├── MANIFEST-SCHEMA.md        # remote manifest spec
 │   ├── PRIVACY.md                # what is stored and sent (EN — canonical pair)
 │   ├── PRIVACY.pl.md             # the same, in Polish; both are maintained
-│   └── SIGNING.md                # Ed25519 manifest signing
+│   ├── SIGNING.md                # Ed25519 manifest signing
+│   └── UNINSTALL.md              # what each platform's uninstaller removes
+├── build/installer.nsh           # the NSIS uninstaller's keep-or-delete question
 ├── electron-builder.config.js    # NSIS + .deb + AppImage targets
 ├── eslint.config.mjs             # flat-config, react-hooks + @typescript-eslint
 ├── tsconfig.json                 # umbrella project for typecheck-all
 ├── tsconfig.main.json            # main + preload + core + shared (Node ESM)
 ├── tsconfig.renderer.json        # renderer (DOM)
-├── tailwind.config.ts            # design tokens + custom animations
 ├── vite.config.ts                # renderer build + path aliases
 ├── .github/workflows/
-│   ├── build.yml                 # PR / push CI
-│   └── release.yml               # tag-triggered, signs + drafts release
+│   ├── build.yml                 # PR / push CI — lint, typecheck, test, build
+│   ├── codeql.yml                # CodeQL analysis
+│   ├── package.yml               # nightly: install the built packages on a clean box
+│   ├── release.yml               # tag-triggered, builds + drafts the release
+│   └── security.yml              # npm audit + Trivy secret & config scan
 └── src/
     ├── main/                     # Electron main process
     │   ├── index.ts              # entry — single-instance, lifecycle, IPC bootstrap
     │   ├── window.ts             # BrowserWindow factory (frameless, secure defaults)
     │   ├── ipc-handlers.ts       # all ipcMain.handle registrations
     │   ├── init.ts               # data-directory bootstrap
+    │   ├── security.ts           # navigation, window-open and permission policy
     │   └── logger.ts             # electron-log setup
     ├── preload/
     │   └── index.ts              # contextBridge — exposes typed RavenForgeAPI
     ├── renderer/                 # React SPA
     │   ├── main.tsx, App.tsx
     │   ├── pages/                # one per route
-    │   ├── components/           # ui/ (Button, Input, Banner, Select) + layout/
+    │   ├── components/           # ui/ (Button, Input, Select, Switch, Banner, …) + layout/
     │   ├── stores/               # Zustand stores (auth, profiles, news, settings, launch)
-    │   └── styles/global.css     # @import "tailwindcss" + CSS variables
+    │   ├── hooks/                # cross-page React hooks (e.g. the machine's memory)
+    │   ├── i18n/                 # UI string dictionaries (pl, en) + the t() helper
+    │   └── styles/global.css     # @import "tailwindcss", @theme tokens, per-theme --rf-*
     ├── core/                     # business logic, runs in main process
     │   ├── auth/                 # MS OAuth → Xbox → XSTS → MC chain, keytar token store
     │   ├── diagnostics/          # crash-report.ts — one redacted file per crash
@@ -58,22 +65,27 @@ raven-forge/
     │   ├── java/                 # Adoptium Temurin download + version selection
     │   ├── minecraft/            # version manifest, asset/library download, game launcher
     │   ├── modloader/            # Fabric, Quilt, Forge and NeoForge installers
-    │   ├── mods/                 # manifest sync, Modrinth API, content (shaders/RP) manager
+    │   ├── mods/                 # manifest sync, Modrinth API, update checks, content manager
+    │   ├── packs/                # .mrpack reader and writer, pack catalogue, profile-from-pack
+    │   ├── net/                  # proxy dispatcher + the shared download helper
     │   ├── updater/              # electron-updater wiring, manifest signature verification
-    │   ├── profiles/             # profile CRUD + import/export
+    │   ├── profiles/             # profile CRUD, import/export, world backups
     │   ├── news/                 # news + announcement fetcher with mock fallback
-    │   └── config/               # paths.ts, settings-manager.ts, defaults.ts
+    │   ├── util/                 # atomic writes, cancellation, path containment, machine memory
+    │   └── config/               # paths.ts, data-root.ts, data-root-move.ts, settings-manager.ts, defaults.ts
     └── shared/                   # types + validators consumed by both processes
         ├── ipc-types.ts          # InvokeChannels, EventChannels, RavenForgeAPI
         ├── ipc/                  # payload shapes, one file per domain
         ├── validators.ts         # Zod schemas for settings + profiles
+        ├── memory.ts             # what of the machine's RAM a profile may take
         ├── manifest-schema.ts    # Zod schema for remote manifests
+        ├── branding.ts           # the launcher's own names and addresses
         └── constants.ts          # endpoints, defaults, MC→Java mapping
 ```
 
 ## IPC contract
 
-All renderer → main calls go through typed channels declared in [`src/shared/ipc-types.ts`](../src/shared/ipc-types.ts) and exposed as `window.ravenforge.<domain>.<method>` via the preload contextBridge. Returns `IpcResult<T> = { success, data?, error? }` so renderer code never throws on cross-process errors.
+All renderer → main calls go through typed channels declared in [`src/shared/ipc-types.ts`](../src/shared/ipc-types.ts) and exposed as `window.ravenforge.<domain>.<method>` via the preload contextBridge. Returns `IpcResult<T> = { success, data?, error?, code?, errorMessage? }` so renderer code never throws on cross-process errors. `error` is always English — it is what the log keeps and what a bug report quotes. `code` tags a failure the UI has to _react_ to rather than merely show (`AUTH_UNREACHABLE` is the one), and `errorMessage` carries a translation key plus its variables for the failures the launcher raises about something the player can go and change, since `src/core/` has no locale. Progress lines travel the same way — see `ProgressKey`.
 
 Channels are grouped by domain: `auth`, `profiles`, `mods`, `content` (shaders + resource packs), `java`, `loaders`, `game`, `settings`, `news`, `announcements`, `manifest` (verification), `updater`, `system`, `window`.
 
@@ -218,6 +230,7 @@ window, so its logout leaves the jar alone.
 sequenceDiagram
     participant Boot as electron main
     participant App as app
+    participant Root as data-root
     participant Init as init.ts
     participant Settings as settings-manager
     participant IPC as ipc-handlers
@@ -227,6 +240,7 @@ sequenceDiagram
     Boot->>App: requestSingleInstanceLock()
     App->>App: app.whenReady()
     App->>Boot: initLogger() (electron-log → userData/logs)
+    App->>Root: dataRoot() — RAVENFORGE_DATA_DIR, else userData/data-root.txt, else userData
     App->>Init: ensureDataDirectories() (profiles, loaders, java, cache, logs, crash-reports)
     App->>Settings: loadSettings() — Zod-validated, defaults written if missing
     App->>IPC: registerAllIpcHandlers()
@@ -244,7 +258,7 @@ sequenceDiagram
 - The preload script is the only bridge — every renderer-callable function goes through `ipcRenderer.invoke` against a known channel name.
 - `system:open-url` rejects anything that isn't `http://` / `https://`.
 - `setWindowOpenHandler` denies `window.open`, and a `will-navigate` handler denies top-level navigation; both route external links to the OS browser.
-- `system:open-path` is confined to the launcher's own data and log directories. It runs whatever the OS associates with the target, so an unrestricted one is a way to execute an arbitrary file.
+- `system:open-path` is confined to the launcher's own data, log and crash-report directories (`paths.isInsideLauncherData`). It runs whatever the OS associates with the target, so an unrestricted one is a way to execute an arbitrary file. The three are listed separately rather than derived from the root: once the data folder can be moved, the logs and crash reports stay in `userData` and are no longer inside it.
 - The Content-Security-Policy is served as a response header (`src/main/security.ts`) as well as in a `<meta>` tag. Only the header cannot be outrun by markup injected ahead of the tag.
 - Every `ipcMain.handle` goes through a sender check, so a handler added later cannot be the first one to forget it.
 - The Microsoft OAuth flow uses PKCE (S256) and a `state` value, and accepts a code only from the exact redirect URI it asked for.
@@ -310,7 +324,7 @@ post-main` description, and that exit is logged but not reported as a crash.
 - No Mica/acrylic backdrop on Windows 11; no one-click rollback to the previous
   launcher version; no warning when a user-installed mod collides with a manifest
   mod.
-- Dead IPC surface: `java:*`, `game:kill`, `game:is-running` and
-  `announcements:dismiss` are declared, handled and exposed but never called from
-  the renderer. `game:kill` is the one that costs the user something — there is
-  no way to stop a running game from the launcher.
+- Dead IPC surface: `game:kill`, `game:is-running` and `announcements:dismiss`
+  are declared, handled and exposed but never called from the renderer.
+  `game:kill` is the one that costs the user something — there is no way to stop
+  a running game from the launcher.

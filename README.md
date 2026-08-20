@@ -19,10 +19,17 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Mod Auto-Sync** — fetch server manifest → check its signature → diff → parallel download → verify each hash → install
 - **Mod Browser** — search Modrinth from the launcher, filtered to your profile
 - **Compatibility Checks** — warns before an install that does not fit the profile, and pulls in required dependencies
+- **Mod Updates** — checks what you installed by hand against Modrinth by file hash, so a jar you dropped in yourself is recognised too, and updates them in place
+- **Pack Export** — write a profile back out as a `.mrpack`: a small file of references, with anything Modrinth does not host carried inside it
+- **World Backups** — copy a profile's worlds aside, restore them again, and get asked before a Minecraft version change touches them
+- **Data Folder You Choose** — profiles, assets and the managed JREs are gigabytes; point them at another drive from Settings and the launcher carries what is already there, or picks up a folder it used before. `RAVENFORGE_DATA_DIR` decides instead for a portable install
+- **RAM That Fits The Machine** — the allocation slider is bounded by the memory this computer actually has, recommends a size for it, and the launcher refuses a heap the machine cannot back rather than failing later
 - **Bilingual UI** — Polish and English, switchable in Settings
 - **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla
 - **Microsoft Auth** — full OAuth 2.0 → Xbox Live → Minecraft JWT chain + offline mode
-- **Java Management** — auto-download the Adoptium Temurin JRE the game actually asks for; Mojang's version metadata names the major (Java 25 for 26.2, 21 for 1.21, and so on), with a table covering versions old enough not to state one
+- **Java Management** — auto-download the Adoptium Temurin JRE the game actually asks for; Mojang's version metadata names the major (Java 25 for 26.2, 21 for 1.21, and so on), with a table covering versions old enough not to state one. A profile may name a JVM of its own instead — picked from the ones found on this machine or from a file — and the launcher checks it says what it needs to before the game gets it
+- **The Window The Game Starts In** — a size and a windowed/fullscreen choice per profile, both optional. Fullscreen is written into the game's own settings rather than passed as an argument, so switching it back off works as well as switching it on
+- **Snapshots** — Mojang's weekly test builds are one toggle away in the version picker, off by default, and a profile already on one opens with them shown
 - **Shaders & Resource Packs** — first-class content management per profile
 - **Auto-Update** — launcher self-updates via GitHub Releases (electron-updater)
 - **Crash Reports** — one file per crash with versions, mods and the game's own report, written with tokens and account details already stripped out
@@ -56,8 +63,11 @@ npm install
 npm run dev
 ```
 
-> **Note:** On Windows, you may need to install Visual Studio Build Tools for native modules (keytar):
-> `npm install --global windows-build-tools` or install the "Desktop development with C++" workload from Visual Studio Installer.
+> **Note:** On Windows, `keytar` is a native module and needs a C++ toolchain to
+> build. The Node.js installer offers to set one up ("Tools for Native Modules");
+> otherwise install the **Desktop development with C++** workload from the Visual
+> Studio Installer. The old `windows-build-tools` package is deprecated — npm
+> itself now says Node ships what it used to provide.
 
 ### Debian / Ubuntu
 
@@ -111,10 +121,11 @@ src/
 │   ├── pages/      # Route pages
 │   ├── stores/     # Zustand state stores
 │   ├── i18n/       # UI string dictionaries (pl, en) + tiny t() helper
-│   └── styles/     # Tailwind entry + backdrop animations
+│   ├── assets/     # bundled fonts
+│   └── styles/     # Tailwind entry + theme tokens + backdrop animations
 ├── core/           # Business logic (runs in main process)
 │   ├── auth/       # Microsoft OAuth + offline auth
-│   ├── config/     # Settings + paths
+│   ├── config/     # Settings, paths, and the movable data root
 │   ├── diagnostics/# Crash reports — one redacted file per crash
 │   ├── discord/    # Rich Presence over Discord's local IPC socket (opt-in)
 │   ├── java/       # Adoptium JRE management
@@ -125,7 +136,8 @@ src/
 │   ├── news/       # News + announcement feeds
 │   ├── packs/      # .mrpack reader, pack catalogue, profile-from-pack install
 │   ├── profiles/   # Profile CRUD + import/export
-│   └── updater/    # electron-updater + Ed25519 manifest verification
+│   ├── updater/    # electron-updater + Ed25519 manifest verification
+│   └── util/       # Atomic writes, cancellation, path containment
 └── shared/         # Types shared between main + renderer
     ├── ipc-types.ts    # the channel contract
     └── ipc/            # payload shapes, one file per domain

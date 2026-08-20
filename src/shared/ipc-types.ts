@@ -27,7 +27,10 @@ import type { AuthState, MinecraftAccount } from './ipc/auth';
 import type {
   LoaderVersion,
   ModLoaderType,
+  MrpackExport,
   OrphanedProfile,
+  WorldBackup,
+  WorldBackupReason,
   Profile,
   ProfileFileSummary,
   ProfileSyncStatus,
@@ -41,11 +44,13 @@ import type {
   ModInstallResult,
   ModSearchFilters,
   ModSearchResult,
+  ModUpdateResult,
+  ModUpdateSummary,
   ShaderLoaderResult,
   ShaderLoaderState,
 } from './ipc/mods';
-import type { JavaInstallation } from './ipc/java';
-import type { GlobalSettings, TrustedKey } from './ipc/settings';
+import type { JavaInstallation, JavaProbe } from './ipc/java';
+import type { GlobalSettings, TrustedKey, DataRootInfo, DataRootPlan } from './ipc/settings';
 import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
 import type { ManifestVerification, UpdateCheck, UpdateInfo } from './ipc/updater';
@@ -89,6 +94,11 @@ export interface InvokeChannels {
   'profiles:duplicate': (profileId: string, name?: string) => Promise<IpcResult<Profile>>;
   'profiles:open-folder': (profileId: string) => Promise<IpcResult<void>>;
   'profiles:export': (profileId: string) => Promise<IpcResult<string>>; // returns JSON string
+  /**
+   * Write the profile out as a Modrinth modpack — the mods, not just the
+   * settings. Asks where to put it; `null` means the player closed the dialog.
+   */
+  'profiles:export-pack': (profileId: string) => Promise<IpcResult<MrpackExport | null>>;
   'profiles:import': (json: string) => Promise<IpcResult<Profile>>;
   'profiles:get-sync-status': (profileId: string) => Promise<IpcResult<ProfileSyncStatus>>;
   /** Copy an image in as the profile's icon; `null` source clears it. */
@@ -98,6 +108,30 @@ export interface InvokeChannels {
   ) => Promise<IpcResult<Profile>>;
   /** The profile's icon as a `data:` URL, or `null` if it has none. */
   'profiles:get-icon': (profileId: string) => Promise<IpcResult<string | null>>;
+  /** World folder names in this profile's `saves/`. */
+  'profiles:list-worlds': (profileId: string) => Promise<IpcResult<string[]>>;
+  /** Copies of `saves/`, newest first. */
+  'profiles:list-backups': (profileId: string) => Promise<IpcResult<WorldBackup[]>>;
+  /**
+   * Copy the worlds aside. Refused while the game holds them open.
+   *
+   * The reason is recorded because it decides what happens later: automatic
+   * copies are pruned to the newest few, a copy taken by hand never is.
+   * `before-restore` is not offered — only `restoreBackup` may claim that one.
+   */
+  'profiles:backup-worlds': (
+    profileId: string,
+    reason?: Exclude<WorldBackupReason, 'before-restore'>,
+  ) => Promise<IpcResult<WorldBackup>>;
+  /**
+   * Put a backup's worlds back. Whatever is in `saves/` now is copied aside
+   * first, and that copy comes back so the UI can say a restore is undoable.
+   */
+  'profiles:restore-backup': (
+    profileId: string,
+    backupId: string,
+  ) => Promise<IpcResult<WorldBackup | null>>;
+  'profiles:delete-backup': (profileId: string, backupId: string) => Promise<IpcResult<void>>;
 
   // -- Packs --
   /** The White Ravens catalogue, from the address compiled into the launcher. */
@@ -133,6 +167,13 @@ export interface InvokeChannels {
     modId: string,
     enabled: boolean,
   ) => Promise<IpcResult<void>>;
+  /**
+   * Ask Modrinth whether anything installed by hand has a newer build, and write
+   * the answer into the lock file. Manifest-managed mods are the pack's to move.
+   */
+  'mods:check-updates': (profileId: string) => Promise<IpcResult<ModUpdateSummary>>;
+  /** Install the builds the last check found, for the mods named. */
+  'mods:update': (profileId: string, modIds: string[]) => Promise<IpcResult<ModUpdateResult>>;
   'mods:search': (filters: ModSearchFilters) => Promise<IpcResult<ModSearchResult[]>>;
   /** Modrinth's live facet list for a project type, grouped as Modrinth groups it. */
   'mods:get-facets': (projectType: ContentProjectType) => Promise<IpcResult<FacetGroups>>;
@@ -174,9 +215,8 @@ export interface InvokeChannels {
   ) => Promise<IpcResult<void>>;
 
   // -- Java --
-  'java:get-installations': () => Promise<IpcResult<JavaInstallation[]>>;
-  'java:ensure-version': (majorVersion: number) => Promise<IpcResult<JavaInstallation>>;
   'java:detect-system': () => Promise<IpcResult<JavaInstallation[]>>;
+  'java:probe': (binPath: string, minecraftVersion: string) => Promise<IpcResult<JavaProbe>>;
 
   // -- Mod Loaders --
   'loaders:install': (
@@ -214,6 +254,12 @@ export interface InvokeChannels {
   'settings:reset': () => Promise<IpcResult<GlobalSettings>>;
   'settings:add-trusted-key': (key: TrustedKey) => Promise<IpcResult<void>>;
   'settings:remove-trusted-key': (publicKey: string) => Promise<IpcResult<void>>;
+  'settings:get-data-root': () => Promise<IpcResult<DataRootInfo>>;
+  /** Opens a directory picker; `null` when it was dismissed. */
+  'settings:choose-data-root': () => Promise<IpcResult<DataRootPlan | null>>;
+  'settings:plan-data-root': (target: string) => Promise<IpcResult<DataRootPlan>>;
+  /** Moves the data and restarts the launcher into the new location. */
+  'settings:apply-data-root': (target: string) => Promise<IpcResult<void>>;
 
   // -- News & Announcements --
   'news:get': () => Promise<IpcResult<FeedResult<NewsItem>>>;
@@ -261,6 +307,7 @@ export interface EventChannels {
   'progress:java-download': (event: ProgressEvent) => void;
   'progress:game-assets': (event: ProgressEvent) => void;
   'progress:launcher-update': (event: ProgressEvent) => void;
+  'progress:data-root': (event: ProgressEvent) => void;
 
   // -- Game Events --
   'game:log': (profileId: string, line: GameLogLine) => void;
@@ -319,10 +366,16 @@ export interface RavenForgeAPI {
     duplicate: InvokeChannels['profiles:duplicate'];
     openFolder: InvokeChannels['profiles:open-folder'];
     export: InvokeChannels['profiles:export'];
+    exportPack: InvokeChannels['profiles:export-pack'];
     import: InvokeChannels['profiles:import'];
     getSyncStatus: InvokeChannels['profiles:get-sync-status'];
     setIcon: InvokeChannels['profiles:set-icon'];
     getIcon: InvokeChannels['profiles:get-icon'];
+    listWorlds: InvokeChannels['profiles:list-worlds'];
+    listBackups: InvokeChannels['profiles:list-backups'];
+    backupWorlds: InvokeChannels['profiles:backup-worlds'];
+    restoreBackup: InvokeChannels['profiles:restore-backup'];
+    deleteBackup: InvokeChannels['profiles:delete-backup'];
   };
   packs: {
     listCatalogue: InvokeChannels['packs:list-catalogue'];
@@ -338,6 +391,8 @@ export interface RavenForgeAPI {
     installFromFile: InvokeChannels['mods:install-from-file'];
     uninstall: InvokeChannels['mods:uninstall'];
     toggleEnabled: InvokeChannels['mods:toggle-enabled'];
+    checkUpdates: InvokeChannels['mods:check-updates'];
+    update: InvokeChannels['mods:update'];
     search: InvokeChannels['mods:search'];
     getFacets: InvokeChannels['mods:get-facets'];
   };
@@ -354,9 +409,8 @@ export interface RavenForgeAPI {
     reorderResourcePacks: InvokeChannels['content:reorder-resourcepacks'];
   };
   java: {
-    getInstallations: InvokeChannels['java:get-installations'];
-    ensureVersion: InvokeChannels['java:ensure-version'];
     detectSystem: InvokeChannels['java:detect-system'];
+    probe: InvokeChannels['java:probe'];
   };
   loaders: {
     install: InvokeChannels['loaders:install'];
@@ -377,6 +431,10 @@ export interface RavenForgeAPI {
     reset: InvokeChannels['settings:reset'];
     addTrustedKey: InvokeChannels['settings:add-trusted-key'];
     removeTrustedKey: InvokeChannels['settings:remove-trusted-key'];
+    getDataRoot: InvokeChannels['settings:get-data-root'];
+    chooseDataRoot: InvokeChannels['settings:choose-data-root'];
+    planDataRoot: InvokeChannels['settings:plan-data-root'];
+    applyDataRoot: InvokeChannels['settings:apply-data-root'];
   };
   news: {
     get: InvokeChannels['news:get'];

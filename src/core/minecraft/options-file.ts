@@ -2,13 +2,20 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 /**
- * The one line of `options.txt` this launcher writes.
+ * The two lines of `options.txt` this launcher writes.
  *
  * Installing a resource pack into `resourcepacks/` does not enable it — the
- * game only loads what this line names, which is why a synced pack used to sit
- * in the folder doing nothing until the player enabled it by hand.
+ * game only loads what `resourcePacks` names, which is why a synced pack used
+ * to sit in the folder doing nothing until the player enabled it by hand.
+ *
+ * `fullscreen` is here rather than on the command line because the command line
+ * only goes one way. `--fullscreen` turns it on and the game then saves that
+ * choice into this file; there is no `--windowed` to turn it back off, so a
+ * profile switched back would have started full-screen for ever, and the
+ * setting would have looked broken to the one person who tried both.
  */
 const RESOURCE_PACKS_KEY = 'resourcePacks';
+const FULLSCREEN_KEY = 'fullscreen';
 
 /**
  * How a pack from the `resourcepacks/` folder is named in the list.
@@ -108,20 +115,15 @@ function writeOption(body: string, key: string, value: string): string {
 }
 
 /**
- * Point the profile's `options.txt` at these packs, in this order.
+ * Read the profile's `options.txt`, change it, and write it back.
  *
  * The file belongs to the player, not to the launcher: every other setting is
  * copied through untouched, and the write goes to a temporary file first so a
  * crash mid-write cannot leave them with a truncated settings file. A profile
  * that has never been launched has no `options.txt` yet — one is created with
- * just this line, and Minecraft fills in the rest at its first save.
- *
- * @param orderedFileNames pack file names, highest priority first
+ * just the line being set, and Minecraft fills in the rest at its first save.
  */
-export async function applyResourcePackOrder(
-  gameDir: string,
-  orderedFileNames: string[],
-): Promise<void> {
+async function editOptions(gameDir: string, edit: (body: string) => string): Promise<void> {
   const file = path.join(gameDir, 'options.txt');
 
   let body = '';
@@ -131,15 +133,42 @@ export async function applyResourcePackOrder(
     /* never launched — a one-line file is a valid options.txt */
   }
 
-  const next = writeOption(
-    body,
-    RESOURCE_PACKS_KEY,
-    buildResourcePacksValue(readOption(body, RESOURCE_PACKS_KEY), orderedFileNames),
-  );
+  const next = edit(body);
   if (next === body) return;
 
   await fs.mkdir(gameDir, { recursive: true });
   const tmp = `${file}.tmp`;
   await fs.writeFile(tmp, next, 'utf-8');
   await fs.rename(tmp, file);
+}
+
+/**
+ * Point the profile's `options.txt` at these packs, in this order.
+ *
+ * @param orderedFileNames pack file names, highest priority first
+ */
+export async function applyResourcePackOrder(
+  gameDir: string,
+  orderedFileNames: string[],
+): Promise<void> {
+  await editOptions(gameDir, (body) =>
+    writeOption(
+      body,
+      RESOURCE_PACKS_KEY,
+      buildResourcePacksValue(readOption(body, RESOURCE_PACKS_KEY), orderedFileNames),
+    ),
+  );
+}
+
+/**
+ * State the profile's full-screen choice in the file the game reads it from.
+ *
+ * Called on every launch, so the profile's answer wins over whatever the last
+ * session left behind — which is the whole point: F11 during play writes
+ * `fullscreen:true` here on exit, and a profile that says "windowed" has to be
+ * able to mean it a second time. A profile that says nothing is left alone, so
+ * the game's own memory of what the player last did survives.
+ */
+export async function applyFullscreen(gameDir: string, fullscreen: boolean): Promise<void> {
+  await editOptions(gameDir, (body) => writeOption(body, FULLSCREEN_KEY, String(fullscreen)));
 }

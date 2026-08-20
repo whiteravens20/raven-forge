@@ -8,6 +8,8 @@ import { assertTrustedSender } from './security';
 import { getSettings, updateSettings, resetSettings } from '../core/config/settings-manager';
 import { applyProxySettings } from '../core/net/proxy';
 import { paths } from '../core/config/paths';
+import { dataRootSource, dataRootUnavailable, defaultDataRoot } from '../core/config/data-root';
+import { applyDataRoot, planDataRootChange } from '../core/config/data-root-move';
 import { fetchNews, fetchAnnouncements } from '../core/news/news-fetcher';
 import {
   getAllProfiles,
@@ -22,13 +24,19 @@ import {
   listOrphanedProfiles,
   adoptOrphanedProfile,
   discardOrphanedProfile,
-  resolveGameDir,
 } from '../core/profiles/profile-manager';
 import {
   setProfileIcon,
   clearProfileIcon,
   getProfileIconDataUrl,
 } from '../core/profiles/profile-icon';
+import {
+  listWorlds,
+  listBackups,
+  backupWorlds,
+  restoreBackup,
+  deleteBackup,
+} from '../core/profiles/world-backup';
 import { getProfileSyncStatus, getLastManifestVerification } from '../core/mods/mod-sync';
 import {
   getInstalledMods,
@@ -38,6 +46,7 @@ import {
   uninstallMod,
   toggleModEnabled,
 } from '../core/mods/mod-sync';
+import { checkModUpdates, updateMods } from '../core/mods/mod-updates';
 import { searchMods, getSearchFacets } from '../core/mods/modrinth-api';
 import { planModInstall, planContentInstall } from '../core/mods/compatibility';
 import { listCataloguePacks } from '../core/packs/catalogue';
@@ -46,6 +55,7 @@ import {
   createProfileFromManifest,
   createProfileFromUrl,
 } from '../core/packs/pack-installer';
+import { exportProfileAsMrpack } from '../core/packs/mrpack-export';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
 import {
   listContent,
@@ -54,11 +64,8 @@ import {
   reorderResourcePacks,
 } from '../core/mods/content-manager';
 import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater/launcher-updater';
-import {
-  getJavaInstallations,
-  ensureJavaVersion,
-  detectSystemJava,
-} from '../core/java/java-manager';
+import { detectSystemJava, probeJava } from '../core/java/java-manager';
+import { requiredJavaFor } from '../core/minecraft/java-requirement';
 import {
   installLoader,
   getLoaderVersions,
@@ -67,6 +74,7 @@ import {
 import { launchGame, killGame, isGameRunning, getLogTail } from '../core/minecraft/game-launcher';
 import { getVersionManifest } from '../core/minecraft/version-manifest';
 import { cancelJob } from '../core/util/cancellation';
+import { machineMemoryMb } from '../core/util/machine-memory';
 import {
   loginMicrosoft,
   loginOffline,
@@ -78,12 +86,15 @@ import {
 import type {
   IpcResult,
   IpcErrorCode,
+  ErrorMessage,
   GlobalSettings,
   TrustedKey,
+  WorldBackupReason,
   SystemInfo,
   ShaderLoaderResult,
 } from '../shared/ipc-types';
 import { AuthServersUnreachableError } from '../core/auth/auth-errors';
+import { launchRefusal } from '../core/minecraft/launch-errors';
 
 /** Log tail limits — enough to diagnose a crash, small enough to ship over IPC. */
 const LOG_TAIL_DEFAULT_LINES = 500;
@@ -94,8 +105,13 @@ function ok<T>(data: T): IpcResult<T> {
   return { success: true, data };
 }
 
-function fail<T>(error: string, code?: IpcErrorCode): IpcResult<T> {
-  return { success: false, error, ...(code ? { code } : {}) };
+function fail<T>(error: string, code?: IpcErrorCode, errorMessage?: ErrorMessage): IpcResult<T> {
+  return {
+    success: false,
+    error,
+    ...(code ? { code } : {}),
+    ...(errorMessage ? { errorMessage } : {}),
+  };
 }
 
 /**
@@ -121,16 +137,6 @@ function handle(
   ipcMain.handle(channel, (event, ...args) => {
     assertTrustedSender(event, channel);
     return listener(event, ...(args as never[]));
-  });
-}
-
-/** True when `target` is one of the launcher's own directories, or inside one. */
-function isInsideLauncherData(target: string): boolean {
-  if (typeof target !== 'string' || target === '') return false;
-  const resolved = path.resolve(target);
-  return [paths.root, paths.logsDir].some((root) => {
-    const relative = path.relative(root, resolved);
-    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
   });
 }
 
@@ -163,7 +169,7 @@ export function registerAllIpcHandlers(): void {
       launcherVersion: app.getVersion(),
       platform: process.platform as SystemInfo['platform'],
       arch: process.arch,
-      totalMemoryMb: Math.round(os.totalmem() / 1024 / 1024),
+      totalMemoryMb: machineMemoryMb(),
       freeMemoryMb: Math.round(os.freemem() / 1024 / 1024),
       dataDirectory: paths.root,
       crashReportsDirectory: paths.crashReportsDir,
@@ -176,7 +182,7 @@ export function registerAllIpcHandlers(): void {
     // unrestricted one is a way to execute an arbitrary file by asking the
     // renderer nicely. Every real caller passes a directory the main process
     // itself produced, so confining it to those costs nothing.
-    if (!isInsideLauncherData(targetPath)) {
+    if (!paths.isInsideLauncherData(targetPath)) {
       log.warn(`Refused to open a path outside the launcher's data directory: ${targetPath}`);
       return fail("That path is outside the launcher's data directory");
     }
@@ -320,6 +326,63 @@ export function registerAllIpcHandlers(): void {
     } catch (err) {
       return fail(`Failed to remove trusted key: ${reason(err)}`);
     }
+  });
+
+  // ── Data directory ──────────────────────────────────────
+  handle('settings:get-data-root', () => {
+    try {
+      return ok({
+        path: paths.root,
+        defaultPath: defaultDataRoot(),
+        source: dataRootSource(),
+        unavailable: dataRootUnavailable(),
+      });
+    } catch (err) {
+      return fail(`Failed to read the data directory: ${reason(err)}`);
+    }
+  });
+  handle('settings:choose-data-root', async () => {
+    const win = getMainWindow();
+    if (!win) return fail('No window available');
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: paths.root,
+    });
+    if (result.canceled || result.filePaths.length === 0) return ok(null);
+    try {
+      return ok(await planDataRootChange(result.filePaths[0]));
+    } catch (err) {
+      return fail(`Failed to inspect ${result.filePaths[0]}: ${reason(err)}`);
+    }
+  });
+  handle('settings:plan-data-root', async (_event, target: string) => {
+    try {
+      return ok(await planDataRootChange(target));
+    } catch (err) {
+      return fail(`Failed to inspect ${target}: ${reason(err)}`);
+    }
+  });
+  /**
+   * The restart is not a convenience. Every module that has already read a path
+   * — the settings cache, the java manager, an in-flight download — is holding
+   * the old root, and there is no version of re-pointing them all that is worth
+   * trusting with somebody's saves. Coming back up is the one way that is.
+   */
+  handle('settings:apply-data-root', async (_event, target: string) => {
+    try {
+      await applyDataRoot(target, (event) => {
+        getMainWindow()?.webContents.send('progress:data-root', event);
+      });
+    } catch (err) {
+      return fail(`Failed to move the data directory: ${reason(err)}`);
+    }
+    // Long enough for this reply to reach the renderer, which is showing the
+    // restart notice it is about to be replaced by.
+    setTimeout(() => {
+      app.relaunch();
+      app.quit();
+    }, 600);
+    return ok(undefined);
   });
 
   // ── News & Announcements ────────────────────────────────
@@ -480,7 +543,7 @@ export function registerAllIpcHandlers(): void {
     try {
       const profile = await getProfile(profileId);
       if (!profile) return fail('Profile not found');
-      const dir = resolveGameDir(profile);
+      const dir = paths.profileGameDir(profile.id);
       // A profile that has never been launched has no game directory yet, and
       // opening a path that does not exist only produces an error the player
       // cannot act on. Create it: this is where the launcher would put it.
@@ -501,6 +564,30 @@ export function registerAllIpcHandlers(): void {
       return ok(await exportProfile(profileId));
     } catch (err) {
       return fail(`Failed to export profile: ${reason(err)}`);
+    }
+  });
+  handle('profiles:export-pack', async (_event, profileId: string) => {
+    try {
+      const win = getMainWindow();
+      if (!win) return fail('No window available');
+      const profile = await getProfile(profileId);
+      if (!profile) return fail('Profile not found');
+
+      // The dialog runs in main, so the renderer never names a destination — it
+      // asks for an export and the person at the keyboard says where it goes.
+      // `defaultPath` needs a directory as well as a name: given a bare file
+      // name the picker opens wherever the process happens to have been
+      // started, which for a packaged app is nowhere anybody keeps files.
+      const suggested = `${profile.name.replace(/[^\p{L}\p{N} ._-]/gu, '_')}.mrpack`;
+      const chosen = await dialog.showSaveDialog(win, {
+        defaultPath: path.join(app.getPath('downloads'), suggested),
+        filters: [{ name: 'Modrinth modpack', extensions: ['mrpack'] }],
+      });
+      if (chosen.canceled || !chosen.filePath) return ok(null);
+
+      return ok(await exportProfileAsMrpack(profileId, chosen.filePath));
+    } catch (err) {
+      return fail(`Could not export that profile as a pack: ${reason(err)}`);
     }
   });
   handle('profiles:import', async (_event, json: string) => {
@@ -532,6 +619,55 @@ export function registerAllIpcHandlers(): void {
       return ok(await getProfileIconDataUrl(profileId));
     } catch (err) {
       return fail(`Failed to read icon: ${reason(err)}`);
+    }
+  });
+
+  handle('profiles:list-worlds', async (_event, profileId: string) => {
+    try {
+      return ok(await listWorlds(profileId));
+    } catch (err) {
+      return fail(`Failed to list worlds: ${reason(err)}`);
+    }
+  });
+  handle('profiles:list-backups', async (_event, profileId: string) => {
+    try {
+      return ok(await listBackups(profileId));
+    } catch (err) {
+      return fail(`Failed to list backups: ${reason(err)}`);
+    }
+  });
+  handle('profiles:backup-worlds', async (_event, profileId: string, why?: WorldBackupReason) => {
+    try {
+      // Copying a world the game has open produces a copy of a half-written
+      // region file, which restores as corruption. There is no way to take a
+      // consistent one from out here, so this refuses instead of pretending.
+      if (isGameRunning(profileId)) {
+        return fail('Close the game first — a world cannot be copied while it is open.');
+      }
+      // A reason from the renderer only decides pruning, and `before-restore`
+      // is not its to claim — anything unexpected is treated as a
+      // deliberate copy, which is the choice that keeps files.
+      return ok(await backupWorlds(profileId, why === 'version-change' ? why : 'manual'));
+    } catch (err) {
+      return fail(`Could not back up the worlds: ${reason(err)}`);
+    }
+  });
+  handle('profiles:restore-backup', async (_event, profileId: string, backupId: string) => {
+    try {
+      if (isGameRunning(profileId)) {
+        return fail('Close the game first — its worlds cannot be replaced while it is running.');
+      }
+      return ok(await restoreBackup(profileId, backupId));
+    } catch (err) {
+      return fail(`Could not restore that backup: ${reason(err)}`);
+    }
+  });
+  handle('profiles:delete-backup', async (_event, profileId: string, backupId: string) => {
+    try {
+      await deleteBackup(profileId, backupId);
+      return ok(undefined);
+    } catch (err) {
+      return fail(`Could not delete that backup: ${reason(err)}`);
     }
   });
 
@@ -623,6 +759,20 @@ export function registerAllIpcHandlers(): void {
       }
     },
   );
+  handle('mods:check-updates', async (_event, profileId: string) => {
+    try {
+      return ok(await checkModUpdates(profileId));
+    } catch (err) {
+      return fail(`Could not check for mod updates: ${reason(err)}`);
+    }
+  });
+  handle('mods:update', async (_event, profileId: string, modIds: string[]) => {
+    try {
+      return ok(await updateMods(profileId, modIds));
+    } catch (err) {
+      return fail(`Failed to update mods: ${reason(err)}`);
+    }
+  });
   handle('mods:search', async (_event, filters) => {
     try {
       return ok(await searchMods(filters));
@@ -741,25 +891,25 @@ export function registerAllIpcHandlers(): void {
   );
 
   // ── Java ─────────────────────────────────────────────────
-  handle('java:get-installations', async () => {
-    try {
-      return ok(await getJavaInstallations());
-    } catch (err) {
-      return fail(`Failed to get Java installations: ${reason(err)}`);
-    }
-  });
-  handle('java:ensure-version', async (_event, majorVersion: number) => {
-    try {
-      return ok(await ensureJavaVersion(majorVersion));
-    } catch (err) {
-      return fail(`Failed to ensure Java version: ${reason(err)}`);
-    }
-  });
   handle('java:detect-system', async () => {
     try {
       return ok(await detectSystemJava());
     } catch (err) {
       return fail(`Failed to detect system Java: ${reason(err)}`);
+    }
+  });
+  handle('java:probe', async (_event, binPath: string, minecraftVersion: string) => {
+    try {
+      // The requirement without a version meta: the table in `requiredJavaFor`
+      // is enough to say "too old" in the editor, and fetching Mojang's meta
+      // for a field somebody is still typing in would be a network round trip
+      // per keystroke.
+      return ok({
+        version: await probeJava(binPath),
+        requiredVersion: requiredJavaFor(minecraftVersion),
+      });
+    } catch (err) {
+      return fail(`Failed to check ${binPath}: ${reason(err)}`);
     }
   });
 
@@ -799,7 +949,9 @@ export function registerAllIpcHandlers(): void {
       if (err instanceof AuthServersUnreachableError) {
         return fail(`Failed to launch game: ${reason(err)}`, 'AUTH_UNREACHABLE');
       }
-      return fail(`Failed to launch game: ${reason(err)}`);
+      // A refusal carries the same sentence twice: English here for the log,
+      // and a key the renderer says in the player's language.
+      return fail(`Failed to launch game: ${reason(err)}`, undefined, launchRefusal(err));
     }
   });
   handle('game:kill', async (_event, profileId: string) => {

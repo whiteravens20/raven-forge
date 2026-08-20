@@ -1,5 +1,12 @@
 import { z } from 'zod';
 import { DEFAULT_NEWS_FEED_URL, DEFAULT_ANNOUNCEMENT_FEED_URL } from './branding';
+import {
+  MAX_GAME_DIMENSION,
+  MAX_RAM_MB,
+  MIN_GAME_HEIGHT,
+  MIN_GAME_WIDTH,
+  MIN_RAM_MB,
+} from './constants';
 import { isSafeFileName } from './manifest-schema';
 
 // ── Runtime validators for IPC payloads ───────────────────
@@ -133,13 +140,36 @@ export const profileSchema = z.object({
   serverIp: z.string().optional(),
   serverPort: z.number().min(1).max(65535).optional(),
   javaArgs: z.string().optional(),
-  allocatedRamMb: z.number().min(512).max(32768),
+  allocatedRamMb: z.number().min(MIN_RAM_MB).max(MAX_RAM_MB),
   customJavaPath: z.string().optional(),
-  windowWidth: z.number().optional(),
-  windowHeight: z.number().optional(),
-  fullscreen: z.boolean().optional(),
-  gameDirectory: z.string().optional(),
-  preLaunchCommand: z.string().optional(),
+  /**
+   * The game's window. All three degrade to "unset" instead of failing the
+   * parse, and that is deliberate: this schema is not only the editor's gate —
+   * every play session ends in an `updateProfile` that runs the whole profile
+   * through it, so a file hand-edited to a resolution the game cannot make
+   * would otherwise become a profile whose play time can never be recorded
+   * again. Refusing to start over a window size would be the wrong trade; the
+   * editor is where a bad number gets argued with.
+   *
+   * Width and height are still checked at launch, in `customResolution`, since
+   * `profiles.json` is read back without going through this at all.
+   */
+  windowWidth: z
+    .number()
+    .int()
+    .min(MIN_GAME_WIDTH)
+    .max(MAX_GAME_DIMENSION)
+    .optional()
+    .catch(undefined),
+  windowHeight: z
+    .number()
+    .int()
+    .min(MIN_GAME_HEIGHT)
+    .max(MAX_GAME_DIMENSION)
+    .optional()
+    .catch(undefined),
+  /** Unset means "whatever the game last did" — see `applyFullscreen`. */
+  fullscreen: z.boolean().optional().catch(undefined),
   notes: z.string().optional(),
   lastPlayed: z.string().optional(),
   totalPlayTimeMinutes: z.number().optional(),

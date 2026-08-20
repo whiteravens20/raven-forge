@@ -8,6 +8,8 @@ import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { ADOPTIUM_API } from '../../shared/constants';
 import { verifyDownload } from '../mods/integrity';
+import { parseJavaVersion } from '../minecraft/java-requirement';
+import { LaunchRefusedError } from '../minecraft/launch-errors';
 import { getMainWindow } from '../../main/window';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
 
@@ -57,15 +59,73 @@ function getManagedJavaPath(majorVersion: number): string {
   return path.join(getManagedJavaDir(majorVersion), 'bin', getJavaExecutable());
 }
 
-// ── Parse java version from java -version output ──────────
+// ── Ask a binary what it is ────────────────────────────────
 
-function parseJavaVersion(stderr: string): number | null {
-  // java -version outputs to stderr: openjdk version "21.0.2" or "1.8.0_392"
-  const match = stderr.match(/version "(\d+)(?:\.(\d+))?/);
-  if (!match) return null;
-  const major = parseInt(match[1], 10);
-  // Java 8 reports as "1.8.x", newer versions report as "17.x", "21.x"
-  return major === 1 ? parseInt(match[2], 10) : major;
+/**
+ * The major version of the JVM at `binPath`, or null if it is not one.
+ *
+ * Null covers every way of not being a Java runtime — no such file, not
+ * executable, an executable that prints something else, one that hangs. They
+ * are one answer here because they are one answer to the caller: this is not a
+ * runtime the game can be started with.
+ */
+export async function probeJava(binPath: string): Promise<number | null> {
+  try {
+    const { stderr } = await execFileAsync(binPath, ['-version'], { timeout: 5000 });
+    return parseJavaVersion(stderr);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The runtime a profile asked for by name, checked before the game gets it.
+ *
+ * A path the player chose is not a path the launcher maintains: the JDK can be
+ * uninstalled, the drive it lives on unplugged, the file replaced by something
+ * that is not a JVM at all. Left unchecked, all of those arrive as a `spawn`
+ * failure or, worse, as `UnsupportedClassVersionError` several seconds into a
+ * game that looks like it started — neither of which mentions the profile
+ * setting that caused it.
+ *
+ * Refusing outright rather than quietly falling back to the managed runtime:
+ * a profile that says which JVM to use and then silently runs a different one
+ * is how "it works on my machine" gets written.
+ */
+export async function resolveChosenJava(
+  binPath: string,
+  requiredVersion: number,
+): Promise<JavaInstallation> {
+  const version = await probeJava(binPath);
+  if (version === null) {
+    throw new LaunchRefusedError(
+      { key: 'launchError.javaNotRuntime', vars: { path: binPath } },
+      `This profile is set to launch with ${binPath}, and that is not a Java runtime this ` +
+        `machine can run. Point it somewhere else in the profile editor, or clear the field to ` +
+        `use the runtime the launcher installs itself.`,
+    );
+  }
+  if (version < requiredVersion) {
+    throw new LaunchRefusedError(
+      {
+        key: 'launchError.javaTooOld',
+        vars: { path: binPath, found: version, required: requiredVersion },
+      },
+      `This profile is set to launch with ${binPath}, which is Java ${version}, and this ` +
+        `version of Minecraft needs Java ${requiredVersion}. It would start and then stop with ` +
+        `an error about class file versions. Clear the field to use the runtime the launcher ` +
+        `installs itself.`,
+    );
+  }
+  // Newer than required is the player's call. It is usually fine and sometimes
+  // exactly what they want, and refusing it would rule out the only JVM some
+  // machines have.
+  if (version > requiredVersion) {
+    log.info(
+      `Profile Java ${version} at ${binPath} is newer than the ${requiredVersion} asked for`,
+    );
+  }
+  return { version, path: binPath, vendor: 'chosen in the profile', managed: false };
 }
 
 // ── Detect system Java ─────────────────────────────────────
@@ -121,8 +181,7 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
       if (seen.has(resolved)) continue;
       seen.add(resolved);
 
-      const { stderr } = await execFileAsync(candidate, ['-version'], { timeout: 5000 });
-      const version = parseJavaVersion(stderr);
+      const version = await probeJava(candidate);
       if (version) {
         installations.push({
           version,
@@ -132,7 +191,7 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
         });
       }
     } catch {
-      /* not a valid java */
+      /* realpath failed — nothing there */
     }
   }
 

@@ -7,7 +7,40 @@
  * the wrong classpath or a missing token. That makes it worth testing directly.
  */
 
+import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '../../shared/constants';
 import type { ConditionalArg, Rule } from './types';
+
+/** A dimension the game could actually be given. */
+function usable(value: number | undefined, min: number): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= min &&
+    value <= MAX_GAME_DIMENSION
+  );
+}
+
+/**
+ * The window size to launch at, or null for "let the game choose".
+ *
+ * Both or neither, and that rule is Mojang's rather than ours: the version meta
+ * gates `--width` and `--height` behind a single `has_custom_resolution`
+ * feature. A width with no height is therefore not half a setting — it is no
+ * setting at all, and the `${resolution_width}` template variable would quietly
+ * pair the one that was set with the 854×480 default for the one that was not.
+ *
+ * The bounds are re-checked here rather than trusted from the profile because
+ * `profiles.json` is read back without being validated: the schema polices what
+ * the editor writes, not what a hand-edited file says, and these two numbers go
+ * into the game's own argument list.
+ */
+export function customResolution(
+  width: number | undefined,
+  height: number | undefined,
+): { width: number; height: number } | null {
+  if (!usable(width, MIN_GAME_WIDTH) || !usable(height, MIN_GAME_HEIGHT)) return null;
+  return { width, height };
+}
 
 /** Mojang's own platform names, which differ from Node's on two of three. */
 export function getMojangOsName(platform: NodeJS.Platform = process.platform): string {

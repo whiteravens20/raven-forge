@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Search, Download, Package } from 'lucide-react';
+import { Search, Download, Package, RefreshCw, ArrowUpCircle } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
@@ -17,7 +17,13 @@ import { CompatibilityBadge } from '@components/CompatibilityBadge';
 import { CompatibilityDialog } from '@components/CompatibilityDialog';
 import { InstalledMark } from '@components/InstalledMark';
 import { isClientModLoader } from '@shared/constants';
-import type { FacetGroups, InstallPlan, ModSearchResult, InstalledMod } from '@shared/ipc-types';
+import type {
+  FacetGroups,
+  InstallPlan,
+  ModSearchResult,
+  InstalledMod,
+  ModUpdateSummary,
+} from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
@@ -44,6 +50,11 @@ export function ModsPage() {
   const [plan, setPlan] = useState<{ mod: ModSearchResult; plan: InstallPlan } | null>(null);
   /** Something worth saying that is not a failure — dependencies that arrived. */
   const [note, setNote] = useState<string | null>(null);
+  /** The last update check's counts, or null before one has run this session. */
+  const [updateCheck, setUpdateCheck] = useState<ModUpdateSummary | null>(null);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  /** Ids being updated right now — a set, so "update all" lights every row. */
+  const [updating, setUpdating] = useState<Set<string>>(new Set());
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
@@ -55,6 +66,14 @@ export function ModsPage() {
   const installedIds = new Set(installed.map((mod) => mod.id));
   const isInstalled = (mod: ModSearchResult) =>
     installedIds.has(mod.id) || installedIds.has(mod.slug);
+
+  // The badge is on the entry, put there by the last check, so this needs no
+  // second source of truth and no request of its own.
+  const outdated = installed.filter((mod) => mod.updateAvailable);
+  // What the check would even look at. A profile whose mods all come from its
+  // manifest has nothing to offer, and a button that always answers "0 of 0"
+  // is a button that teaches people to ignore it.
+  const checkable = installed.filter((mod) => !mod.fromManifest && mod.enabled);
 
   const loadInstalled = useCallback(async () => {
     if (!selectedId) return;
@@ -138,6 +157,59 @@ export function ModsPage() {
     await loadInstalled();
   };
 
+  /**
+   * Ask Modrinth what has moved on.
+   *
+   * The answer is written into the lock file by the main process, so the badges
+   * come from reloading the installed list rather than from anything held here
+   * — which is also why they survive leaving the page and coming back.
+   */
+  const handleCheckUpdates = async () => {
+    if (!selectedId) return;
+    setError(null);
+    setNote(null);
+    setCheckingUpdates(true);
+    try {
+      const result = await api.mods.checkUpdates(selectedId);
+      if (!result.success || !result.data) {
+        setError(result.error ?? t('mods.checkUpdatesFailed'));
+        return;
+      }
+      setUpdateCheck(result.data);
+      await loadInstalled();
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
+  const handleUpdate = async (modIds: string[]) => {
+    if (!selectedId || modIds.length === 0) return;
+    setError(null);
+    setNote(null);
+    setUpdating(new Set(modIds));
+    try {
+      const result = await api.mods.update(selectedId, modIds);
+      if (!result.success || !result.data) {
+        setError(result.error ?? t('mods.checkUpdatesFailed'));
+        return;
+      }
+      // Both halves get said. A run that updated nine mods and lost one is not
+      // a success and not a failure, and reporting only one of the two is how a
+      // profile ends up with a mod nobody knows stayed behind.
+      const { updated, failed } = result.data;
+      if (updated.length > 0) setNote(t('mods.updated', { names: updated.join(', ') }));
+      if (failed.length > 0) {
+        setError(t('mods.updateFailed', { names: failed.map((f) => f.name).join(', ') }));
+      }
+      // The counts came from the check, and installing has just invalidated
+      // them. The badges below come from the reloaded list, which is current.
+      setUpdateCheck(null);
+      await loadInstalled();
+    } finally {
+      setUpdating(new Set());
+    }
+  };
+
   const handleToggle = async (modId: string, enabled: boolean) => {
     if (!selectedId) return;
     await api.mods.toggleEnabled(selectedId, modId, enabled);
@@ -152,6 +224,9 @@ export function ModsPage() {
 
   useEffect(() => {
     void loadInstalled();
+    // A summary line counts one profile's mods; carrying it to the next one
+    // would describe a list that is no longer on screen.
+    setUpdateCheck(null);
   }, [loadInstalled]);
 
   // Modrinth's own vocabulary, fetched rather than hardcoded — these lists move,
@@ -192,30 +267,43 @@ export function ModsPage() {
         <h1 className="text-lg font-display font-semibold text-rf-text">
           {t('mods.title', { profile: selectedProfile.name })}
         </h1>
-        <div className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5">
-          <button
-            onClick={() => {
-              setTab('installed');
-              loadInstalled();
-            }}
-            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-              tab === 'installed'
-                ? 'bg-rf-accent text-white'
-                : 'text-rf-text-secondary hover:text-rf-text'
-            }`}
-          >
-            {t('mods.tabInstalled')}
-          </button>
-          <button
-            onClick={() => setTab('browse')}
-            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-              tab === 'browse'
-                ? 'bg-rf-accent text-white'
-                : 'text-rf-text-secondary hover:text-rf-text'
-            }`}
-          >
-            {t('mods.tabBrowse')}
-          </button>
+        <div className="flex items-center gap-2">
+          {tab === 'installed' && checkable.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw size={14} />}
+              loading={checkingUpdates}
+              onClick={() => void handleCheckUpdates()}
+            >
+              {t('mods.checkUpdates')}
+            </Button>
+          )}
+          <div className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5">
+            <button
+              onClick={() => {
+                setTab('installed');
+                loadInstalled();
+              }}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                tab === 'installed'
+                  ? 'bg-rf-accent text-white'
+                  : 'text-rf-text-secondary hover:text-rf-text'
+              }`}
+            >
+              {t('mods.tabInstalled')}
+            </button>
+            <button
+              onClick={() => setTab('browse')}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                tab === 'browse'
+                  ? 'bg-rf-accent text-white'
+                  : 'text-rf-text-secondary hover:text-rf-text'
+              }`}
+            >
+              {t('mods.tabBrowse')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -272,6 +360,43 @@ export function ModsPage() {
 
       {tab === 'installed' ? (
         <div className="space-y-2">
+          {error && <Banner type="urgent">{error}</Banner>}
+          {note && (
+            <Banner type="info" dismissible onDismiss={() => setNote(null)}>
+              {note}
+            </Banner>
+          )}
+
+          {/* Only after a check has run: before one, silence is the honest
+              answer — nothing has been asked, so nothing is known. */}
+          {updateCheck && (
+            <div className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface px-3 py-2">
+              <ArrowUpCircle
+                size={16}
+                className={outdated.length > 0 ? 'text-rf-accent-text' : 'text-rf-text-muted'}
+                aria-hidden="true"
+              />
+              <p className="flex-1 text-xs text-rf-text-secondary">
+                {updateCheck.updates > 0
+                  ? t.plural('mods.updatesFound', updateCheck.updates)
+                  : updateCheck.checked === 0
+                    ? t('mods.noneToCheck')
+                    : t('mods.upToDate')}
+                {updateCheck.unknown > 0 &&
+                  ` ${t.plural('mods.unknownToModrinth', updateCheck.unknown)}`}
+              </p>
+              {outdated.length > 1 && (
+                <Button
+                  size="sm"
+                  loading={updating.size > 1}
+                  onClick={() => void handleUpdate(outdated.map((mod) => mod.id))}
+                >
+                  {t('mods.updateAll')}
+                </Button>
+              )}
+            </div>
+          )}
+
           {installed.length === 0 ? (
             <EmptyState kind="mods" title={t('mods.empty')} hint={t('mods.emptyHint')} />
           ) : (
@@ -286,9 +411,25 @@ export function ModsPage() {
                   <p className="text-xs text-rf-text-muted">
                     {mod.version} • {mod.source}
                     {mod.fromManifest && ` • ${t('mods.fromManifest')}`}
+                    {mod.updateAvailable && (
+                      <span className="text-rf-accent-text">
+                        {' • '}
+                        {t('mods.updateTo', { version: mod.updateAvailable.versionNumber })}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {mod.updateAvailable && (
+                    <Button
+                      size="sm"
+                      icon={<ArrowUpCircle size={14} />}
+                      loading={updating.has(mod.id)}
+                      onClick={() => void handleUpdate([mod.id])}
+                    >
+                      {t('mods.update')}
+                    </Button>
+                  )}
                   <Switch
                     checked={mod.enabled}
                     onChange={(next) => handleToggle(mod.id, next)}

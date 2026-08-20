@@ -14,6 +14,7 @@ export const DIR_CRASH_REPORTS = 'crash-reports';
 // ── File names ────────────────────────────────────────────
 export const FILE_SETTINGS = 'settings.json';
 export const FILE_PROFILES = 'profiles.json';
+export const FILE_AUTH = 'auth.json';
 
 // ── Modrinth API ──────────────────────────────────────────
 export const MODRINTH_API_BASE = 'https://api.modrinth.com/v2';
@@ -124,11 +125,48 @@ export const JAVA_VERSION_MAP: Record<string, number> = {
   '1.23': 21,
 };
 
-// ── Window defaults ───────────────────────────────────────
+// ── Launcher window ───────────────────────────────────────
+// The launcher's own window, not the game's — see the block below for that.
 export const DEFAULT_WINDOW_WIDTH = 1280;
 export const DEFAULT_WINDOW_HEIGHT = 800;
 export const MIN_WINDOW_WIDTH = 900;
 export const MIN_WINDOW_HEIGHT = 600;
 
-// ── Default RAM ───────────────────────────────────────────
+// ── Game window ───────────────────────────────────────────
+// The bounds a profile's custom resolution may take. Named for the same reason
+// as the RAM bounds: the schema and the form both police this, and a form that
+// accepts a number the save then drops is worse than no form.
+
+/**
+ * The smallest window Minecraft will make. It sets that floor itself, so a
+ * smaller number here is not a small window — it is a setting that does
+ * nothing, which is the one outcome a preference must never have.
+ */
+export const MIN_GAME_WIDTH = 320;
+export const MIN_GAME_HEIGHT = 240;
+/**
+ * Three 5K displays side by side, and nobody plays on more. Past this the
+ * number is a typo rather than a resolution, and a window wider than the
+ * desktop is one whose own controls cannot be reached.
+ */
+export const MAX_GAME_DIMENSION = 15360;
+
+// ── RAM allocation ────────────────────────────────────────
+// The bounds a profile's `-Xmx` may take. Named rather than typed out at each
+// site because there are three of them — the profile schema, the form control
+// and the pack installer — and a cap that disagrees with the schema is a form
+// that accepts a number the save then rejects.
+
+/** Below this the game does not start at all, whatever the machine has. */
+export const MIN_RAM_MB = 512;
+/**
+ * 32 GB. Not a claim about what machines have — an upper bound on what is ever
+ * worth handing to a Minecraft heap. Past a few gigabytes the collector's
+ * pauses grow faster than the extra room helps, and a number this side of
+ * absurd keeps a typo out of `-Xmx`.
+ */
+export const MAX_RAM_MB = 32768;
+/** Half a gigabyte. Finer than this is precision nobody can feel. */
+export const RAM_STEP_MB = 512;
+/** What a profile that does not say gets. See `recommendedRamMb` for what a *new* one gets. */
 export const DEFAULT_RAM_MB = 4096;

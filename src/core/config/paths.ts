@@ -10,14 +10,28 @@ import {
   FILE_SETTINGS,
   FILE_PROFILES,
 } from '../../shared/constants';
+import { dataRoot } from './data-root';
 
 /**
  * Centralized path resolver for all launcher data directories.
- * Base: electron app.getPath('userData') → typically:
- *   Windows: %APPDATA%/Raven Forge Launcher
- *   Linux:   ~/.config/Raven Forge Launcher
+ *
+ * The base is `data-root.ts`, not `app.getPath('userData')` directly, because
+ * the root is movable — see that file. Everything here is a getter for the same
+ * reason: they are read after the root is known, not baked in at import.
+ *
+ * Two things stay behind in `userData` whatever the root is doing, and both are
+ * diagnostics rather than data: the log the app is writing while it runs, which
+ * on Windows cannot be moved out from under its own open handle, and the crash
+ * reports. Pinning them also means the log viewer and the crash reporter still
+ * work on the day the drive holding the games is not plugged in — which is
+ * exactly the day someone needs to read them.
  */
 function getDataRoot(): string {
+  return dataRoot();
+}
+
+/** Electron's own per-user directory. Diagnostics live here, not under the root. */
+function getDiagnosticsRoot(): string {
   return app.getPath('userData');
 }
 
@@ -57,9 +71,9 @@ export const paths = {
     return path.join(getDataRoot(), DIR_CACHE);
   },
 
-  /** logs/ — application logs (electron-log) */
+  /** logs/ — application logs (electron-log). Pinned; see the note above. */
   get logsDir() {
-    return path.join(getDataRoot(), DIR_LOGS);
+    return path.join(getDiagnosticsRoot(), DIR_LOGS);
   },
 
   /**
@@ -68,7 +82,25 @@ export const paths = {
    * each profile's game directory; these quote from those.
    */
   get crashReportsDir() {
-    return path.join(getDataRoot(), DIR_CRASH_REPORTS);
+    return path.join(getDiagnosticsRoot(), DIR_CRASH_REPORTS);
+  },
+
+  /**
+   * Is `target` one of the launcher's own directories?
+   *
+   * `system:open-path` runs whatever the OS associates with what it is given,
+   * so it is confined to these. All three are named because they stopped being
+   * nested when the root became movable: move the data to another drive and the
+   * logs and crash reports stay in `userData`, outside `root` — which silently
+   * made "open the crash reports folder" a refusal.
+   */
+  isInsideLauncherData(target: string): boolean {
+    if (typeof target !== 'string' || target === '') return false;
+    const resolved = path.resolve(target);
+    return [paths.root, paths.logsDir, paths.crashReportsDir].some((base) => {
+      const relative = path.relative(base, resolved);
+      return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+    });
   },
 
   /** Per-profile directory */
@@ -102,6 +134,18 @@ export const paths = {
    */
   profileManifestCacheFile(profileId: string) {
     return path.join(getDataRoot(), DIR_PROFILES, profileId, 'manifest.cache.json');
+  },
+
+  /**
+   * Per-profile world backups, one directory per backup.
+   *
+   * Inside the profile on purpose: a backup belongs to the profile it came from,
+   * follows it around, and goes when it goes. What it protects against is the
+   * launcher — a version change, a restore — and not a failing disk, which is a
+   * different problem and needs somewhere else entirely.
+   */
+  profileBackupsDir(profileId: string) {
+    return path.join(getDataRoot(), DIR_PROFILES, profileId, 'backups');
   },
 
   /** Per-profile shaderpacks directory */

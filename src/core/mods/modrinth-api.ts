@@ -25,6 +25,31 @@ async function modrinthFetch(endpoint: string): Promise<Response> {
   return res;
 }
 
+/**
+ * The same, for the two endpoints that take a list of file hashes.
+ *
+ * They are POSTs because the list is the request body, not because anything is
+ * created — nothing here writes to Modrinth, and no token is ever sent.
+ */
+async function modrinthPost(endpoint: string, body: unknown): Promise<Response> {
+  const res = await fetch(`${MODRINTH_API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'User-Agent': modrinthUserAgent(),
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Modrinth API error (${endpoint}): ${res.status} ${res.statusText}`);
+  }
+
+  return res;
+}
+
 // ── Types from Modrinth API ────────────────────────────────
 
 interface ModrinthSearchResponse {
@@ -226,6 +251,67 @@ export async function getModVersions(
 export async function getVersion(versionId: string): Promise<ModrinthVersion> {
   const res = await modrinthFetch(`/version/${versionId}`);
   return (await res.json()) as ModrinthVersion;
+}
+
+// ── Lookup by file hash ────────────────────────────────────
+
+/**
+ * How many hashes go in one request.
+ *
+ * Modrinth accepts far more, but a profile with three hundred mods should not
+ * become one enormous request that either times out whole or succeeds whole.
+ */
+const HASH_BATCH = 100;
+
+/** Both hash endpoints answer with the same map, and take the same batching. */
+async function byHash(
+  endpoint: string,
+  hashes: string[],
+  extra: Record<string, unknown> = {},
+): Promise<Map<string, ModrinthVersion>> {
+  const found = new Map<string, ModrinthVersion>();
+
+  for (let i = 0; i < hashes.length; i += HASH_BATCH) {
+    const batch = hashes.slice(i, i + HASH_BATCH);
+    const res = await modrinthPost(endpoint, { hashes: batch, algorithm: 'sha512', ...extra });
+    const data = (await res.json()) as Record<string, ModrinthVersion>;
+    // Keyed by the hash that was *sent*, so a file Modrinth has never seen is
+    // simply absent rather than reported as anything.
+    for (const [hash, version] of Object.entries(data)) found.set(hash, version);
+  }
+
+  return found;
+}
+
+/**
+ * Which Modrinth build each of these files *is*.
+ *
+ * The identity of a jar is its contents, which is what makes this work on a mod
+ * the launcher did not install: a file dropped into `mods/` by hand carries no
+ * project id, no version and no URL, and this recovers all three from the bytes.
+ */
+export async function versionsByHash(hashes: string[]): Promise<Map<string, ModrinthVersion>> {
+  return byHash('/version_files', hashes);
+}
+
+/**
+ * The newest build of whatever project each of these files belongs to.
+ *
+ * Narrowed to the profile's Minecraft version and loaders, so "newest" means
+ * newest *that this profile could run* — without that, a 1.21.4 profile is
+ * offered the 1.22 build and updating breaks the game.
+ *
+ * The reply is the newest match, which is very often the file that was sent.
+ * Callers decide what counts as an update by comparing hashes, not version
+ * strings: a project that relabels a build without republishing it would
+ * otherwise read as an update forever.
+ */
+export async function latestVersionsByHash(
+  hashes: string[],
+  loaders: string[],
+  gameVersions: string[],
+): Promise<Map<string, ModrinthVersion>> {
+  return byHash('/version_files/update', hashes, { loaders, game_versions: gameVersions });
 }
 
 /**

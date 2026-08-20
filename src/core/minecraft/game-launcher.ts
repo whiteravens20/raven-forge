@@ -1,6 +1,5 @@
 import { app } from 'electron';
-import { spawn, exec, type ChildProcess } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { log } from '../../main/logger';
@@ -8,26 +7,29 @@ import { paths } from '../config/paths';
 import { getMainWindow } from '../../main/window';
 import { getSettings } from '../config/settings-manager';
 import { getAuthState, getMinecraftAccessToken } from '../auth/microsoft-auth';
-import { getProfile, recordPlaySession, resolveGameDir } from '../profiles/profile-manager';
+import { getProfile, recordPlaySession } from '../profiles/profile-manager';
 import { setGamePresence, clearGamePresence } from '../discord/rich-presence';
 import { loaderLabel } from '../../shared/labels';
 import { syncManifest } from '../mods/mod-sync';
-import { ensureJavaVersion } from '../java/java-manager';
+import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
 import { installLoader, isLoaderInstalled } from '../modloader/loader-manager';
 import { resolveLaunchMeta } from '../modloader/loader-profile';
 import { getVersionMeta } from './version-manifest';
 import { ensureClientJar, ensureLibraries, ensureAssets } from './asset-downloader';
 import { beginJob, endJob, isCancellation, throwIfCancelled } from '../util/cancellation';
+import { machineMemoryMb } from '../util/machine-memory';
+import { formatRamGb, ramAdvice, recommendedRamMb } from '../../shared/memory';
 import {
   isShutdownWatchdogCrash,
   readMinecraftCrash,
   writeCrashReport,
 } from '../diagnostics/crash-report';
 
-const execAsync = promisify(exec);
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
-import { resolveConditionalArgs, substituteVars } from './launch-args';
+import { customResolution, resolveConditionalArgs, substituteVars } from './launch-args';
 import { requiredJavaFor } from './java-requirement';
+import { applyFullscreen } from './options-file';
+import { LaunchRefusedError } from './launch-errors';
 
 // Track running processes by profileId
 const runningProcesses = new Map<string, ChildProcess>();
@@ -99,7 +101,7 @@ function emitLogLine(profileId: string, rawLine: string): void {
 function launchFeatures(profile: Profile): Record<string, boolean> {
   return {
     is_demo_user: false,
-    has_custom_resolution: profile.windowWidth != null && profile.windowHeight != null,
+    has_custom_resolution: customResolution(profile.windowWidth, profile.windowHeight) !== null,
     has_quick_plays_support: false,
     is_quick_play_singleplayer: false,
     is_quick_play_multiplayer: false,
@@ -116,13 +118,49 @@ function launchFeatures(profile: Profile): Record<string, boolean> {
  * path — a throw between `beginJob` and the spawn would otherwise leave a dead
  * controller behind, and the UI would keep offering to cancel nothing.
  */
+/**
+ * Refuse a `-Xmx` the machine cannot back, before anything is downloaded.
+ *
+ * A heap larger than physical memory is not a configuration that runs: on
+ * Windows the JVM will not even reserve it and dies with "Could not reserve
+ * enough space for object heap"; on Linux it starts and the OOM killer collects
+ * the game once it grows in. Both arrive minutes and several gigabytes of
+ * downloads later, as a crash with nothing in it about RAM — and a profile can
+ * carry a number this machine never agreed to, having come from an import, a
+ * pack, or a machine with twice the memory. So it is checked here, first, and
+ * named.
+ *
+ * Only the impossible is refused. Merely optimistic — more than the machine can
+ * comfortably spare — is the profile editor's warning to make and the player's
+ * to overrule; a launcher that argued with every ambitious setting would be
+ * wrong more often than it was right.
+ */
+function assertRamFits(profile: Profile): void {
+  const totalMb = machineMemoryMb();
+  if (ramAdvice(profile.allocatedRamMb, totalMb) !== 'over') return;
+  const allocated = formatRamGb(profile.allocatedRamMb);
+  const total = formatRamGb(totalMb);
+  const recommended = formatRamGb(recommendedRamMb(totalMb));
+  throw new LaunchRefusedError(
+    { key: 'launchError.ramTooBig', vars: { allocated, total, recommended } },
+    `This profile allocates ${allocated} of RAM and this machine has ${total}. Minecraft cannot ` +
+      `start with more memory than the machine has — lower it in the profile editor, where ` +
+      `${recommended} suits this one.`,
+  );
+}
+
 async function runLaunch(options: LaunchOptions): Promise<void> {
   const profile = await getProfile(options.profileId);
   if (!profile) throw new Error(`Profile ${options.profileId} not found`);
 
   if (runningProcesses.has(options.profileId)) {
-    throw new Error('Game is already running for this profile');
+    throw new LaunchRefusedError(
+      { key: 'launchError.alreadyRunning' },
+      'Game is already running for this profile',
+    );
   }
+
+  assertRamFits(profile);
 
   log.info(`Launching game for profile: ${profile.name} (MC ${profile.minecraftVersion})`);
 
@@ -152,7 +190,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   const signal = beginJob(profile.id);
 
   // Resolve paths
-  const gameDir = resolveGameDir(profile);
+  const gameDir = paths.profileGameDir(profile.id);
   const versionsDir = path.join(paths.cacheDir, 'versions');
   const librariesDir = path.join(paths.cacheDir, 'libraries');
   const assetsDir = path.join(paths.cacheDir, 'assets');
@@ -189,7 +227,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   // Ensure Java
   const javaVersion = requiredJavaFor(profile.minecraftVersion, meta);
   const java = profile.customJavaPath
-    ? { path: profile.customJavaPath }
+    ? await resolveChosenJava(profile.customJavaPath, javaVersion)
     : await ensureJavaVersion(javaVersion);
 
   // Download game files
@@ -239,6 +277,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   }
 
   // Build arguments
+  const resolution = customResolution(profile.windowWidth, profile.windowHeight);
   const templateVars: Record<string, string> = {
     auth_player_name: username,
     // The Minecraft version, not the merged profile id. Forge and NeoForge
@@ -267,9 +306,11 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     // module-resolution error that names none of this.
     library_directory: librariesDir,
     classpath_separator: cpSep,
-    // Resolution
-    resolution_width: String(profile.windowWidth ?? 854),
-    resolution_height: String(profile.windowHeight ?? 480),
+    // Resolution. The defaults are the game's own, and are what the feature
+    // gate above leaves unused: with no custom size these variables are never
+    // substituted into anything.
+    resolution_width: String(resolution?.width ?? 854),
+    resolution_height: String(resolution?.height ?? 480),
   };
 
   const features = launchFeatures(profile);
@@ -306,6 +347,13 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   } else if (meta.minecraftArguments) {
     // Legacy format
     gameArgs.push(...substituteVars(meta.minecraftArguments.split(/\s+/), templateVars));
+    // The pre-1.13 argument string has no conditional section, so nothing in it
+    // ever carried the resolution — the feature flag above reaches modern
+    // metas only. Without this the setting silently does nothing on the older
+    // versions, which are exactly the ones people run in a small window.
+    if (resolution) {
+      gameArgs.push('--width', String(resolution.width), '--height', String(resolution.height));
+    }
   }
 
   // Quick connect
@@ -316,29 +364,12 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     }
   }
 
-  // Fullscreen
-  if (profile.fullscreen) {
-    gameArgs.push('--fullscreen');
-  }
-
   const finalArgs = [...jvmArgs, ...gameArgs];
 
-  // Pre-launch hook — a failing hook aborts the launch so the user isn't left
-  // guessing why the game started without whatever the hook was meant to set up.
-  if (profile.preLaunchCommand) {
-    log.info(`Running pre-launch command for ${profile.name}: ${profile.preLaunchCommand}`);
-    try {
-      const { stdout, stderr } = await execAsync(profile.preLaunchCommand, {
-        cwd: gameDir,
-        timeout: 120000,
-      });
-      if (stdout.trim()) log.info(`[pre-launch] ${stdout.trim()}`);
-      if (stderr.trim()) log.warn(`[pre-launch] ${stderr.trim()}`);
-    } catch (err) {
-      throw new Error(`Pre-launch command failed: ${err instanceof Error ? err.message : err}`, {
-        cause: err,
-      });
-    }
+  // Stated in options.txt rather than passed as `--fullscreen`, because that
+  // argument has no opposite. See `applyFullscreen`.
+  if (profile.fullscreen !== undefined) {
+    await applyFullscreen(gameDir, profile.fullscreen);
   }
 
   log.info(`Launching: ${java.path} ${finalArgs.join(' ').substring(0, 200)}...`);
@@ -553,6 +584,15 @@ export async function killGame(profileId: string): Promise<void> {
 
 export function isGameRunning(profileId: string): boolean {
   return runningProcesses.has(profileId);
+}
+
+/**
+ * Any profile at all. Asked before the data directory moves: the game holds
+ * open handles all over the profile it is running from, and on Windows that
+ * alone makes the directory unmovable.
+ */
+export function anyGameRunning(): boolean {
+  return runningProcesses.size > 0;
 }
 
 export async function launchGame(options: LaunchOptions): Promise<void> {

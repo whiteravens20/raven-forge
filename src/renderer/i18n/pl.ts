@@ -126,6 +126,13 @@ export const pl: Translations = {
   'home.updateFailedPlayAnyway':
     'Nie udało się pobrać aktualizacji launchera — gra i tak wystartuje.',
   'home.launchFailed': 'Nie udało się uruchomić gry',
+  'launchError.alreadyRunning': 'Ten profil już działa.',
+  'launchError.ramTooBig':
+    'Ten profil ma przydzielone {allocated} RAM, a ten komputer ma {total}. Minecraft nie wystartuje z większą ilością pamięci, niż fizycznie jest — zmniejsz ją w edytorze profilu, gdzie {recommended} pasuje do tej maszyny.',
+  'launchError.javaNotRuntime':
+    'Ten profil ma startować przez {path}, a to nie jest środowisko Java, które ten komputer potrafi uruchomić. Wskaż w edytorze profilu coś innego albo wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
+  'launchError.javaTooOld':
+    'Ten profil ma startować przez {path}, czyli Javę {found}, a ta wersja Minecrafta potrzebuje Javy {required}. Gra wystartowałaby i zaraz padła z błędem o wersji plików klas. Wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
   'home.launchError': 'Błąd podczas uruchamiania gry',
   'home.showConsole': 'Pokaż konsolę',
   'home.hideConsole': 'Ukryj konsolę',
@@ -165,6 +172,65 @@ export const pl: Translations = {
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
   'profiles.copyName': '{name} (kopia)',
   'profiles.openFolder': 'Otwórz folder profilu',
+  'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
+  'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',
+  'profiles.exportPackDone.one': 'Zapisano do {path}. Paczka odsyła do 1 pliku na Modrinth.',
+  'profiles.exportPackDone.other':
+    'Zapisano do {path}. Paczka odsyła do {count} plików na Modrinth.',
+  'profiles.exportPackBundled.one':
+    'Jeszcze jednego pliku ({size}) nie ma na Modrinth, więc został zapisany w samej paczce.',
+  'profiles.exportPackBundled.few':
+    'Kolejnych {count} plików ({size}) nie ma na Modrinth, więc zostały zapisane w samej paczce.',
+  'profiles.exportPackBundled.many':
+    'Kolejnych {count} plików ({size}) nie ma na Modrinth, więc zostały zapisane w samej paczce.',
+  'profiles.exportPackBundled.other':
+    'Kolejnych {count} plików ({size}) nie ma na Modrinth, więc zostały zapisane w samej paczce.',
+  'profiles.exportPackSkipped.one': 'Pominięto jeden dodatek, który jest wyłączony.',
+  'profiles.exportPackSkipped.few': 'Pominięto {count} dodatki, które są wyłączone.',
+  'profiles.exportPackSkipped.many': 'Pominięto {count} dodatków, które są wyłączone.',
+  'profiles.exportPackSkipped.other': 'Pominięto {count} dodatków, które są wyłączone.',
+
+  // ── Światy i kopie ───────────────────────────────────────
+  'worlds.title': 'Światy',
+  'worlds.none': 'Ten profil nie ma jeszcze żadnego świata.',
+  'worlds.backupNow': 'Zrób kopię',
+  'worlds.backedUp': 'Światy zostały skopiowane.',
+  'worlds.backupFailed': 'Nie udało się zrobić kopii światów.',
+  'worlds.noBackups': 'Brak kopii. Jedna powstaje automatycznie przed zmianą wersji.',
+  'worlds.restore': 'Przywróć tę kopię',
+  'worlds.confirmRestore': 'Zastąpić obecne światy?',
+  'worlds.confirmRestoreYes': 'Zastąp',
+  'worlds.restored': 'Światy zostały przywrócone.',
+  'worlds.restoredWithSafety':
+    'Światy zostały przywrócone. To, co było wcześniej, jest teraz osobną kopią — da się to cofnąć.',
+  'worlds.restoreFailed': 'Nie udało się przywrócić tej kopii.',
+  'worlds.deleteFailed': 'Nie udało się usunąć tej kopii.',
+  'worlds.reason.manual': 'zrobiona ręcznie',
+  'worlds.reason.version-change': 'przed zmianą wersji',
+  'worlds.reason.before-restore': 'przed przywracaniem',
+
+  // ── Zmiana wersji Minecrafta ─────────────────────────────
+  'versionChange.title': 'Przenieść ten profil z {from} na {to}?',
+  'versionChange.mods.one':
+    'Jedyny zainstalowany mod powstał dla {from} i najpewniej się nie wczyta.',
+  'versionChange.mods.few':
+    'Zainstalowane {count} mody powstały dla {from} i najpewniej się nie wczytają. Zaktualizuj je albo usuń.',
+  'versionChange.mods.many':
+    'Zainstalowanych {count} modów powstało dla {from} i najpewniej się nie wczyta. Zaktualizuj je albo usuń.',
+  'versionChange.mods.other':
+    'Zainstalowane mody powstały dla {from} i najpewniej się nie wczytają. Zaktualizuj je albo usuń.',
+  'versionChange.worlds.one':
+    'Jest tu świat. Otwarcie świata nowszym Minecraftem przebudowuje jego format i starsza wersja już go nie otworzy.',
+  'versionChange.worlds.few':
+    'Są tu {count} światy. Otwarcie świata nowszym Minecraftem przebudowuje jego format i starsza wersja już go nie otworzy.',
+  'versionChange.worlds.many':
+    'Jest tu {count} światów. Otwarcie świata nowszym Minecraftem przebudowuje jego format i starsza wersja już go nie otworzy.',
+  'versionChange.worlds.other':
+    'Są tu światy. Otwarcie świata nowszym Minecraftem przebudowuje jego format i starsza wersja już go nie otworzy.',
+  'versionChange.backupFirst': 'Najpierw skopiuj światy',
+  'versionChange.backupHint': 'Kopia zostaje w profilu i można ją przywrócić ze strony profilu.',
+  'versionChange.confirm': 'Zmień wersję',
+  'versionChange.backupFailed': 'Nie udało się skopiować światów, więc nic nie zmieniono.',
   // ── Usuwanie profilu ─────────────────────────────────────
   'delete.title': 'Usuń profil „{name}”',
   'delete.intro':
@@ -271,11 +337,42 @@ export const pl: Translations = {
   'profileForm.loaderUnstable': 'niestabilna',
   'profileForm.loaderVersionLatest': 'Najnowsza',
   'profileForm.loaderVersion': 'Wersja Loadera (opcjonalnie)',
-  'profileForm.ram': 'RAM (MB)',
+  'profileForm.ram': 'Przydzielony RAM',
+  'profileForm.ramMachine': 'Ten komputer ma {total}. Zalecane dla niego: {recommended}.',
+  'profileForm.ramTight':
+    '{value} zostawia temu komputerowi ({total}) bardzo mało na resztę — gra może się zacinać albo zostać zamknięta w trakcie.',
+  'profileForm.ramOver':
+    '{value} to więcej, niż ten komputer ma ({total}). Minecraft się z tym nie uruchomi.',
+  'profileForm.ramUseRecommended': 'Ustaw {recommended}',
   'profileForm.manifestUrl': 'Manifest URL (opcjonalnie)',
   'profileForm.serverIp': 'Serwer IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Argumenty Java (opcjonalnie)',
+  'profileForm.java': 'Środowisko Java',
+  'profileForm.javaManaged': 'To, które instaluje launcher',
+  'profileForm.javaBrowse': 'Wskaż plik…',
+  'profileForm.javaChecking': 'Sprawdzanie…',
+  'profileForm.javaFound': 'Java {version}.',
+  'profileForm.javaTooOld': 'Java {version} — ta wersja Minecrafta potrzebuje Javy {required}.',
+  'profileForm.javaNotJava': 'Ten plik nie jest środowiskiem Java.',
+  'profileForm.javaHint':
+    'Launcher sam instaluje i utrzymuje właściwe środowisko dla każdej wersji Minecrafta. Wybierz tutaj coś innego tylko wtedy, gdy ten profil potrzebuje konkretnej maszyny wirtualnej.',
+  'profileForm.showSnapshots': 'Pokaż snapshoty',
+  'profileForm.snapshotHint':
+    'Snapshoty to cotygodniowe wersje testowe Mojanga. Większość modów nie ma pod nie buildów, a świat stworzony w snapshocie może się nie otworzyć w kolejnym wydaniu.',
+  'profileForm.advanced': 'Zaawansowane',
+  'profileForm.windowWidth': 'Szerokość okna gry',
+  'profileForm.windowHeight': 'Wysokość okna gry',
+  'profileForm.windowSizeHint': 'Zostaw oba pola puste, aby gra sama wybrała rozmiar okna.',
+  'profileForm.windowSizeBoth':
+    'Ustaw oba albo żadnego — gra przyjmuje rozmiar okna tylko w parze.',
+  'profileForm.windowSizeRange': 'Od {minWidth}×{minHeight} do {max}×{max}.',
+  'profileForm.windowMode': 'Tryb okna',
+  'profileForm.windowModeGame': 'Tak jak zostawiła gra',
+  'profileForm.windowModeWindowed': 'W oknie',
+  'profileForm.windowModeFullscreen': 'Pełny ekran',
+  'profileForm.windowModeHint':
+    'Ustawienie inne niż „tak jak zostawiła gra” trafia przy każdym uruchomieniu do ustawień samej gry, więc unieważnia też F11 z poprzedniej sesji.',
   'profileForm.notes': 'Notatki',
   'profileForm.notesPlaceholder': 'Dowolne notatki o tym profilu',
 
@@ -306,6 +403,23 @@ export const pl: Translations = {
   'mods.downloads.many': '{count} pobrań',
   'mods.downloads.other': '{count} pobrania',
   'mods.installedWithDeps': 'Zainstalowano {name}, a wraz z nim to, czego potrzebuje: {deps}',
+  'mods.checkUpdates': 'Sprawdź aktualizacje',
+  'mods.checkUpdatesFailed': 'Nie udało się sprawdzić aktualizacji.',
+  'mods.updatesFound.one': '{count} mod ma nowszą wersję.',
+  'mods.updatesFound.few': '{count} mody mają nowsze wersje.',
+  'mods.updatesFound.many': '{count} modów ma nowsze wersje.',
+  'mods.updatesFound.other': '{count} moda ma nowszą wersję.',
+  'mods.upToDate': 'Wszystko, co doinstalowane ręcznie, jest aktualne.',
+  'mods.noneToCheck': 'Nie ma tu czego sprawdzać — mody tego profilu pochodzą z manifestu.',
+  'mods.unknownToModrinth.one': '{count} pliku nie ma na Modrinth i nie da się go sprawdzić.',
+  'mods.unknownToModrinth.few': '{count} plików nie ma na Modrinth i nie da się ich sprawdzić.',
+  'mods.unknownToModrinth.many': '{count} plików nie ma na Modrinth i nie da się ich sprawdzić.',
+  'mods.unknownToModrinth.other': '{count} pliku nie ma na Modrinth i nie da się go sprawdzić.',
+  'mods.updateAll': 'Zaktualizuj wszystkie',
+  'mods.update': 'Aktualizuj',
+  'mods.updateTo': 'nowa: {version}',
+  'mods.updated': 'Zaktualizowano: {names}',
+  'mods.updateFailed': 'Nie udało się zaktualizować: {names}',
 
   // ── Kompatybilność ───────────────────────────────────────
   'compat.title': 'Czy {name} pasuje do tego profilu?',
@@ -405,6 +519,14 @@ export const pl: Translations = {
   'settings.trustedKeyAdd': 'Dodaj klucz',
   'settings.trustedKeyFailed': 'Nie udało się dodać klucza',
   'settings.dataFolder': 'Folder danych',
+  'settings.dataFolderHint':
+    'Profile, mody, pliki gry i pobrane wersje Javy. Po instalacji paczki to kilka gigabajtów.',
+  'settings.dataFolderChange': 'Przenieś…',
+  'settings.dataFolderRestore': 'Wróć do domyślnego',
+  'settings.dataFolderEnv':
+    'Dla tej instalacji ustawia go RAVENFORGE_DATA_DIR, więc nie zmienisz go tutaj.',
+  'settings.dataFolderUnavailable':
+    'Nie udało się otworzyć wybranego folderu {path}, więc launcher korzysta z domyślnego. To, co tam było, dalej tam jest.',
   'settings.crashReportsFolder': 'Raporty z awarii',
   'settings.logs': 'Logi',
   'settings.showLogs': 'Pokaż logi',
@@ -467,6 +589,7 @@ export const pl: Translations = {
     'Uruchamianie instalatora {loader} — to może potrwać kilka minut…',
   'progress.msg.savingProfile': 'Zapisywanie profilu…',
   'progress.msg.updateDownloading': 'Pobieranie aktualizacji… {percent}%',
+  'progress.msg.movingData': 'Przenoszenie danych…',
 
   // ── Updater ──────────────────────────────────────────────
   'update.ready': 'Aktualizacja gotowa',
@@ -541,9 +664,9 @@ export const pl: Translations = {
   'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge i Quilt',
   'privacy.dest.loaders.when': 'przy instalacji tego, czego mody potrzebują do działania',
   'privacy.dest.modrinth.who': 'Modrinth',
-  'privacy.dest.modrinth.when': 'gdy szukasz modów',
+  'privacy.dest.modrinth.when': 'gdy szukasz modów albo sprawdzasz te, które masz',
   'privacy.dest.modrinth.sends':
-    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
+    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu — tak pyta się Modrinth, czym te pliki są. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'wiadomości i lista paczek serwerowych',
   'privacy.dest.updates.who': 'GitHub',
@@ -600,4 +723,26 @@ export const pl: Translations = {
     'Zakon dawno rozsypał się w proch, piec wystygł, góra zapadła się w siebie. Ale pod warstwą szkła i światła, przed którą teraz siedzisz, wciąż tli się ta sama iskra. Czeka tylko, aż ktoś powie: *graj*.',
   'chronicle.colophon1': 'Kto znalazł ten zwój, znalazł go przypadkiem.',
   'chronicle.colophon2': 'Zwoje nie dają się znaleźć przypadkiem.',
+
+  // ── Folder danych ────────────────────────────────────────
+  'dataRoot.title': 'Przenieś folder danych',
+  'dataRoot.from': 'Teraz',
+  'dataRoot.to': 'Nowe miejsce',
+  'dataRoot.move': 'Przeniesione zostanie {size}. W starym miejscu nic nie zostaje.',
+  'dataRoot.adopt':
+    'W tym folderze są już dane launchera, więc zostaną użyte tak, jak są — nic nie jest kopiowane, a to, co w obecnym folderze, tam zostaje.',
+  'dataRoot.free': 'Wolne miejsce w miejscu docelowym: {free}',
+  'dataRoot.restartNotice': 'Po przeniesieniu launcher uruchomi się ponownie.',
+  'dataRoot.confirm': 'Przenieś i uruchom ponownie',
+  'dataRoot.confirmAdopt': 'Użyj tego folderu i uruchom ponownie',
+  'dataRoot.moving': 'Przenoszenie danych…',
+  'dataRoot.restarting': 'Gotowe — ponowne uruchomienie launchera…',
+  'dataRoot.failed': 'Nie udało się przenieść folderu danych: {error}',
+  'dataRoot.problem.same': 'To już jest używany folder.',
+  'dataRoot.problem.nested': 'Ten folder jest wewnątrz obecnego — wybierz taki spoza niego.',
+  'dataRoot.problem.notWritable': 'Do tego folderu nie da się nic zapisać.',
+  'dataRoot.problem.noSpace': 'Za mało miejsca: do przeniesienia {size}, wolne {free}.',
+  'dataRoot.problem.envLocked':
+    'O miejscu na dane dla tej instalacji decyduje RAVENFORGE_DATA_DIR.',
+  'dataRoot.problem.gameRunning': 'Najpierw zamknij grę — działa z tego folderu.',
 };

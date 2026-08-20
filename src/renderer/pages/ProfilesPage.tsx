@@ -12,30 +12,52 @@ import {
   RefreshCw,
   ShieldCheck,
   ShieldAlert,
+  Package,
 } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { useGameStore } from '@stores/game-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Select } from '@components/ui/Select';
+import { Switch } from '@components/ui/Switch';
 import { EmptyState } from '@components/ui/EmptyState';
 import { ProfileAvatar } from '@components/ProfileAvatar';
 import { ProfileIconPicker } from '@components/ProfileIconPicker';
 import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
 import { ProfileSourcePicker } from '@components/ProfileSourcePicker';
+import { WorldBackupCard } from '@components/WorldBackupCard';
+import { VersionChangeDialog } from '@components/VersionChangeDialog';
+import { RamField } from '@components/RamField';
+import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
+import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 import { useLocale, useT } from '@renderer/i18n';
+import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '@shared/constants';
 import { loaderLabel } from '@shared/labels';
+import { recommendedRamMb } from '@shared/memory';
 import type {
   ModLoaderType,
+  MrpackExport,
   OrphanedProfile,
   Profile,
+  ProfileFileSummary,
   ProfileSyncStatus,
   ManifestVerification,
   LoaderVersion,
+  JavaInstallation,
+  JavaProbe,
 } from '@shared/ipc-types';
 
 const api = window.ravenforge;
+
+/**
+ * The "choose a file…" row of the Java picker.
+ *
+ * Not a path, and cannot be mistaken for one: the file dialog only ever hands
+ * back an absolute path, and no absolute path starts with a question mark on
+ * either platform.
+ */
+const BROWSE_FOR_JAVA = '?browse';
 
 const LOADER_OPTIONS = [
   { value: 'vanilla', label: 'Vanilla' },
@@ -47,7 +69,8 @@ const LOADER_OPTIONS = [
 
 type DraftProfile = Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>;
 
-function emptyDraft(): DraftProfile {
+/** `totalMb` is the machine's memory, or undefined when it could not be read. */
+function emptyDraft(totalMb: number | undefined): DraftProfile {
   return {
     name: '',
     minecraftVersion: '1.21.4',
@@ -57,15 +80,32 @@ function emptyDraft(): DraftProfile {
     serverIp: undefined,
     serverPort: undefined,
     javaArgs: undefined,
-    allocatedRamMb: 4096,
+    allocatedRamMb: recommendedRamMb(totalMb),
     customJavaPath: undefined,
     windowWidth: undefined,
     windowHeight: undefined,
     fullscreen: undefined,
-    gameDirectory: undefined,
-    preLaunchCommand: undefined,
     notes: undefined,
   };
+}
+
+/**
+ * What is wrong with the window size, if anything.
+ *
+ * The pair is the unit. `customResolution` in the launcher applies a size only
+ * when both halves are there and both are usable, because Mojang's own
+ * argument rule gates them together — so an editor that accepted a lone width
+ * would be storing a number the game is never given, with nothing on screen
+ * saying so.
+ */
+function windowSizeProblem(draft: DraftProfile): 'incomplete' | 'range' | null {
+  const { windowWidth: width, windowHeight: height } = draft;
+  if (width === undefined && height === undefined) return null;
+  if (width === undefined || height === undefined) return 'incomplete';
+  if (!Number.isInteger(width) || !Number.isInteger(height)) return 'range';
+  if (width < MIN_GAME_WIDTH || height < MIN_GAME_HEIGHT) return 'range';
+  if (width > MAX_GAME_DIMENSION || height > MAX_GAME_DIMENSION) return 'range';
+  return null;
 }
 
 function profileToDraft(p: Profile): DraftProfile {
@@ -84,8 +124,9 @@ export function ProfilesPage() {
   const reload = useProfileStore((s) => s.load);
 
   const t = useT();
+  const machineMemoryMb = useMachineMemoryMb();
   const [mode, setMode] = useState<'view' | 'create' | 'edit'>('view');
-  const [draft, setDraft] = useState<DraftProfile>(emptyDraft);
+  const [draft, setDraft] = useState<DraftProfile>(() => emptyDraft(undefined));
   const [syncStatus, setSyncStatus] = useState<ProfileSyncStatus | null>(null);
   const [verification, setVerification] = useState<ManifestVerification | null>(null);
   /** The profile whose delete confirmation is open. */
@@ -94,6 +135,12 @@ export function ProfilesPage() {
   const [choosingSource, setChoosingSource] = useState(false);
   /** Profile files left on disk by a "delete, keep files". */
   const [orphans, setOrphans] = useState<OrphanedProfile[]>([]);
+  /** The last pack export, so its result can be reported instead of vanishing. */
+  const [exported, setExported] = useState<MrpackExport | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [exportingPack, setExportingPack] = useState(false);
+  /** Set while a Minecraft version change is waiting to be confirmed. */
+  const [versionChange, setVersionChange] = useState<ProfileFileSummary | null>(null);
 
   const refreshOrphans = useCallback(async () => {
     const result = await api.profiles.listOrphaned();
@@ -163,7 +210,7 @@ export function ProfilesPage() {
   /** The by-hand route, reached from the source picker. */
   const startFromScratch = () => {
     setChoosingSource(false);
-    setDraft(emptyDraft());
+    setDraft(emptyDraft(machineMemoryMb));
     setMode('create');
   };
 
@@ -177,9 +224,39 @@ export function ProfilesPage() {
 
   const save = async () => {
     if (!draft.name.trim()) return;
+    // Changing the Minecraft version is not an edit like the others: the mods
+    // stay behind at the version they were built for, and a world opened by a
+    // newer Minecraft is upgraded in place and will not open on the old one
+    // again. Ask, but only where this profile actually has something to lose.
+    if (
+      mode === 'edit' &&
+      selectedProfile &&
+      draft.minecraftVersion !== selectedProfile.minecraftVersion
+    ) {
+      const r = await api.profiles.getFileSummary(selectedProfile.id);
+      const summary = r.success ? r.data : undefined;
+      if (summary && (summary.mods > 0 || summary.worlds > 0)) {
+        setVersionChange(summary);
+        return;
+      }
+    }
+    await commit();
+  };
+
+  /** Write the draft out. Split from `save` so the dialog can call it too. */
+  const commit = async (backupFirst = false) => {
     if (mode === 'create') {
       await createProfile(draft);
     } else if (mode === 'edit' && selectedProfile) {
+      if (backupFirst) {
+        // Before the profile moves, not after: a failed copy must leave the
+        // profile exactly as it was rather than half-changed.
+        const backup = await api.profiles.backupWorlds(selectedProfile.id, 'version-change');
+        if (!backup.success) {
+          setActionError(backup.error ?? t('versionChange.backupFailed'));
+          return;
+        }
+      }
       await updateProfile(selectedProfile.id, draft);
     }
     setMode('view');
@@ -223,6 +300,27 @@ export function ProfilesPage() {
     link.download = `${selectedProfile?.name ?? 'profile'}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Export the profile as a `.mrpack` — the mods, not just the settings.
+   *
+   * Where it goes is asked in the main process, so nothing here names a path.
+   * A `null` result is the player closing that dialog, which is not a failure
+   * and should say nothing at all.
+   */
+  const handleExportPack = async () => {
+    if (!selectedId) return;
+    setExported(null);
+    setActionError(null);
+    setExportingPack(true);
+    try {
+      const r = await api.profiles.exportPack(selectedId);
+      if (!r.success) setActionError(r.error ?? t('profiles.exportPackFailed'));
+      else if (r.data) setExported(r.data);
+    } finally {
+      setExportingPack(false);
+    }
   };
 
   const handleImport = async () => {
@@ -333,6 +431,36 @@ export function ProfilesPage() {
 
       {/* Detail / form */}
       <div className="flex-1 overflow-y-auto p-6">
+        {/* Above the pane switch on purpose: a save that fails leaves the form
+            open, and a notice rendered inside the detail view would never be
+            seen by the person who caused it. */}
+        {actionError && (
+          <div className="mx-auto mb-4 max-w-2xl">
+            <Banner type="urgent">{actionError}</Banner>
+          </div>
+        )}
+        {exported && (
+          <div className="mx-auto mb-4 max-w-2xl">
+            <Banner
+              type="info"
+              dismissible
+              onDismiss={() => {
+                setExported(null);
+                setActionError(null);
+              }}
+            >
+              {t.plural('profiles.exportPackDone', exported.files, { path: exported.path })}
+              {/* Bundled files are why a 20 KB pack is sometimes 300 MB, and why
+                  a recipient with no network still gets those. Worth a sentence. */}
+              {exported.bundled > 0 &&
+                ` ${t.plural('profiles.exportPackBundled', exported.bundled, {
+                  size: formatBytes(exported.bundledBytes),
+                })}`}
+              {exported.skippedDisabled > 0 &&
+                ` ${t.plural('profiles.exportPackSkipped', exported.skippedDisabled)}`}
+            </Banner>
+          </div>
+        )}
         {mode !== 'view' ? (
           <ProfileForm
             draft={draft}
@@ -341,6 +469,7 @@ export function ProfilesPage() {
             onSave={save}
             isCreate={mode === 'create'}
             profile={mode === 'edit' ? selectedProfile : undefined}
+            machineMemoryMb={machineMemoryMb}
           />
         ) : selectedProfile ? (
           <ProfileDetail
@@ -358,6 +487,8 @@ export function ProfilesPage() {
             }
             onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
+            onExportPack={handleExportPack}
+            exportingPack={exportingPack}
             onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
             onSync={handleSync}
             onQuickConnect={handleQuickConnect}
@@ -378,6 +509,19 @@ export function ProfilesPage() {
           onCreated={(profileId) => {
             setChoosingSource(false);
             void reload().then(() => select(profileId));
+          }}
+        />
+      )}
+
+      {versionChange && selectedProfile && (
+        <VersionChangeDialog
+          from={selectedProfile.minecraftVersion}
+          to={draft.minecraftVersion}
+          summary={versionChange}
+          onCancel={() => setVersionChange(null)}
+          onConfirm={(backupFirst) => {
+            setVersionChange(null);
+            void commit(backupFirst);
           }}
         />
       )}
@@ -410,6 +554,8 @@ interface DetailProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onExport: () => void;
+  onExportPack: () => void;
+  exportingPack: boolean;
   onOpenFolder: () => void;
   onSync: () => void;
   onQuickConnect: () => void;
@@ -427,6 +573,8 @@ function ProfileDetail({
   onDuplicate,
   onDelete,
   onExport,
+  onExportPack,
+  exportingPack,
   onOpenFolder,
   onSync,
   onQuickConnect,
@@ -462,6 +610,14 @@ function ProfileDetail({
             icon={<Download size={14} />}
             onClick={onExport}
             title={t('common.export')}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Package size={14} />}
+            loading={exportingPack}
+            onClick={onExportPack}
+            title={t('profiles.exportPack')}
           />
           <Button
             variant="ghost"
@@ -542,6 +698,8 @@ function ProfileDetail({
           <p className="text-sm text-rf-text-secondary whitespace-pre-wrap">{profile.notes}</p>
         </div>
       )}
+
+      <WorldBackupCard profileId={profile.id} />
 
       {profile.lastPlayed && (
         <p className="text-xs text-rf-text-muted">
@@ -635,14 +793,29 @@ interface FormProps {
   isCreate: boolean;
   /** The saved profile being edited; absent while creating a new one. */
   profile?: Profile;
+  /** The machine's physical memory, or undefined while unknown or unreadable. */
+  machineMemoryMb?: number;
 }
 
-function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: FormProps) {
+function ProfileForm({
+  draft,
+  onChange,
+  onCancel,
+  onSave,
+  isCreate,
+  profile,
+  machineMemoryMb,
+}: FormProps) {
   // Closed lists rather than free text: a typo in either field only surfaces
   // minutes later as a failed download. Both fall back to a text input if the
   // list cannot be fetched, so a first run without network is still usable.
   const [mcVersions, setMcVersions] = useState<string[]>([]);
   const [mcVersionsFailed, setMcVersionsFailed] = useState(false);
+  const [showSnapshots, setShowSnapshots] = useState(false);
+  const [systemJavas, setSystemJavas] = useState<JavaInstallation[]>([]);
+  const [javaProbe, setJavaProbe] = useState<JavaProbe | 'checking' | null>(null);
+  /** Whether the "is this profile already on a snapshot?" question has been asked. */
+  const snapshotsConsidered = useRef(false);
   const [loaderVersions, setLoaderVersions] = useState<LoaderVersion[]>([]);
   const [loaderVersionsFailed, setLoaderVersionsFailed] = useState(false);
   const [noLoaderBuilds, setNoLoaderBuilds] = useState(false);
@@ -654,15 +827,61 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
 
   useEffect(() => {
     let cancelled = false;
-    void api.game.getVersions().then((r) => {
+    void api.game.getVersions(showSnapshots).then((r) => {
       if (cancelled) return;
-      if (r.success && r.data?.length) setMcVersions(r.data);
-      else setMcVersionsFailed(true);
+      if (!r.success || !r.data?.length) {
+        setMcVersionsFailed(true);
+        return;
+      }
+      setMcVersions(r.data);
+      // A profile already pinned to a snapshot opens with the toggle off, and
+      // its own version is then not among the options — which a <select>
+      // renders as whatever happens to be first. Turning the toggle on is the
+      // honest reading of a profile that is already on one.
+      //
+      // Once only, and that is the important part: the same test on every
+      // fetch would turn the toggle straight back on the moment its owner
+      // switched it off, since the profile is still on the snapshot they
+      // picked. After this first look the control belongs to the person
+      // using it.
+      if (snapshotsConsidered.current) return;
+      snapshotsConsidered.current = true;
+      if (!showSnapshots && !r.data.includes(latest.current.draft.minecraftVersion)) {
+        setShowSnapshots(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showSnapshots]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.java.detectSystem().then((r) => {
+      if (!cancelled && r.success && r.data) setSystemJavas(r.data);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Re-run on the Minecraft version too: the same JVM is fine for one version
+  // of the game and too old for the next, so the answer belongs to the pair.
+  useEffect(() => {
+    const chosen = draft.customJavaPath;
+    if (!chosen) {
+      setJavaProbe(null);
+      return;
+    }
+    let cancelled = false;
+    setJavaProbe('checking');
+    void api.java.probe(chosen, draft.minecraftVersion).then((r) => {
+      if (!cancelled) setJavaProbe(r.success && r.data ? r.data : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.customJavaPath, draft.minecraftVersion]);
 
   useEffect(() => {
     setLoaderVersions([]);
@@ -705,6 +924,76 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
     onChange({ ...draft, [key]: value });
   };
 
+  // The version the profile is on is always among the options, even when the
+  // list being shown does not contain it — during the refetch the toggle above
+  // triggers, and for good in the case of a version Mojang has stopped
+  // publishing. A <select> whose value is not an option displays the first one
+  // instead, which is a screen that quietly disagrees with the profile.
+  const versionOptions =
+    draft.minecraftVersion && !mcVersions.includes(draft.minecraftVersion)
+      ? [draft.minecraftVersion, ...mcVersions]
+      : mcVersions;
+
+  // One message, on the field that is actually wrong: a pair of identical red
+  // lines under two adjacent boxes reads as two faults rather than one.
+  const sizeProblem = windowSizeProblem(draft);
+  const sizeMessage =
+    sizeProblem === 'incomplete'
+      ? t('profileForm.windowSizeBoth')
+      : sizeProblem === 'range'
+        ? t('profileForm.windowSizeRange', {
+            minWidth: MIN_GAME_WIDTH,
+            minHeight: MIN_GAME_HEIGHT,
+            max: MAX_GAME_DIMENSION,
+          })
+        : undefined;
+  const heightAtFault = sizeProblem === 'incomplete' && draft.windowHeight === undefined;
+
+  // Same rule as the version list: whatever the profile is already set to is
+  // always one of the options, so the control cannot show a runtime other than
+  // the one that will actually be used.
+  const javaOptions = [
+    { value: '', label: t('profileForm.javaManaged') },
+    ...(draft.customJavaPath && !systemJavas.some((j) => j.path === draft.customJavaPath)
+      ? [{ value: draft.customJavaPath, label: draft.customJavaPath }]
+      : []),
+    ...systemJavas.map((j) => ({ value: j.path, label: `Java ${j.version} — ${j.path}` })),
+    { value: BROWSE_FOR_JAVA, label: t('profileForm.javaBrowse') },
+  ];
+
+  const chooseJava = async (value: string) => {
+    if (value !== BROWSE_FOR_JAVA) {
+      set('customJavaPath', value || undefined);
+      return;
+    }
+    const picked = await api.system.selectFile();
+    // Cancelling leaves the profile as it was; the select is driven by the
+    // draft, so it snaps back to what is really set without being told to.
+    if (picked.success && picked.data) set('customJavaPath', picked.data);
+  };
+
+  // A file that cannot be checked is reported, not refused: the drive it lives
+  // on may simply not be plugged in today, and a profile that cannot be saved
+  // is a worse answer than one that says what is wrong with it. The launch
+  // checks again and refuses there, where it matters.
+  const javaMessage =
+    javaProbe === null
+      ? undefined
+      : javaProbe === 'checking'
+        ? t('profileForm.javaChecking')
+        : javaProbe.version === null
+          ? t('profileForm.javaNotJava')
+          : javaProbe.version < javaProbe.requiredVersion
+            ? t('profileForm.javaTooOld', {
+                version: javaProbe.version,
+                required: javaProbe.requiredVersion,
+              })
+            : t('profileForm.javaFound', { version: javaProbe.version });
+  const javaAtFault =
+    javaProbe !== null &&
+    javaProbe !== 'checking' &&
+    (javaProbe.version === null || javaProbe.version < javaProbe.requiredVersion);
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h2 className="text-lg font-display font-semibold text-rf-text">
@@ -728,12 +1017,25 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
           autoFocus
         />
         {mcVersions.length > 0 ? (
-          <Select
-            label={t('profileForm.mcVersion')}
-            options={mcVersions.map((v) => ({ value: v, label: v }))}
-            value={draft.minecraftVersion}
-            onChange={(e) => set('minecraftVersion', e.target.value)}
-          />
+          <div className="flex flex-col gap-1.5">
+            <Select
+              label={t('profileForm.mcVersion')}
+              options={versionOptions.map((v) => ({ value: v, label: v }))}
+              value={draft.minecraftVersion}
+              onChange={(e) => set('minecraftVersion', e.target.value)}
+            />
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={showSnapshots}
+                onChange={setShowSnapshots}
+                label={t('profileForm.showSnapshots')}
+              />
+              <span className="text-xs text-rf-text-muted">{t('profileForm.showSnapshots')}</span>
+            </div>
+            {showSnapshots && (
+              <p className="text-xs text-rf-text-muted">{t('profileForm.snapshotHint')}</p>
+            )}
+          </div>
         ) : (
           // Only reachable when Mojang's manifest could not be fetched and no
           // cached copy exists — a free field beats blocking profile creation.
@@ -786,14 +1088,10 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
             error={loaderVersionsFailed ? t('profileForm.versionsFailed') : undefined}
           />
         )}
-        <Input
-          label={t('profileForm.ram')}
-          type="number"
-          value={draft.allocatedRamMb}
-          onChange={(e) => set('allocatedRamMb', Number(e.target.value))}
-          min={512}
-          max={32768}
-          step={512}
+        <RamField
+          valueMb={draft.allocatedRamMb}
+          onChange={(mb) => set('allocatedRamMb', mb)}
+          totalMb={machineMemoryMb}
         />
         <Input
           label={t('profileForm.manifestUrl')}
@@ -825,6 +1123,69 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
         />
       </div>
 
+      {/* Folded away rather than absent: none of it is needed to make a profile
+          that works, and all of it is needed by somebody. */}
+      <details className="rounded-lg border border-rf-border bg-rf-surface/40 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-rf-text-secondary">
+          {t('profileForm.advanced')}
+        </summary>
+        <div className="grid grid-cols-2 gap-3 pt-3">
+          <Input
+            label={t('profileForm.windowWidth')}
+            type="number"
+            value={draft.windowWidth ?? ''}
+            onChange={(e) =>
+              set('windowWidth', e.target.value ? Number(e.target.value) : undefined)
+            }
+            placeholder="854"
+            min={MIN_GAME_WIDTH}
+            max={MAX_GAME_DIMENSION}
+            error={heightAtFault ? undefined : sizeMessage}
+          />
+          <Input
+            label={t('profileForm.windowHeight')}
+            type="number"
+            value={draft.windowHeight ?? ''}
+            onChange={(e) =>
+              set('windowHeight', e.target.value ? Number(e.target.value) : undefined)
+            }
+            placeholder="480"
+            min={MIN_GAME_HEIGHT}
+            max={MAX_GAME_DIMENSION}
+            error={heightAtFault ? sizeMessage : undefined}
+          />
+          <p className="col-span-2 -mt-1 text-xs text-rf-text-muted">
+            {t('profileForm.windowSizeHint')}
+          </p>
+          <Select
+            label={t('profileForm.windowMode')}
+            options={[
+              { value: '', label: t('profileForm.windowModeGame') },
+              { value: 'false', label: t('profileForm.windowModeWindowed') },
+              { value: 'true', label: t('profileForm.windowModeFullscreen') },
+            ]}
+            value={draft.fullscreen === undefined ? '' : String(draft.fullscreen)}
+            onChange={(e) =>
+              set('fullscreen', e.target.value === '' ? undefined : e.target.value === 'true')
+            }
+          />
+          <p className="col-span-2 text-xs text-rf-text-muted">{t('profileForm.windowModeHint')}</p>
+          <div className="col-span-2 flex flex-col gap-1">
+            <Select
+              label={t('profileForm.java')}
+              options={javaOptions}
+              value={draft.customJavaPath ?? ''}
+              onChange={(e) => void chooseJava(e.target.value)}
+              error={javaAtFault ? javaMessage : undefined}
+            />
+            {!javaAtFault && javaMessage && (
+              <span className="text-xs text-rf-text-muted">{javaMessage}</span>
+            )}
+            <p className="text-xs text-rf-text-muted">{t('profileForm.javaHint')}</p>
+          </div>
+        </div>
+      </details>
+
       <div className="space-y-2">
         <label className="text-xs font-medium text-rf-text-secondary">
           {t('profileForm.notes')}
@@ -839,7 +1200,11 @@ function ProfileForm({ draft, onChange, onCancel, onSave, isCreate, profile }: F
       </div>
 
       <div className="flex gap-2 pt-2">
-        <Button onClick={onSave} icon={<Save size={14} />} disabled={!draft.name.trim()}>
+        <Button
+          onClick={onSave}
+          icon={<Save size={14} />}
+          disabled={!draft.name.trim() || sizeProblem !== null}
+        >
           {t('common.save')}
         </Button>
         <Button variant="ghost" onClick={onCancel} icon={<X size={14} />}>
