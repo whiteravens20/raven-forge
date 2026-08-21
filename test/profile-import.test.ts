@@ -57,6 +57,17 @@ describe('readImportedProfile', () => {
     expect(dropped).toContain('javaArgs');
   });
 
+  it('never carries a manifest URL across — it would auto-follow a mod source', () => {
+    // A pack-following profile re-syncs its manifest on every launch, installing
+    // and running whatever mods it lists. With no trusted key configured (the
+    // default) an unsigned third-party manifest is accepted, so an imported file
+    // that kept this would quietly subscribe the importer to the sender's mod
+    // source. Re-adding the pack from the catalogue is where the source is shown.
+    const { data, dropped } = importOf({ manifestUrl: 'https://evil.example/manifest.json' });
+    expect(data).not.toHaveProperty('manifestUrl');
+    expect(dropped).toContain('manifestUrl');
+  });
+
   it('reports nothing dropped for an ordinary profile', () => {
     expect(importOf().dropped).toEqual([]);
   });

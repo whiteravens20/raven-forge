@@ -348,7 +348,7 @@ export async function exportProfile(profileId: string): Promise<string> {
  * Fields an imported profile never keeps.
  *
  * A profile export is a file that gets passed around — posted in a Discord
- * channel, attached to a forum reply — and two of its fields reach a process
+ * channel, attached to a forum reply — and three of its fields reach a process
  * the next time it launches:
  *
  * - `customJavaPath` chooses the binary `spawn` runs;
@@ -358,23 +358,30 @@ export async function exportProfile(profileId: string): Promise<string> {
  *   at startup — so a token with no whitespace in it (a literal `$IFS` does the
  *   rest) is a command the moment the game OOMs or crashes, which a modded
  *   instance does routinely.
+ * - `manifestUrl` makes the profile *follow a pack*: every launch re-syncs it,
+ *   installing and running whatever mods that address lists. With no trusted key
+ *   configured — the default — an unsigned third-party manifest is accepted, so
+ *   an imported file could quietly subscribe the importer to a mod source of the
+ *   sender's choosing and run its jars, which are host code in every sense a
+ *   `-javaagent` is.
  *
- * Both make an innocuous-looking "here's my profile" attachment a way to run
- * whatever the sender likes on the machine that opens it, with no step at which
- * anyone is asked. They stay available as features; they are simply set by the
- * person at the keyboard, in the profile editor, rather than arriving inside a
- * file. That is the difference between configuring a hook and receiving one.
+ * All three make an innocuous-looking "here's my profile" attachment a way to
+ * run what the sender likes on the machine that opens it, with no step at which
+ * anyone is asked. They stay available as features — set by the person at the
+ * keyboard, in the editor or by re-adding the pack from the catalogue, where the
+ * source is shown — rather than arriving inside a file. That is the difference
+ * between configuring a hook and receiving one.
  *
  * Only fields the schema declares can get this far, so this list needs an entry
  * only for the ones the launcher does honour. A field it has never heard of —
  * or no longer has — is dropped by the parse below without being named here.
  */
-const NOT_IMPORTED = ['customJavaPath', 'javaArgs'] as const;
+const NOT_IMPORTED = ['customJavaPath', 'javaArgs', 'manifestUrl'] as const;
 
 /** A profile export, reduced to what may safely be turned into a new profile. */
 export interface ImportedProfile {
   data: Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>;
-  /** Executable fields the file carried and that were discarded. */
+  /** Fields the file carried that an import must not silently honour. */
   dropped: string[];
 }
 
@@ -414,6 +421,7 @@ export function readImportedProfile(json: string): ImportedProfile {
     totalPlayTimeMinutes: _tp,
     customJavaPath: _java,
     javaArgs: _jargs,
+    manifestUrl: _murl,
     ...data
   } = parsed.data;
 
