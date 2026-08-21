@@ -23,6 +23,12 @@ updates:
       - github-actions
     commit-message:
       prefix: 'ci'
+    # Let a newly published version settle for a week before proposing it. A tag
+    # can be repointed or a release yanked in the hours after it lands, and none
+    # of these bumps is urgent — a real security advisory is exempt and still
+    # opens immediately.
+    cooldown:
+      default-days: 7
 
   # ── npm (single root package) ────────────────────────────────────────────────
   - package-ecosystem: npm
@@ -37,6 +43,11 @@ updates:
       - dependencies
     commit-message:
       prefix: 'chore'
+    # Same week-long settling window as above: a freshly published npm version is
+    # the one most likely to be a compromised or broken release. Security updates
+    # are exempt and still open the moment the advisory lands.
+    cooldown:
+      default-days: 7
     # Group non-breaking updates into a single PR to reduce noise.
     # Security updates are always opened separately regardless.
     groups:
