@@ -221,7 +221,7 @@ export async function createProfileFromUrl(url: string): Promise<Profile> {
 
   const scratch = path.join(paths.cacheDir, `pack-${crypto.randomUUID()}`);
   try {
-    await downloadToFile(url, scratch, { maxBytes: MAX_PACK_DOWNLOAD_BYTES });
+    await downloadToFile(url, scratch, { maxBytes: MAX_PACK_DOWNLOAD_BYTES, secure: true });
 
     const head = Buffer.alloc(ZIP_MAGIC.length);
     const handle = await fs.open(scratch, 'r');

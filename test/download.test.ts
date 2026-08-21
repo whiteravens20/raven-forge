@@ -153,4 +153,34 @@ describe('downloadToFile', () => {
     await expect(downloadToFile(`${base}/x`, dest, { noFollow: true })).rejects.toThrow();
     expect(await fs.readFile(outside, 'utf-8')).toBe('original');
   });
+
+  describe('secure transport', () => {
+    // The bytes this guards are loaded as code — a mod jar, a config a manifest
+    // ships — so a plaintext hop is a place to swap the file no hash may catch.
+    it('refuses plaintext http to a remote host before it sends a request', async () => {
+      let hit = false;
+      handler = (_req, res) => {
+        hit = true;
+        res.end('should-not-run');
+      };
+      // A non-loopback http URL is refused outright — nothing is fetched.
+      await expect(
+        downloadToFile('http://cdn.example.net/mod.jar', path.join(dir, 'a.jar'), { secure: true }),
+      ).rejects.toThrow(/https/i);
+      expect(hit).toBe(false);
+    });
+
+    it('refuses a non-web scheme', async () => {
+      await expect(
+        downloadToFile('file:///etc/passwd', path.join(dir, 'b'), { secure: true }),
+      ).rejects.toThrow(/https/i);
+    });
+
+    it('still allows loopback http, for a pack author serving one locally', async () => {
+      handler = (_req, res) => res.end('local-bytes');
+      const dest = path.join(dir, 'ok.jar');
+      await downloadToFile(`${base}/x`, dest, { secure: true });
+      expect(await fs.readFile(dest, 'utf-8')).toBe('local-bytes');
+    });
+  });
 });

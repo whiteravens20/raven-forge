@@ -9,7 +9,7 @@ import { getVersion, getModVersions, getProjectTitle, primaryFile } from './modr
 import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
-import { sha256File, fileMatches, verifyDownload } from './integrity';
+import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import type { InstalledMod } from '../../shared/ipc-types';
 import {
   fileNameFromUrl,
@@ -114,6 +114,9 @@ export async function installContent(
   let displayName: string;
   let version = 'unknown';
   let modrinthProjectId: string | undefined;
+  // Set for a Modrinth source, whose API publishes a hash for the exact build —
+  // used to verify the download rather than accepting whatever the CDN returned.
+  let expectedHashes: HashedEntry | undefined;
 
   if (source.startsWith('modrinth:')) {
     const projectId = source.slice('modrinth:'.length);
@@ -137,6 +140,7 @@ export async function installContent(
     const fileInfo = primaryFile(chosen);
     downloadUrl = fileInfo.url;
     fileName = fileInfo.filename;
+    expectedHashes = { sha512: fileInfo.hashes.sha512, sha1: fileInfo.hashes.sha1 };
     // The project's title, not the version's. `ModrinthVersion.name` is a build
     // label — Complementary Reimagined publishes its as `r5.8.1`, so the
     // installed list read "r5.8.1" where a pack name belonged.
@@ -175,7 +179,10 @@ export async function installContent(
 
   const dest = path.join(dir, fileName);
   log.info(`Downloading ${kind.slice(0, -1)}: ${displayName}`);
-  await downloadToFile(downloadUrl, dest);
+  await downloadToFile(downloadUrl, dest, { secure: true });
+  // A Modrinth build is checked against the API's own hash; a direct `url:` the
+  // player pasted has none to check, so its https transport is the guarantee.
+  if (expectedHashes) await verifyDownload(dest, expectedHashes, displayName);
   const hash = await sha256File(dest);
 
   const installed: InstalledMod = {
@@ -233,6 +240,9 @@ export async function syncContentFromManifest(
     let downloadUrl: string;
     let fileName: string;
     let version = entry.version ?? 'unknown';
+    // Modrinth's published hash for the resolved build, folded in below so a
+    // manifest entry that declared none is still verified against the API.
+    let apiHashes: HashedEntry | undefined;
 
     if (entry.url) {
       // Direct URL — no API lookup needed, whatever the declared source is.
@@ -261,6 +271,7 @@ export async function syncContentFromManifest(
       downloadUrl = file.url;
       fileName = file.filename;
       version = match.version_number || match.id;
+      apiHashes = { sha512: file.hashes.sha512, sha1: file.hashes.sha1 };
     } else {
       throw new Error(`${entry.name}: source "${entry.source}" needs a url`);
     }
@@ -274,8 +285,10 @@ export async function syncContentFromManifest(
     }
 
     log.info(`Syncing ${kind.slice(0, -1)}: ${entry.name}`);
-    await downloadToFile(downloadUrl, dest);
-    await verifyDownload(dest, entry, entry.name);
+    await downloadToFile(downloadUrl, dest, { secure: true });
+    // The manifest's own hash wins where it has one; the API hash is the floor,
+    // so a modrinth entry that declared none is still checked against the build.
+    await verifyDownload(dest, { ...apiHashes, ...entry }, entry.name);
     const hash = await sha256File(dest);
 
     fromManifest.push({

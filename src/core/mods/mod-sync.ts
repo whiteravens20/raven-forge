@@ -25,7 +25,13 @@ import { downloadToFile } from '../net/download';
 import { readJsonCapped } from '../net/json';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { syncContentFromManifest } from './content-manager';
-import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
+import {
+  sha256File,
+  fileMatches,
+  verifyDownload,
+  expectedHash,
+  type HashedEntry,
+} from './integrity';
 import { configVersion, shouldApplyConfigOverride } from './config-overrides';
 import { pendingChanges } from './pack-diff';
 import { getMainWindow } from '../../main/window';
@@ -274,7 +280,10 @@ interface ResolvedDownload {
  * matched against Modrinth's `version_number` first and its opaque version `id`
  * second, so manifests can pin either.
  */
-async function resolveModEntry(entry: ModEntry, manifest: ModManifest): Promise<ResolvedDownload> {
+export async function resolveModEntry(
+  entry: ModEntry,
+  manifest: ModManifest,
+): Promise<ResolvedDownload> {
   // Fast path: a manifest that already carries the direct download URL needs no
   // API lookup at all. Pack generators emit this, so syncing a 100-mod pack
   // costs zero Modrinth requests and stays resolvable even if the API is down.
@@ -282,6 +291,15 @@ async function resolveModEntry(entry: ModEntry, manifest: ModManifest): Promise<
     // The schema has already rejected a `fileName` that is anything but a bare
     // filename, so this cannot leave the mods directory.
     const fileName = entry.fileName ?? fileNameFromUrl(entry.url, entry.id, '.jar');
+    // A mod fetched straight from a manifest URL has no API lookup to supply a
+    // hash, so the entry's own is the only thing pinning the jar this process is
+    // about to load as code. Required, not optional: without it a plaintext hop
+    // or an unsigned manifest could swap the file and nothing would notice.
+    if (!expectedHash(entry)) {
+      throw new Error(
+        `${entry.name}: a mod given by url must declare a sha512, sha256 or sha1 hash`,
+      );
+    }
     return { url: entry.url, fileName, version: entry.version };
   }
 
@@ -301,7 +319,15 @@ async function resolveModEntry(entry: ModEntry, manifest: ModManifest): Promise<
         );
       }
       const file = primaryFile(match);
-      return { url: file.url, fileName: file.filename, version: match.version_number || match.id };
+      return {
+        url: file.url,
+        fileName: file.filename,
+        version: match.version_number || match.id,
+        // Verify against the hash Modrinth publishes for this exact build, even
+        // when the manifest carried none of its own — the API always returns
+        // sha512/sha1, so a modrinth entry is never installed unverified.
+        hashes: { sha512: file.hashes.sha512, sha1: file.hashes.sha1 },
+      };
     }
 
     case 'url':
@@ -332,7 +358,7 @@ async function fetchModEntry(
     await fs.mkdir(path.dirname(destPath), { recursive: true });
     await fs.copyFile(resolved.localPath, destPath);
   } else {
-    await downloadToFile(resolved.url!, destPath, { signal });
+    await downloadToFile(resolved.url!, destPath, { signal, secure: true });
   }
 
   // The manifest's own hashes win — `expectedHash` prefers sha512, then sha256,
@@ -660,7 +686,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         // this write out of the tree: the parent is proven contained through
         // realpath here, and `noFollow` refuses a link at the file itself.
         await resolveWithin(gameDir, config.path);
-        await downloadToFile(config.url, dest, { signal, noFollow: true });
+        await downloadToFile(config.url, dest, { signal, noFollow: true, secure: true });
         await verifyDownload(dest, config, `config ${config.path}`);
         log.info(`Applied config override: ${config.path}`);
         configsWritten++;
@@ -822,7 +848,7 @@ export async function installResolvedMod(
   const destPath = path.join(modsDir, resolved.fileName);
 
   log.info(`Installing mod ${identity.name} (${resolved.fileName}) from ${identity.source}`);
-  await downloadToFile(resolved.url, destPath);
+  await downloadToFile(resolved.url, destPath, { secure: true });
 
   // Deletes the file and throws on mismatch. Modrinth supplies sha512; a
   // manifest may supply any of sha512/sha256/sha1. An entry that supplies none
