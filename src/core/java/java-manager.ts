@@ -288,6 +288,10 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
   let total: number | undefined;
   await downloadToFile(url, tmpFile, {
     signal,
+    // Extracted and then run as the JVM for every launch, so the transport is
+    // held to https as well; the resolver's URL already is, and loopback stays
+    // allowed for a mirror served locally.
+    secure: true,
     onProgress: (bytes, declared) => {
       received = bytes;
       total = declared;

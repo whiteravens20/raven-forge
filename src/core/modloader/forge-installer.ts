@@ -301,7 +301,9 @@ async function downloadInstaller(
   // Through the shared downloader: stall timeout, backpressure, and the file
   // removed on any failure. This used to be `res.arrayBuffer()`, which held the
   // whole installer in memory and left a partial file behind when it failed.
-  await downloadToFile(url, dest, { signal });
+  // Executed as a Java process a few lines on, so https is enforced on the way
+  // down as well as the checksum once it lands.
+  await downloadToFile(url, dest, { signal, secure: true });
 
   if (expected) {
     // Deletes the file and throws on mismatch — this jar is about to be run.
@@ -355,7 +357,9 @@ async function ensureVanillaClientForInstaller(
   // Streamed, not `arrayBuffer()`: this jar is around 26 MB and used to be
   // fully resident in memory on its way to disk — the same waste `integrity.ts`
   // removed from hashing and did not remove from here.
-  await downloadToFile(meta.downloads.client.url, jarPath, { signal });
+  // Mojang serves this over https and its sha1 is checked just below; the flag
+  // refuses a redirect that would drop the jar the installer patches to http.
+  await downloadToFile(meta.downloads.client.url, jarPath, { signal, secure: true });
 
   // Mojang's own sha1 is already in hand, and the normal launch path checks the
   // very same file against it. This copy is the one a Java installer is about

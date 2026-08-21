@@ -83,7 +83,9 @@ async function downloadFile(
   for (let attempt = 1; attempt <= retries; attempt++) {
     throwIfCancelled(signal, 'Download');
     try {
-      await downloadToFile(url, part, { signal });
+      // Libraries and natives are loaded straight into the JVM, so the bytes
+      // come down https; the published sha1 (when there is one) is checked next.
+      await downloadToFile(url, part, { signal, secure: true });
 
       if (sha1) {
         const hash = await sha1File(part);
