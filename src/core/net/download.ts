@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { constants as fsConstants } from 'node:fs';
+import { assertSecureContentUrl, isSecureContentUrl } from '../../shared/validators';
 
 /** No data for this long means the transfer is dead, not merely slow. */
 const STALL_TIMEOUT_MS = 45_000;
@@ -29,6 +30,23 @@ export interface DownloadOptions {
    * directory tree.
    */
   noFollow?: boolean;
+  /**
+   * Require the transport to stay secure — https, or http only to loopback. The
+   * initial URL is refused before a byte is sent, and the final URL a redirect
+   * chain lands on is refused before the body is written, so an https link that
+   * 302s down to http cannot slip past. For a file this process will load as
+   * code (a mod jar, a config a manifest ships), where an entry with no hash is
+   * otherwise accepted on trust and a plaintext hop is a place to swap it.
+   */
+  secure?: boolean;
+  /**
+   * Called as the body arrives, with what has been written so far and what the
+   * server declared — `undefined` when it declared nothing. Here rather than in
+   * a caller's own copy of this loop: a progress bar was the only reason the JRE
+   * download had a second implementation of all of this, and that copy had no
+   * timeout at all.
+   */
+  onProgress?: (received: number, total: number | undefined) => void;
 }
 
 /**
@@ -48,7 +66,10 @@ export async function downloadToFile(
   dest: string,
   options: DownloadOptions = {},
 ): Promise<void> {
-  const { signal, maxBytes, noFollow } = options;
+  const { signal, maxBytes, noFollow, onProgress, secure } = options;
+  // Before any request or side effect: a plaintext URL is refused outright, not
+  // fetched and then discarded.
+  if (secure) assertSecureContentUrl(url);
   await fs.mkdir(path.dirname(dest), { recursive: true });
 
   const controller = new AbortController();
@@ -71,9 +92,19 @@ export async function downloadToFile(
       throw new Error(`Download failed (${res.status}): ${new URL(url).host}`);
     }
 
+    // The URL the redirect chain actually landed on. Checked before the body is
+    // read, so an https address that redirected down to http is refused rather
+    // than written — the initial-URL check above cannot see where a 302 leads.
+    // The controller has not been aborted here, so this throws straight through
+    // the catch without being mistaken for a stall.
+    if (secure && !isSecureContentUrl(res.url)) {
+      throw new Error(`Refusing an insecure redirect to ${new URL(res.url).host}`);
+    }
+
     // A server that declares a length over the cap is refused before the body is
     // read at all; the running count below still catches one that lies.
     const declared = Number(res.headers.get('content-length')) || 0;
+    onProgress?.(0, declared > 0 ? declared : undefined);
     if (maxBytes && declared > maxBytes) {
       tooBig = true;
       throw new Error(
@@ -103,6 +134,7 @@ export async function downloadToFile(
           throw new Error(`Download exceeded the ${maxBytes}-byte limit: ${new URL(url).host}`);
         }
         await handle.write(value);
+        onProgress?.(received, declared > 0 ? declared : undefined);
       }
     } finally {
       await handle.close();

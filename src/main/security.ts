@@ -79,7 +79,7 @@ export function installContentSecurityPolicy(): void {
  * rather than `sender`, because a subframe of the right WebContents is still
  * not the page these handlers answer to.
  */
-export function isTrustedSender(event: IpcMainInvokeEvent): boolean {
+function isTrustedSender(event: IpcMainInvokeEvent): boolean {
   const win = getMainWindow();
   if (!win || win.isDestroyed()) return false;
   const frame = event.senderFrame;

@@ -87,9 +87,15 @@ raven-forge/
 
 All renderer → main calls go through typed channels declared in [`src/shared/ipc-types.ts`](../src/shared/ipc-types.ts) and exposed as `window.ravenforge.<domain>.<method>` via the preload contextBridge. Returns `IpcResult<T> = { success, data?, error?, code?, errorMessage? }` so renderer code never throws on cross-process errors. `error` is always English — it is what the log keeps and what a bug report quotes. `code` tags a failure the UI has to _react_ to rather than merely show (`AUTH_UNREACHABLE` is the one), and `errorMessage` carries a translation key plus its variables for the failures the launcher raises about something the player can go and change, since `src/core/` has no locale. Progress lines travel the same way — see `ProgressKey`.
 
-Channels are grouped by domain: `auth`, `profiles`, `mods`, `content` (shaders + resource packs), `java`, `loaders`, `game`, `settings`, `news`, `announcements`, `manifest` (verification), `updater`, `system`, `window`.
+Channels are grouped by domain: `auth`, `profiles`, `packs` (the catalogue and the three ways a pack becomes a profile), `mods`, `content` (shaders + resource packs), `java`, `loaders`, `game`, `settings`, `news`, `announcements`, `manifest` (verification), `updater`, `system`, `window`.
 
-Push events from main → renderer (`webContents.send`) cover progress (`progress:mod-sync`, `progress:java-download`, …), game lifecycle (`game:log`, `game:started`, `game:exited`), auth state changes, and updater state.
+Push events from main → renderer (`webContents.send`) cover progress (`progress:mod-sync`, `progress:java-download`, …), game lifecycle (`game:log`, `game:started`, `game:exited`), auth state changes, profile sync status, and updater state.
+
+Both directions are kept free of channels nobody uses. A declared channel with no
+caller is not harmless: it is API surface that reads as supported, and one of
+them — `progress:mod-download` — had a subscriber in the renderer and a label in
+the progress overlay while nothing in `src/core/` ever emitted it, so the UI held
+a state it could never show.
 
 ## Mod-sync data flow
 
@@ -263,8 +269,9 @@ sequenceDiagram
 - Every `ipcMain.handle` goes through a sender check, so a handler added later cannot be the first one to forget it.
 - The Microsoft OAuth flow uses PKCE (S256) and a `state` value, and accepts a code only from the exact redirect URI it asked for.
 - Every download is verified against the strongest hash its source published — sha512, sha256 or sha1, in that order (`expectedHash` in `core/mods/integrity.ts`). Modrinth supplies sha512 for every file; a `.mrpack` supplies sha512 and sha1; a manifest entry may publish any of them. **An entry that publishes no hash at all is installed unverified** — the launcher does not invent one. Mojang's own assets and libraries are the exception that does retry: `asset-downloader.ts` retries a failed or mismatched download three times, because it is fetching thousands of files. `downloadToFile`, which fetches mods, does not retry.
-- The Forge/NeoForge installer jar, the Adoptium JRE and the vanilla client jar are all executed or extracted after download, and all three are checked against a published checksum where the publisher provides one (Maven `.sha512`/`.sha256`/`.sha1` sidecars, Adoptium's `/assets` response, Mojang's version metadata). Where none exists the download proceeds over HTTPS and says so in the log.
-- Manifest Ed25519 signatures are checked inside the sync, on the exact document about to be installed, before anything is downloaded. The White Ravens publisher key is **compiled into the launcher** (`src/shared/branding.ts`) and always in the key ring, so a first-party pack verifies on a fresh install; shipping it beats downloading it, since a key served next to the manifest it signs is written by whoever wrote the manifest. **With no trusted keys configured nothing is enforced** — that is the default install, and refusing every unsigned manifest out of the box would refuse every pack that exists. **Adding a trusted key switches enforcement on**: from then on a manifest for that profile must carry a signature that verifies, and an unsigned one is refused rather than waved through, because otherwise stripping the signature would be a way past the check. The badge on the profile reports what the last sync found, not what a fresh fetch would find. Settings → Trusted keys lists the built-in key alongside the player's own, unremovable and labelled as built in: it is what makes a White Ravens pack read "Verified" on an install where the player has added nothing, and a screen that hid it left the badge looking invented.
+- **Every file the launcher fetches goes through `core/net/download.ts`.** One policy, in one place: a stall timeout that resets on each chunk rather than a cap on total duration (an absolute one makes a large file unfetchable on a slow link, not merely slow), backpressure from awaiting each write, a size cap for URLs the launcher does not control, and the destination removed on any failure. `asset-downloader.ts` adds a retry and receives into a `.part` file it renames on success, so a file at the final path is always one that arrived whole — which is what lets a library with no published hash be trusted on sight. Preparing a launch is **two passes over the same list** — SHA-1 every declared file, then fetch only what failed — and each reports under its own label, because on a profile that is already installed the first pass is the entire wait and calling it a download made every Play look like Minecraft being downloaded again.
+- The Forge/NeoForge installer jar, the Adoptium JRE and the vanilla client jar are all executed or extracted after download, and all three are checked against a published checksum (Maven `.sha512`/`.sha256`/`.sha1` sidecars, Adoptium's `/assets` response, Mojang's version metadata). **Where no checksum exists the install is refused**, because the artefact in question is one this process then runs: the JRE resolver fails outright, and the loader installer fails unless the player has explicitly turned on _Settings → allow unverified loader installers_, which exists for genuinely old artefacts whose repository never wrote a sidecar.
+- Manifest Ed25519 signatures are checked inside the sync, on the exact document about to be installed, before anything is downloaded. The White Ravens publisher key is **compiled into the launcher** (`src/shared/branding.ts`) and always in the key ring, so a first-party pack verifies on a fresh install; shipping it beats downloading it, since a key served next to the manifest it signs is written by whoever wrote the manifest. **A first-party manifest is enforced unconditionally** — it comes from a White Ravens address and is signed by the key in the binary, so a copy that will not verify has been tampered with or is not genuine, and there is no setting under which installing it is the right answer. **For everything else, with no trusted keys configured nothing is enforced** — that is the default install, and refusing every unsigned third-party manifest out of the box would refuse every pack that exists. **Adding a trusted key switches enforcement on for those too**: from then on a manifest for that profile must carry a signature that verifies, and an unsigned one is refused rather than waved through, because otherwise stripping the signature would be a way past the check. The badge on the profile reports what the last sync found, not what a fresh fetch would find. Settings → Trusted keys lists the built-in key alongside the player's own, unremovable and labelled as built in: it is what makes a White Ravens pack read "Verified" on an install where the player has added nothing, and a screen that hid it left the badge looking invented.
 
 ## Build pipeline
 
@@ -276,9 +283,43 @@ sequenceDiagram
 
 The `package.json` `main` field points at `dist/main/index.js`; the preload reference inside `window.ts` is `path.join(__dirname, '..', 'preload', 'index.js')`, which resolves correctly from `dist/main/`.
 
+## Tests
+
+`npm test` — Vitest, plain Node, `test/**/*.test.ts`. Electron and `keytar` are
+aliased to stubs (`test/stubs/electron.ts`); everything below that seam is the
+real module, not a mock of one.
+
+| Layer                  | How it is tested                                                                                                                                                            |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pure logic             | Called directly — launch arguments, hash selection, canonicalization, version merging, loader compatibility, contrast ratios                                                |
+| State files            | Real files under a temporary root named by `RAVENFORGE_DATA_DIR` — `profiles.json`, `settings.json`, `auth.json`, `installed.lock`, the content indexes, icons, path guards |
+| Network                | A `node:http` server on an ephemeral port stands in for Mojang, Modrinth, Adoptium and a pack host                                                                          |
+| Keychain               | `secret-store` is substituted to model both a working keyring and a machine with none, which is the case that actually fails in the field                                   |
+| Subprocesses           | Real ones: `tar` unpacks a real archive, `unzip -t` reads back an export, and a shell script that prints a version banner stands in for a JVM                               |
+| Build tooling          | `inject-build-ids.mjs` is run over a staged `dist/`, because otherwise it runs for the first time during a release                                                          |
+| The IPC contract       | Preload and main are both loaded and their channel names compared, which is the one half of that contract the types cannot state                                            |
+| Renderer-facing checks | The CSP header, the IPC sender guard, the progress labels the overlay resolves, and the two dictionaries against each other                                                 |
+
+Three properties are asserted rather than assumed, because each of them failed
+silently before it was: **overlapping writes** — every serialized state file has
+a test that fires several mutations at once and checks that none of them was
+lost; **a refusal actually refusing** — a path that leaves its directory, a hash
+that does not match, a JRE with no checksum to verify it against, a profile
+export carrying `javaArgs`, an IPC call from the wrong frame; and **the launcher
+saying what it is really doing** — the labels it names, the variables it hands
+them, and the fact that a checking pass never reports a finished download.
+
+The suite is held to what it checks: `npm run lint` and `npm run typecheck` both
+cover `test/` (`tsconfig.test.json`), and a test may not be left `.only`, which
+ESLint refuses.
+
+What needs a real JVM, a real Microsoft account or a published release is out of
+scope and verified by hand; the gap list below records what was proven that way
+and when.
+
 ## Open implementation gaps
 
-Last checked against the code on **2026-08-14**. Keep it that way — a stale gap
+Last checked against the code on **2026-08-20**. Keep it that way — a stale gap
 list is worse than none, because it sends people looking for problems that were
 fixed and hides the ones that were not.
 
@@ -321,10 +362,12 @@ post-main` description, and that exit is logged but not reported as a crash.
 - **Launcher logs are not redacted.** Only crash reports are. `main.log` echoes
   the game's stdout verbatim, and a mod that prints its launch arguments prints
   a live session token with them.
+- **Some downloads are still not cancellable at every step.** The prepare phase
+  threads its `AbortSignal` through the loader install, the JRE install and every
+  game-file download, and each of those has a stall timeout; the Microsoft auth
+  chain has per-request timeouts but no signal, so cancelling a launch does not
+  drop a sign-in request already in flight. It expires on its own within thirty
+  seconds.
+- **Nothing warns when a user-installed mod collides with a manifest mod.**
 - No Mica/acrylic backdrop on Windows 11; no one-click rollback to the previous
-  launcher version; no warning when a user-installed mod collides with a manifest
-  mod.
-- Dead IPC surface: `game:kill`, `game:is-running` and `announcements:dismiss`
-  are declared, handled and exposed but never called from the renderer.
-  `game:kill` is the one that costs the user something — there is no way to stop
-  a running game from the launcher.
+  launcher version.

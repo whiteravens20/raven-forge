@@ -4,11 +4,12 @@ import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
+import { serializeByKey } from '../util/serialize';
 import { getVersion, getModVersions, getProjectTitle, primaryFile } from './modrinth-api';
 import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
-import { sha256File, fileMatches, verifyDownload } from './integrity';
+import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
 import type { InstalledMod } from '../../shared/ipc-types';
 import {
   fileNameFromUrl,
@@ -30,9 +31,11 @@ function indexPath(kind: ContentKind, profileId: string): string {
 }
 
 async function readIndex(kind: ContentKind, profileId: string): Promise<InstalledMod[]> {
+  // Outside the `try`, for the same reason as `readLockFile`: a missing file is
+  // an ordinary empty state, an id that is not a path component is not.
+  const file = indexPath(kind, profileId);
   try {
-    const raw = await fs.readFile(indexPath(kind, profileId), 'utf-8');
-    return JSON.parse(raw) as InstalledMod[];
+    return JSON.parse(await fs.readFile(file, 'utf-8')) as InstalledMod[];
   } catch {
     return [];
   }
@@ -44,6 +47,27 @@ async function writeIndex(
   items: InstalledMod[],
 ): Promise<void> {
   await writeJsonAtomic(indexPath(kind, profileId), items);
+}
+
+/**
+ * Read one of these indexes, change it, and write it back with nothing in
+ * between — the same guarantee `mutateLockFile` gives `installed.lock`.
+ *
+ * These files are written by the same overlapping paths: a manifest sync
+ * reconciling the whole list while the player installs a pack from the browser.
+ * Both used to read, download, and write the whole array back.
+ */
+function mutateIndex<T>(
+  kind: ContentKind,
+  profileId: string,
+  mutate: (items: InstalledMod[]) => T | Promise<T>,
+): Promise<T> {
+  return serializeByKey(indexPath(kind, profileId), async () => {
+    const items = await readIndex(kind, profileId);
+    const result = await mutate(items);
+    await writeIndex(kind, profileId, items);
+    return result;
+  });
 }
 
 export async function listContent(kind: ContentKind, profileId: string): Promise<InstalledMod[]> {
@@ -90,6 +114,9 @@ export async function installContent(
   let displayName: string;
   let version = 'unknown';
   let modrinthProjectId: string | undefined;
+  // Set for a Modrinth source, whose API publishes a hash for the exact build —
+  // used to verify the download rather than accepting whatever the CDN returned.
+  let expectedHashes: HashedEntry | undefined;
 
   if (source.startsWith('modrinth:')) {
     const projectId = source.slice('modrinth:'.length);
@@ -113,6 +140,7 @@ export async function installContent(
     const fileInfo = primaryFile(chosen);
     downloadUrl = fileInfo.url;
     fileName = fileInfo.filename;
+    expectedHashes = { sha512: fileInfo.hashes.sha512, sha1: fileInfo.hashes.sha1 };
     // The project's title, not the version's. `ModrinthVersion.name` is a build
     // label — Complementary Reimagined publishes its as `r5.8.1`, so the
     // installed list read "r5.8.1" where a pack name belonged.
@@ -141,9 +169,7 @@ export async function installContent(
       enabled: true,
       fromManifest: false,
     };
-    const items = await readIndex(kind, profileId);
-    items.push(installed);
-    await writeIndex(kind, profileId, items);
+    await mutateIndex(kind, profileId, (items) => items.push(installed));
     if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
     log.info(`Installed ${kind.slice(0, -1)} from file: ${fileName}`);
     return installed;
@@ -153,7 +179,10 @@ export async function installContent(
 
   const dest = path.join(dir, fileName);
   log.info(`Downloading ${kind.slice(0, -1)}: ${displayName}`);
-  await downloadToFile(downloadUrl, dest);
+  await downloadToFile(downloadUrl, dest, { secure: true });
+  // A Modrinth build is checked against the API's own hash; a direct `url:` the
+  // player pasted has none to check, so its https transport is the guarantee.
+  if (expectedHashes) await verifyDownload(dest, expectedHashes, displayName);
   const hash = await sha256File(dest);
 
   const installed: InstalledMod = {
@@ -169,19 +198,19 @@ export async function installContent(
     fromManifest: false,
   };
 
-  const items = await readIndex(kind, profileId);
-  const idx = items.findIndex((m) => m.id === installed.id);
-  if (idx >= 0) {
-    try {
-      await fs.rm(path.join(dir, items[idx].fileName), { force: true });
-    } catch {
-      /* ok */
+  await mutateIndex(kind, profileId, async (items) => {
+    const idx = items.findIndex((m) => m.id === installed.id);
+    if (idx >= 0) {
+      try {
+        await fs.rm(path.join(dir, items[idx].fileName), { force: true });
+      } catch {
+        /* ok */
+      }
+      items[idx] = installed;
+    } else {
+      items.push(installed);
     }
-    items[idx] = installed;
-  } else {
-    items.push(installed);
-  }
-  await writeIndex(kind, profileId, items);
+  });
   if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
   return installed;
 }
@@ -203,7 +232,6 @@ export async function syncContentFromManifest(
   await fs.mkdir(dir, { recursive: true });
 
   const existing = await readIndex(kind, profileId);
-  const userInstalled = existing.filter((item) => !item.fromManifest);
   const fromManifest: InstalledMod[] = [];
 
   for (const entry of entries) {
@@ -212,6 +240,9 @@ export async function syncContentFromManifest(
     let downloadUrl: string;
     let fileName: string;
     let version = entry.version ?? 'unknown';
+    // Modrinth's published hash for the resolved build, folded in below so a
+    // manifest entry that declared none is still verified against the API.
+    let apiHashes: HashedEntry | undefined;
 
     if (entry.url) {
       // Direct URL — no API lookup needed, whatever the declared source is.
@@ -240,6 +271,7 @@ export async function syncContentFromManifest(
       downloadUrl = file.url;
       fileName = file.filename;
       version = match.version_number || match.id;
+      apiHashes = { sha512: file.hashes.sha512, sha1: file.hashes.sha1 };
     } else {
       throw new Error(`${entry.name}: source "${entry.source}" needs a url`);
     }
@@ -253,8 +285,10 @@ export async function syncContentFromManifest(
     }
 
     log.info(`Syncing ${kind.slice(0, -1)}: ${entry.name}`);
-    await downloadToFile(downloadUrl, dest);
-    await verifyDownload(dest, entry, entry.name);
+    await downloadToFile(downloadUrl, dest, { secure: true });
+    // The manifest's own hash wins where it has one; the API hash is the floor,
+    // so a modrinth entry that declared none is still checked against the build.
+    await verifyDownload(dest, { ...apiHashes, ...entry }, entry.name);
     const hash = await sha256File(dest);
 
     fromManifest.push({
@@ -282,7 +316,14 @@ export async function syncContentFromManifest(
     log.info(`Removed orphaned ${kind.slice(0, -1)} ${stale.name} from profile ${profileId}`);
   }
 
-  await writeIndex(kind, profileId, [...fromManifest, ...userInstalled]);
+  // Read again under the lock rather than reusing `userInstalled`, which was
+  // taken before the downloads: only the manifest's half of this index is this
+  // function's to replace, and a pack installed by hand in the meantime belongs
+  // to the other half.
+  await mutateIndex(kind, profileId, (items) => {
+    const stillUserInstalled = items.filter((item) => !item.fromManifest);
+    items.splice(0, items.length, ...fromManifest, ...stillUserInstalled);
+  });
   if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
   return fromManifest.length;
 }
@@ -293,22 +334,21 @@ export async function removeContent(
   id: string,
 ): Promise<void> {
   const dir = targetDir(kind, profileId);
-  const items = await readIndex(kind, profileId);
-  const item = items.find((m) => m.id === id);
-  if (!item) throw new Error(`${kind.slice(0, -1)} ${id} not found`);
+  const name = await mutateIndex(kind, profileId, async (items) => {
+    const idx = items.findIndex((m) => m.id === id);
+    if (idx < 0) throw new Error(`${kind.slice(0, -1)} ${id} not found`);
+    const item = items[idx];
 
-  try {
-    await fs.rm(path.join(dir, item.fileName), { force: true });
-  } catch {
-    /* ok */
-  }
-  await writeIndex(
-    kind,
-    profileId,
-    items.filter((m) => m.id !== id),
-  );
+    try {
+      await fs.rm(path.join(dir, item.fileName), { force: true });
+    } catch {
+      /* ok */
+    }
+    items.splice(idx, 1);
+    return item.name;
+  });
   if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
-  log.info(`Removed ${kind.slice(0, -1)} ${item.name} from profile ${profileId}`);
+  log.info(`Removed ${kind.slice(0, -1)} ${name} from profile ${profileId}`);
 }
 
 /**
@@ -320,16 +360,18 @@ export async function removeContent(
  * way into the file.
  */
 export async function reorderResourcePacks(profileId: string, orderedIds: string[]): Promise<void> {
-  const items = await readIndex('resourcepacks', profileId);
-  const byId = new Map(items.map((m) => [m.id, m]));
-  const reordered = orderedIds
-    .map((id) => byId.get(id))
-    .filter((m): m is InstalledMod => Boolean(m));
-  // Append any missing items at the end
-  for (const item of items) {
-    if (!orderedIds.includes(item.id)) reordered.push(item);
-  }
-  await writeIndex('resourcepacks', profileId, reordered);
+  const count = await mutateIndex('resourcepacks', profileId, (items) => {
+    const byId = new Map(items.map((m) => [m.id, m]));
+    const reordered = orderedIds
+      .map((id) => byId.get(id))
+      .filter((m): m is InstalledMod => Boolean(m));
+    // Append any missing items at the end
+    for (const item of items) {
+      if (!orderedIds.includes(item.id)) reordered.push(item);
+    }
+    items.splice(0, items.length, ...reordered);
+    return reordered.length;
+  });
   await syncResourcePackSelection(profileId);
-  log.info(`Reordered ${reordered.length} resource packs for profile ${profileId}`);
+  log.info(`Reordered ${count} resource packs for profile ${profileId}`);
 }

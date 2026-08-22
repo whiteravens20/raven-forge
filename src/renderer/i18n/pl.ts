@@ -118,6 +118,9 @@ export const pl: Translations = {
   'home.running': 'Uruchomiona...',
   'home.preparing': 'Uruchamianie...',
   'home.cancelLaunch': 'Anuluj',
+  'home.stopGame': 'Zatrzymaj grę',
+  'home.stopping': 'Zatrzymywanie…',
+  'home.stopFailed': 'Nie udało się zatrzymać gry.',
   'home.authUnreachable':
     'Nie udało się połączyć z serwerami logowania Microsoft. Możesz zagrać offline — tylko singleplayer i LAN, serwery w trybie online odrzucą połączenie.',
   'home.launchOffline': 'Graj offline',
@@ -127,6 +130,7 @@ export const pl: Translations = {
     'Nie udało się pobrać aktualizacji launchera — gra i tak wystartuje.',
   'home.launchFailed': 'Nie udało się uruchomić gry',
   'launchError.alreadyRunning': 'Ten profil już działa.',
+  'launchError.alreadyPreparing': 'Ten profil jest już przygotowywany do uruchomienia.',
   'launchError.ramTooBig':
     'Ten profil ma przydzielone {allocated} RAM, a ten komputer ma {total}. Minecraft nie wystartuje z większą ilością pamięci, niż fizycznie jest — zmniejsz ją w edytorze profilu, gdzie {recommended} pasuje do tej maszyny.',
   'launchError.javaNotRuntime':
@@ -175,6 +179,12 @@ export const pl: Translations = {
   'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
   'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',
   'profiles.exportPackDone.one': 'Zapisano do {path}. Paczka odsyła do 1 pliku na Modrinth.',
+  // `do` governs the genitive, so `few` and `many` come out identical here.
+  // Two forms that happen to agree, not one form written twice — leaving them
+  // to fall back on `.other` is what a count of three used to do.
+  'profiles.exportPackDone.few': 'Zapisano do {path}. Paczka odsyła do {count} plików na Modrinth.',
+  'profiles.exportPackDone.many':
+    'Zapisano do {path}. Paczka odsyła do {count} plików na Modrinth.',
   'profiles.exportPackDone.other':
     'Zapisano do {path}. Paczka odsyła do {count} plików na Modrinth.',
   'profiles.exportPackBundled.one':
@@ -511,6 +521,9 @@ export const pl: Translations = {
   'settings.announcementFeed': 'Announcement Feed URL',
   'settings.trustedKeysHint':
     'Klucz White Ravens jest wbudowany w launcher, dlatego paczki White Ravens są weryfikowane od pierwszego uruchomienia. Dopóki nie dodasz własnego klucza, launcher pokazuje wynik weryfikacji, ale niczego nie blokuje. Dodanie klucza włącza wymuszanie: instalowane będą wyłącznie podpisane manifesty, które da się zweryfikować.',
+  'settings.allowUnverifiedInstaller': 'Pozwól na niezweryfikowane instalatory loadera',
+  'settings.allowUnverifiedInstallerHint':
+    'Instalator Forge albo NeoForge to program w Javie, który launcher uruchamia. Normalnie jest sprawdzany sumą kontrolną publikowaną przez repozytorium i odrzucany, gdy jej nie ma. Włącz to tylko wtedy, gdy potrzebna starsza wersja żadnej nie publikuje.',
   'settings.trustedKeyBuiltIn': 'Wbudowany w launcher — zawsze zaufany',
   'settings.trustedKeyAdded': 'Dodano: {date}',
   'settings.trustedKeyName': 'Nazwa klucza',
@@ -556,10 +569,9 @@ export const pl: Translations = {
   // ── Progress overlay ─────────────────────────────────────
   'progress.title': 'Postęp instalacji',
   'progress.modSync': 'Synchronizacja modów',
-  'progress.modDownload': 'Pobieranie modów',
   'progress.loaderInstall': 'Instalacja mod loadera',
   'progress.javaDownload': 'Pobieranie Javy',
-  'progress.gameAssets': 'Pobieranie zasobów gry',
+  'progress.gameAssets': 'Pliki gry',
   'progress.launcherUpdate': 'Aktualizacja launchera',
   'progress.files.one': '{done}/{total} plik',
   'progress.files.few': '{done}/{total} pliki',
@@ -570,9 +582,12 @@ export const pl: Translations = {
   'progress.msg.downloading': 'Pobieranie…',
   'progress.msg.checkingFiles': 'Sprawdzanie zainstalowanych plików…',
   'progress.msg.downloadingFile': 'Pobieranie {name}…',
+  'progress.msg.checkingLibraries': 'Sprawdzanie bibliotek Minecraft {version}…',
+  'progress.msg.checkingAssets': 'Sprawdzanie zasobów gry…',
   'progress.msg.downloadComplete': 'Pobieranie zakończone',
-  'progress.msg.libraries': 'Biblioteki Minecraft {version}',
-  'progress.msg.assets': 'Zasoby gry',
+  'progress.msg.gameFilesReady': 'Pliki gry gotowe — nie ma czego pobierać',
+  'progress.msg.libraries': 'Pobieranie bibliotek Minecraft {version}…',
+  'progress.msg.assets': 'Pobieranie zasobów gry…',
   'progress.msg.javaDownloading': 'Pobieranie Javy {version}…',
   'progress.msg.javaReady': 'Pobrano Javę {version}',
   'progress.msg.syncing': 'Synchronizacja {name}…',

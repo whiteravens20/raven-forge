@@ -158,6 +158,19 @@ interface MsTokenResponse {
   expires_in: number;
 }
 
+/**
+ * How long any one step of the sign-in chain may take.
+ *
+ * Every one of these six requests used to go out with no signal at all — the
+ * only fetches in the launcher without one. That is worse than a slow login:
+ * `getMinecraftAccessToken` runs from `runLaunch` immediately before `spawn`, so
+ * an endpoint that accepts a connection and then says nothing left the launch
+ * hanging on its last step, minutes of correct work already done, with nothing
+ * to cancel it. Generous rather than tight — a real sign-in involves the user's
+ * own network and Microsoft's — but finite.
+ */
+const AUTH_TIMEOUT_MS = 30_000;
+
 async function exchangeMsCodeForTokens(code: string, verifier: string): Promise<MsTokenResponse> {
   const body = new URLSearchParams({
     client_id: MS_CLIENT_ID,
@@ -172,6 +185,7 @@ async function exchangeMsCodeForTokens(code: string, verifier: string): Promise<
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
+    signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -193,6 +207,7 @@ async function refreshMsTokens(refreshToken: string): Promise<MsTokenResponse> {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
+    signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -227,6 +242,7 @@ async function authenticateXboxLive(
       RelyingParty: 'http://auth.xboxlive.com',
       TokenType: 'JWT',
     }),
+    signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -257,6 +273,7 @@ async function authenticateXsts(xblToken: string): Promise<string> {
       RelyingParty: 'rp://api.minecraftservices.com/',
       TokenType: 'JWT',
     }),
+    signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -292,6 +309,7 @@ async function authenticateMinecraft(xstsToken: string, userHash: string): Promi
     body: JSON.stringify({
       identityToken: `XBL3.0 x=${userHash};${xstsToken}`,
     }),
+    signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -310,6 +328,7 @@ interface McProfile {
 async function getMinecraftProfile(mcAccessToken: string): Promise<McProfile> {
   const res = await fetch(MC_PROFILE_URL, {
     headers: { Authorization: `Bearer ${mcAccessToken}` },
+    signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
   });
 
   if (!res.ok) {

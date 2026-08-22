@@ -1,5 +1,6 @@
 import { MODRINTH_API_BASE, isClientModLoader } from '../../shared/constants';
 import { modrinthUserAgent } from '../net/user-agent';
+import { isSafeFileName } from '../../shared/manifest-schema';
 import type {
   ContentProjectType,
   FacetGroups,
@@ -91,7 +92,7 @@ export interface ModrinthFile {
   size: number;
 }
 
-export interface ModrinthDependency {
+interface ModrinthDependency {
   version_id: string | null;
   project_id: string | null;
   dependency_type: 'required' | 'optional' | 'incompatible' | 'embedded';
@@ -343,9 +344,25 @@ export async function getProjectTitle(projectId: string): Promise<string> {
   return pending;
 }
 
-/** The file a version is, out of the extras (sources, javadoc) it may also carry. */
+/**
+ * The file a version is, out of the extras (sources, javadoc) it may also carry.
+ *
+ * The name is checked here rather than at each of the three call sites that
+ * turn it into a path (`mods/`, `shaderpacks/`, `resourcepacks/`). A manifest is
+ * held to this rule by `fileNameField` and a local install by `path.basename`;
+ * this was the one route that took a remote API at its word. Modrinth over
+ * HTTPS is a trusted upstream and no live abuse of it is claimed — the point is
+ * that the rule holds everywhere a name becomes a path, not only where an
+ * attacker is currently expected.
+ */
 export function primaryFile(version: ModrinthVersion): ModrinthFile {
   const primary = version.files.find((f) => f.primary) ?? version.files[0];
   if (!primary) throw new Error(`No files found for version ${version.id}`);
+  if (!isSafeFileName(primary.filename)) {
+    throw new Error(
+      `Modrinth version ${version.id} names its file ${JSON.stringify(primary.filename)}, ` +
+        'which is not a plain file name',
+    );
+  }
   return primary;
 }

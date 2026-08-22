@@ -129,6 +129,9 @@ export const en = {
   'home.running': 'Running…',
   'home.preparing': 'Starting…',
   'home.cancelLaunch': 'Cancel',
+  'home.stopGame': 'Stop the game',
+  'home.stopping': 'Stopping…',
+  'home.stopFailed': 'Could not stop the game.',
   'home.authUnreachable':
     'Could not reach the Microsoft sign-in servers. You can play offline — singleplayer and LAN only, and online-mode servers will refuse the connection.',
   'home.launchOffline': 'Play offline',
@@ -138,6 +141,7 @@ export const en = {
     'The launcher update could not be downloaded — the game will start anyway.',
   'home.launchFailed': 'Could not start the game',
   'launchError.alreadyRunning': 'This profile is already running.',
+  'launchError.alreadyPreparing': 'This profile is already being prepared for launch.',
   'launchError.ramTooBig':
     'This profile allocates {allocated} of RAM and this machine has {total}. Minecraft cannot start with more memory than the machine has — lower it in the profile editor, where {recommended} suits this one.',
   'launchError.javaNotRuntime':
@@ -489,6 +493,9 @@ export const en = {
   'settings.announcementFeed': 'Announcement feed URL',
   'settings.trustedKeysHint':
     'The White Ravens key is built into the launcher, which is why White Ravens packs verify on a fresh install. Until you add a key of your own the launcher reports what it verified but blocks nothing. Adding one switches enforcement on: only a signed manifest that verifies is installed.',
+  'settings.allowUnverifiedInstaller': 'Allow unverified loader installers',
+  'settings.allowUnverifiedInstallerHint':
+    'A Forge or NeoForge installer is a Java program the launcher runs. Normally it is checked against the checksum its repository publishes, and refused when there is none. Turn this on only if an older version you need publishes no checksum.',
   'settings.trustedKeyBuiltIn': 'Built into the launcher — always trusted',
   'settings.trustedKeyAdded': 'Added: {date}',
   'settings.trustedKeyName': 'Key name',
@@ -552,10 +559,9 @@ export const en = {
   // ── Progress overlay ─────────────────────────────────────
   'progress.title': 'Install progress',
   'progress.modSync': 'Syncing mods',
-  'progress.modDownload': 'Downloading mods',
   'progress.loaderInstall': 'Installing mod loader',
   'progress.javaDownload': 'Downloading Java',
-  'progress.gameAssets': 'Downloading game assets',
+  'progress.gameAssets': 'Game files',
   'progress.launcherUpdate': 'Updating the launcher',
   'progress.files.one': '{done}/{total} file',
   'progress.files.other': '{done}/{total} files',
@@ -566,9 +572,16 @@ export const en = {
   // says which one it is counting.
   'progress.msg.checkingFiles': 'Checking the installed files…',
   'progress.msg.downloadingFile': 'Downloading {name}…',
+  // Checking is its own phase and gets its own wording. On a launch with the
+  // game fully installed it is the only phase there is, and calling it a
+  // download made the launcher look like it was re-fetching Minecraft every
+  // time somebody pressed Play.
+  'progress.msg.checkingLibraries': 'Checking the Minecraft {version} libraries…',
+  'progress.msg.checkingAssets': 'Checking the game assets…',
   'progress.msg.downloadComplete': 'Download complete',
-  'progress.msg.libraries': 'Minecraft libraries {version}',
-  'progress.msg.assets': 'Game assets',
+  'progress.msg.gameFilesReady': 'Game files ready — nothing to download',
+  'progress.msg.libraries': 'Downloading the Minecraft {version} libraries…',
+  'progress.msg.assets': 'Downloading the game assets…',
   'progress.msg.javaDownloading': 'Downloading Java {version}…',
   'progress.msg.javaReady': 'Java {version} downloaded',
   'progress.msg.syncing': 'Syncing {name}…',

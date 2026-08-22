@@ -10,6 +10,45 @@ import { initUpdater, checkForUpdates } from '../core/updater/launcher-updater';
 import { checkAllProfilesForPackUpdates } from '../core/mods/mod-sync';
 
 /**
+ * Catch what nothing else was going to catch.
+ *
+ * Without these, an exception thrown from an event handler — rather than from
+ * inside an `await` chain somebody wrapped — ends the main process on the spot:
+ * no log line, no crash report, the window simply gone. The launcher writes a
+ * careful crash report when *Minecraft* dies and had nothing at all to say about
+ * its own death.
+ *
+ * Logged and survived rather than logged and quit. Node's default is to exit,
+ * and that default suits a server, where a process in an unknown state should be
+ * replaced by a fresh one. Here there is nothing to replace it with and no
+ * supervisor to do it: the realistic faults are a write that failed on a full
+ * disk or a socket that answered with nonsense, and the honest response to those
+ * is to say so in the log and let the player keep the window they had. The log
+ * is the record; a fault that has genuinely broken the process will show up
+ * again immediately and be recorded again.
+ */
+function registerCrashHandlers(): void {
+  process.on('uncaughtException', (err) => {
+    log.error('Uncaught exception in the main process:', err);
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    log.error('Unhandled promise rejection in the main process:', reason);
+  });
+
+  app.on('render-process-gone', (_event, _contents, details) => {
+    log.error(`Renderer process gone: ${details.reason} (exit code ${details.exitCode})`);
+  });
+
+  app.on('child-process-gone', (_event, details) => {
+    log.error(
+      `Child process gone: ${details.type} ${details.name ?? ''} — ${details.reason} ` +
+        `(exit code ${details.exitCode})`,
+    );
+  });
+}
+
+/**
  * Everything the app does once it knows it is the only copy running.
  *
  * Behind the lock rather than beside it: `app.quit()` on the losing process
@@ -33,6 +72,10 @@ function registerAppLifecycle(): void {
 
   app.whenReady().then(async () => {
     initLogger();
+
+    // After the logger and before anything that can throw: these exist to write
+    // to the log, so registering them earlier would only lose what they caught.
+    registerCrashHandlers();
 
     // The window is opened before any of the setup below it. None of that setup
     // is slow — six mkdirs and a settings file — but all of it used to run with

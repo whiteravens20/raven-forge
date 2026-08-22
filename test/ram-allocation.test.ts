@@ -1,4 +1,6 @@
+import os from 'node:os';
 import { describe, it, expect } from 'vitest';
+import { machineMemoryMb } from '../src/core/util/machine-memory';
 import { DEFAULT_RAM_MB, MAX_RAM_MB, MIN_RAM_MB, RAM_STEP_MB } from '../src/shared/constants';
 import { formatRamGb, ramAdvice, recommendedRamMb, safeMaxRamMb } from '../src/shared/memory';
 
@@ -110,5 +112,26 @@ describe('formatRamGb', () => {
     expect(formatRamGb(1536)).toBe('1.5 GB');
     // Above ten the decimal is noise, and this is where machine totals land.
     expect(formatRamGb(16270)).toBe('16 GB');
+  });
+});
+
+describe('machineMemoryMb', () => {
+  it('answers in megabytes, which is the unit everything above it assumes', () => {
+    // The one thing worth pinning about a `totalmem() / 1024 / 1024`: every
+    // consumer — the slider bounds, the advice, the launch refusal — reads this
+    // as MB, and a division dropped in a refactor turns a 16 GB machine into a
+    // 16-million-megabyte one that agrees with every bound it is checked against.
+    const mb = machineMemoryMb();
+    expect(Number.isInteger(mb)).toBe(true);
+    expect(mb).toBeGreaterThan(256);
+    expect(mb).toBeLessThan(os.totalmem() / 1000);
+  });
+
+  it('produces a ceiling this machine could actually honour', () => {
+    // The composition the RAM slider is: measure, then decide what to offer.
+    const max = safeMaxRamMb(machineMemoryMb());
+    expect(max).toBeGreaterThanOrEqual(MIN_RAM_MB);
+    expect(max).toBeLessThan(machineMemoryMb());
+    expect(max % RAM_STEP_MB).toBe(0);
   });
 });

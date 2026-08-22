@@ -8,7 +8,7 @@ import type { ReactElement, CSSProperties } from 'react';
  * loop seamless: cell appearance is a function of screen-diagonal
  * coordinates (u = i-j, v = i+j) looked up in fixed tables of size
  * U_PERIOD × V_PERIOD. One flight step shifts v by 2, so after
- * V_PERIOD/2 steps — `FLIGHT_PERIOD_PX` on screen — every cell lands
+ * V_PERIOD/2 steps — V_PERIOD × HH pixels on screen — every cell lands
  * exactly where an identical one started, and the animation can snap
  * back with no visible cut. Randomising instead of seeding would break
  * this and also make screenshots unreproducible.
@@ -24,9 +24,6 @@ const VZ = 34; // screen rise per height unit
 
 const U_PERIOD = 26; // horizontal repeat: 26 * HW = 1664px
 const V_PERIOD = 20; // scroll repeat: 20 * HH = 640px
-
-/** One full loop of the flight animation, in screen px. */
-export const FLIGHT_PERIOD_PX = V_PERIOD * HH;
 
 const X_CENTER = 960;
 const U_MIN = -17;

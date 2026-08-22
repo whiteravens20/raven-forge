@@ -70,11 +70,20 @@ download.
   [`docs/MANIFEST-SCHEMA.md`](docs/MANIFEST-SCHEMA.md).
 - Signature verification is only as strong as the key distribution. A profile
   with no `publicKey` configured gets no signature guarantee at all, only hashes.
-- The places where a wrong answer is silent rather than loud carry unit tests in
+- The places where a wrong answer is silent rather than loud carry tests in
   `test/` — hash selection and comparison, canonicalization, launch-argument
-  assembly, offline UUID derivation. The canonicalization suite exists because
-  of a real bug of exactly that shape: nested objects serialized as `{}`, so a
-  manifest whose every mod had been swapped for a different jar still verified.
+  assembly, offline UUID derivation, and every refusal that has to hold: a path
+  that leaves its directory, a downloaded file whose hash is not the published
+  one, a Java runtime the download server quoted no checksum for, a profile
+  export carrying `javaArgs`, an IPC call from a frame that is not the
+  launcher's own page. The canonicalization suite exists because of a real bug
+  of exactly that shape: nested objects serialized as `{}`, so a manifest whose
+  every mod had been swapped for a different jar still verified.
+- **The managed JRE is verified before it is unpacked.** It is executed on every
+  launch from that point on, so `test/java-manager.test.ts` runs the install path
+  against a real archive over a real socket and asserts the three refusals that
+  matter: a hash that does not match, a download the API quoted no checksum for
+  at all, and a runtime that unpacked but does not start.
 
 ### Credentials
 
@@ -82,10 +91,15 @@ download.
   keychain** via `keytar` (service `com.ravenforge.launcher`) — libsecret on
   Linux, Credential Manager on Windows, Keychain on macOS.
 - `auth.json` holds only account identifiers, the active account id, and each
-  session's expiry. No secret material.
+  session's expiry. No secret material. A login made by a pre-keychain build is
+  migrated into the keychain the first time a build with one reads the file, and
+  anything the keychain refuses stays where it is — a failed migration is not a
+  lost login. Both halves are covered in `test/token-store.test.ts`.
 - Where no keyring is available (a headless Linux box, for instance), the
   launcher degrades to a `0600` `auth.json` rather than refusing to log in. That
-  is a deliberate, documented trade-off, not an oversight.
+  is a deliberate, documented trade-off, not an oversight — and it is surfaced in
+  the app rather than only logged, because the person whose refresh token is in a
+  plaintext file is the one who gets to decide whether that is acceptable.
 - **No credential ever leaves the machine** except to Microsoft's and Mojang's own
   endpoints as part of the OAuth chain.
 

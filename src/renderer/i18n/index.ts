@@ -34,9 +34,9 @@ export const LOCALE_NAMES: Record<Locale, string> = {
  * `en.ts` is a translation of one; falling back to English would change the
  * language of the app for anyone who never touched the setting.
  */
-export const DEFAULT_LOCALE: Locale = 'pl';
+const DEFAULT_LOCALE: Locale = 'pl';
 
-export function isLocale(value: unknown): value is Locale {
+function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && value in LOCALES;
 }
 

@@ -4,7 +4,7 @@ import { paths } from '../config/paths';
 import { acceptedLoaders } from '../../shared/constants';
 import { getProfile } from '../profiles/profile-manager';
 import { hashFile } from './integrity';
-import { readLockFile, writeLockFile, modFilePath } from './lock-file';
+import { readLockFile, mutateLockFile, modFilePath } from './lock-file';
 import { getProjectTitle, getVersion, latestVersionsByHash, primaryFile } from './modrinth-api';
 import { downloadFor, installResolvedMod, installRequiredDependencies } from './mod-sync';
 import type { InstalledMod, ModUpdateResult, ModUpdateSummary } from '../../shared/ipc-types';
@@ -51,15 +51,9 @@ export async function checkModUpdates(profileId: string): Promise<ModUpdateSumma
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
 
-  const mods = await readLockFile(profileId);
-  // Cleared up front rather than only where a newer build turns up: a mod that
-  // has since been updated by hand, disabled, or adopted by a manifest would
-  // otherwise keep offering an update that no longer exists.
-  for (const mod of mods) delete mod.updateAvailable;
-
   const modsDir = paths.profileModsDir(profileId);
   const byHash = new Map<string, InstalledMod>();
-  for (const [mod, file] of updatable(mods, modsDir)) {
+  for (const [mod, file] of updatable(await readLockFile(profileId), modsDir)) {
     try {
       byHash.set(await hashFile(file, 'sha512'), mod);
     } catch {
@@ -75,7 +69,11 @@ export async function checkModUpdates(profileId: string): Promise<ModUpdateSumma
     [profile.minecraftVersion],
   );
 
-  let updates = 0;
+  // What the check concluded, keyed by mod id — the hashing and the round trip
+  // above take long enough that the lock file has to be read again before any
+  // of it is written down, and the entries read at the top of this function are
+  // no longer the objects that will be saved.
+  const found = new Map<string, InstalledMod['updateAvailable']>();
   for (const [hash, mod] of byHash) {
     const newest = latest.get(hash);
     // The reply is the newest build that fits the profile, which is usually the
@@ -83,15 +81,31 @@ export async function checkModUpdates(profileId: string): Promise<ModUpdateSumma
     // turning up in the answer means there is nothing to do.
     if (!newest || newest.files.some((f) => f.hashes.sha512 === hash)) continue;
 
-    mod.updateAvailable = {
+    found.set(mod.id, {
       versionId: newest.id,
       versionNumber: newest.version_number || newest.id,
       projectId: newest.project_id,
-    };
-    updates++;
+    });
   }
 
-  await writeLockFile(profileId, mods);
+  const updates = await mutateLockFile(profileId, (mods) => {
+    let applied = 0;
+    for (const mod of mods) {
+      // Cleared for every mod rather than only where a newer build turns up: one
+      // that has since been updated by hand, disabled, or adopted by a manifest
+      // would otherwise keep offering an update that no longer exists.
+      delete mod.updateAvailable;
+      const update = found.get(mod.id);
+      // Only for a mod the launcher may still move. One that became a
+      // manifest's or was switched off while the check was running is not
+      // offered an update it would refuse to install.
+      if (!update || mod.fromManifest || !mod.enabled) continue;
+      mod.updateAvailable = update;
+      applied++;
+    }
+    return applied;
+  });
+
   log.info(
     `Update check for profile ${profileId}: ${updates} of ${byHash.size} mods have a newer build`,
   );

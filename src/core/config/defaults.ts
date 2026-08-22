@@ -22,4 +22,5 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   showLiveConsole: false,
   discordRichPresence: false,
   offlineMode: false,
+  allowUnverifiedLoaderInstaller: false,
 };

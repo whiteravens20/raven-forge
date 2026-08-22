@@ -49,7 +49,7 @@ export function assertSecureContentUrl(value: string): void {
   }
 }
 
-export const trustedKeySchema = z.object({
+const trustedKeySchema = z.object({
   name: z.string().min(1),
   publicKey: z.string().min(1),
   addedAt: z.string(),
@@ -118,6 +118,17 @@ export const globalSettingsSchema = z.object({
    * A single launch can override this either way.
    */
   offlineMode: z.boolean().default(false),
+  /**
+   * Whether a loader installer with no published checksum may still be run.
+   *
+   * Off, because the launcher already refuses an unverifiable JRE for exactly
+   * this reason and the Forge installer is the same kind of artefact: a jar this
+   * process executes. Maven publishes `.sha1`/`.sha256` sidecars beside almost
+   * everything, so the case this covers is a genuinely old artefact whose
+   * repository never wrote one — rare, real, and the player's call rather than
+   * a silent log line.
+   */
+  allowUnverifiedLoaderInstaller: z.boolean().default(false),
 });
 
 export const profileSchema = z.object({
@@ -135,7 +146,13 @@ export const profileSchema = z.object({
     message: 'minecraftVersion must be a plain version id',
   }),
   modLoader: z.enum(['vanilla', 'forge', 'neoforge', 'fabric', 'quilt']),
-  modLoaderVersion: z.string().optional(),
+  // The same rule, for the same reason: this one becomes a directory under
+  // `loaders/<loader>/` and part of the loader profile's file name, and that
+  // file is read back as the version metadata the game is launched from.
+  modLoaderVersion: z
+    .string()
+    .refine(isSafeFileName, { message: 'modLoaderVersion must be a plain version id' })
+    .optional(),
   manifestUrl: z.string().url().optional(),
   serverIp: z.string().optional(),
   serverPort: z.number().min(1).max(65535).optional(),

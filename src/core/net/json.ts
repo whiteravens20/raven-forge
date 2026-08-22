@@ -10,7 +10,7 @@
  */
 
 /** Short lists of references. None of these documents is a large file. */
-export const MAX_REMOTE_JSON_BYTES = 8 * 1024 * 1024;
+const MAX_REMOTE_JSON_BYTES = 8 * 1024 * 1024;
 
 export async function readJsonCapped(
   res: Response,

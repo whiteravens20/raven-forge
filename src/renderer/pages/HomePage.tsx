@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, RefreshCw, Terminal, Gamepad2, X } from 'lucide-react';
+import { Play, RefreshCw, Terminal, Gamepad2, X, Square } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { useAuthStore } from '@stores/auth-store';
 import { useNewsStore } from '@stores/news-store';
@@ -59,6 +59,7 @@ export function HomePage() {
   );
 
   const [launchError, setLaunchError] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
   /** The news item or announcement currently open in the reader. */
   const [reading, setReading] = useState<Article | null>(null);
   /** Set when a launch failed only because the auth servers could not be reached. */
@@ -137,6 +138,27 @@ export function HomePage() {
     // Main resolves the launch call quietly after aborting; clear the button
     // here too so it frees up even if that resolution is slow.
     endPreparing(selectedId);
+  };
+
+  /**
+   * Stop a game that is already up.
+   *
+   * `killGame` — SIGTERM, then SIGKILL after ten seconds, and it does not report
+   * success until the process has actually gone — has been complete since the
+   * launcher could start a game, and nothing called it: a Minecraft that hung on
+   * its splash screen could only be dealt with from outside the launcher. The
+   * running state is not cleared here; the process's own `exit` handler sends
+   * `game:exited`, which is the one event that means it really stopped.
+   */
+  const handleStop = async () => {
+    if (!selectedId) return;
+    setStopping(true);
+    try {
+      const result = await api.game.kill(selectedId);
+      if (!result.success) setLaunchError(result.error ?? t('home.stopFailed'));
+    } finally {
+      setStopping(false);
+    }
   };
 
   // One banner at a time, in feed order — the publisher decides what is most
@@ -284,6 +306,20 @@ export function HomePage() {
         {preparingNow && (
           <Button variant="ghost" size="sm" icon={<X size={14} />} onClick={handleCancel}>
             {t('home.cancelLaunch')}
+          </Button>
+        )}
+
+        {/* And once it is up, the other half of the same offer. */}
+        {runningNow && !preparingNow && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Square size={14} />}
+            loading={stopping}
+            disabled={stopping}
+            onClick={() => void handleStop()}
+          >
+            {stopping ? t('home.stopping') : t('home.stopGame')}
           </Button>
         )}
 

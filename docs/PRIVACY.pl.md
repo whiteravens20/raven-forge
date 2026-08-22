@@ -295,7 +295,9 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 ## Usuwanie wszystkiego
 
 - **Jedno konto:** „Wyloguj” na stronie Konta usuwa je z `auth.json` i kasuje
-  jego wpisy w magazynie poświadczeń.
+  jego wpisy w magazynie poświadczeń. Wylogowanie z konta Microsoft czyści też
+  ciasteczka okna logowania, więc następne logowanie zaczyna się od pustej
+  strony, a nie od rozpoznania Ciebie.
 - **Wszystkie dane launchera:** zamknij launcher i usuń wymieniony wyżej folder
   danych. Poza nim nie zostaje nic oprócz wpisów w magazynie poświadczeń
   systemu, które znikają, jeśli najpierw się wylogujesz.

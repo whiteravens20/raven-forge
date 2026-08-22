@@ -183,16 +183,25 @@ export function ProfilesPage() {
       setVerification(null);
       return;
     }
+    // The guard every other effect on this page has, and this one did not.
+    // `manifest.verify` goes to the network, so switching profiles while it is
+    // in flight used to land profile A's sync state and signature badge on the
+    // screen showing profile B — and a signature badge is the one thing here
+    // that must never be about a different pack than the one being read.
+    let cancelled = false;
     void api.profiles.getSyncStatus(selectedId).then((r) => {
-      if (r.success && r.data) setSyncStatus(r.data);
+      if (!cancelled && r.success && r.data) setSyncStatus(r.data);
     });
     if (selectedProfile?.manifestUrl) {
       void api.manifest.verify(selectedId).then((r) => {
-        if (r.success && r.data) setVerification(r.data);
+        if (!cancelled && r.success && r.data) setVerification(r.data);
       });
     } else {
       setVerification(null);
     }
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId, selectedProfile?.manifestUrl]);
 
   // The startup pack check lands after this page is already on screen, so the

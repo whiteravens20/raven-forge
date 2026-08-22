@@ -165,7 +165,7 @@ The format and the canonicalization rules are specified in
 
 - **The canonical form must stay byte-identical on both sides.**
   `scripts/lib/canonical.mjs` in `raven-packs` and `canonicalize()` in
-  [`src/core/updater/manifest-verify.ts`](../src/core/updater/manifest-verify.ts)
+  [`src/core/updater/canonical.ts`](../src/core/updater/canonical.ts)
   are the same algorithm written twice. If one changes, both change, in the same
   pull request.
 - **Key sorting recurses.** A shallow sort produces a signature that covers only

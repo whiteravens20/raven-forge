@@ -42,6 +42,7 @@ export type IpcErrorCode = 'AUTH_UNREACHABLE';
  */
 export type ErrorKey =
   | 'launchError.alreadyRunning'
+  | 'launchError.alreadyPreparing'
   | 'launchError.ramTooBig'
   | 'launchError.javaNotRuntime'
   | 'launchError.javaTooOld';
@@ -68,7 +69,10 @@ export type ProgressKey =
   | 'progress.msg.downloading'
   | 'progress.msg.downloadingFile'
   | 'progress.msg.checkingFiles'
+  | 'progress.msg.checkingLibraries'
+  | 'progress.msg.checkingAssets'
   | 'progress.msg.downloadComplete'
+  | 'progress.msg.gameFilesReady'
   | 'progress.msg.libraries'
   | 'progress.msg.assets'
   | 'progress.msg.javaDownloading'

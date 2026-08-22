@@ -19,7 +19,6 @@ const api: RavenForgeAPI = {
   },
   profiles: {
     getAll: () => ipcRenderer.invoke('profiles:get-all'),
-    get: (profileId) => ipcRenderer.invoke('profiles:get', profileId),
     create: (profile) => ipcRenderer.invoke('profiles:create', profile),
     update: (profileId, updates) => ipcRenderer.invoke('profiles:update', profileId, updates),
     delete: (profileId, deleteFiles) =>
@@ -58,8 +57,6 @@ const api: RavenForgeAPI = {
     installFromSearch: (profileId, mod, version) =>
       ipcRenderer.invoke('mods:install-from-search', profileId, mod, version),
     checkInstall: (profileId, mod) => ipcRenderer.invoke('mods:check-install', profileId, mod),
-    installFromFile: (profileId, filePath) =>
-      ipcRenderer.invoke('mods:install-from-file', profileId, filePath),
     uninstall: (profileId, modId) => ipcRenderer.invoke('mods:uninstall', profileId, modId),
     toggleEnabled: (profileId, modId, enabled) =>
       ipcRenderer.invoke('mods:toggle-enabled', profileId, modId, enabled),
@@ -92,17 +89,12 @@ const api: RavenForgeAPI = {
       ipcRenderer.invoke('java:probe', binPath, minecraftVersion),
   },
   loaders: {
-    install: (loader, loaderVersion, mcVersion) =>
-      ipcRenderer.invoke('loaders:install', loader, loaderVersion, mcVersion),
     getVersions: (loader, mcVersion) =>
       ipcRenderer.invoke('loaders:get-versions', loader, mcVersion),
-    isInstalled: (loader, loaderVersion, mcVersion) =>
-      ipcRenderer.invoke('loaders:is-installed', loader, loaderVersion, mcVersion),
   },
   game: {
     launch: (options) => ipcRenderer.invoke('game:launch', options),
     kill: (profileId) => ipcRenderer.invoke('game:kill', profileId),
-    isRunning: (profileId) => ipcRenderer.invoke('game:is-running', profileId),
     getLogTail: (profileId, lines) => ipcRenderer.invoke('game:get-log-tail', profileId, lines),
     getVersions: (includeSnapshots) => ipcRenderer.invoke('game:get-versions', includeSnapshots),
     cancel: (profileId) => ipcRenderer.invoke('game:cancel', profileId),
@@ -125,7 +117,6 @@ const api: RavenForgeAPI = {
   announcements: {
     get: () => ipcRenderer.invoke('announcements:get'),
     refresh: () => ipcRenderer.invoke('announcements:refresh'),
-    dismiss: (id) => ipcRenderer.invoke('announcements:dismiss', id),
   },
   manifest: {
     verify: (profileId) => ipcRenderer.invoke('manifest:verify', profileId),

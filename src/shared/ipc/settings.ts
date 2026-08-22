@@ -22,6 +22,11 @@ export interface GlobalSettings {
   discordRichPresence: boolean;
   /** Never contact auth servers; launch offline. Singleplayer and LAN only. */
   offlineMode: boolean;
+  /**
+   * Install a Forge/NeoForge loader whose repository publishes no checksum
+   * beside the installer jar. Off by default: that jar is executed.
+   */
+  allowUnverifiedLoaderInstaller: boolean;
 }
 
 export interface TrustedKey {

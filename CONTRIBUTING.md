@@ -105,7 +105,7 @@ src/
   preload/       # the ONLY bridge between main and renderer
   renderer/      # React UI — pages/, components/, stores/ (zustand), i18n/, styles/
   shared/        # types and Zod schemas used on both sides of the bridge
-test/            # Vitest suites + Electron/keytar stubs
+test/            # Vitest suites + Electron/keytar stubs (linted and typechecked like src/)
 ```
 
 Two boundaries worth respecting:
@@ -175,20 +175,55 @@ UI strings live in `src/renderer/i18n/`. Polish (`pl.ts`) is the reference local
 Five gates run in CI ([`build.yml`](.github/workflows/build.yml)) and must pass locally first:
 
 ```bash
-npm run lint         # zero errors
-npm run typecheck    # main + renderer projects, zero errors
+npm run lint         # src/ and test/, zero errors
+npm run typecheck    # main, renderer and test projects, zero errors
 npm test             # vitest, test/**/*.test.ts
 npm run format:check # prettier
 npm run build        # must produce a clean dist/
 ```
 
-Tests live in `test/` and run under Vitest in a plain Node environment —
-Electron and `keytar` are aliased to stubs (`test/stubs/electron.ts`), so the
-suite covers pure logic only: launch-argument assembly, hash selection, manifest
-canonicalization, offline UUIDs, version merging, feed parsing, loader
-compatibility. Anything that talks to the network, the keychain or a child
-process is deliberately out of scope. Add a test with your change when the logic
-is the kind that can be wrong quietly.
+Tests live in `test/` and run under Vitest in a plain Node environment. Electron
+and `keytar` are aliased to stubs (`test/stubs/electron.ts`), so anything needing
+a window or a keyring daemon is faked at that seam — and everything below the
+seam is the real code. The suite is held to the same standard as what it checks:
+`eslint` and `tsc` (`tsconfig.test.json`) both cover `test/`, and a `.only` left
+in a file fails the lint rather than quietly switching off everything around it.
+Five kinds of suite:
+
+- **Pure logic.** Launch-argument assembly, hash selection, manifest
+  canonicalization, offline UUIDs, version merging, feed parsing, loader
+  compatibility, contrast ratios.
+- **Real filesystem.** Every state file and everything that writes one, under a
+  temporary data root named by `RAVENFORGE_DATA_DIR`: `profiles.json`,
+  `settings.json`, `auth.json`, `installed.lock`, the shader and resource-pack
+  indexes, profile icons, loader profiles, and path containment. Concurrency is
+  exercised rather than assumed — several of these fire overlapping writes and
+  assert that neither one is lost.
+- **Real sockets.** A `node:http` server on an ephemeral port stands in for
+  Mojang, Modrinth, Adoptium and a pack host, so the download policy, the size
+  caps and the hash refusals are tested against an actual response instead of a
+  mock of one.
+- **Real subprocesses.** `tar` unpacks a JRE archive the suite built a moment
+  earlier, `unzip -t` reads back an exported `.mrpack`, and a shell script that
+  prints a version banner stands in for a JVM — enough for `java-manager.ts` to
+  be tested end to end on a machine with no Java on it at all.
+- **Contracts between two files.** Things the type system cannot state and
+  nothing else would notice: that every channel the preload can invoke has a
+  handler registered for it, that every message key the main process names
+  exists in both dictionaries with the variables it was handed, and that the
+  build-time ID injector still finds the literal it rewrites.
+
+Out of scope is what needs a real JVM, a real Microsoft account or a published
+release: launching the game, the OAuth chain end to end, and self-update. Those
+are verified by hand, and
+[ARCHITECTURE.md](docs/ARCHITECTURE.md#open-implementation-gaps) records what was
+proven that way and when.
+
+Add a test with your change when the logic is the kind that can be wrong
+quietly. A rule of thumb from this codebase: nearly everything that has cost a
+user something — a wiped `settings.json`, a launch that silently ran vanilla, a
+progress bar reading "downloading" while it was hashing — failed with no
+exception attached to it.
 
 **And then actually run it.** A change that typechecks is not a change that works:
 
@@ -211,7 +246,7 @@ State in the PR description what you actually ran. "Typechecks" is not a test re
 ### Integrity
 
 - **Do not relax hash verification.** A file whose hash does not match is deleted, not installed. There is no "continue anyway" path and there should not be one.
-- The manifest canonicalization in `manifest-verify.ts` must stay **byte-identical** to `scripts/lib/canonical.mjs` in the `raven-packs` repository. Any divergence silently breaks every signature. If you change one, change both in the same PR and say so.
+- The manifest canonicalization in `src/core/updater/canonical.ts` must stay **byte-identical** to `scripts/lib/canonical.mjs` in the `raven-packs` repository. Any divergence silently breaks every signature. If you change one, change both in the same PR and say so.
 - Treat everything in a manifest as attacker-controlled input: file names become paths, URLs become requests. Validate before use.
 
 ### Process boundary
