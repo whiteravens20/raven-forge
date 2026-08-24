@@ -5,6 +5,7 @@ import { en, type PluralKey, type TranslationKey, type Translations } from './en
 import { pl } from './pl';
 
 export type { TranslationKey, Translations, PluralKey, Locale };
+export { localized } from './localized';
 
 /**
  * Deliberately not an i18n library.
