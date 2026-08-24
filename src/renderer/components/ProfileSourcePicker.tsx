@@ -4,7 +4,7 @@ import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
-import { useT } from '@renderer/i18n';
+import { localized, useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import type { CataloguePack } from '@shared/ipc-types';
 
@@ -31,6 +31,7 @@ type Route = 'choose' | 'white-ravens' | 'import';
  */
 export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const t = useT();
+  const locale = useLocale();
   const [route, setRoute] = useState<Route>('choose');
   const [packs, setPacks] = useState<CataloguePack[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -190,7 +191,9 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                       {pack.name}{' '}
                       <span className="font-normal text-rf-text-muted">{pack.version}</span>
                     </p>
-                    <p className="text-xs text-rf-text-muted">{pack.summary}</p>
+                    <p className="text-xs text-rf-text-muted">
+                      {localized(pack.summaryI18n, locale, pack.summary)}
+                    </p>
                     <p className="mt-0.5 text-xs text-rf-text-muted">
                       MC {pack.minecraftVersion} • {loaderLabel(pack.modLoader)} •{' '}
                       {t.plural('packs.mods', pack.modCount)}

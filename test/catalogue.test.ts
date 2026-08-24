@@ -61,6 +61,45 @@ describe('listCataloguePacks', () => {
     });
   });
 
+  it('carries the summary map through for the picker to choose from', async () => {
+    respondWith({
+      indexVersion: 1,
+      packs: [
+        entry({
+          summary: 'Klasyczny Minecraft.',
+          summaryI18n: { pl: 'Klasyczny Minecraft.', en: 'Classic Minecraft.' },
+        }),
+      ],
+    });
+
+    const [pack] = await listCataloguePacks();
+    expect(pack.summaryI18n).toEqual({ pl: 'Klasyczny Minecraft.', en: 'Classic Minecraft.' });
+    // The flat field survives beside it: it is what the picker falls back to.
+    expect(pack.summary).toBe('Klasyczny Minecraft.');
+  });
+
+  it('reads a catalogue published before the summary map existed', async () => {
+    respondWith({ indexVersion: 1, packs: [entry({ summary: 'Classic Minecraft.' })] });
+
+    const [pack] = await listCataloguePacks();
+    expect(pack.summary).toBe('Classic Minecraft.');
+    expect(pack.summaryI18n).toBeUndefined();
+  });
+
+  it('rejects a catalogue that puts the map in `summary` itself', async () => {
+    // This is the reason raven-packs publishes two fields instead of changing
+    // the shape of one. A launcher already installed parses `summary` as a
+    // string, and an object there does not degrade to a missing description —
+    // it fails the whole catalogue and empties the pack list. Asserting it here
+    // keeps the constraint visible from this side of the contract too.
+    respondWith({
+      indexVersion: 1,
+      packs: [entry({ summary: { pl: 'Klasyczny Minecraft.', en: 'Classic Minecraft.' } })],
+    });
+
+    await expect(listCataloguePacks()).rejects.toThrow(/malformed/);
+  });
+
   it('drops packs with no manifest URL rather than offering a dead button', async () => {
     // raven-packs writes null URLs when it is built without PACK_BASE_URL. A
     // profile created from one would fail on its first sync, so it never gets

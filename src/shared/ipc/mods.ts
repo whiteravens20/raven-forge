@@ -133,7 +133,13 @@ export interface CataloguePack {
   slug: string;
   name: string;
   version: string;
+  /** One language, already flattened — what a catalogue without a map carries. */
   summary: string;
+  /**
+   * The summary in every language the pack published it in, when it published
+   * more than one. Absent from older catalogues, which is why `summary` stays.
+   */
+  summaryI18n?: Record<string, string>;
   minecraftVersion: string;
   modLoader: string;
   recommendedRamMb?: number;

@@ -24,6 +24,12 @@ const catalogueSchema = z.object({
       name: z.string().min(1),
       version: z.string(),
       summary: z.string().default(''),
+      // Optional, and `summary` stays required-with-a-default beside it. The
+      // two exist together because this schema rejects the whole catalogue on
+      // a field of the wrong type — a published map where a string was would
+      // empty the pack list for every launcher already installed, so the flat
+      // field is the one that can never change shape.
+      summaryI18n: z.record(z.string(), z.string()).optional(),
       minecraft: z.string().min(1),
       loader: z.object({ type: z.string(), version: z.string().optional() }),
       recommendedRamMb: z.number().optional(),
@@ -69,6 +75,7 @@ export async function listCataloguePacks(): Promise<CataloguePack[]> {
     name: pack.name,
     version: pack.version,
     summary: pack.summary,
+    summaryI18n: pack.summaryI18n,
     minecraftVersion: pack.minecraft,
     modLoader: pack.loader.type,
     recommendedRamMb: pack.recommendedRamMb,
