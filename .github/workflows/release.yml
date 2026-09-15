@@ -10,6 +10,7 @@
 #   latest.yml / latest-linux.yml + .blockmap   electron-updater feeds
 #   SHA256SUMS.txt                         checksums over every artefact
 #   sbom.cdx.json                          CycloneDX SBOM of the shipped deps
+#   Raven-Forge-Launcher-<ver>.sigstore.json   provenance attestation bundle
 #
 # The release is created as a DRAFT. electron-updater ignores drafts, so nothing
 # reaches users until the draft is published by hand — which is the point: check
@@ -311,12 +312,19 @@ jobs:
       # this workflow, at this commit. Verify with:
       #   gh attestation verify <file> --repo whiteravens20/raven-forge
       - name: Attest build provenance
+        id: attest
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             artifacts/*.exe
             artifacts/*.deb
             artifacts/*.AppImage
+
+      # The same attestation as a release asset, so it travels with the installers.
+      - name: Keep the attestation bundle
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" "artifacts/Raven-Forge-Launcher-${GITHUB_REF_NAME#v}.sigstore.json"
 
       - name: Extract tag message
         id: tag-msg
@@ -346,6 +354,7 @@ jobs:
             artifacts/*.yml
             artifacts/SHA256SUMS.txt
             artifacts/sbom.cdx.json
+            artifacts/*.sigstore.json
           body: |
             ${{ steps.tag-msg.outputs.message }}
 
@@ -403,6 +412,8 @@ jobs:
             sha256sum -c SHA256SUMS.txt --ignore-missing
             gh attestation verify <file> --repo ${{ github.repository }}
             ```
+
+            The `.sigstore.json` file is the same attestation as a file, for `gh attestation verify --bundle`.
 
             `sbom.cdx.json` lists every production dependency inside the installer.
 
