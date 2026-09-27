@@ -319,9 +319,10 @@ and when.
 
 ## Open implementation gaps
 
-Last checked against the code on **2026-08-20**. Keep it that way — a stale gap
-list is worse than none, because it sends people looking for problems that were
-fixed and hides the ones that were not.
+Last checked against the code on **2026-08-20**, and the self-update entry on
+**2026-09-27**. Keep it that way — a stale gap list is worse than none, because
+it sends people looking for problems that were fixed and hides the ones that
+were not.
 
 - **Microsoft login is proven against an approved Azure app.** The OAuth → Xbox
   Live → Minecraft JWT chain has signed a real account in on Windows and come
@@ -341,9 +342,10 @@ fixed and hides the ones that were not.
   from a rejection, the renderer offered offline play, and accepting the offer
   took the `offline && type === 'microsoft'` branch and launched the game with
   the `0` token sentinel.
-- **The launcher has never updated itself from a published release.** The update
-  check, platform matrix and install-before-play path are covered by tests, but
-  there is no tagged release to update _from_.
+- **Self-update is proven on Windows only.** An installed release has updated
+  itself to the next one through the published feed. The AppImage takes the same
+  path but nobody has exercised it yet, and a `.deb` install leaves updates to
+  the package manager on purpose.
 - **Crash reports are now proven against a real exit.** A Windows 26.2/Fabric
   session produced one end to end: `readMinecraftCrash` found Mojang's own file,
   quoted it, and the redaction replaced the token, the account UUID, the player
