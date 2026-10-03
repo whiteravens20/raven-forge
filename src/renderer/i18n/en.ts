@@ -620,6 +620,8 @@ export const en = {
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Secret of the forge',
   'about.privacy': 'Privacy',
+  'about.legal':
+    'Free software under the GNU Affero General Public License, version 3: you may share and change it on the terms of that licence. It comes with no warranty.',
 
   // ── Privacy ──────────────────────────────────────────────
   // Written for whoever is worried, not for whoever wrote the code: no file

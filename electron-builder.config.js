@@ -26,6 +26,11 @@ const config = {
 
   files: ['dist/**/*', 'package.json'],
 
+  // The licence asks that every copy come with its text, and NOTICE that the
+  // attribution travel with it. The NSIS licence page shows the first only, and
+  // only while installing, so both are copied next to the app as well.
+  extraResources: ['LICENSE', 'NOTICE'],
+
   // Asar archive for security + performance
   asar: true,
   asarUnpack: [

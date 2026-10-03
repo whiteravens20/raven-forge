@@ -95,17 +95,19 @@ is not a certificate:
 | Route                                                      | Cost          | Open to us?                                                                                               |
 | ---------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
 | **Microsoft Store, MSIX** — the Store re-signs the package | free          | yes — free developer account, worldwide, no SmartScreen at all                                            |
-| **SignPath Foundation** — free OV signing for open source  | free          | **no** — it requires an OSI-approved licence, and this project is PolyForm Noncommercial                  |
+| **SignPath Foundation** — free OV signing for open source  | free          | not applied for — its licence condition is met now that the project is AGPL-3.0                           |
 | **Azure Artifact Signing** (ex-Trusted Signing)            | ~$10/month    | **no** — individuals are limited to the USA and Canada; EU _organisations_ qualify, EU individuals do not |
 | **OV certificate** from a CA                               | $150–300/year | yes, worldwide, needs a token or cloud HSM                                                                |
 | **Self-signed**                                            | free          | pointless — Windows blocks it harder than an unsigned file                                                |
 
-Two of those "no"s are ours to change rather than facts of the world. SignPath
-wants an OSI-approved licence, and PolyForm Noncommercial is deliberately not
-one; that trade was made for the app's licensing, not for signing, and it should
-not be reopened for this. Azure wants a legal entity if you are in the EU, so
-registering White Ravens as one would open a $10/month path that works directly
-from CI with no hardware.
+SignPath wants an OSI-approved licence with no commercial dual-licensing. That
+used to rule this project out; since the move to AGPL-3.0 it does not, and what
+is left is an application and the rest of its conditions. Being a certificate,
+it would name a publisher but not remove the warning.
+
+The remaining "no" is ours to change rather than a fact of the world. Azure
+wants a legal entity if you are in the EU, so registering White Ravens as one
+would open a $10/month path that works directly from CI with no hardware.
 
 The Store route only re-signs **MSIX**. Submitting the NSIS installer through the
 Store instead does not get it signed — Microsoft re-signs packages, not

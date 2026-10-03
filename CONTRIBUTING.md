@@ -27,7 +27,7 @@ before opening a pull request.
 - For anything larger than a bug fix, open an issue first and agree on the approach. The roadmap is not published, so a feature that cuts across it is better discussed than discovered in review.
 - By contributing you agree to the [License](LICENSE) and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-> **Note on the licence.** Raven Forge ships under **PolyForm Noncommercial 1.0.0** — free for any noncommercial use, not an OSI open-source licence. Contributions are accepted under the same terms.
+> **Note on the licence.** Raven Forge ships under the **GNU Affero General Public License, version 3** (AGPL-3.0-only), with the attribution term in [NOTICE](NOTICE). Contributions are accepted under the same terms.
 
 ---
 

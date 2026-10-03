@@ -629,6 +629,8 @@ export const pl: Translations = {
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Sekret kuźni',
   'about.privacy': 'Prywatność',
+  'about.legal':
+    'Wolne oprogramowanie na licencji GNU Affero General Public License w wersji 3: możesz je rozpowszechniać i zmieniać na warunkach tej licencji. Program nie ma żadnej gwarancji.',
 
   // ── Prywatność ───────────────────────────────────────────
   // Pisane dla kogoś, kto się niepokoi, a nie dla kogoś, kto pisał kod: bez

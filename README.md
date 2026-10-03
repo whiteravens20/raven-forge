@@ -499,9 +499,9 @@ Contributions are welcome — bug fixes, macOS support, accessibility and transl
 
 ## License
 
-PolyForm Noncommercial 1.0.0 — see [LICENSE](LICENSE) for details.
+[GNU Affero General Public License, version 3](LICENSE) (AGPL-3.0-only), with one additional term in [NOTICE](NOTICE).
 
-You are free to use, modify, and share this software for **non-commercial purposes only**. Commercial use (selling, monetizing, offering as a paid service, etc.) is not permitted without explicit written permission from the author.
+You are free to use, modify, and share this software. Anyone who distributes it, or a version based on it, has to do so under the same licence with the source code available, and has to keep the attribution "Raven Forge by White Ravens" together with the address of this repository.
 
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 

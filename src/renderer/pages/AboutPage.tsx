@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { APP_NAME } from '@shared/constants';
-import { REPO_URL, ORG_URL } from '@shared/branding';
+import { REPO_URL, ORG_URL, ATTRIBUTION, ORIGINAL_SOURCE_URL } from '@shared/branding';
 import iconMono from '@assets/icons/icon-mono.svg?raw';
 import { InlineSvg } from '@components/ui/InlineSvg';
 import { BedrockInfoCard } from '@components/BedrockInfoCard';
@@ -112,12 +112,22 @@ export function AboutPage() {
         <span aria-hidden>•</span>
         <ExtLink href={REPO_URL}>GitHub</ExtLink>
         <span aria-hidden>•</span>
-        <ExtLink href={LICENSE_URL}>PolyForm Noncommercial 1.0.0</ExtLink>
+        <ExtLink href={LICENSE_URL}>AGPL-3.0</ExtLink>
         <span aria-hidden>•</span>
         <span>
           © 2026 <ExtLink href={ORG_URL}>White Ravens</ExtLink>
         </span>
       </div>
+
+      {/* The rest of the legal notices AGPL-3.0 asks an interface to display —
+          free to share under the licence, no warranty — closed by the
+          attribution NOTICE asks every copy to keep. The copyright line and the
+          link to the licence text are in the row above. */}
+      <p className="max-w-md text-center text-[11px] leading-relaxed text-rf-text-muted">
+        {t('about.legal')}
+        <br />
+        {ATTRIBUTION} — <ExtLink href={ORIGINAL_SOURCE_URL}>{ORIGINAL_SOURCE_URL}</ExtLink>
+      </p>
 
       <p className="max-w-md text-center text-[11px] leading-relaxed tracking-wide text-rf-text-muted">
         {MOJANG_DISCLAIMER}

@@ -65,9 +65,9 @@ jobs:
         with:
           fail-on-severity: high
           # Deny licences that would conflict with redistributing the packaged
-          # app. PolyForm-Noncommercial is not a copyleft-compatible licence, so
-          # a strong-copyleft dependency cannot ship inside the installer.
-          deny-licenses: GPL-3.0, AGPL-3.0, SSPL-1.0
+          # app. Raven Forge is AGPL-3.0-only, and these two are not compatible
+          # with it, so a dependency under either cannot ship inside the installer.
+          deny-licenses: GPL-2.0-only, SSPL-1.0
 
   scan:
     name: Trivy secret & config scan

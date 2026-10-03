@@ -119,6 +119,17 @@ export const REPO_URL = 'https://github.com/whiteravens20/raven-forge';
 export const ORG_URL = 'https://whiteravens.net';
 
 /**
+ * Who wrote the launcher and where its original source lives: the attribution
+ * the term in NOTICE asks every copy, and every work based on this one, to keep.
+ *
+ * The one pair in this file a fork leaves alone. `REPO_URL` above becomes the
+ * fork's own repository; these two go on naming the original, which is all the
+ * term is for. A fork may put "Based on" in front of the first.
+ */
+export const ATTRIBUTION = 'Raven Forge by White Ravens';
+export const ORIGINAL_SOURCE_URL = 'https://github.com/whiteravens20/raven-forge';
+
+/**
  * The published privacy policy, one file per UI language.
  *
  * Two files rather than one because the launcher opens in Polish, and a policy
