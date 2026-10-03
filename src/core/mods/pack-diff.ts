@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import type { ModEntry } from '../../shared/manifest-schema';
 import type { InstalledMod } from '../../shared/ipc-types';
 

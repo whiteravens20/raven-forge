@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { NavLink } from 'react-router';
 import { Home, FolderOpen, Package, Sparkles, Settings, User, Coffee } from 'lucide-react';
 import { useT, type TranslationKey } from '@renderer/i18n';

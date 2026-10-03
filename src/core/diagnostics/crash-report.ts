@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // One file per crash, containing everything a bug report needs and nothing
 // that identifies the player. See `writeCrashReport` for what "nothing" means.
 

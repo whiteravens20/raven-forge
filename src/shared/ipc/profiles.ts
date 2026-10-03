@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // A profile: what it targets, what it has played, what it owns on disk.
 // Part of the IPC contract — see `../ipc-types.ts`.
 

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // Results, error codes and progress — the shapes every channel shares.
 // Part of the IPC contract — see `../ipc-types.ts`.
 

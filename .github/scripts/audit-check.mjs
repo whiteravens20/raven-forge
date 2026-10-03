@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // `npm audit` with a documented, expiring allowlist.
 //
 // npm audit has no native ignore mechanism: it is all-or-nothing at a severity

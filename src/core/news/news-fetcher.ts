@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import type { z } from 'zod';
 import type { NewsItem, Announcement, FeedResult } from '../../shared/ipc-types';
 import { newsItemSchema, announcementSchema } from '../../shared/validators';

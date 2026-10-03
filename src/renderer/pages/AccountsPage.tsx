@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { LogOut, UserPlus, Shield, ShieldAlert, ExternalLink } from 'lucide-react';

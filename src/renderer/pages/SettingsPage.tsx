@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { useSettingsStore } from '@stores/settings-store';

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useState, useCallback, useEffect } from 'react';
 import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { ProxyAgent, setGlobalDispatcher, getGlobalDispatcher, type Dispatcher } from 'undici';
 import { createSocksDispatcher, isSocksProxy } from './socks-dispatcher';
 import { session } from 'electron';

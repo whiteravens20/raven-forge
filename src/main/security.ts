@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { session, type IpcMainInvokeEvent } from 'electron';
 import { log } from './logger';
 import { getMainWindow } from './window';

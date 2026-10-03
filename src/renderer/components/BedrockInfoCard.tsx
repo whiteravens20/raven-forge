@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useState } from 'react';
 import { ExternalLink, Info, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';

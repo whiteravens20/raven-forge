@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import os from 'node:os';
 import { describe, it, expect } from 'vitest';
 import { machineMemoryMb } from '../src/core/util/machine-memory';

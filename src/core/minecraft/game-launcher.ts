@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { app } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';

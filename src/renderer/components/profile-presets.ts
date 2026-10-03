@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import raven from '@assets/profile-icons/raven.svg';
 import anvil from '@assets/profile-icons/anvil.svg';
 import pickaxe from '@assets/profile-icons/pickaxe.svg';

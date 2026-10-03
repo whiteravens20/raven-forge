@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { Check } from 'lucide-react';
 import { useT } from '@renderer/i18n';
 

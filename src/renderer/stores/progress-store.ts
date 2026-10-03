@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { create } from 'zustand';
 import type { ProgressEvent } from '@shared/ipc-types';
 

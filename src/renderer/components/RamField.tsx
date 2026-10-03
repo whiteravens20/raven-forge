@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useId } from 'react';
 import { MAX_RAM_MB, MIN_RAM_MB, RAM_STEP_MB } from '@shared/constants';
 import { formatRamGb, ramAdvice, recommendedRamMb } from '@shared/memory';

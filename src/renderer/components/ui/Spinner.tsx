@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import forgeSpinner from '@assets/animations/forge-spinner.svg?raw';
 import { InlineSvg } from '@components/ui/InlineSvg';
 

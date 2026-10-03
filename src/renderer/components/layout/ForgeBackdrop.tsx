@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { OverworldScene, NetherScene, CaveScene, TechScene } from './backdrop-scenes';

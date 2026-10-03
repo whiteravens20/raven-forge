@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useState } from 'react';
 import { PROFILE_PRESETS } from '@components/profile-presets';
 import type { Profile } from '@shared/ipc-types';

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // Mods, shaders and resource packs — searching, installing, compatibility.
 // Part of the IPC contract — see `../ipc-types.ts`.
 

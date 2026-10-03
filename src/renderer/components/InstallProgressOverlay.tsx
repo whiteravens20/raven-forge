@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect } from 'react';
 import { useProgressStore } from '@stores/progress-store';
 import { formatBytes } from '@renderer/format';

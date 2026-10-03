@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect } from 'vitest';
 import { isSocksProxy } from '../src/core/net/socks-dispatcher';
 import { globalSettingsSchema, PROXY_SCHEMES } from '../src/shared/validators';

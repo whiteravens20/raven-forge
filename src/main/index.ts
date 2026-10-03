@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { app, BrowserWindow } from 'electron';
 import { initLogger, log } from './logger';
 import { createMainWindow, getMainWindow } from './window';

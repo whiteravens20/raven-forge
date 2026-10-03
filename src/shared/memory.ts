@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { DEFAULT_RAM_MB, MAX_RAM_MB, MIN_RAM_MB, RAM_STEP_MB } from './constants';
 
 /**

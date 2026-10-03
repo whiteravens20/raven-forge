@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useMemo } from 'react';
 import { useSettingsStore } from '@stores/settings-store';
 import type { Locale } from '@shared/ipc-types';

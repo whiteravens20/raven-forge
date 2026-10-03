@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import iconMono from '@assets/icons/icon-mono.svg?raw';

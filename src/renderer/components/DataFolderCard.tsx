@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, FolderOpen, HardDrive, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';

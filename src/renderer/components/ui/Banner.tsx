@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { AlertTriangle, Info, AlertCircle, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useT } from '@renderer/i18n';

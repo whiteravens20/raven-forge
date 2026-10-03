@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useRef, useState } from 'react';
 import { Terminal, X } from 'lucide-react';
 import { useLocale, useT } from '@renderer/i18n';
