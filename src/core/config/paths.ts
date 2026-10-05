@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { app } from 'electron';
 import {
+  DIR_BROWSER,
   DIR_PROFILES,
   DIR_LOADERS,
   DIR_JAVA,
@@ -22,19 +23,20 @@ import { isSafeFileName } from '../../shared/manifest-schema';
  * the root is movable — see that file. Everything here is a getter for the same
  * reason: they are read after the root is known, not baked in at import.
  *
- * Two things stay behind in `userData` whatever the root is doing, and both are
- * diagnostics rather than data: the log the app is writing while it runs, which
- * on Windows cannot be moved out from under its own open handle, and the crash
- * reports. Pinning them also means the log viewer and the crash reporter still
- * work on the day the drive holding the games is not plugged in — which is
- * exactly the day someone needs to read them.
+ * The log and the crash reports are under the root with everything else. They
+ * were once pinned to the home, so that they could still be read on a day the
+ * drive holding the games was not plugged in — and that needs no pinning: with
+ * the configured root unreachable the home stands in as the root, so they land
+ * there anyway. What the pinning did do was leave a folder of the launcher's
+ * files behind every time the data moved, with the "open logs" button pointing
+ * at the place the player had just moved away from.
  */
 function getDataRoot(): string {
   return dataRoot();
 }
 
-/** Electron's own per-user directory. Diagnostics live here, not under the root. */
-function getDiagnosticsRoot(): string {
+/** The launcher's home: Electron's `userData`. See `app-home.ts`. */
+function getHome(): string {
   return app.getPath('userData');
 }
 
@@ -68,6 +70,19 @@ export const paths = {
     return getDataRoot();
   },
 
+  /**
+   * The launcher's home. The same directory as `root` until the data is moved;
+   * after that, the pointer to it and the embedded browser's files.
+   */
+  get home() {
+    return getHome();
+  },
+
+  /** browser/ — the embedded browser's own files. In the home, never the root. */
+  get browserDir() {
+    return path.join(getHome(), DIR_BROWSER);
+  },
+
   /** settings.json */
   get settings() {
     return path.join(getDataRoot(), FILE_SETTINGS);
@@ -98,9 +113,9 @@ export const paths = {
     return path.join(getDataRoot(), DIR_CACHE);
   },
 
-  /** logs/ — application logs (electron-log). Pinned; see the note above. */
+  /** logs/ — application logs (electron-log). */
   get logsDir() {
-    return path.join(getDiagnosticsRoot(), DIR_LOGS);
+    return path.join(getDataRoot(), DIR_LOGS);
   },
 
   /**
@@ -109,24 +124,25 @@ export const paths = {
    * each profile's game directory; these quote from those.
    */
   get crashReportsDir() {
-    return path.join(getDiagnosticsRoot(), DIR_CRASH_REPORTS);
+    return path.join(getDataRoot(), DIR_CRASH_REPORTS);
   },
 
   /**
-   * Is `target` one of the launcher's own directories?
+   * Is `target` inside one of the launcher's own directories?
    *
    * `system:open-path` runs whatever the OS associates with what it is given,
-   * so it is confined to these. All three are named because they stopped being
-   * nested when the root became movable: move the data to another drive and the
-   * logs and crash reports stay in `userData`, outside `root` — which silently
-   * made "open the crash reports folder" a refusal.
+   * so it is confined to these two: the data root, and the home it has moved
+   * away from, which is still the launcher's and is still shown in Settings.
    */
   isInsideLauncherData(target: string): boolean {
     if (typeof target !== 'string' || target === '') return false;
     const resolved = path.resolve(target);
-    return [paths.root, paths.logsDir, paths.crashReportsDir].some((base) => {
+    return [paths.root, paths.home].some((base) => {
       const relative = path.relative(base, resolved);
-      return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+      return (
+        relative === '' ||
+        (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+      );
     });
   },
 

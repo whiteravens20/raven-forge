@@ -4,7 +4,7 @@ import { app, ipcMain, dialog, shell, type IpcMainInvokeEvent } from 'electron';
 import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { log } from './logger';
+import { log, LOG_FILE } from './logger';
 import { getMainWindow } from './window';
 import { assertTrustedSender } from './security';
 import { getSettings, updateSettings, resetSettings } from '../core/config/settings-manager';
@@ -231,7 +231,7 @@ export function registerAllIpcHandlers(): void {
    */
   handle('system:read-log', async (_event, lines?: number, since?: number) => {
     const wanted = Math.min(Math.max(lines ?? LOG_TAIL_DEFAULT_LINES, 1), LOG_TAIL_MAX_LINES);
-    const file = path.join(paths.logsDir, 'main.log');
+    const file = path.join(paths.logsDir, LOG_FILE);
     let handle;
     try {
       handle = await fs.open(file, 'r');
