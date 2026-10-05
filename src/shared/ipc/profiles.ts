@@ -21,7 +21,10 @@ export interface LoaderVersion {
 export interface Profile {
   id: string;
   name: string;
-  /** Absolute path to a user-supplied image, copied into the profile directory. */
+  /**
+   * File name of a user-supplied image, copied into the profile directory —
+   * `icon.png`. A name and not a path, so it stays true when the data moves.
+   */
   iconPath?: string;
   iconUrl?: string;
   /** Id of one of the launcher's built-in avatars, e.g. `raven`. */
