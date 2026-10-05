@@ -12,11 +12,24 @@ export const DIR_JAVA = 'java';
 export const DIR_CACHE = 'cache';
 export const DIR_LOGS = 'logs';
 export const DIR_CRASH_REPORTS = 'crash-reports';
+/** Where the embedded browser keeps its own files, inside the launcher's home. */
+export const DIR_BROWSER = 'browser';
+
+/**
+ * The name of the launcher's home directory under the per-user application
+ * data folder. Deliberately the package name and not the product name: no
+ * spaces, and the same on every platform.
+ */
+export const HOME_DIR_NAME = 'raven-forge-launcher';
+/** What that directory was called through 0.7.1, when Electron named it. */
+export const LEGACY_HOME_DIR_NAME = 'Raven Forge Launcher';
 
 // ── File names ────────────────────────────────────────────
 export const FILE_SETTINGS = 'settings.json';
 export const FILE_PROFILES = 'profiles.json';
 export const FILE_AUTH = 'auth.json';
+/** Names the data directory when it is not the home; see `data-root.ts`. */
+export const FILE_DATA_ROOT_POINTER = 'data-root.txt';
 
 // ── Modrinth API ──────────────────────────────────────────
 export const MODRINTH_API_BASE = 'https://api.modrinth.com/v2';
