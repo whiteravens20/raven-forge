@@ -227,6 +227,32 @@ export async function withLoaderVersion(profile: Profile): Promise<Profile> {
   return updateProfile(profile.id, { modLoaderVersion: version });
 }
 
+/**
+ * The second half of "close the launcher when the game starts": what becomes of
+ * it once the game is over.
+ *
+ * At launch the window is hidden rather than closed. Closing the last window
+ * quits the app, and the game's exit would then have nobody to report to: no
+ * play time recorded, no crash report written. The setting used to wait and
+ * close the window at exit instead — so it did nothing while the game ran, and
+ * raced the bookkeeping it had been registered ahead of. Hidden, the process
+ * stays and this decides how it ends:
+ *
+ * - a crash brings the window back. The crash card is the one thing the player
+ *   now needs, and a launcher that had quit could not show it;
+ * - anything else quits, which is what "close" promised — unless the player has
+ *   opened the launcher again in the meantime and is looking at it, or another
+ *   profile's game is running or being got ready and still needs this process.
+ */
+export function afterGameWhenClosed(state: {
+  crashed: boolean;
+  windowVisible: boolean;
+  othersRunning: boolean;
+}): 'show' | 'quit' | 'stay' {
+  if (state.crashed) return 'show';
+  return state.windowVisible || state.othersRunning ? 'stay' : 'quit';
+}
+
 async function runLaunch(options: LaunchOptions): Promise<void> {
   const stored = await getProfile(options.profileId);
   if (!stored) throw new Error(`Profile ${options.profileId} not found`);
@@ -517,11 +543,24 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   win?.webContents.send('game:started', profile.id);
 
   // Apply launcher behavior from settings
+  const closedForGame = settings.launcherBehaviorOnLaunch === 'close';
+  /** Run last by both ways out below, once the session is on record. */
+  const finishClosing = (crashed: boolean) => {
+    const window = getMainWindow();
+    const next = afterGameWhenClosed({
+      crashed,
+      windowVisible: window?.isVisible() ?? false,
+      // Being got ready counts as much as running: quitting would stop that
+      // launch half-way through its downloads.
+      othersRunning: isLaunchInProgress(),
+    });
+    if (next === 'show') window?.show();
+    else if (next === 'quit') app.quit();
+  };
+
   switch (settings.launcherBehaviorOnLaunch) {
     case 'close': {
-      child.on('exit', () => {
-        getMainWindow()?.close();
-      });
+      win?.hide();
       break;
     }
     case 'minimize': {
@@ -609,6 +648,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
 
       getMainWindow()?.webContents.send('game:exited', exitInfo);
       clearBuffer(profile.id);
+      if (closedForGame) finishClosing(crashed);
     })();
   });
 
@@ -631,6 +671,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
       };
       getMainWindow()?.webContents.send('game:exited', exitInfo);
       clearBuffer(profile.id);
+      if (closedForGame) finishClosing(true);
     })();
   });
 }
@@ -677,7 +718,6 @@ export async function killGame(profileId: string): Promise<void> {
 export function isGameRunning(profileId: string): boolean {
   return runningProcesses.has(profileId);
 }
-
 
 /**
  * Profiles between "launch pressed" and `spawn`.

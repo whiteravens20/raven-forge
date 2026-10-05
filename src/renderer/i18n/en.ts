@@ -509,6 +509,8 @@ export const en = {
   'settings.onLaunch.minimize': 'Minimise',
   'settings.onLaunch.close': 'Close',
   'settings.onLaunch.keepOpen': 'Stay open',
+  'settings.onLaunchCloseHint':
+    'The launcher window goes away once the game is running, and the launcher quits when the game does. If the game crashes the window comes back instead, so the crash report is not missed.',
   'settings.showConsole': 'Show the game console',
   'settings.offlineMode': 'Always launch offline',
   'settings.offlineModeHint':

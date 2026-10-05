@@ -539,6 +539,8 @@ export const pl: Translations = {
   'settings.onLaunch.minimize': 'Minimalizuj',
   'settings.onLaunch.close': 'Zamknij',
   'settings.onLaunch.keepOpen': 'Zostaw otwarte',
+  'settings.onLaunchCloseHint':
+    'Okno launchera znika, gdy gra już działa, a launcher kończy pracę razem z grą. Jeśli gra ulegnie awarii, okno wraca, żeby raport z awarii nie przepadł.',
   'settings.showConsole': 'Pokaż konsolę gry',
   'settings.offlineMode': 'Zawsze uruchamiaj offline',
   'settings.offlineModeHint':

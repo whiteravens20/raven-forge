@@ -117,6 +117,10 @@ export function SettingsPage() {
             update({ launcherBehaviorOnLaunch: e.target.value as LauncherBehaviorOnLaunch })
           }
         />
+        {/* The one option of the three with more to it than its name. */}
+        {settings.launcherBehaviorOnLaunch === 'close' && (
+          <p className="text-xs text-rf-text-muted">{t('settings.onLaunchCloseHint')}</p>
+        )}
         <CheckboxRow
           checked={settings.showLiveConsole}
           onChange={(v) => update({ showLiveConsole: v })}
