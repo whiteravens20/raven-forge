@@ -275,6 +275,7 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
     operationId: `java-${majorVersion}`,
     progress: 0,
     message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
+    installing: true,
   });
 
   const tmpFile = path.join(paths.cacheDir, `jre-${majorVersion}.${ext}`);
@@ -307,6 +308,7 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
         message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
         bytesDownloaded: bytes,
         bytesTotal: declared,
+        installing: true,
       });
     },
   });

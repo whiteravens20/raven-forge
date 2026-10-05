@@ -42,6 +42,7 @@ export function initUpdater(): void {
       },
       bytesDownloaded: progress.transferred,
       bytesTotal: progress.total,
+      installing: true,
     });
   });
 

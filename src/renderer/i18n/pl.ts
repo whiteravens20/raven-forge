@@ -575,7 +575,9 @@ export const pl: Translations = {
   'logs.warnCount.other': '{count} ostrzeżenia',
 
   // ── Progress overlay ─────────────────────────────────────
-  'progress.title': 'Postęp instalacji',
+  'progress.titleInstalling': 'Pobieranie i instalacja',
+  'progress.titlePreparing': 'Przygotowywanie do uruchomienia',
+  'progress.titleChecking': 'Sprawdzanie plików',
   'progress.modSync': 'Synchronizacja modów',
   'progress.loaderInstall': 'Instalacja mod loadera',
   'progress.javaDownload': 'Pobieranie Javy',

@@ -563,7 +563,9 @@ export const en = {
   'logs.warnCount.other': '{count} warnings',
 
   // ── Progress overlay ─────────────────────────────────────
-  'progress.title': 'Install progress',
+  'progress.titleInstalling': 'Downloading and installing',
+  'progress.titlePreparing': 'Preparing to launch',
+  'progress.titleChecking': 'Checking files',
   'progress.modSync': 'Syncing mods',
   'progress.loaderInstall': 'Installing mod loader',
   'progress.javaDownload': 'Downloading Java',

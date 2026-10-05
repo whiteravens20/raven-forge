@@ -637,6 +637,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         currentFile,
         filesCompleted: fetched,
         filesTotal: downloadTotal,
+        installing: true,
       });
 
     for (const planned of plannedMods) {

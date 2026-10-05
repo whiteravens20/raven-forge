@@ -31,6 +31,16 @@ interface ProgressStore {
   entries: Map<string, ProgressEntry>;
   /** Visible to consumers — true while at least one entry is in-flight. */
   hasActive: boolean;
+  /**
+   * Whether anything shown since the overlay last emptied was a download or an
+   * install.
+   *
+   * Held for as long as the overlay is up rather than read off the newest
+   * event: one launch checks the mods, fetches a library, checks the assets —
+   * and a heading that followed each step would change its mind three times in
+   * as many seconds.
+   */
+  installing: boolean;
   init: () => void;
   clear: (operationId: string) => void;
 }
@@ -48,6 +58,7 @@ let initialized = false;
 export const useProgressStore = create<ProgressStore>((set, get) => ({
   entries: new Map(),
   hasActive: false,
+  installing: false,
 
   init: () => {
     if (initialized) return;
@@ -59,7 +70,11 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
           // Auto-remove completed entries after a short hold
           const stamp = ++stamps;
           next.set(event.operationId, { ...event, channel, stamp });
-          set({ entries: next, hasActive: hasInflight(next) });
+          set({
+            entries: next,
+            hasActive: hasInflight(next),
+            installing: get().installing || Boolean(event.installing),
+          });
           setTimeout(() => {
             const after = new Map(get().entries);
             // Only if it is still the entry this timeout was set for. Operation
@@ -69,11 +84,19 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
             // progress, leaving the overlay blank while work carried on.
             if (after.get(event.operationId)?.stamp !== stamp) return;
             after.delete(event.operationId);
-            set({ entries: after, hasActive: hasInflight(after) });
+            set({
+              entries: after,
+              hasActive: hasInflight(after),
+              installing: after.size > 0 && get().installing,
+            });
           }, 1500);
         } else {
           next.set(event.operationId, { ...event, channel, stamp: ++stamps });
-          set({ entries: next, hasActive: true });
+          set({
+            entries: next,
+            hasActive: true,
+            installing: get().installing || Boolean(event.installing),
+          });
         }
       };
       api.on(channel, handler);
@@ -83,7 +106,11 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
   clear: (operationId) => {
     const next = new Map(get().entries);
     next.delete(operationId);
-    set({ entries: next, hasActive: hasInflight(next) });
+    set({
+      entries: next,
+      hasActive: hasInflight(next),
+      installing: next.size > 0 && get().installing,
+    });
   },
 }));
 

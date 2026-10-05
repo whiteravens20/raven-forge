@@ -191,7 +191,7 @@ async function downloadBatch(
 ): Promise<void> {
   const total = tasks.length;
 
-  const emit = (progress: number, message: ProgressMessage, done: number) => {
+  const emit = (progress: number, message: ProgressMessage, done: number, installing = false) => {
     if (!opts) return;
     emitAssetProgress({
       operationId: opts.operationId,
@@ -199,6 +199,7 @@ async function downloadBatch(
       message,
       filesCompleted: done,
       filesTotal: total,
+      installing,
     });
   };
 
@@ -234,7 +235,8 @@ async function downloadBatch(
   // ── Pass two: fetch what pass one turned down ──
 
   let completed = total - pending.length;
-  const reportDownload = () => emit(total > 0 ? completed / total : 1, downloadLabel, completed);
+  const reportDownload = () =>
+    emit(total > 0 ? completed / total : 1, downloadLabel, completed, true);
 
   // Announced only when there is something to announce. Seeding the counter
   // unconditionally put the download line on screen — at 100%, on a launch with

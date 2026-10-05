@@ -49,6 +49,7 @@ async function installFabric(
     operationId: opId,
     progress: 0,
     message: { key: 'progress.msg.loaderProfile', vars: { loader: 'Fabric' } },
+    installing: true,
   });
 
   log.info(`Fetching Fabric profile JSON for MC ${mcVersion} / loader ${loaderVersion}`);
@@ -113,6 +114,7 @@ async function installQuilt(
     operationId: opId,
     progress: 0,
     message: { key: 'progress.msg.loaderProfile', vars: { loader: 'Quilt' } },
+    installing: true,
   });
 
   log.info(`Fetching Quilt profile JSON for MC ${mcVersion} / loader ${loaderVersion}`);
@@ -191,6 +193,7 @@ export async function installLoader(
             operationId: `loader-${loader}-${mcVersion}-${loaderVersion}`,
             progress,
             message,
+            installing: progress < 1,
           }),
         signal,
       );

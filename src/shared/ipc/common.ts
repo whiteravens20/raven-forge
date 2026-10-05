@@ -123,4 +123,13 @@ export interface ProgressEvent {
   /** Files completed / total */
   filesCompleted?: number;
   filesTotal?: number;
+  /**
+   * Set while this step downloads or installs something, as opposed to checking
+   * what is already on disk.
+   *
+   * Every launch reports progress, because a profile's files are verified each
+   * time, and nearly every launch fetches nothing. The overlay reads this to say
+   * which of the two is happening instead of calling both an installation.
+   */
+  installing?: boolean;
 }
