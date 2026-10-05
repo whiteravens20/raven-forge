@@ -65,7 +65,7 @@ import type {
 import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
 import type { ManifestVerification, UpdateCheck, UpdateInfo } from './ipc/updater';
-import type { LogTail, SystemInfo } from './ipc/system';
+import type { LogTail, StorageReport, SystemInfo } from './ipc/system';
 
 // Naming convention: "domain:action"
 // Invoke channels: renderer calls, main responds (ipcMain.handle)
@@ -298,6 +298,8 @@ export interface InvokeChannels {
 
   // -- System --
   'system:get-info': () => Promise<IpcResult<SystemInfo>>;
+  /** Every place the launcher writes to on this computer, with sizes. */
+  'system:get-storage': () => Promise<IpcResult<StorageReport>>;
   /** Quit and start again — after the data folder has changed. */
   'system:relaunch': () => Promise<void>;
   'system:open-path': (path: string) => Promise<IpcResult<void>>;
@@ -470,6 +472,7 @@ export interface RavenForgeAPI {
   };
   system: {
     getInfo: InvokeChannels['system:get-info'];
+    getStorage: InvokeChannels['system:get-storage'];
     relaunch: InvokeChannels['system:relaunch'];
     openPath: InvokeChannels['system:open-path'];
     openUrl: InvokeChannels['system:open-url'];

@@ -17,6 +17,7 @@ import {
   writeDataRootPointer,
 } from '../core/config/data-root';
 import { applyDataRoot, pathConcerns, planDataRootChange } from '../core/config/data-root-move';
+import { measureStorage } from '../core/config/storage-map';
 import { fetchNews, fetchAnnouncements } from '../core/news/news-fetcher';
 import {
   getAllProfiles,
@@ -204,6 +205,13 @@ export function registerAllIpcHandlers(): void {
     // machine with no file manager to open one with.
     const failure = await shell.openPath(targetPath);
     return failure ? fail(failure) : ok(undefined);
+  });
+  handle('system:get-storage', async () => {
+    try {
+      return ok(await measureStorage());
+    } catch (err) {
+      return fail(`Failed to measure the launcher's files: ${reason(err)}`);
+    }
   });
   handle('system:relaunch', () => {
     app.relaunch();

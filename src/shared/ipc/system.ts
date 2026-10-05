@@ -19,6 +19,53 @@ export interface SystemInfo {
   crashReportsDirectory: string;
 }
 
+/** One place the launcher writes to. The renderer names it; this locates it. */
+export type StorageId =
+  | 'profiles'
+  | 'gameFiles'
+  | 'java'
+  | 'loaders'
+  | 'state'
+  | 'logs'
+  | 'crashReports'
+  | 'browser'
+  | 'pointer'
+  | 'updateCache'
+  | 'program'
+  | 'legacyHome';
+
+export interface StorageEntry {
+  id: StorageId;
+  /**
+   * Which of the three kinds of place it is: the data folder, which moves; the
+   * launcher's home, which does not; or somewhere the system decides.
+   */
+  where: 'data' | 'home' | 'system';
+  path: string;
+  /** Bytes on disk right now, or null when nothing is there. */
+  bytes: number | null;
+  /** Whether the launcher will open it — only its own two folders. */
+  openable: boolean;
+}
+
+/**
+ * Every place on this computer the launcher writes to, as measured just now.
+ *
+ * `keychain.secrets` is how many entries the operating system's credential
+ * store holds for the launcher — a count, never their contents — or null when
+ * the store could not be asked, which on Linux means no keyring service is
+ * running.
+ */
+export interface StorageReport {
+  root: string;
+  home: string;
+  entries: StorageEntry[];
+  keychain: {
+    platform: 'win32' | 'linux' | 'darwin';
+    secrets: number | null;
+  };
+}
+
 /**
  * A window onto the launcher log, and a cursor for asking what came next.
  *

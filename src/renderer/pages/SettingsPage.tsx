@@ -9,6 +9,7 @@ import { Input } from '@components/ui/Input';
 import { Button } from '@components/ui/Button';
 import { LogViewer } from '@components/LogViewer';
 import { DataFolderCard } from '@components/DataFolderCard';
+import { StorageMap } from '@components/StorageMap';
 import { Spinner } from '@components/ui/Spinner';
 import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
 import { isBuiltInKey, trustedKeyRing } from '@shared/branding';
@@ -251,15 +252,6 @@ export function SettingsPage() {
 
       <Section title={t('settings.section.data')}>
         <DataFolderCard />
-        <PathRow
-          label={t('settings.crashReportsFolder')}
-          onOpen={async () => {
-            const result = await api.system.getInfo();
-            if (result.success && result.data) {
-              await api.system.openPath(result.data.crashReportsDirectory);
-            }
-          }}
-        />
         <div className="flex items-center gap-2">
           <span className="text-sm text-rf-text-secondary">{t('settings.logs')}:</span>
           <button
@@ -268,19 +260,11 @@ export function SettingsPage() {
           >
             {t('settings.showLogs')}
           </button>
-          <span className="text-rf-text-muted">•</span>
-          <button
-            onClick={async () => {
-              const result = await api.system.getLogsPath();
-              if (result.success && result.data) {
-                await api.system.openPath(result.data);
-              }
-            }}
-            className="text-sm text-rf-accent-text hover:underline"
-          >
-            {t('common.openFolder')}
-          </button>
         </div>
+        {/* Every folder the launcher writes to, each with its own way in. The
+            three separate "open folder" links this replaces pointed at two
+            different places once the data had moved, and said so nowhere. */}
+        <StorageMap />
       </Section>
 
       {showLogs && <LogViewer onClose={() => setShowLogs(false)} />}
@@ -394,19 +378,6 @@ function CheckboxRow({
       />
       {label}
     </label>
-  );
-}
-
-function PathRow({ label, onOpen }: { label: string; onOpen: () => void }) {
-  const t = useT();
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-rf-text-secondary">{label}:</span>
-      <button onClick={onOpen} className="text-sm text-rf-accent-text hover:underline">
-        {t('common.openFolder')}
-      </button>
-    </div>
   );
 }
 

@@ -545,7 +545,6 @@ export const en = {
   'settings.dataFolderForget': 'Forget that folder',
   'settings.dataFolderForgetHint':
     'The launcher stops looking for it and stays with the default folder. Nothing in the unreachable folder is touched.',
-  'settings.crashReportsFolder': 'Crash reports',
   'settings.logs': 'Logs',
   'settings.showLogs': 'Show logs',
   'settings.reset': 'Reset settings',
@@ -697,17 +696,68 @@ export const en = {
 
   'privacy.local.title': 'What stays on this computer',
   'privacy.local.body':
-    'All of it sits in one folder. Where that folder is depends on your system — this is the one this launcher is using:',
-  'privacy.local.profiles':
-    'Your profiles, and with them your worlds, screenshots, game settings and mods.',
-  'privacy.local.settings':
-    'Your launcher settings — the look, the language, and the addresses it downloads from.',
-  'privacy.local.accounts': 'Your list of accounts: player name, and when you last signed in.',
-  'privacy.local.logs':
-    'A record of what the launcher has been doing. It can contain your player name and folder names, so look it over before sending it to anybody.',
-  'privacy.local.crashes': 'Crash reports, with the sign-in details already taken out.',
-  'privacy.local.keychain':
-    'Your password is not kept here or anywhere else — you type it on Microsoft’s page, not in this launcher. What the launcher does keep is the pass Microsoft hands back, and it puts that in the safe your system provides for passwords, the same one your web browser uses. If your system offers no such safe, the launcher keeps it in its own folder instead and says so plainly on the Accounts screen.',
+    'Below is everything the launcher writes on this computer — with where it is and how much, measured a moment ago on your disk rather than described from memory.',
+  'storage.total': 'On disk in all: {size}',
+  'storage.measuring': 'Measuring the files on disk…',
+  'storage.refresh': 'Measure again',
+  'storage.failed': 'The launcher’s files could not be measured.',
+  'storage.openFailed': 'That folder could not be opened.',
+  'storage.nothingYet': 'nothing yet',
+  'storage.groupData': 'The data folder — the one that moves',
+  'storage.groupHome': 'The launcher folder — it stays put',
+  'storage.groupSystem': 'Outside those two folders',
+  'storage.homeIsData': 'Until you move the data, this is the same folder as the one above.',
+  'storage.profiles.title': 'Profiles',
+  'storage.profiles.body':
+    'Each profile has a folder of its own here: worlds, mods, resource packs, shaders, screenshots, game settings and world backups. It is the one thing on this list that cannot be downloaded again.',
+  'storage.gameFiles.title': 'Game files',
+  'storage.gameFiles.body':
+    'Minecraft versions, libraries and assets downloaded from Mojang, shared by every profile. Deleted, they are downloaded again at the next launch.',
+  'storage.java.title': 'Java runtimes',
+  'storage.java.body':
+    'The Java the launcher downloaded for the Minecraft versions that need it. Deleted, it is downloaded again.',
+  'storage.loaders.title': 'Loaders',
+  'storage.loaders.body': 'The installed builds of Fabric, Quilt, Forge and NeoForge.',
+  'storage.state.title': 'Settings and lists',
+  'storage.state.body':
+    'Three files: settings.json (launcher settings), profiles.json (the list of profiles) and auth.json (the list of accounts: player name and account id, no password).',
+  'storage.logs.title': 'Logs',
+  'storage.logs.body':
+    'A record of what the launcher did and what the game printed. It has your player name and folder paths in it, so read it before sending it to anyone.',
+  'storage.crashReports.title': 'Crash reports',
+  'storage.crashReports.body':
+    'One file per game crash, with the token and the account details already taken out. They are sent nowhere — you decide whether to attach one to a report.',
+  'storage.browser.title': 'The launcher window’s files',
+  'storage.browser.body':
+    'The launcher’s window is an embedded browser, and this is where it keeps its own files: a cache of images (mod icons, news pictures), the announcements you dismissed, and the cookies of the Microsoft sign-in page.',
+  'storage.pointer.title': 'Pointer to the data folder',
+  'storage.pointer.body':
+    'A text file with one line: the path of the data folder. It is how the launcher and the uninstaller find data that has been moved.',
+  'storage.updateCache.title': 'A downloaded launcher update',
+  'storage.updateCache.body':
+    'The installer of a new version, downloaded and waiting to be installed.',
+  'storage.program.title': 'The program',
+  'storage.program.body': 'The launcher itself — what the installer put here.',
+  'storage.legacyHome.title': 'A folder from an older version',
+  'storage.legacyHome.body':
+    'Versions up to 0.7.1 used this folder. This version has its own and leaves this one alone — check that nothing you need is still in it.',
+  'storage.keychain.title': 'The Microsoft sign-in — in the system’s credential store',
+  'storage.keychain.what':
+    'The launcher does not know your password and does not keep it: you type it on Microsoft’s own page. Microsoft sends back two keys and only those are stored — a refresh token, which lets the launcher renew the sign-in without asking for the password, and a Minecraft session token, good for about a day.',
+  'storage.keychain.windows':
+    'On Windows they go into Credential Manager: Control Panel → User Accounts → Credential Manager → Windows Credentials, the entries beginning “com.ravenforge.launcher”. Windows encrypts them with your user account; programs running as you can ask for them, other users of the computer cannot.',
+  'storage.keychain.linux':
+    'On Linux they go into the desktop’s keyring through the Secret Service: GNOME Keyring (the “Passwords and Keys” app) or KWallet (KWalletManager), as entries of the service “com.ravenforge.launcher”. The keyring is encrypted with your login password and open for as long as you are logged in; programs in your session can read from it.',
+  'storage.keychain.mac':
+    'On macOS they go into the Keychain (the “Keychain Access” app), as entries of the service “com.ravenforge.launcher”.',
+  'storage.keychain.none': 'On this computer: no entries — no Microsoft account is signed in.',
+  'storage.keychain.count.one': 'On this computer: {count} entry.',
+  'storage.keychain.count.other':
+    'On this computer: {count} entries, two for each Microsoft account.',
+  'storage.keychain.unavailable':
+    'On this computer the credential store does not answer. The Microsoft sign-in is then kept in the file auth.json in the data folder, readable only by your user — the Accounts page says so outright.',
+  'storage.keychain.remove':
+    '“Sign out” on the Accounts page removes both of that account’s entries. You can also delete them by hand in the place described above — the launcher will then ask you to sign in again.',
 
   'privacy.dest.title': 'Who the launcher talks to',
   'privacy.dest.body':
@@ -723,13 +773,14 @@ export const en = {
   'privacy.dest.java.when': 'when the launcher installs Java for you',
   'privacy.dest.java.sends': 'Which version of Java is needed, and which system you are on.',
   'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge and Quilt',
-  'privacy.dest.loaders.when': 'when installing what mods need to run',
+  'privacy.dest.loaders.when': 'when choosing and installing a loader',
   'privacy.dest.modrinth.who': 'Modrinth',
-  'privacy.dest.modrinth.when': 'when you look for mods, or check the ones you have',
+  'privacy.dest.modrinth.when':
+    'when you look for mods and packs, open the list of what is installed, or check for updates',
   'privacy.dest.modrinth.sends':
-    'What you type into the search box, and the filters you set. Checking for updates or exporting a pack also sends a hash of each mod file in that profile, which is how Modrinth is asked what those files are. Nothing that says who you are — the request names the launcher that is asking, not the person.',
+    'What you type in the search box, and the filters you set. Opening a profile’s list of mods, shaders or resource packs sends the identifiers of the ones you have — that is how the launcher fetches their descriptions and icons, and it remembers the answer for a week. Checking for updates, or exporting a pack, also sends a hash of each mod file in that profile. Nothing that says who you are — the request introduces the launcher that is asking, not a person.',
   'privacy.dest.packs.who': 'White Ravens',
-  'privacy.dest.packs.when': 'news, and the list of server packs',
+  'privacy.dest.packs.when': 'news, the list of server packs, and the packs themselves',
   'privacy.dest.updates.who': 'GitHub',
   'privacy.dest.updates.when': 'at every start, and when you check for updates',
   'privacy.dest.updates.sends':
@@ -745,11 +796,23 @@ export const en = {
 
   'privacy.control.title': 'What you decide',
   'privacy.control.offline':
-    'Offline mode never contacts a sign-in server at all — you play on your own or on a home network.',
-  'privacy.control.feeds': 'Clear the news address in Settings and nothing more is downloaded.',
-  'privacy.control.proxy': 'A proxy sends everything through a server you choose yourself.',
+    'Signing in: Settings → Behaviour → “Always launch offline”. The launcher then never contacts the Microsoft, Xbox or Mojang sign-in servers; game files and mods are still downloaded. An offline account (Accounts → Offline mode) signs in nowhere at all.',
+  'privacy.control.feeds':
+    'News: Settings → Content sources. Clear both addresses and the launcher stops fetching news and announcements. Enter your own and it asks only those.',
+  'privacy.control.proxy':
+    'A proxy: Settings → Network and downloads → Proxy URL. Every connection the launcher makes — downloads, sign-in, images — goes through the server you name. The game, once it is running, connects for itself and is not covered by the launcher’s proxy.',
+  'privacy.control.discord':
+    'Discord: Settings → Behaviour → “Show the game on your Discord status”, off by default. Switched on, it shows the profile’s name, version and loader to everyone who can see your Discord profile — never a server address.',
+  'privacy.control.packs':
+    'Packs: a profile that follows a pack asks the address in its “Manifest URL” field about it — when the launcher starts and before every launch of the game. Remove that address in the profile editor and the profile stops asking, and stops updating.',
+  'privacy.control.updates':
+    'Launcher updates: checked at every start with one request to GitHub. This cannot be switched off yet.',
+  'privacy.control.diagnostics':
+    'Logs and crash reports: they do not leave the computer until you send them to someone yourself. “Report a bug” opens the issue page in your browser, and you attach the file by hand.',
+  'privacy.control.location':
+    'Where it all is: Settings → Data → “Move…” moves the data folder to wherever you point.',
   'privacy.control.delete':
-    'Signing out deletes that account’s saved sign-in, and forgets it in the sign-in window too. Deleting the folder above removes everything else — on our side there is nothing to delete.',
+    'Deleting: “Sign out” on the Accounts page erases that account’s saved sign-in — its entries in the system’s credential store and the sign-in window’s cookies. Deleting the data folder and the launcher folder listed above removes everything else; the Windows uninstaller asks about it outright. There is nothing on our side to delete.',
 
   'privacy.fullPolicy': 'Read the full privacy policy',
   'privacy.fullPolicyHint':

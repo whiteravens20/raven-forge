@@ -133,6 +133,7 @@ const api: RavenForgeAPI = {
   },
   system: {
     getInfo: () => ipcRenderer.invoke('system:get-info'),
+    getStorage: () => ipcRenderer.invoke('system:get-storage'),
     relaunch: () => ipcRenderer.invoke('system:relaunch'),
     openPath: (p) => ipcRenderer.invoke('system:open-path', p),
     openUrl: (url) => ipcRenderer.invoke('system:open-url', url),

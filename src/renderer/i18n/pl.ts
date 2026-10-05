@@ -575,7 +575,6 @@ export const pl: Translations = {
   'settings.dataFolderForget': 'Zapomnij ten folder',
   'settings.dataFolderForgetHint':
     'Launcher przestanie go szukać i zostanie przy folderze domyślnym. Niczego w niedostępnym folderze nie rusza.',
-  'settings.crashReportsFolder': 'Raporty z awarii',
   'settings.logs': 'Logi',
   'settings.showLogs': 'Pokaż logi',
   'settings.reset': 'Resetuj ustawienia',
@@ -690,17 +689,71 @@ export const pl: Translations = {
 
   'privacy.local.title': 'Co zostaje na tym komputerze',
   'privacy.local.body':
-    'Wszystko leży w jednym folderze. To, gdzie on jest, zależy od Twojego systemu — ten launcher używa tego:',
-  'privacy.local.profiles':
-    'Twoje profile, a razem z nimi światy, zrzuty ekranu, ustawienia gry i mody.',
-  'privacy.local.settings':
-    'Twoje ustawienia launchera — wygląd, język i adresy, z których pobiera treści.',
-  'privacy.local.accounts': 'Twoja lista kont: nazwa gracza i data ostatniego logowania.',
-  'privacy.local.logs':
-    'Zapis tego, co launcher robił. Może zawierać Twoją nazwę gracza i nazwy folderów, więc przejrzyj go, zanim komuś wyślesz.',
-  'privacy.local.crashes': 'Raporty z awarii, już bez danych logowania.',
-  'privacy.local.keychain':
-    'Twoje hasło nie jest trzymane ani tutaj, ani nigdzie indziej — wpisujesz je na stronie Microsoftu, nie w tym launcherze. Launcher przechowuje tylko przepustkę, którą Microsoft odsyła, i wkłada ją do systemowego sejfu na hasła — tego samego, z którego korzysta Twoja przeglądarka. Jeśli Twój system takiego sejfu nie udostępnia, launcher trzyma ją u siebie w folderze i mówi o tym wprost na ekranie Konta.',
+    'Poniżej jest wszystko, co launcher zapisuje na tym komputerze — z miejscem i rozmiarem, zmierzone przed chwilą na Twoim dysku, a nie opisane z pamięci.',
+  'storage.total': 'Razem na dysku: {size}',
+  'storage.measuring': 'Mierzę pliki na dysku…',
+  'storage.refresh': 'Zmierz ponownie',
+  'storage.failed': 'Nie udało się zmierzyć plików launchera.',
+  'storage.openFailed': 'Nie udało się otworzyć tego folderu.',
+  'storage.nothingYet': 'jeszcze nic',
+  'storage.groupData': 'Folder danych — to on się przenosi',
+  'storage.groupHome': 'Folder launchera — zostaje na miejscu',
+  'storage.groupSystem': 'Poza tymi dwoma folderami',
+  'storage.homeIsData': 'Dopóki nie przeniesiesz danych, to ten sam folder co powyżej.',
+  'storage.profiles.title': 'Profile',
+  'storage.profiles.body':
+    'Każdy profil ma tu własny folder: światy, mody, paczki zasobów, shadery, zrzuty ekranu, ustawienia gry i kopie światów. To jedyna rzecz na tej liście, której nie da się pobrać ponownie.',
+  'storage.gameFiles.title': 'Pliki gry',
+  'storage.gameFiles.body':
+    'Wersje Minecrafta, biblioteki i zasoby pobrane od Mojanga, wspólne dla wszystkich profili. Usunięte pobiorą się ponownie przy następnym uruchomieniu.',
+  'storage.java.title': 'Środowiska Java',
+  'storage.java.body':
+    'Java, którą launcher pobrał dla wersji Minecrafta, które jej potrzebują. Usunięta pobierze się ponownie.',
+  'storage.loaders.title': 'Loadery',
+  'storage.loaders.body': 'Zainstalowane wersje Fabric, Quilt, Forge i NeoForge.',
+  'storage.state.title': 'Ustawienia i listy',
+  'storage.state.body':
+    'Trzy pliki: settings.json (ustawienia launchera), profiles.json (lista profili) i auth.json (lista kont: nazwa gracza i identyfikator konta, bez hasła).',
+  'storage.logs.title': 'Logi',
+  'storage.logs.body':
+    'Zapis tego, co robił launcher i co wypisywała gra. Zawiera Twoją nazwę gracza i ścieżki folderów, więc przejrzyj go, zanim komuś wyślesz.',
+  'storage.crashReports.title': 'Raporty z awarii',
+  'storage.crashReports.body':
+    'Jeden plik na każdą awarię gry, już bez tokenu i danych konta. Nigdzie nie są wysyłane — to Ty decydujesz, czy dołączyć któryś do zgłoszenia.',
+  'storage.browser.title': 'Pliki okna launchera',
+  'storage.browser.body':
+    'Okno launchera to wbudowana przeglądarka i tu trzyma swoje pliki: pamięć podręczną obrazków (ikony modów, grafiki aktualności), zapamiętane ukryte ogłoszenia i ciasteczka strony logowania Microsoft.',
+  'storage.pointer.title': 'Wskaźnik folderu danych',
+  'storage.pointer.body':
+    'Plik tekstowy z jedną linią: ścieżką do folderu danych. Po nim launcher i deinstalator trafiają do danych, które zostały przeniesione.',
+  'storage.updateCache.title': 'Pobrana aktualizacja launchera',
+  'storage.updateCache.body': 'Instalator nowej wersji, pobrany i czekający na instalację.',
+  'storage.program.title': 'Program',
+  'storage.program.body': 'Sam launcher — to, co położył tu instalator.',
+  'storage.legacyHome.title': 'Folder po starszej wersji',
+  'storage.legacyHome.body':
+    'Z tego folderu korzystały wersje do 0.7.1. Ta wersja ma swój i tego nie rusza — sprawdź, czy nie zostało w nim coś, czego potrzebujesz.',
+  'storage.keychain.title': 'Logowanie Microsoft — w magazynie poświadczeń systemu',
+  'storage.keychain.what':
+    'Twojego hasła launcher nie zna i nie przechowuje: wpisujesz je na stronie Microsoftu. Microsoft odsyła dwa klucze i tylko one są zapisywane — token odświeżania, którym launcher przedłuża logowanie bez pytania o hasło, oraz token sesji Minecrafta, ważny około doby.',
+  'storage.keychain.windows':
+    'W Windows trafiają do Menedżera poświadczeń: Panel sterowania → Konta użytkowników → Menedżer poświadczeń → Poświadczenia systemu Windows, wpisy zaczynające się od „com.ravenforge.launcher”. Windows szyfruje je Twoim kontem użytkownika; programy uruchomione na Twoim koncie mogą o nie poprosić, inni użytkownicy komputera nie.',
+  'storage.keychain.linux':
+    'W Linuksie trafiają do pęku kluczy pulpitu przez usługę Secret Service: GNOME Keyring (aplikacja „Hasła i klucze”) albo KWallet (KWalletManager), jako wpisy usługi „com.ravenforge.launcher”. Pęk jest zaszyfrowany hasłem logowania i otwarty, dopóki jesteś zalogowany; programy z Twojej sesji mogą z niego czytać.',
+  'storage.keychain.mac':
+    'W macOS trafiają do Pęku kluczy (aplikacja „Dostęp do pęku kluczy”), jako wpisy usługi „com.ravenforge.launcher”.',
+  'storage.keychain.none':
+    'Na tym komputerze: brak wpisów — nie jest zalogowane żadne konto Microsoft.',
+  'storage.keychain.count.one': 'Na tym komputerze: {count} wpis.',
+  'storage.keychain.count.few':
+    'Na tym komputerze: {count} wpisy, po dwa na każde konto Microsoft.',
+  'storage.keychain.count.many':
+    'Na tym komputerze: {count} wpisów, po dwa na każde konto Microsoft.',
+  'storage.keychain.count.other': 'Na tym komputerze: {count} wpisu.',
+  'storage.keychain.unavailable':
+    'Na tym komputerze magazyn poświadczeń nie odpowiada. Logowanie Microsoft jest wtedy zapisane w pliku auth.json w folderze danych, czytelnym tylko dla Twojego użytkownika — ekran Konta mówi o tym wprost.',
+  'storage.keychain.remove':
+    '„Wyloguj” w zakładce Konta usuwa oba wpisy tego konta. Możesz je też usunąć ręcznie w miejscu opisanym wyżej — launcher poprosi wtedy o ponowne logowanie.',
 
   'privacy.dest.title': 'Z kim launcher się kontaktuje',
   'privacy.dest.body':
@@ -716,13 +769,14 @@ export const pl: Translations = {
   'privacy.dest.java.when': 'gdy launcher instaluje za Ciebie Javę',
   'privacy.dest.java.sends': 'Która wersja Javy jest potrzebna i na jakim jesteś systemie.',
   'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge i Quilt',
-  'privacy.dest.loaders.when': 'przy instalacji tego, czego mody potrzebują do działania',
+  'privacy.dest.loaders.when': 'przy wyborze i instalacji loadera',
   'privacy.dest.modrinth.who': 'Modrinth',
-  'privacy.dest.modrinth.when': 'gdy szukasz modów albo sprawdzasz te, które masz',
+  'privacy.dest.modrinth.when':
+    'gdy szukasz modów i paczek, otwierasz listę zainstalowanych albo sprawdzasz aktualizacje',
   'privacy.dest.modrinth.sends':
-    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu — tak pyta się Modrinth, czym te pliki są. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
+    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Otwarcie listy modów, shaderów albo paczek zasobów profilu wysyła identyfikatory tych, które masz — tak launcher pobiera ich opisy i ikony, a odpowiedź pamięta przez tydzień. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
   'privacy.dest.packs.who': 'White Ravens',
-  'privacy.dest.packs.when': 'wiadomości i lista paczek serwerowych',
+  'privacy.dest.packs.when': 'wiadomości, lista paczek serwerowych i same paczki',
   'privacy.dest.updates.who': 'GitHub',
   'privacy.dest.updates.when': 'przy każdym starcie i gdy sprawdzasz aktualizacje',
   'privacy.dest.updates.sends':
@@ -738,12 +792,23 @@ export const pl: Translations = {
 
   'privacy.control.title': 'O czym decydujesz Ty',
   'privacy.control.offline':
-    'Tryb offline w ogóle nie kontaktuje się z serwerami logowania — grasz sam albo w sieci domowej.',
+    'Logowanie: Ustawienia → Zachowanie → „Zawsze uruchamiaj offline”. Launcher nie łączy się wtedy z serwerami logowania Microsoft, Xbox ani Mojang; pliki gry i mody nadal się pobierają. Konto offline (Konta → Tryb offline) nie loguje się nigdzie w ogóle.',
   'privacy.control.feeds':
-    'Wyczyść adres wiadomości w Ustawieniach, a nic więcej nie będzie pobierane.',
-  'privacy.control.proxy': 'Proxy przepuszcza wszystko przez serwer, który sam wybierasz.',
+    'Wiadomości: Ustawienia → Źródła treści. Wyczyść oba adresy, a launcher przestanie pobierać aktualności i ogłoszenia. Wpisz własne, a będzie pytał tylko je.',
+  'privacy.control.proxy':
+    'Pośrednik: Ustawienia → Sieć i pobieranie → Proxy URL. Przez wskazany serwer idą wszystkie połączenia launchera — pobieranie, logowanie, obrazki. Gra, kiedy już działa, łączy się po swojemu i proxy launchera jej nie obejmuje.',
+  'privacy.control.discord':
+    'Discord: Ustawienia → Zachowanie → „Pokazuj grę na statusie Discorda”, domyślnie wyłączone. Włączone pokazuje nazwę profilu, wersję i loader każdemu, kto widzi Twój profil na Discordzie — bez adresu serwera.',
+  'privacy.control.packs':
+    'Paczki: profil, który śledzi paczkę, pyta o nią adres ze swojego pola „Manifest URL” — przy starcie launchera i przed każdym uruchomieniem gry. Usuń ten adres w edytorze profilu, a profil przestanie pytać i przestanie się aktualizować.',
+  'privacy.control.updates':
+    'Aktualizacje launchera: sprawdzane przy każdym starcie jednym zapytaniem do GitHuba. Tego na razie nie da się wyłączyć.',
+  'privacy.control.diagnostics':
+    'Logi i raporty z awarii: nie opuszczają komputera, dopóki sam ich komuś nie wyślesz. „Zgłoś błąd” otwiera stronę zgłoszeń w przeglądarce, a plik dołączasz ręcznie.',
+  'privacy.control.location':
+    'Miejsce na dysku: Ustawienia → Dane → „Przenieś…” przenosi folder danych tam, gdzie wskażesz.',
   'privacy.control.delete':
-    'Wylogowanie kasuje zapisane logowanie tego konta i zapomina je także w oknie logowania. Usunięcie powyższego folderu usuwa całą resztę — po naszej stronie nie ma czego usuwać.',
+    'Usuwanie: „Wyloguj” w zakładce Konta kasuje zapisane logowanie tego konta — wpisy w systemowym magazynie poświadczeń i ciasteczka okna logowania. Usunięcie folderu danych i folderu launchera z listy powyżej usuwa całą resztę; deinstalator w Windows pyta o to wprost. Po naszej stronie nie ma czego usuwać.',
 
   'privacy.fullPolicy': 'Przeczytaj pełną politykę prywatności',
   'privacy.fullPolicyHint':

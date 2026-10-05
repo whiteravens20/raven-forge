@@ -83,3 +83,19 @@ export async function deleteSecret(key: string): Promise<void> {
     log.warn(`OS keychain delete failed for "${key}":`, err);
   }
 }
+
+/**
+ * How many secrets the keychain holds for the launcher, or null when it cannot
+ * be asked. Only ever the count: this exists so the privacy page can say what
+ * is kept there, and saying that does not need the secrets themselves.
+ */
+export async function countSecrets(): Promise<number | null> {
+  const kt = keytar();
+  if (!kt) return null;
+  try {
+    return (await kt.findCredentials(SERVICE)).length;
+  } catch (err) {
+    log.warn('OS keychain could not be listed:', err);
+    return null;
+  }
+}
