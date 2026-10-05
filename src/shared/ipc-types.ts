@@ -50,6 +50,7 @@ import type {
   ModSearchResult,
   ModUpdateResult,
   ModUpdateSummary,
+  ProjectDetails,
   ShaderLoaderResult,
   ShaderLoaderState,
 } from './ipc/mods';
@@ -186,6 +187,11 @@ export interface InvokeChannels {
   /** Install the builds the last check found, for the mods named. */
   'mods:update': (profileId: string, modIds: string[]) => Promise<IpcResult<ModUpdateResult>>;
   'mods:search': (filters: ModSearchFilters) => Promise<IpcResult<ModSearchPage>>;
+  /**
+   * Descriptions, icons and page addresses for installed content, keyed by the
+   * id or slug asked about. Names Modrinth does not know are simply absent.
+   */
+  'mods:get-details': (ids: string[]) => Promise<IpcResult<Record<string, ProjectDetails>>>;
   /** Modrinth's live facet list for a project type, grouped as Modrinth groups it. */
   'mods:get-facets': (projectType: ContentProjectType) => Promise<IpcResult<FacetGroups>>;
 
@@ -388,6 +394,7 @@ export interface RavenForgeAPI {
     checkUpdates: InvokeChannels['mods:check-updates'];
     update: InvokeChannels['mods:update'];
     search: InvokeChannels['mods:search'];
+    getDetails: InvokeChannels['mods:get-details'];
     getFacets: InvokeChannels['mods:get-facets'];
   };
   content: {

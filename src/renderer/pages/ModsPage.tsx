@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Search, Download, Package, RefreshCw, ArrowUpCircle } from 'lucide-react';
 import { usePagedSearch } from '@hooks/use-paged-search';
-import { SearchPager, SearchResultRow } from '@components/SearchResults';
+import { InstalledEntryInfo, SearchPager, SearchResultRow } from '@components/SearchResults';
+import { projectKey, useProjectDetails } from '@hooks/use-project-details';
 import { useProfileStore } from '@stores/profile-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
@@ -57,6 +58,7 @@ export function ModsPage() {
   /** Ids being updated right now — a set, so "update all" lights every row. */
   const [updating, setUpdating] = useState<Set<string>>(new Set());
 
+  const details = useProjectDetails(installed);
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
   const profileLoader = selectedProfile?.modLoader;
@@ -400,20 +402,20 @@ export function ModsPage() {
                 key={mod.id}
                 className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"
               >
-                <Package size={18} className="shrink-0 text-rf-text-muted" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-rf-text truncate">{mod.name}</p>
-                  <p className="text-xs text-rf-text-muted">
-                    {mod.version} • {mod.source}
-                    {mod.fromManifest && ` • ${t('mods.fromManifest')}`}
-                    {mod.updateAvailable && (
-                      <span className="text-rf-accent-text">
-                        {' • '}
-                        {t('mods.updateTo', { version: mod.updateAvailable.versionNumber })}
-                      </span>
-                    )}
-                  </p>
-                </div>
+                <InstalledEntryInfo
+                  entry={mod}
+                  details={details[projectKey(mod)]}
+                  fallbackIcon={<Package size={18} className="shrink-0 text-rf-text-muted" />}
+                >
+                  {mod.version} • {t(`mods.source.${mod.source}`)}
+                  {mod.fromManifest && ` • ${t('mods.fromManifest')}`}
+                  {mod.updateAvailable && (
+                    <span className="text-rf-accent-text">
+                      {' • '}
+                      {t('mods.updateTo', { version: mod.updateAvailable.versionNumber })}
+                    </span>
+                  )}
+                </InstalledEntryInfo>
                 <div className="flex items-center gap-2">
                   {mod.updateAvailable && (
                     <Button

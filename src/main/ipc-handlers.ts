@@ -49,6 +49,7 @@ import {
 } from '../core/mods/mod-sync';
 import { checkModUpdates, updateMods } from '../core/mods/mod-updates';
 import { searchMods, getSearchFacets } from '../core/mods/modrinth-api';
+import { getProjectDetails } from '../core/mods/project-details';
 import { planModInstall, planContentInstall } from '../core/mods/compatibility';
 import { listCataloguePacks } from '../core/packs/catalogue';
 import {
@@ -776,6 +777,16 @@ export function registerAllIpcHandlers(): void {
       return ok(await searchMods(filters));
     } catch (err) {
       return fail(`Mod search failed: ${reason(err)}`);
+    }
+  });
+  handle('mods:get-details', async (_event, ids: unknown) => {
+    try {
+      // Whatever arrives is narrowed to names Modrinth could know before any
+      // of it is sent; a profile has a few hundred entries at the very most.
+      const keys = Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
+      return ok(await getProjectDetails(keys.slice(0, 2000)));
+    } catch (err) {
+      return fail(`Could not load descriptions: ${reason(err)}`);
     }
   });
   handle('mods:get-facets', async (_event, projectType) => {

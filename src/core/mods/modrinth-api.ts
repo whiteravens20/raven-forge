@@ -234,6 +234,37 @@ export async function getSearchFacets(projectType: ContentProjectType): Promise<
   };
 }
 
+// ── Projects ───────────────────────────────────────────────
+
+export interface ModrinthProject {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  icon_url: string | null;
+}
+
+/** How many ids go in one request — they travel in the query string. */
+const PROJECT_BATCH = 100;
+
+/**
+ * Several projects at once, by id or by slug.
+ *
+ * Modrinth answers for either and simply leaves out a name it does not know,
+ * so the reply can be shorter than the question and that is not an error.
+ */
+export async function getProjects(idsOrSlugs: string[]): Promise<ModrinthProject[]> {
+  const found: ModrinthProject[] = [];
+  for (let i = 0; i < idsOrSlugs.length; i += PROJECT_BATCH) {
+    const params = new URLSearchParams({
+      ids: JSON.stringify(idsOrSlugs.slice(i, i + PROJECT_BATCH)),
+    });
+    const res = await modrinthFetch(`/projects?${params}`);
+    found.push(...((await res.json()) as ModrinthProject[]));
+  }
+  return found;
+}
+
 // ── Version listing ────────────────────────────────────────
 
 /**

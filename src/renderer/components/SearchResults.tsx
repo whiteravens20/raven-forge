@@ -5,7 +5,7 @@ import { ExternalLink, Package } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useLocale, useT } from '@renderer/i18n';
 import { modrinthProjectUrl } from '@shared/constants';
-import type { ModSearchResult } from '@shared/ipc-types';
+import type { InstalledMod, ModSearchResult, ProjectDetails } from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
@@ -147,5 +147,46 @@ export function SearchPager({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * What an installed mod, shader or resource pack is: its icon, its name, a way
+ * to its page, and a sentence about what it does.
+ *
+ * `details` arrives after the row is first drawn, and for a file Modrinth has
+ * never seen it never arrives — so everything here that depends on it is
+ * simply left out until it does, and the row never waits.
+ */
+export function InstalledEntryInfo({
+  entry,
+  details,
+  fallbackIcon,
+  children,
+}: {
+  entry: InstalledMod;
+  details?: ProjectDetails;
+  fallbackIcon: React.ReactNode;
+  /** The line of facts under the description: version, origin, update. */
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      {details?.iconUrl ? (
+        <img src={details.iconUrl} alt="" className="h-8 w-8 shrink-0 rounded" />
+      ) : (
+        fallbackIcon
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 text-sm font-medium text-rf-text">
+          <span className="truncate">{entry.name}</span>
+          {details && <ProjectLink slug={details.slug} name={entry.name} />}
+        </p>
+        {details?.description && (
+          <p className="line-clamp-2 text-xs text-rf-text-muted">{details.description}</p>
+        )}
+        <p className="text-xs text-rf-text-muted">{children}</p>
+      </div>
+    </>
   );
 }

@@ -72,6 +72,20 @@ export interface ModSearchResult {
   categories: string[];
 }
 
+/**
+ * What an installed mod, shader or resource pack is, as Modrinth describes it.
+ *
+ * Looked up for the installed lists, which otherwise know a name, a version and
+ * a file — nothing that says what the thing does or where it came from.
+ */
+export interface ProjectDetails {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  iconUrl?: string;
+}
+
 /** What Modrinth calls a project type. Shaders and resource packs are not mods. */
 export type ContentProjectType = 'mod' | 'shader' | 'resourcepack' | 'modpack';
 

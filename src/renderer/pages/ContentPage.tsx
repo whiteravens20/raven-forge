@@ -4,7 +4,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { usePagedSearch } from '@hooks/use-paged-search';
-import { SearchPager, SearchResultRow } from '@components/SearchResults';
+import { InstalledEntryInfo, SearchPager, SearchResultRow } from '@components/SearchResults';
+import { projectKey, useProjectDetails } from '@hooks/use-project-details';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
@@ -75,6 +76,7 @@ export function ContentPage() {
   // whatever named them: a project id when the launcher installed them, a slug
   // when a pack manifest did — and a search result carries both. Switching kind
   // reloads the list, so shaders are never matched against resource packs.
+  const details = useProjectDetails(installed);
   const installedIds = new Set(installed.map((item) => item.id));
   const isInstalled = (item: ModSearchResult) =>
     installedIds.has(item.id) || installedIds.has(item.slug);
@@ -461,14 +463,14 @@ export function ContentPage() {
                     </button>
                   </div>
                 )}
-                <Icon size={18} className="shrink-0 text-rf-text-muted" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-rf-text truncate">{item.name}</p>
-                  <p className="text-xs text-rf-text-muted">
-                    {item.version} • {item.source}
-                    {item.fromManifest && ` • ${t('mods.fromManifest')}`}
-                  </p>
-                </div>
+                <InstalledEntryInfo
+                  entry={item}
+                  details={details[projectKey(item)]}
+                  fallbackIcon={<Icon size={18} className="shrink-0 text-rf-text-muted" />}
+                >
+                  {item.version} • {t(`mods.source.${item.source}`)}
+                  {item.fromManifest && ` • ${t('mods.fromManifest')}`}
+                </InstalledEntryInfo>
                 {/* Manifest-managed entries are re-added by the next sync, so
                     removing one here would only look like it worked. */}
                 {!item.fromManifest && (
