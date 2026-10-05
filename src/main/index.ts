@@ -2,6 +2,8 @@
 
 import { app, BrowserWindow } from 'electron';
 import { initLogger, log } from './logger';
+import { establishAppHome } from './home';
+import type { AppHome } from '../core/config/app-home';
 import { createMainWindow, getMainWindow } from './window';
 import { installContentSecurityPolicy } from './security';
 import { registerAllIpcHandlers } from './ipc-handlers';
@@ -59,7 +61,7 @@ function registerCrashHandlers(): void {
  * created in the first tick of the handler, so losing the race would put a
  * second window on screen and take it away again.
  */
-function registerAppLifecycle(): void {
+function registerAppLifecycle(home: AppHome): void {
   app.on('second-instance', () => {
     // The launcher's own window, not whichever one happens to be first: a
     // sign-in is a second BrowserWindow, and raising that instead would answer a
@@ -74,6 +76,10 @@ function registerAppLifecycle(): void {
 
   app.whenReady().then(async () => {
     initLogger();
+    if (home.migratedFrom) log.info(`Renamed the home from ${home.migratedFrom}`);
+    if (home.legacyInUse) {
+      log.warn(`${home.legacyInUse} is in use, so it is the home for this session as it stands`);
+    }
 
     // After the logger and before anything that can throw: these exist to write
     // to the log, so registering them earlier would only lose what they caught.
@@ -120,9 +126,14 @@ function registerAppLifecycle(): void {
   });
 }
 
+// Where the launcher lives is settled first: the single-instance lock below is
+// kept in that directory, so it has to be the right one by the time it is asked
+// for.
+const home = establishAppHome();
+
 // Prevent multiple instances.
 if (app.requestSingleInstanceLock()) {
-  registerAppLifecycle();
+  registerAppLifecycle(home);
 } else {
   app.quit();
 }
