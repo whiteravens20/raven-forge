@@ -106,7 +106,6 @@ export const globalSettingsSchema = z.object({
   newsFeedUrl: z.string().url().or(z.literal('')).default(DEFAULT_NEWS_FEED_URL),
   announcementFeedUrl: z.string().url().or(z.literal('')).default(DEFAULT_ANNOUNCEMENT_FEED_URL),
   trustedPublicKeys: z.array(trustedKeySchema).default([]),
-  autoRemoveOrphanedMods: z.boolean().default(false),
   showLiveConsole: z.boolean().default(false),
   /**
    * Off unless asked for. It publishes what the player is doing to everyone who

@@ -115,11 +115,6 @@ export function SettingsPage() {
           label={t('settings.showConsole')}
         />
         <CheckboxRow
-          checked={settings.autoRemoveOrphanedMods}
-          onChange={(v) => update({ autoRemoveOrphanedMods: v })}
-          label={t('settings.autoRemoveOrphans')}
-        />
-        <CheckboxRow
           checked={settings.discordRichPresence}
           onChange={(v) => update({ discordRichPresence: v })}
           label={t('settings.discordPresence')}

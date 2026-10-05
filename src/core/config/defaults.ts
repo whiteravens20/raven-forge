@@ -20,7 +20,6 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   newsFeedUrl: DEFAULT_NEWS_FEED_URL,
   announcementFeedUrl: DEFAULT_ANNOUNCEMENT_FEED_URL,
   trustedPublicKeys: [],
-  autoRemoveOrphanedMods: false,
   showLiveConsole: false,
   discordRichPresence: false,
   offlineMode: false,

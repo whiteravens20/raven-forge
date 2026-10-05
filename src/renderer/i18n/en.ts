@@ -504,7 +504,6 @@ export const en = {
   'settings.offlineMode': 'Always launch offline',
   'settings.offlineModeHint':
     'Never contacts the sign-in servers. Singleplayer and LAN only — online-mode servers refuse an offline session.',
-  'settings.autoRemoveOrphans': 'Automatically remove orphaned mods',
   'settings.discordPresence': 'Show the game on your Discord status',
   'settings.discordPresenceHint':
     'While the game runs, your status shows the profile name, version and loader — never the ' +

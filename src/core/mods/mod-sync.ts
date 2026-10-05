@@ -473,7 +473,8 @@ async function obtainManifest(
  * imported `.mrpack` is a list of files with URLs and hashes, which is what a
  * manifest is, so it is converted and handed straight in. That reuses this
  * whole path rather than growing a second one: progress reporting,
- * cancellation, hash verification, orphan removal, the resource-pack order
+ * cancellation, hash verification, removal of what a pack dropped, the
+ * resource-pack order
  * written into `options.txt`, and a lock file the mods page can read. A supplied
  * manifest is cached like a fetched one, so syncing an imported pack again later
  * repairs anything deleted by hand.
@@ -704,46 +705,45 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     await syncContentFromManifest('resourcepacks', profileId, manifest.resourcePacks, mcVersion);
     await syncContentFromManifest('shaders', profileId, manifest.shaders, mcVersion);
 
-    // Mods that were installed from a previous manifest but are gone from this one.
+    // Mods the pack put here and no longer ships. They go, always: a profile
+    // that follows a pack is meant to match it, and a mod the server dropped is
+    // as likely to stop the client joining as one it added and the client lacks.
+    //
+    // This was a setting, off by default, and off was not a state anyone could
+    // live in. The mods stayed, the profile was marked "updates available" for
+    // as many as there were, pressing Sync changed nothing because the same
+    // sync left them there again — and they could not be removed by hand
+    // either, since a pack's mods have no Remove button.
     const keptIds = new Set(synced.map((m) => m.id));
 
     // Read again here, under the lock, rather than reusing the snapshot taken
     // before the downloads: minutes have passed, and a mod the player installed
     // by hand in the meantime would otherwise be written out of existence by a
     // list assembled before it arrived. Only the manifest's own half of the file
-    // is this function's to replace.
-    const orphaned = await mutateLockFile(profileId, (mods) => {
+    // is this function's to replace — what the player added is theirs to keep.
+    //
+    // The files go before the list is rewritten, inside the same turn. Done the
+    // other way round, a jar that could not be deleted — Windows refuses while
+    // the game has it open — was left in `mods/` with nothing recording it:
+    // still loaded by the game, never looked at by a sync again. This way a
+    // failure leaves the list as it was, the sync says why it stopped, and the
+    // next one tries again.
+    const dropped = await mutateLockFile(profileId, async (mods) => {
       const userInstalled = mods.filter((m) => !m.fromManifest);
       const stale = mods.filter((m) => m.fromManifest && !keptIds.has(m.id));
-      const next = settings.autoRemoveOrphanedMods
-        ? [...synced, ...userInstalled]
-        : // Keep them installed and surface the count so the UI can prompt.
-          [...synced, ...stale, ...userInstalled];
-      mods.splice(0, mods.length, ...next);
+      for (const mod of stale) {
+        await fs.rm(modFilePath(modsDir, mod.fileName, mod.enabled), { force: true });
+        log.info(`Removed ${mod.name} from ${profile.name}: the pack no longer ships it`);
+      }
+      mods.splice(0, mods.length, ...synced, ...userInstalled);
       return stale;
     });
-
-    // After the write, not before it: the lock file is what the next sync reads
-    // to decide what exists, so it is the thing that must be correct if the
-    // process dies between the two.
-    if (settings.autoRemoveOrphanedMods) {
-      for (const stale of orphaned) {
-        try {
-          await fs.rm(modFilePath(modsDir, stale.fileName, stale.enabled), { force: true });
-        } catch {
-          /* ok */
-        }
-        log.info(`Removed orphaned mod ${stale.name} from profile ${profile.name}`);
-      }
-    }
-
-    const pendingUpdates = settings.autoRemoveOrphanedMods ? 0 : orphaned.length;
 
     await writeSyncState(profileId, {
       lastSyncedAt: new Date().toISOString(),
       manifestEtag: etag ?? undefined,
-      pendingUpdates,
-      status: pendingUpdates > 0 ? 'updates-available' : 'synced',
+      pendingUpdates: 0,
+      status: 'synced',
       verification,
       appliedConfigs,
     });
@@ -758,7 +758,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     log.info(
       `Manifest sync complete for ${profile.name}: ${synced.length} mods, ` +
         `${configsWritten} of ${manifest.configFiles.length} configs written, ` +
-        `${orphaned.length} orphaned`,
+        `${dropped.length} removed`,
     );
   } catch (err) {
     // A cancelled sync is not an error state — leave the profile as it was

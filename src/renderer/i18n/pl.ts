@@ -534,7 +534,6 @@ export const pl: Translations = {
   'settings.offlineMode': 'Zawsze uruchamiaj offline',
   'settings.offlineModeHint':
     'Nigdy nie łączy się z serwerami logowania. Tylko singleplayer i LAN — serwery w trybie online odrzucą sesję offline.',
-  'settings.autoRemoveOrphans': 'Automatycznie usuwaj osierocone mody',
   'settings.discordPresence': 'Pokazuj grę na statusie Discorda',
   'settings.discordPresenceHint':
     'Kiedy gra działa, Twój status widzi nazwę profilu, wersję i loader — bez adresu serwera. ' +

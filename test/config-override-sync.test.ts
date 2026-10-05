@@ -40,7 +40,7 @@ vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 vi.mock('../src/core/config/settings-manager', () => ({
-  getSettings: async () => ({ trustedPublicKeys: [], autoRemoveOrphanedMods: true }),
+  getSettings: async () => ({ trustedPublicKeys: [] }),
 }));
 vi.mock('../src/core/profiles/profile-manager', () => ({ getProfile: async () => profile }));
 vi.mock('../src/core/mods/content-manager', () => ({ syncContentFromManifest: async () => {} }));

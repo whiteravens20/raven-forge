@@ -18,7 +18,6 @@ export interface GlobalSettings {
   newsFeedUrl?: string;
   announcementFeedUrl?: string;
   trustedPublicKeys: TrustedKey[];
-  autoRemoveOrphanedMods: boolean;
   showLiveConsole: boolean;
   /** Show the running profile on the player's Discord status. */
   discordRichPresence: boolean;
