@@ -26,6 +26,7 @@ vi.mock('../src/main/logger', () => ({
 }));
 
 const { writeCrashReport } = await import('../src/core/diagnostics/crash-report');
+const { reloadDataRoot } = await import('../src/core/config/data-root');
 
 let root: string;
 const reportsDir = () => path.join(root, 'userData', 'crash-reports');
@@ -69,6 +70,9 @@ async function seed(slug: string, count: number): Promise<string[]> {
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-crash-files-'));
   userData.path = path.join(root, 'userData');
+  // The reports are kept with the data, and where the data is gets worked out
+  // once and remembered — so each case has it worked out again.
+  reloadDataRoot();
 });
 
 afterEach(async () => {

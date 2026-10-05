@@ -488,7 +488,7 @@ describe.skipIf(!posix)('the end of a game', () => {
     expect(info.exitCode).toBe(1);
     expect(info.logTail).toEqual(['[12:00:00] [main/ERROR]: java.lang.NullPointerException']);
 
-    expect(path.dirname(info.reportPath!)).toBe(path.join(root, 'userData', 'crash-reports'));
+    expect(path.dirname(info.reportPath!)).toBe(path.join(root, 'data', 'crash-reports'));
     const report = await fs.readFile(info.reportPath!, 'utf-8');
     expect(report).toContain('Exit code: 1');
     expect(report).toContain('java.lang.NullPointerException');
@@ -564,7 +564,7 @@ describe.skipIf(!posix)('a game that is running', () => {
 
     expect(await exitInfo()).toMatchObject({ exitCode: 143, crashed: false });
     expect((await exitInfo()).reportPath).toBeUndefined();
-    await expect(fs.readdir(path.join(root, 'userData', 'crash-reports'))).rejects.toThrow();
+    await expect(fs.readdir(path.join(root, 'data', 'crash-reports'))).rejects.toThrow();
   });
 
   it('is not reported as crashed when the stop kills it outright either', async () => {
