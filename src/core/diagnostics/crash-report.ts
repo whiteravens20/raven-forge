@@ -67,6 +67,25 @@ export function redactSecrets(text: string, secrets: string[] = []): string {
   return out;
 }
 
+/**
+ * Take the session token out of a line of game output, and nothing else.
+ *
+ * `redactSecrets` is for a file that is about to be published. This is for what
+ * the launcher keeps and shows while the game runs — its own log, the live
+ * console, the tail an exit card quotes — where the player's name and their
+ * home directory are theirs to read, and the token is still nobody's business:
+ * Minecraft 1.8.9 prints `(Session ID is token:<token>:<uuid>)` on every start,
+ * and that line used to be copied into `main.log` as it came.
+ *
+ * The token itself is matched as well as the JWT shape, so that none of this
+ * rests on what a token happens to look like. The same length floor as above
+ * keeps the `0` an offline launch passes from blanking every zero in the output.
+ */
+export function redactTokens(line: string, accessToken: string): string {
+  const out = line.replace(JWT_PATTERN, '<redacted>');
+  return accessToken.length < 3 ? out : out.replaceAll(accessToken, '<redacted>');
+}
+
 export interface CrashReportInput {
   profile: Profile;
   exitCode: number;

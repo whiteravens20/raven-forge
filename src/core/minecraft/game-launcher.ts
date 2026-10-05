@@ -30,6 +30,7 @@ import { formatRamGb, ramAdvice, recommendedRamMb } from '../../shared/memory';
 import {
   isShutdownWatchdogCrash,
   readMinecraftCrash,
+  redactTokens,
   writeCrashReport,
   type CrashReportInput,
 } from '../diagnostics/crash-report';
@@ -539,7 +540,10 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   // halves of a split `ż` into replacement characters.
   const passOn = (stream: Readable | null, record: (text: string) => void) => {
     if (!stream) return;
-    readline.createInterface({ input: stream, crlfDelay: Infinity }).on('line', (line) => {
+    readline.createInterface({ input: stream, crlfDelay: Infinity }).on('line', (raw) => {
+      // Before anything holds on to it: the log, the ring buffer the console
+      // and the exit card read, and the renderer all get the line from here.
+      const line = redactTokens(raw, accessToken);
       if (!line) return;
       record(`[MC:${profile.name}] ${line}`);
       emitLogLine(profile.id, line);

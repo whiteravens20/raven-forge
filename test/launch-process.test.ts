@@ -418,6 +418,49 @@ describe.skipIf(!posix)('a game whose log4j looks things up', () => {
   });
 });
 
+/**
+ * The token the game is started with is a live credential for the player's
+ * Minecraft account, and Minecraft 1.8.9 prints it on every start.
+ */
+describe.skipIf(!posix)('the session token', () => {
+  const SESSION = '[12:00:00] [Client thread/INFO]: (Session ID is token:';
+  const printsIt = `echo '${SESSION}${TOKEN}:069a79f444e94726a5befca90e38aaf5)'`;
+
+  it('is kept out of the launcher’s log, the live console and the buffer behind both', async () => {
+    await launch([printsIt, 'echo ready', 'exec sleep 30'].join('\n'));
+    await vi.waitFor(() => expect(launcher.getLogTail('p1')).toContain('ready'));
+
+    const redacted = `${SESSION}<redacted>:069a79f444e94726a5befca90e38aaf5)`;
+    expect(launcher.getLogTail('p1')).toEqual([redacted, 'ready']);
+    expect(gameLines().map((line) => line.message)).toEqual([redacted, 'ready']);
+    // The line is still logged — it is the token that is not.
+    expect(state.logged).toContain(`[MC:Survival] ${redacted}`);
+    expect(state.logged.join('\n')).not.toContain(TOKEN);
+  });
+
+  it('is kept out of what a crash leaves behind', async () => {
+    await launch([printsIt, 'exit 1'].join('\n'));
+
+    const info = await exitInfo();
+    expect(info.logTail).toEqual([`${SESSION}<redacted>:069a79f444e94726a5befca90e38aaf5)`]);
+    expect(JSON.stringify(info)).not.toContain(TOKEN);
+    expect(await fs.readFile(info.reportPath!, 'utf-8')).not.toContain(TOKEN);
+  });
+
+  it('is not mistaken for the "0" an offline launch passes instead', async () => {
+    state.account = { ...state.account, type: 'offline' };
+    await launch(
+      [`echo '[12:00:00] [main/INFO]: Loaded 0 advancements in 10 ms'`, 'exit 0'].join('\n'),
+    );
+    await exitInfo();
+
+    expect((await gameArgs()).at(-1)).toBe('0');
+    expect(gameLines().map((line) => line.message)).toEqual([
+      '[12:00:00] [main/INFO]: Loaded 0 advancements in 10 ms',
+    ]);
+  });
+});
+
 describe.skipIf(!posix)('the end of a game', () => {
   it('reports a game that closed normally as exactly that', async () => {
     await launch('exit 0');

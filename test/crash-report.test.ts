@@ -4,6 +4,7 @@ import os from 'node:os';
 import { describe, it, expect } from 'vitest';
 import {
   redactSecrets,
+  redactTokens,
   buildCrashReport,
   isShutdownWatchdogCrash,
 } from '../src/core/diagnostics/crash-report';
@@ -57,6 +58,42 @@ describe('redactSecrets', () => {
     // `0` is the access token an offline launch uses. Redacting it would blank
     // out every version number, port and timestamp in the file.
     expect(redactSecrets('Exit code 0 after 10 min', ['0'])).toBe('Exit code 0 after 10 min');
+  });
+});
+
+/**
+ * The same promise for what the launcher keeps while the game runs: its own
+ * log, the live console, the tail on the exit card. Those are the player's own
+ * to read, so only the credential goes.
+ */
+describe('redactTokens', () => {
+  it('takes the token out of the line Minecraft 1.8.9 prints at every start', () => {
+    const line = `[12:00:00] [Client thread/INFO]: (Session ID is token:${TOKEN}:069a79f444e94726a5befca90e38aaf5)`;
+    expect(redactTokens(line, TOKEN)).toBe(
+      '[12:00:00] [Client thread/INFO]: (Session ID is token:<redacted>:069a79f444e94726a5befca90e38aaf5)',
+    );
+  });
+
+  it('takes out a JWT that is not this launch’s own', () => {
+    const other = 'eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJvdGhlciJ9.b3RoZXItc2lnbmF0dXJl';
+    expect(redactTokens(`[main/INFO]: auth=${other}`, TOKEN)).toBe('[main/INFO]: auth=<redacted>');
+  });
+
+  it('takes out this launch’s token whatever it looks like', () => {
+    const opaque = '5d41402abc4b2a76b9719d911017c592';
+    expect(redactTokens(`--accessToken ${opaque} --version 1.8.9`, opaque)).toBe(
+      '--accessToken <redacted> --version 1.8.9',
+    );
+  });
+
+  it('leaves the player’s own name and paths in their own log', () => {
+    const line = `[main/INFO]: Setting user: RavenPlayer, saving to ${os.homedir()}/worlds`;
+    expect(redactTokens(line, TOKEN)).toBe(line);
+  });
+
+  it('does not shred the output over the "0" an offline launch uses for a token', () => {
+    const line = '[12:00:00] [main/INFO]: Loaded 0 advancements in 10 ms';
+    expect(redactTokens(line, '0')).toBe(line);
   });
 });
 
