@@ -180,7 +180,8 @@ export const pl: Translations = {
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profile',
   'profiles.new': 'Nowy profil',
-  'profiles.import': 'Importuj profil',
+  'profiles.importDropped':
+    'Profil zaimportowany. Plik zawierał też pola, których import celowo nie przenosi: {fields}. Decydują o tym, co uruchamia się na tym komputerze, więc ustaw je sam w edytorze profilu, jeśli ufasz źródłu.',
   'profiles.empty': 'Brak profili',
   'profiles.emptyHint': 'Dodaj pierwszy profil przyciskiem +',
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
@@ -295,8 +296,9 @@ export const pl: Translations = {
     'Nasze serwery chodzą na whiteliście — paczkę zainstalujesz od razu, ale o wejście na serwer trzeba poprosić.',
   'packs.scratchTitle': 'Stwórz własną paczkę od zera',
   'packs.scratchBody': 'Pusty profil. Wybierasz wersję Minecrafta i loader, mody dodajesz sam.',
-  'packs.importTitle': 'Importuj własną paczkę',
-  'packs.importBody': 'Plik .mrpack, który już masz, albo link do manifestu.',
+  'packs.importTitle': 'Importuj',
+  'packs.importBody':
+    'Plik paczki .mrpack, link do paczki albo plik profilu wyeksportowany z launchera.',
   'packs.loading': 'Wczytuję listę paczek…',
   'packs.none': 'Nie opublikowano jeszcze żadnej paczki.',
   'packs.listFailed': 'Nie udało się wczytać listy paczek.',
@@ -308,7 +310,11 @@ export const pl: Translations = {
   'packs.mods.few': '{count} mody',
   'packs.mods.many': '{count} modów',
   'packs.mods.other': '{count} moda',
-  'packs.fileTitle': 'Plik .mrpack',
+  'packs.profileFileTitle': 'Plik profilu (.json)',
+  'packs.profileFileBody':
+    'Ustawienia jednego profilu zapisane przyciskiem „Eksportuj” w tym launcherze: wersja Minecrafta, loader, RAM, serwer. Bez modów i światów — te przenosi paczka .mrpack.',
+  'packs.profileFileFailed': 'Nie udało się zaimportować tego pliku profilu.',
+  'packs.fileTitle': 'Plik paczki (.mrpack)',
   'packs.fileBody':
     'Format paczek Modrintha, który czytają też Prism, ATLauncher i aplikacja Modrintha. Instalowany jako migawka — sam się nie zaktualizuje.',
   'packs.chooseFile': 'Wybierz plik…',
@@ -369,6 +375,7 @@ export const pl: Translations = {
   'profileForm.serverIp': 'Serwer IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Argumenty Java (opcjonalnie)',
+  'profileForm.javaArgsShort': 'Argumenty Java',
   'profileForm.java': 'Środowisko Java',
   'profileForm.javaManaged': 'To, które instaluje launcher',
   'profileForm.javaBrowse': 'Wskaż plik…',

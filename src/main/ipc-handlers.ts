@@ -21,7 +21,7 @@ import {
   deleteProfile,
   duplicateProfile,
   exportProfile,
-  importProfile,
+  importProfileFile,
   summarizeProfileFiles,
   listOrphanedProfiles,
   adoptOrphanedProfile,
@@ -576,9 +576,20 @@ export function registerAllIpcHandlers(): void {
       return fail(`Could not export that profile as a pack: ${reason(err)}`);
     }
   });
-  handle('profiles:import', async (_event, json: string) => {
+  handle('profiles:import', async () => {
     try {
-      return ok(await importProfile(json));
+      const win = getMainWindow();
+      if (!win) return fail('No window available');
+      // Asked here for the same reason the pack export asks here: the renderer
+      // never names a path, so there is no path for it to get wrong. It used to
+      // pick the file and then read it with `fetch('file://…')`, which only
+      // works for as long as the page itself happens to be a `file://` one.
+      const chosen = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        filters: [{ name: 'Raven Forge profile', extensions: ['json'] }],
+      });
+      if (chosen.canceled || chosen.filePaths.length === 0) return ok(null);
+      return ok(await importProfileFile(chosen.filePaths[0]));
     } catch (err) {
       return fail(`Failed to import profile: ${reason(err)}`);
     }

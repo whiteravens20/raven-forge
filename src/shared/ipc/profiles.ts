@@ -90,6 +90,18 @@ export interface OrphanedProfile {
 }
 
 /**
+ * A profile made from an exported profile file.
+ *
+ * `dropped` names the fields the file carried that an import never honours —
+ * a Java path, JVM arguments, a pack address — so the person importing is told
+ * what did not come across instead of finding out at the first launch.
+ */
+export interface ProfileImport {
+  profile: Profile;
+  dropped: string[];
+}
+
+/**
  * What exporting a profile as a `.mrpack` produced.
  *
  * The counts are the point: a pack is references, not jars, so the difference

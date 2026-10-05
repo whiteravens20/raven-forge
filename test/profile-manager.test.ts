@@ -282,13 +282,32 @@ describe('exportProfile', () => {
   it('round-trips through the import rules', async () => {
     const created = await mgr.createProfile(newProfile('Ravens'));
     const imported = await mgr.importProfile(await mgr.exportProfile(created.id));
-    expect(imported.id).not.toBe(created.id);
-    expect(imported.name).toBe('Ravens');
+    expect(imported.profile.id).not.toBe(created.id);
+    expect(imported.profile.name).toBe('Ravens');
+    expect(imported.dropped).toEqual([]);
   });
 
   it('does not let an export carry a Java path into a new profile', async () => {
     const created = await mgr.createProfile(newProfile('Ravens'));
     const json = JSON.stringify({ ...created, customJavaPath: '/tmp/not-a-jvm' });
-    expect(await mgr.importProfile(json)).not.toHaveProperty('customJavaPath');
+    const imported = await mgr.importProfile(json);
+    expect(imported.profile).not.toHaveProperty('customJavaPath');
+    // And says so, which is what lets the UI tell the player what was left out.
+    expect(imported.dropped).toEqual(['customJavaPath']);
+  });
+
+  it('reads an export back from a file', async () => {
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    const file = path.join(root, 'ravens.json');
+    await fs.writeFile(file, await mgr.exportProfile(created.id));
+
+    expect((await mgr.importProfileFile(file)).profile.name).toBe('Ravens');
+  });
+
+  it('refuses a file far too large to be a profile before reading it', async () => {
+    const file = path.join(root, 'huge.json');
+    await fs.writeFile(file, Buffer.alloc(2 * 1024 * 1024, 0x20));
+
+    await expect(mgr.importProfileFile(file)).rejects.toThrow(/too large/);
   });
 });

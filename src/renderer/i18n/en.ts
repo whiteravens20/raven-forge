@@ -188,7 +188,8 @@ export const en = {
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profiles',
   'profiles.new': 'New profile',
-  'profiles.import': 'Import profile',
+  'profiles.importDropped':
+    'Profile imported. The file also carried fields an import deliberately leaves out: {fields}. They decide what runs on this computer, so set them yourself in the profile editor if you trust where the file came from.',
   'profiles.empty': 'No profiles',
   'profiles.emptyHint': 'Add your first profile with the + button',
   'profiles.pickOrCreate': 'Select a profile, or create a new one',
@@ -272,8 +273,9 @@ export const en = {
   'packs.scratchTitle': 'Build a pack from scratch',
   'packs.scratchBody':
     'An empty profile. Choose the Minecraft version and loader, add mods yourself.',
-  'packs.importTitle': 'Import your own pack',
-  'packs.importBody': 'A .mrpack file you already have, or a link to a manifest.',
+  'packs.importTitle': 'Import',
+  'packs.importBody':
+    'A .mrpack pack file, a link to a pack, or a profile file exported from the launcher.',
   'packs.loading': 'Loading the pack list…',
   'packs.none': 'No packs are published yet.',
   'packs.listFailed': 'Could not load the pack list.',
@@ -283,7 +285,11 @@ export const en = {
   'packs.wrSyncNote': 'These profiles follow the server: every sync brings whatever changed.',
   'packs.mods.one': '{count} mod',
   'packs.mods.other': '{count} mods',
-  'packs.fileTitle': 'A .mrpack file',
+  'packs.profileFileTitle': 'A profile file (.json)',
+  'packs.profileFileBody':
+    'The settings of one profile, as saved by “Export” in this launcher: Minecraft version, loader, RAM, server. No mods and no worlds — a .mrpack pack carries those.',
+  'packs.profileFileFailed': 'Could not import that profile file.',
+  'packs.fileTitle': 'A pack file (.mrpack)',
   'packs.fileBody':
     'The Modrinth pack format, which Prism, ATLauncher and the Modrinth app also read. Installed as a snapshot — it will not update itself.',
   'packs.chooseFile': 'Choose a file…',
@@ -344,6 +350,7 @@ export const en = {
   'profileForm.serverIp': 'Server IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Java arguments (optional)',
+  'profileForm.javaArgsShort': 'Java arguments',
   'profileForm.java': 'Java runtime',
   'profileForm.javaManaged': 'The one the launcher installs',
   'profileForm.javaBrowse': 'Choose a file…',

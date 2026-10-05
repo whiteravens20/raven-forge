@@ -10,7 +10,12 @@ import { writeJsonAtomic } from '../util/atomic-file';
 import { profileSchema } from '../../shared/validators';
 import { recommendedRamMb } from '../../shared/memory';
 import { machineMemoryMb } from '../util/machine-memory';
-import type { OrphanedProfile, Profile, ProfileFileSummary } from '../../shared/ipc-types';
+import type {
+  OrphanedProfile,
+  Profile,
+  ProfileFileSummary,
+  ProfileImport,
+} from '../../shared/ipc-types';
 
 // ── Profiles index persistence ─────────────────────────────
 
@@ -430,10 +435,25 @@ export function readImportedProfile(json: string): ImportedProfile {
   return { data, dropped };
 }
 
-export async function importProfile(json: string): Promise<Profile> {
+export async function importProfile(json: string): Promise<ProfileImport> {
   const { data, dropped } = readImportedProfile(json);
   if (dropped.length > 0) {
     log.warn(`Dropped ${dropped.join(' and ')} while importing profile ${data.name}`);
   }
-  return createProfile(data);
+  return { profile: await createProfile(data), dropped };
+}
+
+/**
+ * A profile export is a page of JSON. Anything far past that is not one, and
+ * is refused before it is read into memory rather than after.
+ */
+const MAX_PROFILE_FILE_BYTES = 1024 * 1024;
+
+/** {@link importProfile}, from a file on disk. */
+export async function importProfileFile(filePath: string): Promise<ProfileImport> {
+  const { size } = await fs.stat(filePath);
+  if (size > MAX_PROFILE_FILE_BYTES) {
+    throw new Error('That file is too large to be a profile');
+  }
+  return importProfile(await fs.readFile(filePath, 'utf-8'));
 }

@@ -9,7 +9,6 @@ import {
   X,
   Edit3,
   Download,
-  Upload,
   FolderOpen,
   RefreshCw,
   ShieldCheck,
@@ -33,7 +32,7 @@ import { RamField } from '@components/RamField';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useMachineMemoryMb } from '@hooks/use-machine-memory';
-import { useLocale, useT } from '@renderer/i18n';
+import { useLocale, useT, type TranslationKey } from '@renderer/i18n';
 import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '@shared/constants';
 import { GAME_LANGUAGES } from '@shared/game-languages';
 import { loaderLabel } from '@shared/labels';
@@ -72,6 +71,18 @@ const LOADER_OPTIONS = [
 ];
 
 type DraftProfile = Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>;
+
+/**
+ * The form labels of the fields a profile import leaves out, keyed by field.
+ *
+ * `Partial`, because the list of fields is the main process's to extend: one
+ * added there and not here is shown under its own name instead of a label.
+ */
+const DROPPED_FIELD_LABELS: Partial<Record<string, TranslationKey>> = {
+  customJavaPath: 'profileForm.java',
+  javaArgs: 'profileForm.javaArgsShort',
+  manifestUrl: 'profiles.manifestUrl',
+};
 
 /** `totalMb` is the machine's memory, or undefined when it could not be read. */
 function emptyDraft(totalMb: number | undefined): DraftProfile {
@@ -143,6 +154,8 @@ export function ProfilesPage() {
   /** The last pack export, so its result can be reported instead of vanishing. */
   const [exported, setExported] = useState<MrpackExport | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Something worth saying that is not a failure — what an import left out. */
+  const [notice, setNotice] = useState<string | null>(null);
   const [exportingPack, setExportingPack] = useState(false);
   /** Set while a Minecraft version change is waiting to be confirmed. */
   const [versionChange, setVersionChange] = useState<ProfileFileSummary | null>(null);
@@ -337,18 +350,6 @@ export function ProfilesPage() {
     }
   };
 
-  const handleImport = async () => {
-    const filePath = await api.system.selectFile([{ name: 'Profile JSON', extensions: ['json'] }]);
-    if (!filePath.success || !filePath.data) return;
-    // Read file via fetch — file:// URLs aren't allowed, so we round-trip through a fresh tag
-    const json = await fetch(`file://${filePath.data}`)
-      .then((r) => r.text())
-      .catch(() => null);
-    if (!json) return;
-    await api.profiles.import(json);
-    await reload();
-  };
-
   return (
     <div className="flex h-full">
       {/* Profile list */}
@@ -357,22 +358,13 @@ export function ProfilesPage() {
           <h2 className="text-xs font-display font-semibold text-rf-text-secondary uppercase tracking-wider">
             {t('profiles.title')}
           </h2>
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Upload size={14} />}
-              onClick={handleImport}
-              title={t('profiles.import')}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Plus size={14} />}
-              onClick={startCreate}
-              title={t('profiles.new')}
-            />
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Plus size={14} />}
+            onClick={startCreate}
+            title={t('profiles.new')}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -453,6 +445,13 @@ export function ProfilesPage() {
             <Banner type="urgent">{actionError}</Banner>
           </div>
         )}
+        {notice && (
+          <div className="mx-auto mb-4 max-w-2xl">
+            <Banner type="info" dismissible onDismiss={() => setNotice(null)}>
+              {notice}
+            </Banner>
+          </div>
+        )}
         {exported && (
           <div className="mx-auto mb-4 max-w-2xl">
             <Banner
@@ -520,8 +519,23 @@ export function ProfilesPage() {
         <ProfileSourcePicker
           onCancel={() => setChoosingSource(false)}
           onScratch={startFromScratch}
-          onCreated={(profileId) => {
+          onCreated={(profileId, dropped) => {
             setChoosingSource(false);
+            // A profile file can carry a Java path, JVM arguments and a pack
+            // address, and an import takes none of them. Said here, where the
+            // new profile is on screen, so nobody finds out at the first launch.
+            setNotice(
+              dropped && dropped.length > 0
+                ? t('profiles.importDropped', {
+                    fields: dropped
+                      .map((field) => {
+                        const label = DROPPED_FIELD_LABELS[field];
+                        return label ? t(label) : field;
+                      })
+                      .join(', '),
+                  })
+                : null,
+            );
             void reload().then(() => select(profileId));
           }}
         />

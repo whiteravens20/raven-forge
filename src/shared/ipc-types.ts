@@ -35,6 +35,7 @@ import type {
   WorldBackupReason,
   Profile,
   ProfileFileSummary,
+  ProfileImport,
   ProfileSyncStatus,
 } from './ipc/profiles';
 import type {
@@ -100,7 +101,11 @@ export interface InvokeChannels {
    * settings. Asks where to put it; `null` means the player closed the dialog.
    */
   'profiles:export-pack': (profileId: string) => Promise<IpcResult<MrpackExport | null>>;
-  'profiles:import': (json: string) => Promise<IpcResult<Profile>>;
+  /**
+   * Make a profile from an exported profile file. Asks which file; `null` means
+   * the player closed the dialog.
+   */
+  'profiles:import': () => Promise<IpcResult<ProfileImport | null>>;
   'profiles:get-sync-status': (profileId: string) => Promise<IpcResult<ProfileSyncStatus>>;
   /** Copy an image in as the profile's icon; `null` source clears it. */
   'profiles:set-icon': (

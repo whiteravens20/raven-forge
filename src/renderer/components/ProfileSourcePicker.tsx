@@ -16,8 +16,11 @@ interface Props {
   onCancel: () => void;
   /** Build a profile by hand — hands back to the ordinary create form. */
   onScratch: () => void;
-  /** A profile arrived; `profileId` is the one to select. */
-  onCreated: (profileId: string) => void;
+  /**
+   * A profile arrived; `profileId` is the one to select. `dropped` names what a
+   * profile file carried that an import leaves out, for the page to say.
+   */
+  onCreated: (profileId: string, dropped?: string[]) => void;
 }
 
 type Route = 'choose' | 'white-ravens' | 'import';
@@ -85,6 +88,18 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     setBusy(null);
     if (result.success && result.data) onCreated(result.data.id);
     else setError(result.error ?? t('packs.importFailed'));
+  };
+
+  // The settings of one profile, as this launcher's own Export wrote them. It
+  // lives here, beside the pack file, because both are "I have a file" — it
+  // used to be an unlabelled icon above the profile list that nobody found.
+  const importProfileFile = async () => {
+    setBusy('profile');
+    setError(null);
+    const result = await api.profiles.import();
+    setBusy(null);
+    if (!result.success) setError(result.error ?? t('packs.profileFileFailed'));
+    else if (result.data) onCreated(result.data.profile.id, result.data.dropped);
   };
 
   // One field for both kinds of link. Which one it is gets decided in the main
@@ -266,6 +281,21 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                     {t('common.add')}
                   </Button>
                 </form>
+              </div>
+
+              <div className="rounded-lg border border-rf-border p-3">
+                <p className="text-sm font-medium text-rf-text">{t('packs.profileFileTitle')}</p>
+                <p className="mt-0.5 text-xs text-rf-text-muted">{t('packs.profileFileBody')}</p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="mt-2"
+                  loading={busy === 'profile'}
+                  disabled={Boolean(busy)}
+                  onClick={() => void importProfileFile()}
+                >
+                  {t('packs.chooseFile')}
+                </Button>
               </div>
             </>
           )}
