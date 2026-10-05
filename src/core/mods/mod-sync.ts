@@ -349,6 +349,19 @@ export async function resolveModEntry(
   }
 }
 
+/**
+ * The hash a manifest entry's file has to match.
+ *
+ * The manifest's own, whenever it states one: that is the publisher's claim and
+ * can be covered by the manifest signature. What the source's API reports is
+ * the fallback for an entry that states none — and only that. Merging the two
+ * and taking the strongest algorithm, as this used to, let Modrinth's sha512
+ * outrank a sha256 the manifest pinned, so the pin was never compared at all.
+ */
+function pinnedHashes(entry: ModEntry, resolved: ResolvedDownload): HashedEntry {
+  return expectedHash(entry) ? entry : (resolved.hashes ?? {});
+}
+
 /** Download (or copy) one entry into the profile and verify its hash. */
 async function fetchModEntry(
   entry: ModEntry,
@@ -363,10 +376,7 @@ async function fetchModEntry(
     await downloadToFile(resolved.url!, destPath, { signal, secure: true });
   }
 
-  // The manifest's own hashes win — `expectedHash` prefers sha512, then sha256,
-  // then sha1, so spreading the entry last cannot downgrade a manifest-declared
-  // hash to whatever the source's API happened to report.
-  await verifyDownload(destPath, { ...resolved.hashes, ...entry }, entry.name);
+  await verifyDownload(destPath, pinnedHashes(entry, resolved), entry.name);
 
   // installed.lock always records sha256 so local integrity checks stay uniform,
   // whichever algorithm the manifest happened to publish.
@@ -586,10 +596,14 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       const enabled = previous?.enabled ?? true;
       const destPath = modFilePath(modsDir, resolved.fileName, enabled);
 
-      // Already on disk and matching the manifest hash — leave it alone.
+      // Already on disk and matching — leave it alone. Whether the lock file
+      // has heard of it is beside the point: the lock is written once, at the
+      // very end, so a first install that failed at mod sixty had recorded
+      // nothing, and the retry fetched the first fifty-nine again — on every
+      // launch, for as long as that one URL stayed broken.
       let hash: string | undefined;
-      if (previous && (await fileMatches(destPath, entry))) {
-        hash = previous.sha256 ?? (await sha256File(destPath));
+      if (await fileMatches(destPath, pinnedHashes(entry, resolved))) {
+        hash = previous?.sha256 ?? (await sha256File(destPath));
       }
 
       plannedMods.push({ entry, resolved, destPath, previous, enabled, hash });
