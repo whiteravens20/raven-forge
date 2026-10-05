@@ -16,6 +16,7 @@ import {
   Package,
 } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
+import { useAuthStore } from '@stores/auth-store';
 import { useGameStore } from '@stores/game-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
@@ -26,6 +27,7 @@ import { ProfileAvatar } from '@components/ProfileAvatar';
 import { ProfileIconPicker } from '@components/ProfileIconPicker';
 import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
 import { ProfileSourcePicker } from '@components/ProfileSourcePicker';
+import { GameFailureNotice } from '@components/GameFailureNotice';
 import { WorldBackupCard } from '@components/WorldBackupCard';
 import { VersionChangeDialog } from '@components/VersionChangeDialog';
 import { RamField } from '@components/RamField';
@@ -187,15 +189,6 @@ export function ProfilesPage() {
   };
   const [syncing, setSyncing] = useState(false);
 
-  const beginPreparing = useGameStore((s) => s.beginPreparing);
-  const endPreparing = useGameStore((s) => s.endPreparing);
-  const quickConnectPreparing = useGameStore((s) =>
-    selectedId ? s.preparing.has(selectedId) : false,
-  );
-  const quickConnectBusy = useGameStore((s) =>
-    selectedId ? s.running.has(selectedId) || s.preparing.has(selectedId) : false,
-  );
-
   const selectedProfile = profiles.find((p) => p.id === selectedId);
 
   useEffect(() => {
@@ -307,16 +300,6 @@ export function ProfilesPage() {
   const handleCancelSync = async () => {
     if (!selectedId) return;
     await api.game.cancel(selectedId);
-  };
-
-  const handleQuickConnect = async () => {
-    if (!selectedId || quickConnectBusy) return;
-    beginPreparing(selectedId);
-    try {
-      await api.game.launch({ profileId: selectedId, quickConnect: true });
-    } finally {
-      endPreparing(selectedId);
-    }
   };
 
   const handleDuplicate = async () => {
@@ -519,9 +502,6 @@ export function ProfilesPage() {
             exportingPack={exportingPack}
             onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
             onSync={handleSync}
-            onQuickConnect={handleQuickConnect}
-            quickConnectBusy={quickConnectBusy}
-            quickConnectPreparing={quickConnectPreparing}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-rf-text-muted">
@@ -615,9 +595,6 @@ interface DetailProps {
   exportingPack: boolean;
   onOpenFolder: () => void;
   onSync: () => void;
-  onQuickConnect: () => void;
-  quickConnectBusy: boolean;
-  quickConnectPreparing: boolean;
 }
 
 function ProfileDetail({
@@ -635,9 +612,6 @@ function ProfileDetail({
   exportingPack,
   onOpenFolder,
   onSync,
-  onQuickConnect,
-  quickConnectBusy,
-  quickConnectPreparing,
 }: DetailProps) {
   const t = useT();
   // Dates follow the UI language, not a hardcoded pl-PL.
@@ -746,19 +720,7 @@ function ProfileDetail({
         </div>
       )}
 
-      {/* Spinner only while preparing — a running game has nothing pending. */}
-      {profile.serverIp && (
-        <Button
-          onClick={onQuickConnect}
-          size="lg"
-          loading={quickConnectPreparing}
-          disabled={quickConnectBusy}
-        >
-          {t('profiles.quickConnect', {
-            address: `${profile.serverIp}:${profile.serverPort ?? 25565}`,
-          })}
-        </Button>
-      )}
+      {profile.serverIp && <QuickConnect profile={profile} />}
 
       {profile.notes && (
         <div className="rounded-lg border border-rf-border bg-rf-surface p-3">
@@ -779,6 +741,57 @@ function ProfileDetail({
             : ''}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Start the game and join the profile's server in one press.
+ *
+ * The same launch as Play, through the same routine in the game store, so it
+ * gets the same answers. It used to make the call itself and look at nothing
+ * that came back: with no account signed in, the button spun through the
+ * pack, Java and the assets and then went quiet.
+ */
+function QuickConnect({ profile }: { profile: Profile }) {
+  const t = useT();
+  const signedIn = useAuthStore((s) => s.accounts.some((a) => a.id === s.activeAccountId));
+  const preparing = useGameStore((s) => s.preparing.has(profile.id));
+  const running = useGameStore((s) => s.running.has(profile.id));
+  const cancelling = useGameStore((s) => s.cancelling.has(profile.id));
+  const launch = useGameStore((s) => s.launch);
+  const cancelLaunch = useGameStore((s) => s.cancelLaunch);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        {/* Spinner only while preparing — a running game has nothing pending. */}
+        <Button
+          size="lg"
+          loading={preparing}
+          disabled={!signedIn || running}
+          onClick={() => void launch(profile.id, { quickConnect: true })}
+        >
+          {t('profiles.quickConnect', {
+            address: `${profile.serverIp}:${profile.serverPort ?? 25565}`,
+          })}
+        </Button>
+        {preparing && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<X size={14} />}
+            loading={cancelling}
+            onClick={() => void cancelLaunch(profile.id)}
+          >
+            {cancelling ? t('home.cancelling') : t('home.cancelLaunch')}
+          </Button>
+        )}
+      </div>
+      {/* The launch needs an account and only finds that out after the
+          downloads, so the button says it first. */}
+      {!signedIn && <p className="text-xs text-rf-warning">{t('home.notSignedIn')}</p>}
+      <GameFailureNotice profileId={profile.id} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { useGameStore } from '@stores/game-store';
 import { useSettingsStore } from '@stores/settings-store';
 import { Button } from '@components/ui/Button';
 import { Banner } from '@components/ui/Banner';
+import { GameFailureNotice } from '@components/GameFailureNotice';
 import { LiveConsole } from '@components/LiveConsole';
 import { NewsStrip } from '@components/NewsStrip';
 import { ProfileAvatar } from '@components/ProfileAvatar';
@@ -18,8 +19,6 @@ import { ForgeBackdrop } from '@components/layout/ForgeBackdrop';
 import { useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import { useUpdaterStore } from '@stores/updater-store';
-
-const api = window.ravenforge;
 
 /** Feed dates are ISO strings from a file someone hand-edits; show what parses. */
 function formatDate(iso: string, locale: string): string | undefined {
@@ -60,8 +59,11 @@ export function HomePage() {
   // forced a render. Select the value, not the getter.
   const runningNow = useGameStore((s) => (selectedId ? s.running.has(selectedId) : false));
   const preparingNow = useGameStore((s) => (selectedId ? s.preparing.has(selectedId) : false));
-  const beginPreparing = useGameStore((s) => s.beginPreparing);
-  const endPreparing = useGameStore((s) => s.endPreparing);
+  const cancellingNow = useGameStore((s) => (selectedId ? s.cancelling.has(selectedId) : false));
+  const stoppingNow = useGameStore((s) => (selectedId ? s.stopping.has(selectedId) : false));
+  const launch = useGameStore((s) => s.launch);
+  const cancelLaunch = useGameStore((s) => s.cancelLaunch);
+  const stop = useGameStore((s) => s.stop);
   const crashInfo = useGameStore((s) => (selectedId ? s.getCrashInfo(selectedId) : undefined));
   const clearCrash = useGameStore((s) => s.clearCrash);
   const toggleConsole = useGameStore((s) => s.toggleConsole);
@@ -69,14 +71,10 @@ export function HomePage() {
     selectedId ? s.isConsoleVisible(selectedId) : false,
   );
 
-  const [launchError, setLaunchError] = useState<string | null>(null);
-  const [stopping, setStopping] = useState(false);
   /** Outlives the fetch itself, so a refresh that answers instantly is still seen to turn. */
   const [refreshSpinning, setRefreshSpinning] = useState(false);
   /** The news item or announcement currently open in the reader. */
   const [reading, setReading] = useState<Article | null>(null);
-  /** Set when a launch failed only because the auth servers could not be reached. */
-  const [offlineOffer, setOfflineOffer] = useState(false);
   const pendingUpdate = useUpdaterStore((s) => s.available);
   const updateStage = useUpdaterStore((s) => s.stage);
   const downloadPending = useUpdaterStore((s) => s.downloadPending);
@@ -89,11 +87,7 @@ export function HomePage() {
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
   const busyNow = runningNow || preparingNow;
 
-  /**
-   * @param offlineMode `true` retries a launch that failed because the auth
-   *        servers were unreachable. Left undefined the global setting decides.
-   */
-  const handleLaunch = async (offlineMode?: boolean) => {
+  const handleLaunch = async () => {
     if (!selectedId || !selectedProfile || busyNow) return;
 
     // A waiting launcher update is installed before the game starts, because a
@@ -113,65 +107,7 @@ export function HomePage() {
       // update is not a reason to be unable to play.
     }
 
-    setLaunchError(null);
-    setOfflineOffer(false);
-    clearCrash(selectedId);
-    beginPreparing(selectedId);
-    try {
-      const result = await api.game.launch({ profileId: selectedId, offlineMode });
-      if (!result.success) {
-        // Unreachable is recoverable and rejected is not, so only one of them
-        // gets an offer — and this banner stays until it is acted on rather
-        // than timing out under the reader.
-        if (result.code === 'AUTH_UNREACHABLE') {
-          setOfflineOffer(true);
-          return;
-        }
-        // A refusal the launcher raised about the profile comes with a key,
-        // and is said in the player's language; anything else is a diagnostic
-        // and arrives in English, which is also what the log holds.
-        setLaunchError(
-          result.errorMessage
-            ? t(result.errorMessage.key, result.errorMessage.vars)
-            : (result.error ?? t('home.launchFailed')),
-        );
-      }
-    } catch {
-      setLaunchError(t('home.launchError'));
-    } finally {
-      // `game:started` normally clears this; do it here too so a launch that
-      // fails before spawning does not leave the button disabled forever.
-      endPreparing(selectedId);
-    }
-  };
-
-  const handleCancel = async () => {
-    if (!selectedId) return;
-    await api.game.cancel(selectedId);
-    // Main resolves the launch call quietly after aborting; clear the button
-    // here too so it frees up even if that resolution is slow.
-    endPreparing(selectedId);
-  };
-
-  /**
-   * Stop a game that is already up.
-   *
-   * `killGame` — SIGTERM, then SIGKILL after ten seconds, and it does not report
-   * success until the process has actually gone — has been complete since the
-   * launcher could start a game, and nothing called it: a Minecraft that hung on
-   * its splash screen could only be dealt with from outside the launcher. The
-   * running state is not cleared here; the process's own `exit` handler sends
-   * `game:exited`, which is the one event that means it really stopped.
-   */
-  const handleStop = async () => {
-    if (!selectedId) return;
-    setStopping(true);
-    try {
-      const result = await api.game.kill(selectedId);
-      if (!result.success) setLaunchError(result.error ?? t('home.stopFailed'));
-    } finally {
-      setStopping(false);
-    }
+    await launch(selectedId);
   };
 
   /**
@@ -349,24 +285,31 @@ export function HomePage() {
                 : t('home.play')}
         </Button>
 
-        {/* Only while preparing: once the game is up there is no download to stop. */}
-        {preparingNow && (
-          <Button variant="ghost" size="sm" icon={<X size={14} />} onClick={handleCancel}>
-            {t('home.cancelLaunch')}
+        {/* Only while preparing: once the game is up there is no download to
+            stop. It keeps turning until the launch has actually let go, which
+            is the moment Play can be pressed again. */}
+        {selectedId && preparingNow && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<X size={14} />}
+            loading={cancellingNow}
+            onClick={() => void cancelLaunch(selectedId)}
+          >
+            {cancellingNow ? t('home.cancelling') : t('home.cancelLaunch')}
           </Button>
         )}
 
         {/* And once it is up, the other half of the same offer. */}
-        {runningNow && !preparingNow && (
+        {selectedId && runningNow && !preparingNow && (
           <Button
             variant="ghost"
             size="sm"
             icon={<Square size={14} />}
-            loading={stopping}
-            disabled={stopping}
-            onClick={() => void handleStop()}
+            loading={stoppingNow}
+            onClick={() => void stop(selectedId)}
           >
-            {stopping ? t('home.stopping') : t('home.stopGame')}
+            {stoppingNow ? t('home.stopping') : t('home.stopGame')}
           </Button>
         )}
 
@@ -386,33 +329,7 @@ export function HomePage() {
           </p>
         )}
 
-        {/* No auto-dismiss, for the same reason as the offer below: most of
-            these sentences end with something to go and change, and eight
-            seconds is not long enough to read one and act on it. The next
-            launch clears it, and so does the ×. */}
-        {launchError && (
-          <div className="w-full max-w-xl">
-            <Banner type="urgent" dismissible onDismiss={() => setLaunchError(null)}>
-              {launchError}
-            </Banner>
-          </div>
-        )}
-
-        {/* No auto-dismiss: this one asks a question, and a banner that
-            disappears while being read cannot be answered. */}
-        {offlineOffer && (
-          <div className="flex max-w-md flex-col items-center gap-2 rounded-lg border border-rf-warning/40 bg-rf-warning/10 p-3">
-            <p className="text-xs text-rf-text-secondary">{t('home.authUnreachable')}</p>
-            <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => void handleLaunch(true)}>
-                {t('home.launchOffline')}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setOfflineOffer(false)}>
-                {t('common.cancel')}
-              </Button>
-            </div>
-          </div>
-        )}
+        {selectedId && <GameFailureNotice profileId={selectedId} />}
 
         {selectedProfile && (
           <p className="text-xs text-rf-text-muted">

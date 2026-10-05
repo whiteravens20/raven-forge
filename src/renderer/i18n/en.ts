@@ -133,6 +133,7 @@ export const en = {
   'home.running': 'Running…',
   'home.preparing': 'Starting…',
   'home.cancelLaunch': 'Cancel',
+  'home.cancelling': 'Cancelling…',
   'home.stopGame': 'Stop the game',
   'home.stopping': 'Stopping…',
   'home.stopFailed': 'Could not stop the game.',
@@ -154,7 +155,6 @@ export const en = {
     'This profile is set to launch with {path}, and that is not a Java runtime this machine can run. Point it somewhere else in the profile editor, or clear the field to use the runtime the launcher installs itself.',
   'launchError.javaTooOld':
     'This profile is set to launch with {path}, which is Java {found}, and this version of Minecraft needs Java {required}. It would start and then stop with an error about class file versions. Clear the field to use the runtime the launcher installs itself.',
-  'home.launchError': 'Error while starting the game',
   'home.showConsole': 'Show console',
   'home.hideConsole': 'Hide console',
   'home.news': 'News',

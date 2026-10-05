@@ -122,6 +122,7 @@ export const pl: Translations = {
   'home.running': 'Uruchomiona...',
   'home.preparing': 'Uruchamianie...',
   'home.cancelLaunch': 'Anuluj',
+  'home.cancelling': 'Anulowanie…',
   'home.stopGame': 'Zatrzymaj grę',
   'home.stopping': 'Zatrzymywanie…',
   'home.stopFailed': 'Nie udało się zatrzymać gry.',
@@ -143,7 +144,6 @@ export const pl: Translations = {
     'Ten profil ma startować przez {path}, a to nie jest środowisko Java, które ten komputer potrafi uruchomić. Wskaż w edytorze profilu coś innego albo wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
   'launchError.javaTooOld':
     'Ten profil ma startować przez {path}, czyli Javę {found}, a ta wersja Minecrafta potrzebuje Javy {required}. Gra wystartowałaby i zaraz padła z błędem o wersji plików klas. Wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
-  'home.launchError': 'Błąd podczas uruchamiania gry',
   'home.showConsole': 'Pokaż konsolę',
   'home.hideConsole': 'Ukryj konsolę',
   'home.news': 'Aktualności',
