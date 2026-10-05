@@ -138,6 +138,102 @@ describe('resetSettings', () => {
   });
 });
 
+/**
+ * The launcher starts on the defaults when the file cannot be read, and those
+ * defaults are a stand-in, not the settings.
+ *
+ * Nothing used to tell the two apart. The first change made after such a start
+ * was merged into the defaults and saved — over the proxy, the trusted keys and
+ * the theme in a file nobody had read, with no copy kept.
+ */
+describe.skipIf(asRoot)('after a start that could not read the file', () => {
+  const real = {
+    ...DEFAULT_SETTINGS,
+    theme: 'light',
+    proxyUrl: 'http://proxy.example.net:8080',
+    trustedPublicKeys: [
+      {
+        name: 'Mine',
+        publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+        addedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+  };
+
+  async function startUnreadable() {
+    await fs.writeFile(settingsFile(), JSON.stringify(real));
+    await fs.chmod(settingsFile(), 0o000);
+    const mod = await loadModule();
+    expect(await mod.loadSettings()).toEqual(DEFAULT_SETTINGS);
+    return mod;
+  }
+
+  it('refuses a change instead of saving the defaults over the file', async () => {
+    const { updateSettings } = await startUnreadable();
+
+    await expect(updateSettings({ showLiveConsole: true })).rejects.toThrow(/EACCES/);
+
+    await fs.chmod(settingsFile(), 0o600);
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(real);
+  });
+
+  it('refuses a reset for the same reason', async () => {
+    const { resetSettings } = await startUnreadable();
+
+    await expect(resetSettings()).rejects.toThrow(/EACCES/);
+
+    await fs.chmod(settingsFile(), 0o600);
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(real);
+  });
+
+  it('builds the change on what the file holds once it can be read', async () => {
+    const { updateSettings, getSettings } = await startUnreadable();
+    await fs.chmod(settingsFile(), 0o600);
+
+    const updated = await updateSettings({ showLiveConsole: true });
+
+    const expected = { ...real, showLiveConsole: true };
+    expect(updated).toEqual(expected);
+    expect(await getSettings()).toEqual(expected);
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(expected);
+  });
+});
+
+describe('overlapping changes', () => {
+  it('does not let two updates in flight lose each other', async () => {
+    // Each one is a read, a merge and a write with an `await` in the middle.
+    // Unqueued, they all merged into the same starting point, and whichever
+    // finished last erased the rest — after each had been answered as saved.
+    const { loadSettings, updateSettings, getSettings } = await loadModule();
+    await loadSettings();
+
+    const replies = await Promise.all([
+      updateSettings({ theme: 'light' }),
+      updateSettings({ downloadConcurrency: 2 }),
+      updateSettings({ showLiveConsole: true }),
+    ]);
+
+    const all = { theme: 'light', downloadConcurrency: 2, showLiveConsole: true };
+    expect(replies[2]).toMatchObject(all);
+    expect(await getSettings()).toMatchObject(all);
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toMatchObject(all);
+  });
+
+  it('does not let an update made during a reset bring the old settings back', async () => {
+    // The update merged into what was cached when it was called — the settings
+    // the reset was in the middle of replacing — and then saved all of them.
+    const { loadSettings, updateSettings, resetSettings, getSettings } = await loadModule();
+    await loadSettings();
+    await updateSettings({ theme: 'light' });
+
+    await Promise.all([resetSettings(), updateSettings({ downloadConcurrency: 2 })]);
+
+    const expected = { ...DEFAULT_SETTINGS, downloadConcurrency: 2 };
+    expect(await getSettings()).toEqual(expected);
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(expected);
+  });
+});
+
 describe('getSettings', () => {
   it('answers from the cache once loaded, without re-reading the file', async () => {
     const { getSettings } = await loadModule();
