@@ -29,6 +29,7 @@ import {
   isShutdownWatchdogCrash,
   readMinecraftCrash,
   writeCrashReport,
+  type CrashReportInput,
 } from '../diagnostics/crash-report';
 
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
@@ -40,6 +41,33 @@ import { LaunchRefusedError } from './launch-errors';
 
 // Track running processes by profileId
 const runningProcesses = new Map<string, ChildProcess>();
+
+/** The processes `killGame` was asked to end, so their exit can be read as that. */
+const stopRequested = new WeakSet<ChildProcess>();
+
+/**
+ * Whether the way the game ended is a failure to look into.
+ *
+ * The exit code alone answers this wrongly twice over on Linux. A JVM that is
+ * sent SIGTERM handles it, shuts down and exits 143 — so pressing Stop produced
+ * a crash card and a crash report. And a JVM that a signal *kills* has no exit
+ * code at all: the OOM killer `assertRamFits` describes, or a native crash
+ * ending in SIGABRT, arrived as `code === null`, which used to read as a clean
+ * exit and left the player with a game that vanished and nothing said.
+ *
+ * So: a stop that was asked for is never a failure, whatever the process then
+ * reports — 143, a signal, or on Windows, where the stop is `TerminateProcess`,
+ * the code that call was given. Otherwise dying of a signal always is one, and
+ * an exit code is one unless it is zero.
+ */
+export function endedInFailure(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+  stopWasRequested: boolean,
+): boolean {
+  if (stopWasRequested) return false;
+  return signal !== null || code !== 0;
+}
 
 // Per-profile log ring buffer (last 500 lines)
 const logBuffers = new Map<string, string[]>();
@@ -450,20 +478,16 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   // Both ways out of here end the same way: with a file the player can attach to
   // a bug report without first having to learn where the launcher keeps its logs.
   const reportCrash = (
-    exitCode: number,
+    ended: Pick<CrashReportInput, 'exitCode' | 'signal' | 'minecraftCrash' | 'spawnError'>,
     playTimeMinutes: number,
     logTail: string[],
-    minecraftCrash?: { file: string; content: string },
-    spawnError?: string,
   ) =>
     writeCrashReport({
       profile,
-      exitCode,
+      ...ended,
       playTimeMinutes,
       startedAt: startTime,
       logTail,
-      minecraftCrash,
-      spawnError,
       gameDir,
       java,
       accountType: account.type,
@@ -526,12 +550,12 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     }
   });
 
-  child.on('exit', (code) => {
+  child.on('exit', (code, signal) => {
     void (async () => {
       runningProcesses.delete(profile.id);
       clearGamePresence();
       const playTimeMinutes = Math.round((Date.now() - startTime) / 60000);
-      const failed = code !== 0 && code !== null;
+      const failed = endedInFailure(code, signal, stopRequested.has(child));
 
       // A non-zero exit is not yet a crash. Minecraft's shutdown watchdog halts
       // the JVM when something — nearly always a mod's leaked non-daemon thread
@@ -552,7 +576,11 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
         // Written before the buffer is cleared below, and before the renderer is
         // told anything — the card offers the file, so it has to exist by then.
         reportPath: crashed
-          ? await reportCrash(code ?? -1, playTimeMinutes, logTail ?? [], minecraftCrash)
+          ? await reportCrash(
+              { exitCode: code ?? -1, signal, minecraftCrash },
+              playTimeMinutes,
+              logTail ?? [],
+            )
           : undefined,
       };
 
@@ -563,7 +591,10 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
             'not reported as a crash.',
         );
       }
-      log.info(`Game exited for ${profile.name} with code ${code} (played ${playTimeMinutes} min)`);
+      log.info(
+        `Game exited for ${profile.name} with ${signal ? `signal ${signal}` : `code ${code}`} ` +
+          `(played ${playTimeMinutes} min)`,
+      );
 
       // `lastPlayed` and total play time are both shown in the profile list and
       // nothing was ever writing them. Persist before announcing the exit, so
@@ -594,7 +625,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
         // The process never ran, so there is no output and no crash file of the
         // game's own — the error itself is the whole finding, and the report is
         // where it says which Java it tried to start.
-        reportPath: await reportCrash(-1, 0, logTail, undefined, err.message),
+        reportPath: await reportCrash({ exitCode: -1, spawnError: err.message }, 0, logTail),
       };
       getMainWindow()?.webContents.send('game:exited', exitInfo);
       clearBuffer(profile.id);
@@ -619,6 +650,7 @@ export async function killGame(profileId: string): Promise<void> {
   if (!child) throw new Error('Game is not running');
 
   const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  stopRequested.add(child);
   child.kill('SIGTERM');
 
   const timer = setTimeout(() => {

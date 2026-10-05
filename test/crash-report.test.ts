@@ -109,6 +109,21 @@ describe('buildCrashReport', () => {
     const report = buildCrashReport({ ...input, spawnError: 'spawn java ENOENT' }, []);
     expect(report).toContain('spawn java ENOENT');
   });
+
+  it('names the signal that killed the game, and claims no exit code for it', () => {
+    // A process that dies of a signal has no exit code; the -1 here is only the
+    // placeholder the exit card is given, and printing it would be inventing one.
+    const report = buildCrashReport({ ...input, exitCode: -1, signal: 'SIGKILL' }, []);
+    expect(report).toContain('Killed by signal: SIGKILL');
+    expect(report).toContain('Exit code: —');
+    expect(report).not.toContain('Exit code: -1');
+  });
+
+  it('says nothing about signals for a game that simply exited', () => {
+    const report = buildCrashReport({ ...input, signal: null }, []);
+    expect(report).toContain('Exit code: 1');
+    expect(report).not.toContain('Killed by signal');
+  });
 });
 
 /**

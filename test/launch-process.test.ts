@@ -425,6 +425,20 @@ describe.skipIf(!posix)('the end of a game', () => {
     expect(info.crashed).toBe(false);
     expect(info.reportPath).toBeUndefined();
   });
+
+  it('reports a game that was killed under the player as a crash, and says by what', async () => {
+    // The kernel's out-of-memory killer, in effect: SIGKILL, and so no exit
+    // code at all — which used to be read as a game that closed normally.
+    await launch([`echo '[12:00:00] [main/INFO]: Loading world'`, 'kill -KILL $$'].join('\n'));
+
+    const info = await exitInfo();
+    expect(info.crashed).toBe(true);
+    expect(info.logTail).toEqual(['[12:00:00] [main/INFO]: Loading world']);
+
+    const report = await fs.readFile(info.reportPath!, 'utf-8');
+    expect(report).toContain('Killed by signal: SIGKILL');
+    expect(report).toContain('Exit code: —');
+  });
 });
 
 describe.skipIf(!posix)('a game that is running', () => {
@@ -444,5 +458,30 @@ describe.skipIf(!posix)('a game that is running', () => {
 
     expect(launcher.isGameRunning('p1')).toBe(false);
     await exitInfo();
+  });
+
+  it('is not reported as crashed for having been stopped', async () => {
+    // What a JVM does with the SIGTERM that Stop sends: it runs its shutdown
+    // hooks and exits 143. That is a non-zero exit, and it is not a crash.
+    await launch(
+      ["trap 'kill $pid; exit 143' TERM", 'sleep 30 &', 'pid=$!', 'echo ready', 'wait $pid'].join(
+        '\n',
+      ),
+    );
+    await vi.waitFor(() => expect(gameLines().map((l) => l.message)).toContain('ready'));
+
+    await launcher.killGame('p1');
+
+    expect(await exitInfo()).toMatchObject({ exitCode: 143, crashed: false });
+    expect((await exitInfo()).reportPath).toBeUndefined();
+    await expect(fs.readdir(path.join(root, 'userData', 'crash-reports'))).rejects.toThrow();
+  });
+
+  it('is not reported as crashed when the stop kills it outright either', async () => {
+    await launch('exec sleep 30');
+
+    await launcher.killGame('p1');
+
+    expect((await exitInfo()).crashed).toBe(false);
   });
 });

@@ -70,6 +70,11 @@ export function redactSecrets(text: string, secrets: string[] = []): string {
 export interface CrashReportInput {
   profile: Profile;
   exitCode: number;
+  /**
+   * The signal that killed the process, when one did. There is no exit code
+   * then, and `exitCode` holds only the placeholder the exit card is given.
+   */
+  signal?: NodeJS.Signals | null;
   playTimeMinutes: number;
   /** `Date.now()` at spawn, so the game's own crash file can be matched to this run. */
   startedAt: number;
@@ -240,7 +245,10 @@ export function buildCrashReport(
   sections.push(
     [
       '## Exit',
-      field('Exit code', input.exitCode),
+      field('Exit code', input.signal ? null : input.exitCode),
+      // Which signal is most of the diagnosis: SIGKILL is usually the kernel's
+      // out-of-memory killer, SIGSEGV and SIGABRT a native library or the JVM.
+      ...(input.signal ? [field('Killed by signal', input.signal)] : []),
       field('Played', `${input.playTimeMinutes} min`),
       ...(input.spawnError ? [field('The process never started', input.spawnError)] : []),
     ].join('\n'),
