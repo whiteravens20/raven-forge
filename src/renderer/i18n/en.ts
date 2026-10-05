@@ -146,6 +146,8 @@ export const en = {
   'launchError.alreadyPreparing': 'This profile is already being prepared for launch.',
   'launchError.ramTooBig':
     'This profile allocates {allocated} of RAM and this machine has {total}. Minecraft cannot start with more memory than the machine has — lower it in the profile editor, where {recommended} suits this one.',
+  'launchError.loaderVersionUnknown':
+    'Could not work out which {loader} build to use for Minecraft {version}. Check the connection, or pick a loader version in the profile editor.',
   'launchError.javaNotRuntime':
     'This profile is set to launch with {path}, and that is not a Java runtime this machine can run. Point it somewhere else in the profile editor, or clear the field to use the runtime the launcher installs itself.',
   'launchError.javaTooOld':
@@ -297,7 +299,7 @@ export const en = {
   'orphans.discard': 'Delete for good',
 
   'profiles.fieldMinecraft': 'Minecraft',
-  'profiles.fieldLoader': 'Mod loader',
+  'profiles.fieldLoader': 'Loader',
   'profiles.fieldRam': 'RAM',
   'profiles.fieldServer': 'Server',
   'profiles.manifestUrl': 'Manifest URL',
@@ -322,14 +324,15 @@ export const en = {
   'profileForm.name': 'Profile name',
   'profileForm.namePlaceholder': 'e.g. Survival Server',
   'profileForm.mcVersion': 'Minecraft version',
-  'profileForm.loader': 'Mod loader',
+  'profileForm.loader': 'Loader',
   'profileForm.versionsLoading': 'Loading versions…',
   'profileForm.versionsFailed': 'Could not load the version list — type it manually',
   'profileForm.noLoaderBuilds':
     '{loader} has no builds for Minecraft {mcVersion} — pick another version or loader',
-  'profileForm.loaderUnstable': 'unstable',
-  'profileForm.loaderVersionLatest': 'Latest',
-  'profileForm.loaderVersion': 'Loader version (optional)',
+  'profileForm.loaderUnstable': 'prerelease',
+  'profileForm.loaderRecommended': 'recommended',
+  'profileForm.loaderVersion': 'Loader version',
+  'profileForm.loaderVersionAuto': 'chosen at the first launch',
   'profileForm.ram': 'Allocated RAM',
   'profileForm.ramMachine': 'This machine has {total}. Recommended for it: {recommended}.',
   'profileForm.ramTight':
@@ -567,7 +570,7 @@ export const en = {
   'progress.titlePreparing': 'Preparing to launch',
   'progress.titleChecking': 'Checking files',
   'progress.modSync': 'Syncing mods',
-  'progress.loaderInstall': 'Installing mod loader',
+  'progress.loaderInstall': 'Installing the loader',
   'progress.javaDownload': 'Downloading Java',
   'progress.gameAssets': 'Game files',
   'progress.launcherUpdate': 'Updating the launcher',

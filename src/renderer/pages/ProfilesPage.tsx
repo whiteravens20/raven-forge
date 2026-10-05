@@ -36,6 +36,7 @@ import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 import { useLocale, useT } from '@renderer/i18n';
 import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '@shared/constants';
 import { loaderLabel } from '@shared/labels';
+import { defaultLoaderVersion } from '@shared/loader-version';
 import { recommendedRamMb } from '@shared/memory';
 import type {
   ModLoaderType,
@@ -913,16 +914,16 @@ function ProfileForm({
       // invites the player to type a version that cannot exist.
       setNoLoaderBuilds(versions.length === 0);
 
-      // Every loader version belongs to exactly one Minecraft version, so a
-      // version carried over from the previous selection is now wrong. Without
-      // this the select falls back to displaying its first option while the
-      // draft still holds the stale value — and that is what gets saved.
+      // The draft always holds a build that is on the list. Every loader
+      // version belongs to exactly one Minecraft version, so one carried over
+      // from the previous selection is now wrong — and one that was never
+      // chosen is not a choice the launcher can act on: a profile saved with
+      // "latest" in this field had no version, so its loader was never
+      // installed and it started as plain Minecraft. The default is therefore
+      // written into the draft, where it is visible and is what gets saved.
       const { draft: current, onChange: apply } = latest.current;
-      if (
-        current.modLoaderVersion &&
-        !versions.some((v) => v.version === current.modLoaderVersion)
-      ) {
-        apply({ ...current, modLoaderVersion: undefined });
+      if (!versions.some((v) => v.version === current.modLoaderVersion)) {
+        apply({ ...current, modLoaderVersion: defaultLoaderVersion(versions) });
       }
     });
     return () => {
@@ -931,6 +932,7 @@ function ProfileForm({
   }, [draft.modLoader, draft.minecraftVersion]);
 
   const t = useT();
+  const recommendedLoaderVersion = defaultLoaderVersion(loaderVersions);
   const set = <K extends keyof DraftProfile>(key: K, value: DraftProfile[K]) => {
     onChange({ ...draft, [key]: value });
   };
@@ -1080,22 +1082,26 @@ function ProfileForm({
         ) : loaderVersions.length > 0 ? (
           <Select
             label={t('profileForm.loaderVersion')}
-            options={[
-              { value: '', label: t('profileForm.loaderVersionLatest') },
-              ...loaderVersions.map((v) => ({
-                value: v.version,
-                label: v.stable ? v.version : `${v.version} (${t('profileForm.loaderUnstable')})`,
-              })),
-            ]}
+            options={loaderVersions.map((v) => ({
+              value: v.version,
+              label:
+                v.version === recommendedLoaderVersion
+                  ? `${v.version} — ${t('profileForm.loaderRecommended')}`
+                  : v.stable
+                    ? v.version
+                    : `${v.version} (${t('profileForm.loaderUnstable')})`,
+            }))}
             value={draft.modLoaderVersion ?? ''}
             onChange={(e) => set('modLoaderVersion', e.target.value || undefined)}
           />
         ) : (
+          // The list is still loading, or could not be fetched. Left empty, the
+          // build is chosen at the first launch, which needs the network anyway.
           <Input
             label={t('profileForm.loaderVersion')}
             value={draft.modLoaderVersion ?? ''}
             onChange={(e) => set('modLoaderVersion', e.target.value || undefined)}
-            placeholder="latest"
+            placeholder={t('profileForm.loaderVersionAuto')}
             error={loaderVersionsFailed ? t('profileForm.versionsFailed') : undefined}
           />
         )}

@@ -33,10 +33,13 @@ import { getVersionMeta } from '../minecraft/version-manifest';
 import { verifyDownload, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion } from '../java/java-manager';
 import { loaderCacheDir } from './loader-paths';
+import { loaderProfilePath } from './loader-profile';
+import { writeJsonAtomic } from '../util/atomic-file';
 import { downloadToFile } from '../net/download';
 import { getSettings } from '../config/settings-manager';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
 import { requiredJavaFor } from '../minecraft/java-requirement';
+import { isPrerelease } from '../../shared/loader-version';
 import type { LoaderVersion, ProgressMessage } from '../../shared/ipc-types';
 import type { VersionMeta } from '../minecraft/types';
 
@@ -102,14 +105,14 @@ export function neoForgeVersionsFor(all: string[], mcVersion: string): string[] 
 
 /** NeoForge marks unfinished builds in the version string itself. */
 export function isNeoForgeStable(version: string): boolean {
-  return !/-(alpha|beta|rc)/i.test(version);
+  return !isPrerelease(version);
 }
 
 /**
  * Forge's promotion feed, which is the only place "recommended" is published.
  *
- * A failure here is not fatal — it costs the stable/unstable marking, not the
- * list itself, so a promotions outage must not stop someone installing Forge.
+ * A failure here is not fatal — it costs the recommendation, not the list
+ * itself, so a promotions outage must not stop someone installing Forge.
  */
 async function forgePromotions(
   mcVersion: string,
@@ -123,7 +126,7 @@ async function forgePromotions(
     };
   } catch (err) {
     log.warn(
-      `Could not read Forge promotions — versions will not be marked stable: ${String(err)}`,
+      `Could not read Forge promotions — no build will be marked recommended: ${String(err)}`,
     );
     return {};
   }
@@ -142,9 +145,11 @@ export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion
   // Maven metadata is oldest-first; the newest build is the useful default.
   return versions.reverse().map((version) => ({
     version,
-    // "Stable" for Forge means promoted, not merely released. Everything else
-    // is a build that happens to exist.
-    stable: version === recommended,
+    // Forge publishes no prereleases under this artifact; what it does publish
+    // is one promoted build per Minecraft version, which is the one to default
+    // to. The rest are builds that happen to exist, not unstable ones.
+    stable: true,
+    recommended: version === recommended,
   }));
 }
 
@@ -471,7 +476,13 @@ export async function installForgeLike(
     profileJson = JSON.stringify(embeddedProfile, null, 2);
   }
 
-  await fs.writeFile(path.join(destDir, `${loader}-profile.json`), profileJson, 'utf-8');
+  // Parsed on the way through, and written whole or not at all: this file is
+  // what "installed" means, and the launch reads it back as the version the
+  // game starts from.
+  await writeJsonAtomic(
+    loaderProfilePath(loader, loaderVersion, mcVersion),
+    JSON.parse(profileJson) as unknown,
+  );
 
   // The installer jar is 4–8 MB and has done its job.
   await fs.rm(installerPath, { force: true });
@@ -481,19 +492,4 @@ export async function installForgeLike(
     vars: { loader: `${label} ${loaderVersion}` },
   });
   log.info(`Installed ${label} ${loaderVersion} for MC ${mcVersion} (version id ${versionId})`);
-}
-
-export async function isForgeLikeInstalled(
-  loader: ForgeLikeLoader,
-  loaderVersion: string,
-  mcVersion: string,
-): Promise<boolean> {
-  const profilePath = path.join(
-    loaderInstallDir(loader, loaderVersion, mcVersion),
-    `${loader}-profile.json`,
-  );
-  return fs
-    .access(profilePath)
-    .then(() => true)
-    .catch(() => false);
 }

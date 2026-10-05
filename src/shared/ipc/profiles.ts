@@ -8,7 +8,14 @@ export type ModLoaderType = 'vanilla' | 'forge' | 'neoforge' | 'fabric' | 'quilt
 /** A mod loader build offered for a given Minecraft version. */
 export interface LoaderVersion {
   version: string;
+  /** False for a build its loader publishes as a prerelease. */
   stable: boolean;
+  /**
+   * The one build the loader itself points people at, where it names one —
+   * Fabric's current build, Forge's promoted one. Not the same thing as
+   * `stable`: every other Fabric build is finished software too.
+   */
+  recommended?: boolean;
 }
 
 export interface Profile {

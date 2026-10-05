@@ -9,12 +9,16 @@ import { paths } from '../config/paths';
 import { getMainWindow } from '../../main/window';
 import { getSettings } from '../config/settings-manager';
 import { getAuthState, getMinecraftAccessToken } from '../auth/microsoft-auth';
-import { getProfile, recordPlaySession } from '../profiles/profile-manager';
+import { getProfile, recordPlaySession, updateProfile } from '../profiles/profile-manager';
 import { setGamePresence, clearGamePresence } from '../discord/rich-presence';
 import { loaderLabel } from '../../shared/labels';
 import { syncManifest } from '../mods/mod-sync';
 import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
-import { installLoader, isLoaderInstalled } from '../modloader/loader-manager';
+import {
+  installLoader,
+  isLoaderInstalled,
+  resolveDefaultLoaderVersion,
+} from '../modloader/loader-manager';
 import { resolveLaunchMeta } from '../modloader/loader-profile';
 import { getVersionMeta } from './version-manifest';
 import { ensureClientJar, ensureLibraries, ensureAssets } from './asset-downloader';
@@ -151,11 +155,52 @@ function assertRamFits(profile: Profile): void {
   );
 }
 
-async function runLaunch(options: LaunchOptions): Promise<void> {
-  const profile = await getProfile(options.profileId);
-  if (!profile) throw new Error(`Profile ${options.profileId} not found`);
+/**
+ * Give a modded profile with no loader build chosen the build it should have,
+ * and write that down.
+ *
+ * Without a version there is nothing to install and no loader profile to read,
+ * and the launch used to carry on regardless: it skipped the install, found no
+ * loader metadata and started plain Minecraft, with the profile still saying
+ * NeoForge and its mods sitting in `mods/` unread. Leaving the version at the
+ * editor's "latest" was all it took.
+ *
+ * Pinned rather than looked up at every launch. A profile that follows the
+ * newest build changes under a working mod set without anyone having asked, and
+ * cannot start at all when the loader's servers are unreachable.
+ */
+export async function withLoaderVersion(profile: Profile): Promise<Profile> {
+  if (profile.modLoader === 'vanilla' || profile.modLoaderVersion) return profile;
 
-  assertRamFits(profile);
+  const label = loaderLabel(profile.modLoader);
+  const refuse = (cause?: unknown) =>
+    new LaunchRefusedError(
+      {
+        key: 'launchError.loaderVersionUnknown',
+        vars: { loader: label, version: profile.minecraftVersion },
+      },
+      `No ${label} build could be chosen for Minecraft ${profile.minecraftVersion}` +
+        (cause ? `: ${cause instanceof Error ? cause.message : String(cause)}` : ''),
+    );
+
+  let version: string | undefined;
+  try {
+    version = await resolveDefaultLoaderVersion(profile.modLoader, profile.minecraftVersion);
+  } catch (err) {
+    throw refuse(err);
+  }
+  if (!version) throw refuse();
+
+  log.info(`${profile.name} had no ${label} build chosen — using ${version}`);
+  return updateProfile(profile.id, { modLoaderVersion: version });
+}
+
+async function runLaunch(options: LaunchOptions): Promise<void> {
+  const stored = await getProfile(options.profileId);
+  if (!stored) throw new Error(`Profile ${options.profileId} not found`);
+
+  assertRamFits(stored);
+  const profile = await withLoaderVersion(stored);
 
   log.info(`Launching game for profile: ${profile.name} (MC ${profile.minecraftVersion})`);
 

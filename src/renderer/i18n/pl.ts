@@ -135,6 +135,8 @@ export const pl: Translations = {
   'launchError.alreadyPreparing': 'Ten profil jest już przygotowywany do uruchomienia.',
   'launchError.ramTooBig':
     'Ten profil ma przydzielone {allocated} RAM, a ten komputer ma {total}. Minecraft nie wystartuje z większą ilością pamięci, niż fizycznie jest — zmniejsz ją w edytorze profilu, gdzie {recommended} pasuje do tej maszyny.',
+  'launchError.loaderVersionUnknown':
+    'Nie udało się ustalić wersji {loader} dla Minecraft {version}. Sprawdź połączenie albo wybierz wersję loadera w edytorze profilu.',
   'launchError.javaNotRuntime':
     'Ten profil ma startować przez {path}, a to nie jest środowisko Java, które ten komputer potrafi uruchomić. Wskaż w edytorze profilu coś innego albo wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
   'launchError.javaTooOld':
@@ -322,7 +324,7 @@ export const pl: Translations = {
   'orphans.discard': 'Usuń trwale',
 
   'profiles.fieldMinecraft': 'Minecraft',
-  'profiles.fieldLoader': 'Mod Loader',
+  'profiles.fieldLoader': 'Loader',
   'profiles.fieldRam': 'RAM',
   'profiles.fieldServer': 'Serwer',
   'profiles.manifestUrl': 'Manifest URL',
@@ -347,14 +349,15 @@ export const pl: Translations = {
   'profileForm.name': 'Nazwa profilu',
   'profileForm.namePlaceholder': 'np. Survival Server',
   'profileForm.mcVersion': 'Wersja Minecraft',
-  'profileForm.loader': 'Mod Loader',
+  'profileForm.loader': 'Loader',
   'profileForm.versionsLoading': 'Wczytywanie wersji…',
   'profileForm.versionsFailed': 'Nie udało się pobrać listy wersji — wpisz ręcznie',
   'profileForm.noLoaderBuilds':
     '{loader} nie ma wydań dla Minecraft {mcVersion} — wybierz inną wersję lub loader',
-  'profileForm.loaderUnstable': 'niestabilna',
-  'profileForm.loaderVersionLatest': 'Najnowsza',
-  'profileForm.loaderVersion': 'Wersja Loadera (opcjonalnie)',
+  'profileForm.loaderUnstable': 'wersja testowa',
+  'profileForm.loaderRecommended': 'zalecana',
+  'profileForm.loaderVersion': 'Wersja loadera',
+  'profileForm.loaderVersionAuto': 'dobierze się przy pierwszym uruchomieniu',
   'profileForm.ram': 'Przydzielony RAM',
   'profileForm.ramMachine': 'Ten komputer ma {total}. Zalecane dla niego: {recommended}.',
   'profileForm.ramTight':
@@ -579,7 +582,7 @@ export const pl: Translations = {
   'progress.titlePreparing': 'Przygotowywanie do uruchomienia',
   'progress.titleChecking': 'Sprawdzanie plików',
   'progress.modSync': 'Synchronizacja modów',
-  'progress.loaderInstall': 'Instalacja mod loadera',
+  'progress.loaderInstall': 'Instalacja loadera',
   'progress.javaDownload': 'Pobieranie Javy',
   'progress.gameAssets': 'Pliki gry',
   'progress.launcherUpdate': 'Aktualizacja launchera',

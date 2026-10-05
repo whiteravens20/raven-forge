@@ -46,6 +46,7 @@ export type ErrorKey =
   | 'launchError.alreadyRunning'
   | 'launchError.alreadyPreparing'
   | 'launchError.ramTooBig'
+  | 'launchError.loaderVersionUnknown'
   | 'launchError.javaNotRuntime'
   | 'launchError.javaTooOld';
 

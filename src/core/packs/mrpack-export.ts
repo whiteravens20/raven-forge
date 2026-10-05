@@ -5,7 +5,7 @@ import path from 'node:path';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { getProfile } from '../profiles/profile-manager';
-import { getLoaderVersions } from '../modloader/loader-manager';
+import { resolveDefaultLoaderVersion } from '../modloader/loader-manager';
 import { hashFile } from '../mods/integrity';
 import { readLockFile } from '../mods/lock-file';
 import { listContent } from '../mods/content-manager';
@@ -184,9 +184,9 @@ export async function exportProfileAsMrpack(
   if (loaderKey) {
     const version =
       profile.modLoaderVersion ??
-      (await getLoaderVersions(profile.modLoader, profile.minecraftVersion).catch(() => [])).find(
-        (v) => v.stable,
-      )?.version;
+      (await resolveDefaultLoaderVersion(profile.modLoader, profile.minecraftVersion).catch(
+        () => undefined,
+      ));
     if (!version) {
       throw new Error(
         `This profile does not pin a ${profile.modLoader} version, and no build could be looked ` +

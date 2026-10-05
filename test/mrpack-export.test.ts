@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { defaultLoaderVersion } from '../src/shared/loader-version';
 import type { InstalledMod, Profile } from '../src/shared/ipc-types';
 
 /**
@@ -58,7 +59,7 @@ vi.mock('../src/core/mods/content-manager', () => ({
   listContent: async (kind: string) => (kind === 'shaders' ? shaders : resourcePacks),
 }));
 vi.mock('../src/core/modloader/loader-manager', () => ({
-  getLoaderVersions: async () => loaderVersions,
+  resolveDefaultLoaderVersion: async () => defaultLoaderVersion(loaderVersions),
 }));
 vi.mock('../src/core/mods/modrinth-api', () => ({
   versionsByHash: async (hashes: string[]) =>
