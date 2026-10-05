@@ -310,15 +310,29 @@ function stamp(at: number): string {
   return new Date(at).toISOString().replace(/[-:]/g, '').replace(/T/, '-').slice(0, 15);
 }
 
-/** Delete all but the newest `KEEP_REPORTS` files, so this never grows forever. */
+/** A name `writeCrashReport` gives a file, with the stamp it ends in captured. */
+const REPORT_NAME = /^crash-.*-(\d{8}-\d{6})\.txt$/;
+
+/**
+ * Delete all but the newest `KEEP_REPORTS` files, so this never grows forever.
+ *
+ * Newest by the stamp the name ends in, which sorts as text in the order it
+ * was written. Sorting the whole name does not: the profile comes first in it,
+ * so every report for "Classic" sorted before every one for "Raven Forge"
+ * whatever their dates, and with twenty of the second on disk the first crash
+ * of the other profile deleted its own report — the file just written, which
+ * the exit card was about to offer.
+ *
+ * A file that is not named this way was not put here by the launcher, and is
+ * neither counted nor removed.
+ */
 async function prune(dir: string): Promise<void> {
-  const entries = (await fs.readdir(dir)).filter(
-    (e) => e.startsWith('crash-') && e.endsWith('.txt'),
-  );
-  if (entries.length <= KEEP_REPORTS) return;
-  // The name ends in a sortable timestamp, so lexical order is chronological.
-  for (const stale of entries.sort().slice(0, entries.length - KEEP_REPORTS)) {
-    await fs.rm(path.join(dir, stale), { force: true });
+  const reports = (await fs.readdir(dir))
+    .map((name) => ({ name, stamp: REPORT_NAME.exec(name)?.[1] ?? '' }))
+    .filter((report) => report.stamp !== '')
+    .sort((a, b) => a.stamp.localeCompare(b.stamp));
+  for (const stale of reports.slice(0, Math.max(0, reports.length - KEEP_REPORTS))) {
+    await fs.rm(path.join(dir, stale.name), { force: true });
   }
 }
 
