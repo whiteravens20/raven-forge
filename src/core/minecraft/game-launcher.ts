@@ -200,9 +200,8 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   if (!stored) throw new Error(`Profile ${options.profileId} not found`);
 
   assertRamFits(stored);
-  const profile = await withLoaderVersion(stored);
 
-  log.info(`Launching game for profile: ${profile.name} (MC ${profile.minecraftVersion})`);
+  log.info(`Launching game for profile: ${stored.name} (MC ${stored.minecraftVersion})`);
 
   // A profile that follows a pack is brought up to the pack before it starts.
   // Nothing else in this path touches mods — the loader, Java, the client jar
@@ -212,18 +211,22 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   // Before beginJob, not after: syncManifest starts a job of its own for this
   // profile, and beginJob aborts whatever it finds registered. Doing it the
   // other way round would have the sync cancel the launch that asked for it.
-  if (profile.manifestUrl) {
+  if (stored.manifestUrl) {
     try {
-      await syncManifest(profile.id);
+      await syncManifest(stored.id);
     } catch (err) {
       // Cancelling is the player's own decision — do not then launch anyway.
       if (isCancellation(err)) throw err;
-      // Anything else means the pack could not be reached at all: syncManifest
-      // already falls back to the last manifest that validated. Starting with
-      // what is installed beats refusing to start, and the log says why.
-      log.warn(`Could not sync ${profile.name} before launch: ${err}`);
+      // Anything else means the sync did not finish — the pack unreachable with
+      // nothing cached, a file that failed its hash. Starting with what is
+      // installed beats refusing to start, and the log says why.
+      log.warn(`Could not sync ${stored.name} before launch: ${err}`);
     }
   }
+
+  // Read again, after the sync: a pack can move the profile to a newer loader
+  // build, and the launch has to install and start that one.
+  const profile = await withLoaderVersion((await getProfile(stored.id)) ?? stored);
 
   // Everything from here to spawn is cancellable: it can run for minutes and
   // the user has no other way out short of killing the launcher.

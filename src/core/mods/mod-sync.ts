@@ -12,7 +12,7 @@ import {
 } from '../util/cancellation';
 import { paths } from '../config/paths';
 import { getSettings } from '../config/settings-manager';
-import { getAllProfiles, getProfile } from '../profiles/profile-manager';
+import { getAllProfiles, getProfile, updateProfile } from '../profiles/profile-manager';
 import {
   getModVersions,
   getProjectTitle,
@@ -530,6 +530,31 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       );
     }
 
+    // A profile that follows a pack follows its loader build too. The build was
+    // copied once, when the profile was made, and never again: a pack that then
+    // moved to a newer one — because a mod in it needs that — delivered the mod
+    // and left the profile starting the loader it no longer runs on.
+    //
+    // The build only. A different loader, or a different Minecraft version, is
+    // a different game directory in all but name — worlds are upgraded in place
+    // and do not go back — so those are said in the log and left for a person.
+    if (
+      !supplied &&
+      manifest.modLoader === profile.modLoader &&
+      manifest.modLoaderVersion &&
+      manifest.modLoaderVersion !== profile.modLoaderVersion
+    ) {
+      log.info(
+        `${profile.name}: the pack moved ${manifest.modLoader} from ` +
+          `${profile.modLoaderVersion ?? 'no build'} to ${manifest.modLoaderVersion}`,
+      );
+      await updateProfile(profileId, { modLoaderVersion: manifest.modLoaderVersion });
+    } else if (!supplied && manifest.modLoader !== profile.modLoader) {
+      log.warn(
+        `Manifest targets ${manifest.modLoader} but profile ${profile.name} runs ${profile.modLoader}`,
+      );
+    }
+
     const modsDir = paths.profileModsDir(profileId);
     await fs.mkdir(modsDir, { recursive: true });
 
@@ -711,6 +736,9 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       if (version) appliedConfigs[config.path] = version;
     }
 
+    // The resource packs and shaders below take no signal of their own, so this
+    // is the last point at which a cancel is still honoured.
+    throwIfCancelled(signal, 'Sync');
     const mcVersion = manifest.minecraftVersion;
     await syncContentFromManifest('resourcepacks', profileId, manifest.resourcePacks, mcVersion);
     await syncContentFromManifest('shaders', profileId, manifest.shaders, mcVersion);
@@ -736,9 +764,6 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     // other way round, a jar that could not be deleted — Windows refuses while
     // the game has it open — was left in `mods/` with nothing recording it:
     // still loaded by the game, never looked at by a sync again. This way a
-    // The resource packs and shaders below take no signal of their own, so this
-    // is the last point at which a cancel is still honoured.
-    throwIfCancelled(signal, 'Sync');
     // failure leaves the list as it was, the sync says why it stopped, and the
     // next one tries again.
     const dropped = await mutateLockFile(profileId, async (mods) => {
@@ -785,6 +810,11 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
   } catch (err) {
     // A cancelled sync is not an error state — leave the profile as it was
     // rather than flagging it red for a choice the user made deliberately.
+    //
+    // It is still thrown on. Returning here made a cancelled sync look like a
+    // finished one to whoever called, and the caller that matters is a launch:
+    // pressing Cancel while the mods were being checked stopped the check and
+    // then started the game anyway, on whatever half of the update had landed.
     if (isCancellation(err)) {
       log.info(`Manifest sync cancelled for ${profile.name}`);
       await writeSyncState(profileId, previousState);
@@ -810,11 +840,6 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
  * build — so it is fetched by id rather than looked for in a filtered list it
  * would be missing from by definition.
  *
-    //
-    // It is still thrown on. Returning here made a cancelled sync look like a
-    // finished one to whoever called, and the caller that matters is a launch:
-    // pressing Cancel while the mods were being checked stopped the check and
-    // then started the game anyway, on whatever half of the update had landed.
  * Without one, the profile decides. The argument is optional because
  * `ModSearchResult.versions` holds *game* versions, so the renderer has no build
  * id to hand over; passing `versions[0]` (as it once did) asked Modrinth for a
