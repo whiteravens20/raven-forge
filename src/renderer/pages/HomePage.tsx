@@ -27,6 +27,13 @@ function formatDate(iso: string, locale: string): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toLocaleDateString(locale);
 }
 
+/** How long the refresh icon turns at the least; see `handleRefreshNews`. */
+const REFRESH_SPIN_MS = 600;
+
+function formatTime(timestamp: number, locale: string): string {
+  return new Date(timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+}
+
 export function HomePage() {
   const profiles = useProfileStore((s) => s.profiles);
   const selectedId = useProfileStore((s) => s.selectedProfileId);
@@ -41,6 +48,8 @@ export function HomePage() {
   const dismiss = useNewsStore((s) => s.dismiss);
   const refreshNews = useNewsStore((s) => s.refresh);
   const feedError = useNewsStore((s) => s.feedError);
+  const newsLoading = useNewsStore((s) => s.loading);
+  const lastRefresh = useNewsStore((s) => s.lastRefresh);
 
   const settings = useSettingsStore((s) => s.settings);
 
@@ -62,6 +71,8 @@ export function HomePage() {
 
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
+  /** Outlives the fetch itself, so a refresh that answers instantly is still seen to turn. */
+  const [refreshSpinning, setRefreshSpinning] = useState(false);
   /** The news item or announcement currently open in the reader. */
   const [reading, setReading] = useState<Article | null>(null);
   /** Set when a launch failed only because the auth servers could not be reached. */
@@ -162,6 +173,40 @@ export function HomePage() {
       setStopping(false);
     }
   };
+
+  /**
+   * Refresh both feeds, visibly.
+   *
+   * The feed usually has not moved, so the cards do not change — and a button
+   * that changes nothing reads as a button that did nothing. The icon turns for
+   * at least `REFRESH_SPIN_MS` because a warm connection answers faster than an
+   * eye catches, and the line beside it then says how the attempt ended.
+   */
+  const handleRefreshNews = async () => {
+    if (refreshSpinning) return;
+    setRefreshSpinning(true);
+    const started = Date.now();
+    try {
+      await refreshNews();
+    } finally {
+      const rest = REFRESH_SPIN_MS - (Date.now() - started);
+      if (rest > 0) await new Promise((resolve) => setTimeout(resolve, rest));
+      setRefreshSpinning(false);
+    }
+  };
+
+  const refreshing = newsLoading || refreshSpinning;
+  // A failed refresh is reported by the warning under the heading, which stays
+  // until a later attempt works; this line only ever reports one that did.
+  const refreshNote = refreshing
+    ? t('home.newsRefreshing')
+    : lastRefresh && !feedError
+      ? lastRefresh.added > 0
+        ? t.plural('home.newsRefreshedNew', lastRefresh.added, {
+            time: formatTime(lastRefresh.at, locale),
+          })
+        : t('home.newsRefreshedSame', { time: formatTime(lastRefresh.at, locale) })
+      : null;
 
   // One banner at a time, in feed order — the publisher decides what is most
   // urgent, and a stack of them pushes the launch button off the fold. Dismiss
@@ -408,13 +453,21 @@ export function HomePage() {
           <h2 className="text-sm font-display font-semibold text-rf-text-secondary uppercase tracking-wider">
             {t('home.news')}
           </h2>
-          <button
-            onClick={refreshNews}
-            aria-label={t('home.refreshNews')}
-            className="text-rf-text-muted hover:text-rf-text-secondary"
-          >
-            <RefreshCw size={14} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* `role="status"` so the outcome is announced, not only drawn. */}
+            <span role="status" className="text-xs text-rf-text-muted">
+              {refreshNote}
+            </span>
+            <button
+              onClick={() => void handleRefreshNews()}
+              disabled={refreshing}
+              aria-label={t('home.refreshNews')}
+              title={t('home.refreshNews')}
+              className="text-rf-text-muted hover:text-rf-text-secondary disabled:cursor-default"
+            >
+              <RefreshCw size={14} className={refreshing ? 'motion-safe:animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         {/* A feed that cannot be reached says so. Left silent, a dead or
