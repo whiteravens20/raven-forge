@@ -7,6 +7,7 @@ import type { Dirent } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
+import { serializeByKey } from '../util/serialize';
 import { profileSchema } from '../../shared/validators';
 import { recommendedRamMb } from '../../shared/memory';
 import { machineMemoryMb } from '../util/machine-memory';
@@ -21,22 +22,65 @@ import type {
 
 let cachedProfiles: Profile[] | null = null;
 
+/**
+ * The profile list, from the cache once the file has been read.
+ *
+ * The first read takes its turn in a queue. Several callers arrive before it
+ * has finished — the page asking for the list, the startup pack check — and
+ * each used to read the file for itself, which is harmless until the file is
+ * one that has to be moved aside: the second mover either fails on a file that
+ * is no longer there, or moves the good one a save has since put in its place.
+ */
 async function readProfilesIndex(): Promise<Profile[]> {
   if (cachedProfiles) return cachedProfiles;
-  try {
-    const raw = await fs.readFile(paths.profilesIndex, 'utf-8');
-    const parsed = JSON.parse(raw) as Profile[];
-    cachedProfiles = parsed;
-    return parsed;
-  } catch {
-    cachedProfiles = [];
-    return [];
-  }
+  return serializeByKey(paths.profilesIndex, async () => {
+    cachedProfiles ??= await loadProfilesIndex();
+    return cachedProfiles;
+  });
 }
 
+/**
+ * Read `profiles.json` from disk.
+ *
+ * Only a file that is not there reads as "no profiles". Every failure used to,
+ * and the answer was cached — so one read that failed on a locked file or a
+ * share that hiccuped left the launcher holding an empty list, and the next
+ * change of any kind wrote that list back over the real one.
+ *
+ * A file that is there and will not parse is moved aside rather than written
+ * over, so what it held can still be recovered by hand; if it cannot be moved
+ * it is left alone and the read fails. Any other error is the caller's to see,
+ * and is not remembered: the next call reads again.
+ */
+async function loadProfilesIndex(): Promise<Profile[]> {
+  const file = paths.profilesIndex;
+
+  let raw: string;
+  try {
+    raw = await fs.readFile(file, 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  if (Array.isArray(parsed)) return parsed as Profile[];
+
+  const backup = `${file}.broken-${Date.now()}`;
+  log.error(`${file} is not a profile list — keeping a copy at ${backup} and starting empty`);
+  await fs.rename(file, backup);
+  return [];
+}
+
+/** The cache follows the file: a write that failed leaves both as they were. */
 async function writeProfilesIndex(profiles: Profile[]): Promise<void> {
-  cachedProfiles = profiles;
   await writeJsonAtomic(paths.profilesIndex, profiles);
+  cachedProfiles = profiles;
 }
 
 /** The tail of the chain of in-flight mutations. */

@@ -371,9 +371,15 @@ export function activeSkinUrl(profile: McProfile): string | undefined {
 function pushAuthState(): void {
   const win = getMainWindow();
   if (!win || win.isDestroyed()) return;
-  getStoredAuthState().then((state) => {
-    win.webContents.send('auth:state-changed', state);
-  });
+  getStoredAuthState()
+    .then((state) => {
+      win.webContents.send('auth:state-changed', state);
+    })
+    // A store that cannot be read says so instead of passing for an empty one,
+    // and nothing awaits this: the window simply keeps the list it has.
+    .catch((err: unknown) => {
+      log.warn('Could not send the auth state to the window:', err);
+    });
 }
 
 async function fullMicrosoftAuthChain(

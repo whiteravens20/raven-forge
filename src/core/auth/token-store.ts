@@ -65,19 +65,56 @@ function warnFallback(): void {
   );
 }
 
-async function readRaw(): Promise<AuthStoreData> {
-  try {
-    const raw = await fs.readFile(getAuthPath(), 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<AuthStoreData>;
+/**
+ * Read `auth.json` from disk.
+ *
+ * Only a file that is not there reads as "nobody signed in". Every failure used
+ * to, and every writer here starts from what this returns — so one read that
+ * failed on a locked file was followed by a save of the one account being
+ * changed, and every other login was gone from the list, fallback tokens
+ * included.
+ *
+ * A file that is there and will not parse is moved aside rather than saved
+ * over, and its mode re-applied: it may hold tokens, and it is the one copy an
+ * older build could have left readable by others. Any other error is thrown.
+ *
+ * Reads take turns, in a queue of their own because a mutation reads from
+ * inside its turn. Two readers finding the file broken at once would both move
+ * it aside, and the second would move whatever a save had put there since.
+ */
+function readRaw(): Promise<AuthStoreData> {
+  const file = getAuthPath();
+  return serializeByKey(`${file}:read`, async () => {
+    let raw: string;
+    try {
+      raw = await fs.readFile(file, 'utf-8');
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      return { accounts: [], activeAccountId: null, refreshTokens: {} };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      const backup = `${file}.broken-${Date.now()}`;
+      log.error(`${file} is not an account store — keeping a copy at ${backup} and starting empty`);
+      await fs.rename(file, backup);
+      await fs.chmod(backup, AUTH_FILE_MODE).catch(() => undefined);
+      return { accounts: [], activeAccountId: null, refreshTokens: {} };
+    }
+
+    const stored = parsed as Partial<AuthStoreData>;
     return {
-      accounts: parsed.accounts ?? [],
-      activeAccountId: parsed.activeAccountId ?? null,
-      refreshTokens: parsed.refreshTokens ?? {},
-      mcSessions: parsed.mcSessions,
+      accounts: stored.accounts ?? [],
+      activeAccountId: stored.activeAccountId ?? null,
+      refreshTokens: stored.refreshTokens ?? {},
+      mcSessions: stored.mcSessions,
     };
-  } catch {
-    return { accounts: [], activeAccountId: null, refreshTokens: {} };
-  }
+  });
 }
 
 async function writeStore(data: AuthStoreData): Promise<void> {
@@ -94,6 +131,11 @@ let migration: Promise<void> | undefined;
  * Lift plaintext secrets left by pre-keychain builds into the keychain and drop
  * them from the file. Runs at most once per process; anything the keychain
  * rejects stays exactly where it is, so a failed migration is not a lost login.
+ *
+ * Once it has worked, that is. Every read waits on this promise, so one that
+ * failed — the file could not be read just then — is forgotten rather than
+ * kept: remembered, it would answer every later read of the session with the
+ * same failure, long after the file was readable again.
  */
 function migrateOnce(): Promise<void> {
   migration ??= (async () => {
@@ -119,7 +161,10 @@ function migrateOnce(): Promise<void> {
       await writeStore(store);
       log.info(`Moved ${moved} stored credential(s) from auth.json into the OS keychain`);
     }
-  })();
+  })().catch((err: unknown) => {
+    migration = undefined;
+    throw err;
+  });
   return migration;
 }
 

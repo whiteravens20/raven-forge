@@ -52,6 +52,11 @@ async function loadModule(): Promise<Store> {
 
 const authFile = () => path.join(root, 'auth.json');
 const readAuth = async () => JSON.parse(await fs.readFile(authFile(), 'utf-8'));
+const keptAside = async () =>
+  (await fs.readdir(root)).filter((f) => f.startsWith('auth.json.broken-'));
+
+/** Root ignores the mode bits, so the unreadable-file case cannot be staged. */
+const asRoot = typeof process.getuid === 'function' && process.getuid() === 0;
 
 const account = (id: string, name = id): MinecraftAccount => ({
   id,
@@ -245,6 +250,76 @@ describe('the account list', () => {
     await store.saveAccount(account('a1'));
     await expect(store.setActiveAccountId('a2')).rejects.toThrow(/not found/);
     expect((await store.getAuthState()).activeAccountId).toBe('a1');
+  });
+});
+
+/**
+ * Absent, unreadable and unparsable are three different things, and only the
+ * first is "nobody signed in".
+ *
+ * Every writer starts from what the read returns, and every failure to read
+ * used to return an empty store — so one read that failed on a locked file was
+ * followed by a save of whichever account was being changed, and every other
+ * login left the list with it.
+ */
+describe('reading auth.json', () => {
+  it.skipIf(asRoot)('fails rather than answer an unreadable file with no accounts', async () => {
+    const store = await loadModule();
+    await store.saveAccount(account('a1'), 'r1');
+    await store.saveAccount(account('a2'), 'r2');
+    await fs.chmod(authFile(), 0o000);
+    const fresh = await loadModule();
+
+    await expect(fresh.getAuthState()).rejects.toThrow(/EACCES/);
+    // The save that would have left `a3` as the only account there is.
+    await expect(fresh.saveAccount(account('a3'), 'r3')).rejects.toThrow(/EACCES/);
+
+    // And the failure is not remembered: every read waits on the migration, so
+    // one that failed and stayed failed would lock the session out for good.
+    await fs.chmod(authFile(), 0o600);
+    expect((await fresh.getAuthState()).accounts.map((a) => a.id)).toEqual(['a1', 'a2']);
+    expect((await readAuth()).accounts).toHaveLength(2);
+  });
+
+  it('keeps a file it cannot parse beside the one that replaces it', async () => {
+    const truncated = '{ "accounts": [{ "id": "a1" }], "refreshTokens": { "a1": "secr';
+    // As an older build could have left it: readable by everybody.
+    await fs.writeFile(authFile(), truncated, { mode: 0o644 });
+    const store = await loadModule();
+
+    expect((await store.getAuthState()).accounts).toEqual([]);
+    await store.saveAccount(account('a2'));
+
+    const kept = await keptAside();
+    expect(kept).toHaveLength(1);
+    expect(await fs.readFile(path.join(root, kept[0]), 'utf-8')).toBe(truncated);
+    // It may hold tokens, so it gets the mode the live file always has.
+    expect((await fs.stat(path.join(root, kept[0]))).mode & 0o777).toBe(0o600);
+    expect((await readAuth()).accounts.map((a: MinecraftAccount) => a.id)).toEqual(['a2']);
+  });
+
+  it('does the same for a file that parses but is not an account store', async () => {
+    await fs.writeFile(authFile(), '[]');
+    const store = await loadModule();
+
+    expect((await store.getAuthState()).accounts).toEqual([]);
+    expect(await keptAside()).toHaveLength(1);
+  });
+
+  it('moves a broken file aside once, however many callers find it together', async () => {
+    await fs.writeFile(authFile(), '{ not json');
+    const store = await loadModule();
+
+    const [state, missing, token] = await Promise.all([
+      store.getAuthState(),
+      store.getAccount('a1'),
+      store.getRefreshToken('a1'),
+    ]);
+
+    expect(state.accounts).toEqual([]);
+    expect(missing).toBeUndefined();
+    expect(token).toBeUndefined();
+    expect(await keptAside()).toHaveLength(1);
   });
 });
 

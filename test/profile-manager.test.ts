@@ -42,6 +42,13 @@ const newProfile = (name: string): Omit<Profile, 'id' | 'createdAt' | 'updatedAt
 
 let mgr: Manager;
 
+const indexFile = () => path.join(root, 'profiles.json');
+const keptAside = async () =>
+  (await fs.readdir(root)).filter((f) => f.startsWith('profiles.json.broken-'));
+
+/** Root ignores the mode bits, so the unreadable-file case cannot be staged. */
+const asRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-profiles-'));
   process.env.RAVENFORGE_DATA_DIR = root;
@@ -141,6 +148,89 @@ describe('mutateProfiles', () => {
     await expect(mgr.updateProfile(created.id, { name: 'still works' })).resolves.toMatchObject({
       name: 'still works',
     });
+  });
+});
+
+/**
+ * Absent, unreadable and unparsable are three different things, and only the
+ * first is an empty list.
+ *
+ * Every failure to read the file used to be cached as "no profiles", and the
+ * next change — creating one, a game exiting — wrote that back: one read that
+ * failed on a locked file turned two profiles into one, with nothing kept.
+ */
+describe('reading profiles.json', () => {
+  it('reads an absent file as no profiles yet', async () => {
+    expect(await mgr.getAllProfiles()).toEqual([]);
+  });
+
+  it.skipIf(asRoot)('fails rather than answer an unreadable file with an empty list', async () => {
+    await mgr.createProfile(newProfile('A'));
+    await mgr.createProfile(newProfile('B'));
+    await fs.chmod(indexFile(), 0o000);
+    const fresh = await loadModule();
+
+    await expect(fresh.getAllProfiles()).rejects.toThrow(/EACCES/);
+    // The write that would have made the empty answer permanent.
+    await expect(fresh.createProfile(newProfile('C'))).rejects.toThrow(/EACCES/);
+
+    // Not remembered either: once the file can be read, it is.
+    await fs.chmod(indexFile(), 0o600);
+    expect((await fresh.getAllProfiles()).map((p) => p.name)).toEqual(['A', 'B']);
+    expect(JSON.parse(await fs.readFile(indexFile(), 'utf-8'))).toHaveLength(2);
+  });
+
+  it('keeps a file it cannot parse beside the one that replaces it', async () => {
+    const truncated = '[{ "id": "p1", "name": "Ravens"';
+    await fs.writeFile(indexFile(), truncated);
+    const fresh = await loadModule();
+
+    expect(await fresh.getAllProfiles()).toEqual([]);
+    await fresh.createProfile(newProfile('New'));
+
+    const kept = await keptAside();
+    expect(kept).toHaveLength(1);
+    expect(await fs.readFile(path.join(root, kept[0]), 'utf-8')).toBe(truncated);
+    expect(JSON.parse(await fs.readFile(indexFile(), 'utf-8'))).toHaveLength(1);
+  });
+
+  it('does the same for a file that parses but is not a list', async () => {
+    await fs.writeFile(indexFile(), '{"profiles":[]}');
+    const fresh = await loadModule();
+
+    expect(await fresh.getAllProfiles()).toEqual([]);
+    expect(await keptAside()).toHaveLength(1);
+  });
+
+  it('moves a broken file aside once, however many callers find it together', async () => {
+    // The page asking for the list and the startup pack check arrive in the
+    // same tick. Each finding the file broken for itself meant each moving it
+    // aside: the second either failed on a file no longer there, or moved the
+    // good one a save had put in its place.
+    await fs.writeFile(indexFile(), '{ not json');
+    const fresh = await loadModule();
+
+    const answers = await Promise.all([
+      fresh.getAllProfiles(),
+      fresh.getAllProfiles(),
+      fresh.getProfile('nobody'),
+    ]);
+
+    expect(answers).toEqual([[], [], null]);
+    expect(await keptAside()).toHaveLength(1);
+  });
+
+  it('does not list a profile whose write never reached the disk', async () => {
+    const saved = await mgr.createProfile(newProfile('Saved'));
+    // A directory where the file belongs, which the atomic rename cannot
+    // replace: the stand-in for a full disk that works for any user.
+    await fs.rm(indexFile());
+    await fs.mkdir(indexFile());
+
+    await expect(mgr.createProfile(newProfile('Lost'))).rejects.toThrow();
+    await expect(mgr.updateProfile(saved.id, { name: 'Renamed' })).rejects.toThrow();
+
+    expect(await mgr.getAllProfiles()).toEqual([saved]);
   });
 });
 
