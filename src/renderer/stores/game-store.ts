@@ -49,6 +49,13 @@ export const useGameStore = create<GameStore>((set, get) => {
     // so "last played" and the hour count update without a navigation.
     void useProfileStore.getState().load();
   });
+  // The events only say what changes from here on. Asked once as well, for the
+  // page that has just been reloaded while a game was up: its own record went
+  // with the old page, and it would otherwise offer Play for a running game
+  // and no way to stop it.
+  void api.game.getRunning().then((result) => {
+    for (const profileId of result.data ?? []) get().addRunning(profileId);
+  });
 
   return {
     running: new Set(),

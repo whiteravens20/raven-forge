@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import nacl from 'tweetnacl';
 import { encodeBase64 } from 'tweetnacl-util';
 import { WHITE_RAVENS_PUBLIC_KEY } from '../src/shared/branding';
-import type { GlobalSettings, IpcResult } from '../src/shared/ipc-types';
+import type { GlobalSettings, IpcResult, Profile } from '../src/shared/ipc-types';
 
 /**
  * What a handler answers, asked the way the renderer asks it.
@@ -20,9 +20,11 @@ import type { GlobalSettings, IpcResult } from '../src/shared/ipc-types';
 
 type Listener = (event: unknown, ...args: unknown[]) => unknown;
 
-const { handlers, mainFrame } = vi.hoisted(() => ({
+const { handlers, mainFrame, running } = vi.hoisted(() => ({
   handlers: new Map<string, Listener>(),
   mainFrame: {},
+  /** Profiles this suite says have a game up; nothing is ever spawned. */
+  running: new Set<string>(),
 }));
 
 let root: string;
@@ -47,6 +49,11 @@ vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 
+vi.mock('../src/core/minecraft/game-launcher', async (original) => ({
+  ...(await original<typeof import('../src/core/minecraft/game-launcher')>()),
+  isGameRunning: (profileId: string) => running.has(profileId),
+}));
+
 // The sender guard wants a window whose main frame the call came from.
 vi.mock('../src/main/window', () => ({
   getMainWindow: () => ({
@@ -69,6 +76,7 @@ beforeEach(async () => {
 
   vi.resetModules();
   handlers.clear();
+  running.clear();
   const { reloadDataRoot } = await import('../src/core/config/data-root');
   reloadDataRoot();
   const { registerAllIpcHandlers } = await import('../src/main/ipc-handlers');
@@ -78,6 +86,28 @@ beforeEach(async () => {
 afterEach(async () => {
   delete process.env.RAVENFORGE_DATA_DIR;
   await fs.rm(root, { recursive: true, force: true });
+});
+
+const newProfile = (name: string) => ({
+  name,
+  minecraftVersion: '1.21.4',
+  modLoader: 'fabric',
+  allocatedRamMb: 4096,
+});
+
+describe('game:get-running', () => {
+  it('names the profiles with a game up, and only those', async () => {
+    // What a reloaded page asks, having lost the count it kept from events.
+    const a = (await call<Profile>('profiles:create', newProfile('A'))).data!;
+    const b = (await call<Profile>('profiles:create', newProfile('B'))).data!;
+    expect((await call<string[]>('game:get-running')).data).toEqual([]);
+
+    running.add(b.id);
+    expect((await call<string[]>('game:get-running')).data).toEqual([b.id]);
+
+    running.add(a.id);
+    expect((await call<string[]>('game:get-running')).data).toEqual([a.id, b.id]);
+  });
 });
 
 describe('settings:add-trusted-key', () => {

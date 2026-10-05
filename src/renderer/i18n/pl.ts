@@ -671,8 +671,9 @@ export const pl: Translations = {
 
   // ── Error boundary ───────────────────────────────────────
   'error.title': 'Ups, coś poszło nie tak',
-  'error.body': 'Launcher napotkał nieoczekiwany błąd. Kliknij poniżej, aby spróbować ponownie.',
-  'error.restart': 'Uruchom ponownie',
+  'error.body':
+    'Launcher napotkał nieoczekiwany błąd. Przycisk poniżej wczytuje jego interfejs od nowa — uruchomiona gra działa dalej.',
+  'error.reload': 'Wczytaj okno ponownie',
 
   // ── About ────────────────────────────────────────────────
   'about.tagline':

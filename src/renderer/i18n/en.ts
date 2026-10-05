@@ -678,8 +678,9 @@ export const en = {
 
   // ── Error boundary ───────────────────────────────────────
   'error.title': 'Something went wrong',
-  'error.body': 'The launcher hit an unexpected error. Click below to try again.',
-  'error.restart': 'Restart',
+  'error.body':
+    'The launcher hit an unexpected error. Reloading the window below starts its interface again — a game that is running is left alone.',
+  'error.reload': 'Reload the window',
 
   // ── About ────────────────────────────────────────────────
   'about.tagline':

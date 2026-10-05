@@ -1015,6 +1015,24 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to kill game: ${reason(err)}`);
     }
   });
+  /**
+   * Which profiles have a game up.
+   *
+   * Worked out from the profile list, because the launcher only ever starts a
+   * game for a profile and `isGameRunning` is the question it already answers.
+   * The renderer's own record comes from `game:started` and `game:exited`, and
+   * is gone when its page reloads — which is what the error screen's button
+   * does. Without this it came back offering Play for a game that was running
+   * and no way to stop it.
+   */
+  handle('game:get-running', async () => {
+    try {
+      const profiles = await getAllProfiles();
+      return ok(profiles.map((profile) => profile.id).filter(isGameRunning));
+    } catch (err) {
+      return fail(`Failed to list running games: ${reason(err)}`);
+    }
+  });
   handle('game:get-log-tail', async (_event, profileId: string, lines?: number) => {
     try {
       return ok(getLogTail(profileId, lines));

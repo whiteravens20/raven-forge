@@ -254,6 +254,12 @@ export interface InvokeChannels {
   // -- Game Launch --
   'game:launch': (options: LaunchOptions) => Promise<IpcResult<void>>;
   'game:kill': (profileId: string) => Promise<IpcResult<void>>;
+  /**
+   * The profiles with a game up right now. The renderer keeps count of these
+   * itself, from the two events — this is for the moment it has just been
+   * reloaded and has forgotten.
+   */
+  'game:get-running': () => Promise<IpcResult<string[]>>;
   /** Recent stdout already buffered in main, so a console opened mid-game is not blank. */
   'game:get-log-tail': (profileId: string, lines?: number) => Promise<IpcResult<string[]>>;
   /** Minecraft version ids from Mojang, newest first. Releases only unless asked. */
@@ -446,6 +452,7 @@ export interface RavenForgeAPI {
   game: {
     launch: InvokeChannels['game:launch'];
     kill: InvokeChannels['game:kill'];
+    getRunning: InvokeChannels['game:get-running'];
     getLogTail: InvokeChannels['game:get-log-tail'];
     getVersions: InvokeChannels['game:get-versions'];
     cancel: InvokeChannels['game:cancel'];

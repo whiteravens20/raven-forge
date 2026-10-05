@@ -29,7 +29,8 @@ export class ErrorBoundary extends Component<Props, State> {
   override render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-screen items-center justify-center bg-rf-bg p-6 text-rf-text">
+        // Fills what is left under the title bar, which stays where it was.
+        <div className="flex flex-1 items-center justify-center overflow-y-auto bg-rf-bg p-6 text-rf-text">
           <div className="max-w-md space-y-4 rounded-lg border border-rf-border bg-rf-surface p-6 text-center">
             <h1 className="text-xl font-display font-bold text-rf-danger">{t('error.title')}</h1>
             {/* A class component cannot use hooks, and this one renders while
@@ -41,11 +42,14 @@ export class ErrorBoundary extends Component<Props, State> {
                 {this.state.error.message}
               </pre>
             )}
+            {/* A reload of the page, not of the launcher: the main process and
+                any game it started carry on, and the stores ask it again for
+                what they had been keeping count of. */}
             <button
               onClick={() => window.location.reload()}
               className="rounded-lg bg-rf-accent px-4 py-2 text-sm font-medium text-white hover:bg-rf-accent-hover transition-colors"
             >
-              {t('error.restart')}
+              {t('error.reload')}
             </button>
           </div>
         </div>

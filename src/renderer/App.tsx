@@ -29,10 +29,13 @@ export function App() {
   }, []);
 
   return (
-    <ErrorBoundary>
-      <HashRouter>
-        <div className="flex h-screen flex-col overflow-hidden bg-rf-bg text-rf-text font-sans">
-          <TitleBar />
+    <div className="flex h-screen flex-col overflow-hidden bg-rf-bg text-rf-text font-sans">
+      {/* Outside the boundary on purpose. The window has no frame, so this bar
+          is the only way to move, minimise or close it — and the error screen
+          used to replace it along with everything else. */}
+      <TitleBar />
+      <ErrorBoundary>
+        <HashRouter>
           <div className="flex flex-1 overflow-hidden">
             <Sidebar />
             <main className="flex-1 overflow-y-auto">
@@ -52,8 +55,8 @@ export function App() {
           </div>
           <InstallProgressOverlay />
           <UpdateToast />
-        </div>
-      </HashRouter>
-    </ErrorBoundary>
+        </HashRouter>
+      </ErrorBoundary>
+    </div>
   );
 }

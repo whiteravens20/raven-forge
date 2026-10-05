@@ -99,6 +99,7 @@ const api: RavenForgeAPI = {
   game: {
     launch: (options) => ipcRenderer.invoke('game:launch', options),
     kill: (profileId) => ipcRenderer.invoke('game:kill', profileId),
+    getRunning: () => ipcRenderer.invoke('game:get-running'),
     getLogTail: (profileId, lines) => ipcRenderer.invoke('game:get-log-tail', profileId, lines),
     getVersions: (includeSnapshots) => ipcRenderer.invoke('game:get-versions', includeSnapshots),
     cancel: (profileId) => ipcRenderer.invoke('game:cancel', profileId),
