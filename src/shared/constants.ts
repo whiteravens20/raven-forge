@@ -21,6 +21,17 @@ export const FILE_AUTH = 'auth.json';
 // ── Modrinth API ──────────────────────────────────────────
 export const MODRINTH_API_BASE = 'https://api.modrinth.com/v2';
 
+/**
+ * A project's page on Modrinth, from its id or its slug.
+ *
+ * The `/project/` form answers for either and redirects to the address for
+ * whatever the project is — mod, shader, resource pack, modpack — so a caller
+ * holding only an id does not have to know which.
+ */
+export function modrinthProjectUrl(idOrSlug: string): string {
+  return `https://modrinth.com/project/${encodeURIComponent(idOrSlug)}`;
+}
+
 // ── Mod loaders ───────────────────────────────────────────
 /**
  * The loaders this launcher can install, and therefore the only ones worth

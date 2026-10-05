@@ -2,13 +2,15 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { Search, Download, Package, RefreshCw, ArrowUpCircle } from 'lucide-react';
+import { usePagedSearch } from '@hooks/use-paged-search';
+import { SearchPager, SearchResultRow } from '@components/SearchResults';
 import { useProfileStore } from '@stores/profile-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Switch } from '@components/ui/Switch';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
-import { useLocale, useT } from '@renderer/i18n';
+import { useT } from '@renderer/i18n';
 import {
   SearchFilters,
   EMPTY_FILTERS,
@@ -36,17 +38,14 @@ export function ModsPage() {
   const selectedId = useProfileStore((s) => s.selectedProfileId);
 
   const t = useT();
-  const locale = useLocale();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ModSearchResult[]>([]);
+  const search = usePagedSearch();
+  const { results, searching, searched } = search;
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
-  const [searching, setSearching] = useState(false);
   const [tab, setTab] = useState<'installed' | 'browse'>('installed');
   const [error, setError] = useState<string | null>(null);
   const [facets, setFacets] = useState<FacetGroups>(NO_FACETS);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
-  /** Set once a search has run, so the "nothing matched" line waits its turn. */
-  const [searched, setSearched] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   /** Non-null while a compatibility warning is waiting on a decision. */
   const [plan, setPlan] = useState<{ mod: ModSearchResult; plan: InstallPlan } | null>(null);
@@ -83,31 +82,22 @@ export function ModsPage() {
     if (result.success && result.data) setInstalled(result.data);
   }, [selectedId]);
 
-  const handleSearch = async () => {
-    setSearching(true);
+  const handleSearch = () => {
     setError(null);
-    try {
-      const result = await api.mods.search({
-        query: query.trim(),
-        // Every constraint comes from the visible filter row. Reading the
-        // version and loader straight off the profile is what made a search for
-        // a mod that exists come back empty with nothing on screen to explain
-        // it — Modrinth ANDs the facets, so "26.2 AND fabric" genuinely has no
-        // Mekanism in it.
-        gameVersion: filters.gameVersion || undefined,
-        // Typed and separate from `categories`, even though Modrinth files
-        // loaders under the same facet key — the profile's loader is a
-        // constraint, not a tag the user picked.
-        loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
-        categories: categoriesWithoutLoader(filters),
-        limit: 20,
-      });
-      if (result.success && result.data) setResults(result.data);
-      else setError(result.error ?? t('mods.searchFailed'));
-      setSearched(true);
-    } finally {
-      setSearching(false);
-    }
+    void search.search({
+      query: query.trim(),
+      // Every constraint comes from the visible filter row. Reading the
+      // version and loader straight off the profile is what made a search for
+      // a mod that exists come back empty with nothing on screen to explain
+      // it — Modrinth ANDs the facets, so "26.2 AND fabric" genuinely has no
+      // Mekanism in it.
+      gameVersion: filters.gameVersion || undefined,
+      // Typed and separate from `categories`, even though Modrinth files
+      // loaders under the same facet key — the profile's loader is a
+      // constraint, not a tag the user picked.
+      loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
+      categories: categoriesWithoutLoader(filters),
+    });
   };
 
   /**
@@ -337,6 +327,9 @@ export function ModsPage() {
             loaderLabel={t('mods.loaderFilter')}
           />
 
+          {search.error !== null && (
+            <Banner type="urgent">{search.error || t('mods.searchFailed')}</Banner>
+          )}
           {error && <Banner type="urgent">{error}</Banner>}
           {note && (
             <Banner type="info" dismissible onDismiss={() => setNote(null)}>
@@ -460,50 +453,42 @@ export function ModsPage() {
             </p>
           )}
           {results.map((mod) => (
-            <div
+            <SearchResultRow
               key={mod.id}
-              className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"
+              item={mod}
+              action={
+                isInstalled(mod) ? (
+                  <InstalledMark />
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Download size={14} />}
+                    loading={busyId === mod.id}
+                    onClick={() => void handleInstall(mod)}
+                  >
+                    {t('common.install')}
+                  </Button>
+                )
+              }
             >
-              {mod.iconUrl ? (
-                <img src={mod.iconUrl} alt="" className="h-10 w-10 rounded shrink-0" />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded bg-rf-bg-tertiary shrink-0">
-                  <Package size={18} className="text-rf-text-muted" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-rf-text">{mod.name}</p>
-                <p className="text-xs text-rf-text-muted truncate">{mod.description}</p>
-                <p className="text-xs text-rf-text-muted">
-                  {mod.author} •{' '}
-                  {t.plural('mods.downloads', mod.downloads, {
-                    count: mod.downloads.toLocaleString(locale),
-                  })}
-                </p>
-                {/* Judged against the profile, not against the filter row: the
-                    filters can be widened to browse, and what matters is where
-                    the mod is about to land. */}
-                <CompatibilityBadge
-                  item={mod}
-                  gameVersion={profileVersion}
-                  modLoader={profileLoader}
-                />
-              </div>
-              {isInstalled(mod) ? (
-                <InstalledMark />
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<Download size={14} />}
-                  loading={busyId === mod.id}
-                  onClick={() => void handleInstall(mod)}
-                >
-                  {t('common.install')}
-                </Button>
-              )}
-            </div>
+              {/* Judged against the profile, not against the filter row: the
+                  filters can be widened to browse, and what matters is where
+                  the mod is about to land. */}
+              <CompatibilityBadge
+                item={mod}
+                gameVersion={profileVersion}
+                modLoader={profileLoader}
+              />
+            </SearchResultRow>
           ))}
+          <SearchPager
+            shown={results.length}
+            total={search.total}
+            hasMore={search.hasMore}
+            loading={search.loadingMore}
+            onMore={() => void search.loadMore()}
+          />
         </div>
       )}
     </div>

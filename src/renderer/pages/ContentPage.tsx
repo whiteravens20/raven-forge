@@ -3,11 +3,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
+import { usePagedSearch } from '@hooks/use-paged-search';
+import { SearchPager, SearchResultRow } from '@components/SearchResults';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
-import { useLocale, useT } from '@renderer/i18n';
+import { useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import {
   SearchFilters,
@@ -49,13 +51,12 @@ export function ContentPage() {
   const selectedId = useProfileStore((s) => s.selectedProfileId);
 
   const t = useT();
-  const locale = useLocale();
   const [kind, setKind] = useState<Kind>('shaders');
   const [tab, setTab] = useState<'installed' | 'browse'>('installed');
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ModSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
+  const search = usePagedSearch();
+  const { results, searching, searched, reset: resetSearch } = search;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [facets, setFacets] = useState<FacetGroups>(NO_FACETS);
@@ -96,7 +97,7 @@ export function ContentPage() {
   // screen — neither carries over. A shader loader means nothing for a resource
   // pack, and `32x` returns nothing for a shader.
   useEffect(() => {
-    setResults([]);
+    resetSearch();
     setError(null);
     // The version pin survives a kind switch — it is a property of the profile
     // you are dressing up, not of what you are dressing it in. The rest does
@@ -114,7 +115,7 @@ export function ContentPage() {
     return () => {
       cancelled = true;
     };
-  }, [kind]);
+  }, [kind, resetSearch]);
 
   // Start pinned to the profile, which is the answer nine times out of ten —
   // but as a visible, changeable control rather than an invisible rule.
@@ -122,28 +123,20 @@ export function ContentPage() {
     setFilters((prev) => ({ ...prev, gameVersion: profileVersion ?? '' }));
   }, [profileVersion]);
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     // No early return on an empty query: Modrinth searches happily without one,
     // and "every 32x vanilla-like pack for my version" is a question worth
     // being able to ask without inventing a word to type.
-    setSearching(true);
     setError(null);
-    try {
-      const result = await api.mods.search({
-        query: query.trim(),
-        projectType: kind === 'shaders' ? 'shader' : 'resourcepack',
-        // One value per axis, each its own facet group. Modrinth ORs within a
-        // group and ANDs across them, so this reads as "iris AND realistic AND
-        // potato" — narrowing, which is what a filter row is expected to do.
-        categories: filterCategories(filters),
-        gameVersion: filters.gameVersion || undefined,
-        limit: 20,
-      });
-      if (result.success && result.data) setResults(result.data);
-      else setError(result.error ?? t('content.searchFailed'));
-    } finally {
-      setSearching(false);
-    }
+    void search.search({
+      query: query.trim(),
+      projectType: kind === 'shaders' ? 'shader' : 'resourcepack',
+      // One value per axis, each its own facet group. Modrinth ORs within a
+      // group and ANDs across them, so this reads as "iris AND realistic AND
+      // potato" — narrowing, which is what a filter row is expected to do.
+      categories: filterCategories(filters),
+      gameVersion: filters.gameVersion || undefined,
+    });
   };
 
   /**
@@ -352,7 +345,7 @@ export function ContentPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void handleSearch();
+              handleSearch();
             }}
             className="flex gap-2"
           >
@@ -382,50 +375,53 @@ export function ContentPage() {
 
           {kind === 'shaders' && <Banner type="info">{t('content.shadersNeedIris')}</Banner>}
 
+          {search.error !== null && (
+            <Banner type="urgent">{search.error || t('content.searchFailed')}</Banner>
+          )}
+
           {results.length === 0 && !searching && (
-            <p className="py-8 text-center text-sm text-rf-text-muted">{t('content.browseHint')}</p>
+            <p className="py-8 text-center text-sm text-rf-text-muted">
+              {!searched
+                ? t('content.browseHint')
+                : filters.gameVersion
+                  ? t('search.noResultsFiltered', { version: filters.gameVersion })
+                  : t('search.noResults')}
+            </p>
           )}
 
           {results.map((item) => (
-            <div
+            <SearchResultRow
               key={item.id}
-              className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"
+              item={item}
+              fallbackIcon={<Icon size={18} className="text-rf-text-muted" />}
+              action={
+                isInstalled(item) ? (
+                  <InstalledMark />
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Download size={14} />}
+                    loading={busyId === item.id}
+                    onClick={() => void handleInstall(item)}
+                  >
+                    {t('common.install')}
+                  </Button>
+                )
+              }
             >
-              {item.iconUrl ? (
-                <img src={item.iconUrl} alt="" className="h-10 w-10 rounded shrink-0" />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded bg-rf-bg-tertiary shrink-0">
-                  <Icon size={18} className="text-rf-text-muted" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-rf-text">{item.name}</p>
-                <p className="text-xs text-rf-text-muted truncate">{item.description}</p>
-                <p className="text-xs text-rf-text-muted">
-                  {item.author} •{' '}
-                  {t.plural('mods.downloads', item.downloads, {
-                    count: item.downloads.toLocaleString(locale),
-                  })}
-                </p>
-                {/* No loader: a resource pack has none, and a shader's loader is
-                    Iris or OptiFine, which the shader loader picker handles. */}
-                <CompatibilityBadge item={item} gameVersion={profileVersion} />
-              </div>
-              {isInstalled(item) ? (
-                <InstalledMark />
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<Download size={14} />}
-                  loading={busyId === item.id}
-                  onClick={() => void handleInstall(item)}
-                >
-                  {t('common.install')}
-                </Button>
-              )}
-            </div>
+              {/* No loader: a resource pack has none, and a shader's loader is
+                  Iris or OptiFine, which the shader loader picker handles. */}
+              <CompatibilityBadge item={item} gameVersion={profileVersion} />
+            </SearchResultRow>
           ))}
+          <SearchPager
+            shown={results.length}
+            total={search.total}
+            hasMore={search.hasMore}
+            loading={search.loadingMore}
+            onMore={() => void search.loadMore()}
+          />
         </div>
       ) : (
         <div className="space-y-2">

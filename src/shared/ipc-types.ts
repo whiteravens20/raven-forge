@@ -46,6 +46,7 @@ import type {
   InstalledMod,
   ModInstallResult,
   ModSearchFilters,
+  ModSearchPage,
   ModSearchResult,
   ModUpdateResult,
   ModUpdateSummary,
@@ -176,7 +177,7 @@ export interface InvokeChannels {
   'mods:check-updates': (profileId: string) => Promise<IpcResult<ModUpdateSummary>>;
   /** Install the builds the last check found, for the mods named. */
   'mods:update': (profileId: string, modIds: string[]) => Promise<IpcResult<ModUpdateResult>>;
-  'mods:search': (filters: ModSearchFilters) => Promise<IpcResult<ModSearchResult[]>>;
+  'mods:search': (filters: ModSearchFilters) => Promise<IpcResult<ModSearchPage>>;
   /** Modrinth's live facet list for a project type, grouped as Modrinth groups it. */
   'mods:get-facets': (projectType: ContentProjectType) => Promise<IpcResult<FacetGroups>>;
 

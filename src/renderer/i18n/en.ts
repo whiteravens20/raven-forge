@@ -78,6 +78,9 @@ export const en = {
   // ── Search filters (mods, shaders, resource packs) ───────
   'search.gameVersion': 'Minecraft version',
   'search.noResults': 'Nothing matched.',
+  'search.shown': 'Showing {shown} of {total}',
+  'search.loadMore': 'Load more',
+  'search.openProject': 'Open the {name} page on Modrinth',
   'search.noResultsFiltered':
     'Nothing matched. The filters above are ANDed together, so a project with no build for {version} will not appear — widen one of them.',
   'nav.accounts.short': 'Accounts',

@@ -67,6 +67,9 @@ export const pl: Translations = {
   // ── Filtry wyszukiwania (mody, shadery, paczki zasobów) ──
   'search.gameVersion': 'Wersja Minecraft',
   'search.noResults': 'Brak wyników.',
+  'search.shown': 'Pokazano {shown} z {total}',
+  'search.loadMore': 'Załaduj więcej',
+  'search.openProject': 'Otwórz stronę {name} na Modrinth',
   'search.noResultsFiltered':
     'Brak wyników. Filtry powyżej łączą się przez ORAZ, więc projekt bez wersji na {version} się nie pokaże — poluzuj któryś.',
   'nav.accounts.short': 'Konta',

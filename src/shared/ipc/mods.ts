@@ -73,7 +73,19 @@ export interface ModSearchResult {
 }
 
 /** What Modrinth calls a project type. Shaders and resource packs are not mods. */
-export type ContentProjectType = 'mod' | 'shader' | 'resourcepack';
+export type ContentProjectType = 'mod' | 'shader' | 'resourcepack' | 'modpack';
+
+/**
+ * One page of search results, and how many there are in all.
+ *
+ * The total is what makes a second page askable: a bare list of twenty cannot
+ * say whether there were twenty matches or two thousand, and the search used to
+ * show the first twenty of either with nothing to tell them apart.
+ */
+export interface ModSearchPage {
+  hits: ModSearchResult[];
+  total: number;
+}
 
 /**
  * Search facets for one project type. `groups` mirrors Modrinth's own headers —

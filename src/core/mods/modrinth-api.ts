@@ -7,7 +7,7 @@ import type {
   ContentProjectType,
   FacetGroups,
   ModSearchFilters,
-  ModSearchResult,
+  ModSearchPage,
 } from '../../shared/ipc-types';
 
 // ── Modrinth API helpers ───────────────────────────────────
@@ -102,16 +102,21 @@ interface ModrinthDependency {
 
 // ── Search ─────────────────────────────────────────────────
 
-export async function searchMods(filters: ModSearchFilters): Promise<ModSearchResult[]> {
+/** Modrinth refuses a page larger than this. */
+const MAX_SEARCH_PAGE = 100;
+
+export async function searchMods(filters: ModSearchFilters): Promise<ModSearchPage> {
   const projectType = filters.projectType ?? 'mod';
 
   const facets: string[][] = [];
   facets.push([`project_type:${projectType}`]);
   if (filters.gameVersion) facets.push([`versions:${filters.gameVersion}`]);
-  // A loader facet only means anything for mods. Resource packs have no loader,
-  // and shaders are categorised by the shader loader that runs them (iris,
-  // optifine) — facetting those on `fabric` returns nothing at all.
-  if (filters.loader && projectType === 'mod') facets.push([`categories:${filters.loader}`]);
+  // A loader facet only means anything for mods and for packs of them. Resource
+  // packs have no loader, and shaders are categorised by the shader loader that
+  // runs them (iris, optifine) — facetting those on `fabric` returns nothing.
+  if (filters.loader && (projectType === 'mod' || projectType === 'modpack')) {
+    facets.push([`categories:${filters.loader}`]);
+  }
   // Each category becomes its own facet group, which Modrinth ANDs: asking for
   // `iris` and `realistic` means both, not either.
   for (const category of filters.categories ?? []) facets.push([`categories:${category}`]);
@@ -119,25 +124,27 @@ export async function searchMods(filters: ModSearchFilters): Promise<ModSearchRe
   const params = new URLSearchParams({
     query: filters.query,
     facets: JSON.stringify(facets),
-    limit: String(filters.limit ?? 20),
-    offset: String(filters.offset ?? 0),
+    limit: String(Math.min(Math.max(filters.limit ?? 20, 1), MAX_SEARCH_PAGE)),
+    offset: String(Math.max(filters.offset ?? 0, 0)),
   });
 
   const res = await modrinthFetch(`/search?${params}`);
   const data = (await res.json()) as ModrinthSearchResponse;
 
-  return data.hits.map((hit) => ({
-    id: hit.project_id,
-    slug: hit.slug,
-    name: hit.title,
-    description: hit.description,
-    author: hit.author,
-    iconUrl: hit.icon_url ?? undefined,
-    downloads: hit.downloads,
-    source: 'modrinth' as const,
-    versions: hit.versions,
-    categories: hit.categories,
-  }));
+  return {
+    total: data.total_hits,
+    hits: data.hits.map((hit) => ({
+      id: hit.project_id,
+      slug: hit.slug,
+      name: hit.title,
+      description: hit.description,
+      author: hit.author,
+      iconUrl: hit.icon_url ?? undefined,
+      downloads: hit.downloads,
+      versions: hit.versions,
+      categories: hit.categories,
+    })),
+  };
 }
 
 /**
@@ -196,8 +203,11 @@ export async function getSearchFacets(projectType: ContentProjectType): Promise<
   )
     .filter((l) => l.supported_project_types.includes(projectType))
     // A launcher starts a client, so the server platforms Modrinth also files
-    // under `mod` (bukkit, paper, velocity …) would only be dead options.
-    .filter((l) => projectType !== 'mod' || isClientModLoader(l.name))
+    // under `mod` and `modpack` (bukkit, paper, velocity …) would only be dead
+    // options.
+    .filter(
+      (l) => (projectType !== 'mod' && projectType !== 'modpack') || isClientModLoader(l.name),
+    )
     .map((l) => l.name)
     .sort();
 
