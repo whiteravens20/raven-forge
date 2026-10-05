@@ -736,6 +736,9 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     // other way round, a jar that could not be deleted — Windows refuses while
     // the game has it open — was left in `mods/` with nothing recording it:
     // still loaded by the game, never looked at by a sync again. This way a
+    // The resource packs and shaders below take no signal of their own, so this
+    // is the last point at which a cancel is still honoured.
+    throwIfCancelled(signal, 'Sync');
     // failure leaves the list as it was, the sync says why it stopped, and the
     // next one tries again.
     const dropped = await mutateLockFile(profileId, async (mods) => {
@@ -785,7 +788,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     if (isCancellation(err)) {
       log.info(`Manifest sync cancelled for ${profile.name}`);
       await writeSyncState(profileId, previousState);
-      return;
+      throw err;
     }
     const message = err instanceof Error ? err.message : String(err);
     await writeSyncState(profileId, {
@@ -807,6 +810,11 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
  * build — so it is fetched by id rather than looked for in a filtered list it
  * would be missing from by definition.
  *
+    //
+    // It is still thrown on. Returning here made a cancelled sync look like a
+    // finished one to whoever called, and the caller that matters is a launch:
+    // pressing Cancel while the mods were being checked stopped the check and
+    // then started the game anyway, on whatever half of the update had landed.
  * Without one, the profile decides. The argument is optional because
  * `ModSearchResult.versions` holds *game* versions, so the renderer has no build
  * id to hand over; passing `versions[0]` (as it once did) asked Modrinth for a

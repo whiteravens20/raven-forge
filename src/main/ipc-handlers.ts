@@ -72,7 +72,7 @@ import { requiredJavaFor } from '../core/minecraft/java-requirement';
 import { getLoaderVersions } from '../core/modloader/loader-manager';
 import { launchGame, killGame, isGameRunning, getLogTail } from '../core/minecraft/game-launcher';
 import { getVersionManifest } from '../core/minecraft/version-manifest';
-import { cancelJob } from '../core/util/cancellation';
+import { cancelJob, isCancellation } from '../core/util/cancellation';
 import { machineMemoryMb } from '../core/util/machine-memory';
 import {
   loginMicrosoft,
@@ -720,6 +720,9 @@ export function registerAllIpcHandlers(): void {
       await syncManifest(profileId);
       return ok(undefined);
     } catch (err) {
+      // Stopping a sync is something the player did, not something that went
+      // wrong; the profile's state says it was left as it was.
+      if (isCancellation(err)) return ok(undefined);
       return fail(`Mod sync failed: ${reason(err)}`);
     }
   });
