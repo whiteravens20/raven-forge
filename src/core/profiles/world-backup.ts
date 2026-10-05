@@ -118,12 +118,28 @@ export async function listBackups(profileId: string): Promise<WorldBackup[]> {
  * Without this every version change leaves another full copy of every world
  * behind, and a profile quietly grows without anybody choosing that. A manual
  * backup is somebody's decision and is never touched.
+ *
+ * Neither is anything named in `keep`, however old it sorts. Age alone used to
+ * decide, and age is the id, which is whatever the clock said. Restoring the
+ * oldest of five automatic copies pruned the very one being restored; and with
+ * the clock set back, the copy just taken sorted oldest and went the moment it
+ * was made.
+ *
+ * Never throws. This is housekeeping after something that has already worked,
+ * and an old copy that will not go — a file in it held open, on Windows — must
+ * not turn a restore that put the worlds back into one that reports failure.
+ * Whatever stays is past keeping the next time as well, and is tried again.
  */
-async function pruneAutomatic(profileId: string): Promise<void> {
+async function pruneAutomatic(profileId: string, keep: string[]): Promise<void> {
   const automatic = (await listBackups(profileId)).filter((b) => b.reason !== 'manual');
   for (const stale of automatic.slice(KEEP_AUTOMATIC)) {
-    await fs.rm(backupDir(profileId, stale.id), { recursive: true, force: true });
-    log.info(`Pruned automatic world backup ${stale.id} of profile ${profileId}`);
+    if (keep.includes(stale.id)) continue;
+    try {
+      await fs.rm(backupDir(profileId, stale.id), { recursive: true, force: true });
+      log.info(`Pruned automatic world backup ${stale.id} of profile ${profileId}`);
+    } catch (err) {
+      log.warn(`Could not prune world backup ${stale.id} of profile ${profileId}:`, err);
+    }
   }
 }
 
@@ -137,6 +153,18 @@ export async function backupWorlds(
   profileId: string,
   reason: WorldBackupReason = 'manual',
 ): Promise<WorldBackup> {
+  const backup = await copyWorldsAside(profileId, reason);
+  if (reason !== 'manual') await pruneAutomatic(profileId, [backup.id]);
+  return backup;
+}
+
+/**
+ * The copy itself, and nothing else: no older backup is touched from here.
+ *
+ * Apart from `backupWorlds` so that a restore can take its safety copy without
+ * pruning in the same breath — see `restoreBackup`.
+ */
+async function copyWorldsAside(profileId: string, reason: WorldBackupReason): Promise<WorldBackup> {
   const savesDir = await savesDirFor(profileId);
   const worlds = await worldsIn(savesDir);
   if (worlds.length === 0) throw new Error('This profile has no worlds to back up.');
@@ -167,8 +195,6 @@ export async function backupWorlds(
     throw err;
   }
 
-  if (reason !== 'manual') await pruneAutomatic(profileId);
-
   log.info(`Backed up ${worlds.length} world(s) of profile ${profileId} as ${id} (${reason})`);
   return {
     id,
@@ -186,6 +212,12 @@ export async function backupWorlds(
  * *before* anything is deleted — so a restore chosen by mistake is itself
  * undoable, and a failure part-way through has left the originals somewhere.
  *
+ * Nothing is pruned until the worlds are back. The safety copy is an automatic
+ * backup like any other, and taking it used to prune on the spot: restoring the
+ * oldest of five deleted that very backup, then `saves/`, and then failed for
+ * want of anything to copy. Until the copy back has finished, the backup being
+ * restored and the safety copy are the only two places the worlds exist.
+ *
  * @returns the safety copy taken, or null when there was nothing to save
  */
 export async function restoreBackup(
@@ -200,12 +232,17 @@ export async function restoreBackup(
 
   const savesDir = await savesDirFor(profileId);
   const existing = await worldsIn(savesDir);
-  const safety = existing.length > 0 ? await backupWorlds(profileId, 'before-restore') : null;
+  const safety = existing.length > 0 ? await copyWorldsAside(profileId, 'before-restore') : null;
 
   await fs.rm(savesDir, { recursive: true, force: true });
   await fs.cp(source, savesDir, { recursive: true });
 
   log.info(`Restored world backup ${backupId} into profile ${profileId}`);
+
+  // The backup just restored stays even when it is the oldest: it was asked for
+  // by name a moment ago, and a list it has vanished from reads as a restore
+  // that used it up.
+  if (safety) await pruneAutomatic(profileId, [backupId, safety.id]);
   return safety;
 }
 

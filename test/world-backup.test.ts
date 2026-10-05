@@ -85,6 +85,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  // Before the cleanup, not left to each test's last line: an assertion that
+  // fails skips that line, and a spy on `fs.rm` then outlives its test.
+  vi.restoreAllMocks();
   await fs.rm(root, { recursive: true, force: true });
 });
 
@@ -191,6 +194,103 @@ describe('restoreBackup', () => {
 
     await expect(restoreBackup('p1', '2026-01-01T00-00-09-000')).rejects.toThrow(/holds no worlds/);
     expect(await listWorlds('p1')).toEqual(['Home']);
+  });
+
+  it('restores the oldest automatic backup instead of pruning it first', async () => {
+    // Five automatic copies is a full set, so the safety copy a restore takes
+    // is a sixth and something has to go. It used to be the oldest — the one
+    // being restored — and it went before `saves/` was emptied: the restore
+    // then had nothing to copy back, and both were gone.
+    await world('Home', 'what is there now');
+    for (let i = 1; i <= 5; i++) {
+      await existingBackup(`2026-01-01T00-00-0${i}-000`, 'version-change');
+    }
+
+    const safety = await restoreBackup('p1', '2026-01-01T00-00-01-000');
+
+    expect(await listWorlds('p1')).toEqual(['Old']);
+    expect(await fs.readFile(path.join(savesDir(), 'Old', 'level.dat'), 'utf-8')).toBe('old');
+    const left = (await listBackups('p1')).map((b) => b.id);
+    expect(left).toContain('2026-01-01T00-00-01-000');
+    expect(left).toContain(safety?.id);
+    const kept = path.join(root, 'backups', safety!.id, 'saves', 'Home', 'level.dat');
+    expect(await fs.readFile(kept, 'utf-8')).toBe('what is there now');
+  });
+
+  it('still clears out automatic copies that are past keeping', async () => {
+    // Protecting the two a restore depends on must not turn every restore into
+    // one more full copy of every world, kept for good.
+    await world('Home', 'data');
+    for (let i = 1; i <= 6; i++) {
+      await existingBackup(`2026-01-01T00-00-0${i}-000`, 'version-change');
+    }
+
+    const safety = await restoreBackup('p1', '2026-01-01T00-00-05-000');
+
+    expect((await listBackups('p1')).map((b) => b.id)).toEqual([
+      safety?.id,
+      '2026-01-01T00-00-06-000',
+      '2026-01-01T00-00-05-000',
+      '2026-01-01T00-00-04-000',
+      '2026-01-01T00-00-03-000',
+    ]);
+  });
+
+  it('keeps the backup and the safety copy when the copy back fails', async () => {
+    await world('Home', 'what is there now');
+    for (let i = 1; i <= 5; i++) {
+      await existingBackup(`2026-01-01T00-00-0${i}-000`, 'version-change');
+    }
+    // The first copy is the safety one and has to work; the second is the
+    // restore itself.
+    const copy = fs.cp.bind(fs);
+    vi.spyOn(fs, 'cp').mockImplementationOnce(copy).mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(restoreBackup('p1', '2026-01-01T00-00-01-000')).rejects.toThrow('disk full');
+
+    // Nothing was pruned, so everything needed to try again is still there:
+    // the backup, and the worlds that were in `saves/` before it.
+    const left = await listBackups('p1');
+    expect(left).toHaveLength(6);
+    expect(left.map((b) => b.id)).toContain('2026-01-01T00-00-01-000');
+    expect(left[0].reason).toBe('before-restore');
+    expect(left[0].worlds).toEqual(['Home']);
+  });
+
+  it('reports a restore that worked as one, even when an old copy will not go', async () => {
+    await world('Home', 'data');
+    for (let i = 1; i <= 6; i++) {
+      await existingBackup(`2026-01-01T00-00-0${i}-000`, 'version-change');
+    }
+    const remove = fs.rm.bind(fs);
+    vi.spyOn(fs, 'rm').mockImplementation(async (target, options) => {
+      if (String(target).includes(`${path.sep}backups${path.sep}`)) throw new Error('EBUSY');
+      return remove(target, options);
+    });
+
+    await expect(restoreBackup('p1', '2026-01-01T00-00-06-000')).resolves.not.toBeNull();
+
+    expect(await listWorlds('p1')).toEqual(['Old']);
+  });
+});
+
+describe('pruning', () => {
+  it('never prunes the copy it has just taken, whatever the clock says', async () => {
+    // A backup's age is its id and its id is the clock's word. With the clock
+    // set back — or five copies taken while it ran ahead — the new one sorts
+    // oldest, and was deleted the moment it was made: a version change went
+    // ahead believing it had a backup, and a restore emptied `saves/` with no
+    // safety copy behind it.
+    await world('Home', 'data');
+    for (let i = 1; i <= 5; i++) {
+      await existingBackup(`2099-01-01T00-00-0${i}-000`, 'version-change');
+    }
+
+    const fresh = await backupWorlds('p1', 'version-change');
+
+    expect((await listBackups('p1')).map((b) => b.id)).toContain(fresh.id);
+    const copied = path.join(root, 'backups', fresh.id, 'saves', 'Home', 'level.dat');
+    expect(await fs.readFile(copied, 'utf-8')).toBe('data');
   });
 });
 
