@@ -38,6 +38,12 @@ export interface Profile {
   windowWidth?: number;
   windowHeight?: number;
   fullscreen?: boolean;
+  /**
+   * The game's own language, as a Minecraft locale code (`pl_pl`). Unset leaves
+   * the choice to the game, which starts in English and then remembers what the
+   * player picked there.
+   */
+  gameLanguage?: string;
   notes?: string;
   lastPlayed?: string;
   totalPlayTimeMinutes?: number;

@@ -34,7 +34,7 @@ import {
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
 import { customResolution, resolveConditionalArgs, substituteVars } from './launch-args';
 import { requiredJavaFor } from './java-requirement';
-import { applyFullscreen } from './options-file';
+import { applyFullscreen, applyLanguage } from './options-file';
 import { LaunchRefusedError } from './launch-errors';
 
 // Track running processes by profileId
@@ -415,6 +415,9 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   // argument has no opposite. See `applyFullscreen`.
   if (profile.fullscreen !== undefined) {
     await applyFullscreen(gameDir, profile.fullscreen);
+  }
+  if (profile.gameLanguage) {
+    await applyLanguage(gameDir, profile.gameLanguage);
   }
 
   log.info(`Launching: ${java.path} ${finalArgs.join(' ').substring(0, 200)}...`);

@@ -35,6 +35,7 @@ import { formatBytes } from '@renderer/format';
 import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 import { useLocale, useT } from '@renderer/i18n';
 import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '@shared/constants';
+import { GAME_LANGUAGES } from '@shared/game-languages';
 import { loaderLabel } from '@shared/labels';
 import { defaultLoaderVersion } from '@shared/loader-version';
 import { recommendedRamMb } from '@shared/memory';
@@ -88,6 +89,7 @@ function emptyDraft(totalMb: number | undefined): DraftProfile {
     windowWidth: undefined,
     windowHeight: undefined,
     fullscreen: undefined,
+    gameLanguage: undefined,
     notes: undefined,
   };
 }
@@ -1187,6 +1189,24 @@ function ProfileForm({
             }
           />
           <p className="col-span-2 text-xs text-rf-text-muted">{t('profileForm.windowModeHint')}</p>
+          <Select
+            label={t('profileForm.gameLanguage')}
+            options={[
+              { value: '', label: t('profileForm.gameLanguageGame') },
+              // Whatever the profile already names is always on offer, the same
+              // rule the version and Java pickers follow: a code from outside
+              // the short list must not be shown as something else.
+              ...(draft.gameLanguage && !GAME_LANGUAGES.some((l) => l.code === draft.gameLanguage)
+                ? [{ value: draft.gameLanguage, label: draft.gameLanguage }]
+                : []),
+              ...GAME_LANGUAGES.map((l) => ({ value: l.code, label: l.name })),
+            ]}
+            value={draft.gameLanguage ?? ''}
+            onChange={(e) => set('gameLanguage', e.target.value || undefined)}
+          />
+          <p className="col-span-2 text-xs text-rf-text-muted">
+            {t('profileForm.gameLanguageHint')}
+          </p>
           <div className="col-span-2 flex flex-col gap-1">
             <Select
               label={t('profileForm.java')}

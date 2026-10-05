@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 /**
- * The two lines of `options.txt` this launcher writes.
+ * The three lines of `options.txt` this launcher writes.
  *
  * Installing a resource pack into `resourcepacks/` does not enable it — the
  * game only loads what `resourcePacks` names, which is why a synced pack used
@@ -15,9 +15,13 @@ import path from 'node:path';
  * choice into this file; there is no `--windowed` to turn it back off, so a
  * profile switched back would have started full-screen for ever, and the
  * setting would have looked broken to the one person who tried both.
+ *
+ * `lang` has no command-line form at all; this file is the only place the game
+ * reads its language from.
  */
 const RESOURCE_PACKS_KEY = 'resourcePacks';
 const FULLSCREEN_KEY = 'fullscreen';
+const LANGUAGE_KEY = 'lang';
 
 /**
  * How a pack from the `resourcepacks/` folder is named in the list.
@@ -173,4 +177,17 @@ export async function applyResourcePackOrder(
  */
 export async function applyFullscreen(gameDir: string, fullscreen: boolean): Promise<void> {
   await editOptions(gameDir, (body) => writeOption(body, FULLSCREEN_KEY, String(fullscreen)));
+}
+
+/**
+ * State the profile's language in the file the game reads it from.
+ *
+ * The same contract as {@link applyFullscreen}: called on every launch for a
+ * profile that names a language, so the profile's answer wins over a change
+ * made in the game's own menu, and never called for one that names none, so
+ * that change is then the player's to keep. A code the installed Minecraft
+ * version does not ship is not an error; the game falls back to English.
+ */
+export async function applyLanguage(gameDir: string, code: string): Promise<void> {
+  await editOptions(gameDir, (body) => writeOption(body, LANGUAGE_KEY, code));
 }

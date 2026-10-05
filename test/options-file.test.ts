@@ -4,7 +4,11 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { applyFullscreen, buildResourcePacksValue } from '../src/core/minecraft/options-file';
+import {
+  applyFullscreen,
+  applyLanguage,
+  buildResourcePacksValue,
+} from '../src/core/minecraft/options-file';
 
 /**
  * The one thing here that can be wrong quietly: the direction.
@@ -119,6 +123,44 @@ describe('applyFullscreen', () => {
     const before = (await fs.stat(optionsFile())).mtimeMs;
     await new Promise((resolve) => setTimeout(resolve, 10));
     await applyFullscreen(dir, true);
+    expect((await fs.stat(optionsFile())).mtimeMs).toBe(before);
+  });
+});
+
+/**
+ * The game's language, which it reads from this file and from nowhere else.
+ *
+ * There is no launch argument for it, so a profile that names a language has
+ * exactly one way to make the game use it.
+ */
+describe('applyLanguage', () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-options-lang-'));
+  });
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  const optionsFile = () => path.join(dir, 'options.txt');
+  const read = () => fs.readFile(optionsFile(), 'utf-8');
+
+  it('gives a profile that has never launched its language from the first start', async () => {
+    await applyLanguage(dir, 'pl_pl');
+    expect(await read()).toBe('lang:pl_pl\n');
+  });
+
+  it('replaces the language the last session left, and nothing else', async () => {
+    await fs.writeFile(optionsFile(), 'version:3465\nlang:en_us\nfov:0.0\n');
+    await applyLanguage(dir, 'de_de');
+    expect(await read()).toBe('version:3465\nlang:de_de\nfov:0.0\n');
+  });
+
+  it('does not rewrite a file that already says the same thing', async () => {
+    await fs.writeFile(optionsFile(), 'lang:pl_pl\n');
+    const before = (await fs.stat(optionsFile())).mtimeMs;
+    await applyLanguage(dir, 'pl_pl');
     expect((await fs.stat(optionsFile())).mtimeMs).toBe(before);
   });
 });

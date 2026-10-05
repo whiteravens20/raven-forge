@@ -10,6 +10,7 @@ import {
   MIN_RAM_MB,
 } from './constants';
 import { isSafeFileName } from './manifest-schema';
+import { GAME_LANGUAGE_PATTERN } from './game-languages';
 
 // ── Runtime validators for IPC payloads ───────────────────
 // These schemas validate data at IPC boundaries.
@@ -189,6 +190,8 @@ export const profileSchema = z.object({
     .catch(undefined),
   /** Unset means "whatever the game last did" — see `applyFullscreen`. */
   fullscreen: z.boolean().optional().catch(undefined),
+  /** Unset means "whatever the game is set to" — see `applyLanguage`. */
+  gameLanguage: z.string().regex(GAME_LANGUAGE_PATTERN).optional().catch(undefined),
   notes: z.string().optional(),
   lastPlayed: z.string().optional(),
   totalPlayTimeMinutes: z.number().optional(),

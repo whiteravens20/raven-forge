@@ -394,6 +394,10 @@ export const pl: Translations = {
   'profileForm.windowModeFullscreen': 'Pełny ekran',
   'profileForm.windowModeHint':
     'Ustawienie inne niż „tak jak zostawiła gra” trafia przy każdym uruchomieniu do ustawień samej gry, więc unieważnia też F11 z poprzedniej sesji.',
+  'profileForm.gameLanguage': 'Język gry',
+  'profileForm.gameLanguageGame': 'Tak jak w grze (na start angielski)',
+  'profileForm.gameLanguageHint':
+    'Minecraft startuje po angielsku i zapamiętuje język wybrany w swoich ustawieniach. Język wybrany tutaj jest wpisywany do ustawień gry przy każdym uruchomieniu tego profilu, więc wygrywa z tym, co zmienisz w samej grze.',
   'profileForm.notes': 'Notatki',
   'profileForm.notesPlaceholder': 'Dowolne notatki o tym profilu',
 

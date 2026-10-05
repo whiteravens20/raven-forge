@@ -369,6 +369,10 @@ export const en = {
   'profileForm.windowModeFullscreen': 'Fullscreen',
   'profileForm.windowModeHint':
     'Anything other than “however the game left it” is written into the game’s own settings at every launch, so it also overrules an F11 from the last session.',
+  'profileForm.gameLanguage': 'Game language',
+  'profileForm.gameLanguageGame': 'As set in the game (English to begin with)',
+  'profileForm.gameLanguageHint':
+    'Minecraft starts in English and remembers the language picked in its own settings. A language chosen here is written into the game’s settings every time this profile starts, so it overrules a change made in the game itself.',
   'profileForm.notes': 'Notes',
   'profileForm.notesPlaceholder': 'Any notes about this profile',
 

@@ -68,6 +68,17 @@ describe('the profile schema and the window', () => {
     expect(profileSchema.parse({ ...base, fullscreen: 'yes' }).fullscreen).toBeUndefined();
   });
 
+  it('keeps a game language that is a locale code', () => {
+    expect(profileSchema.parse({ ...base, gameLanguage: 'pl_pl' }).gameLanguage).toBe('pl_pl');
+  });
+
+  it('drops a game language that could not be one line of options.txt', () => {
+    // The value is written into the game's settings file as `lang:<value>`.
+    for (const bad of ['pl_pl\nfullscreen:true', 'PL', '../../etc', 'pl-PL', '']) {
+      expect(profileSchema.parse({ ...base, gameLanguage: bad }).gameLanguage).toBeUndefined();
+    }
+  });
+
   it('still refuses the fields a launch depends on', () => {
     // The forgiving treatment above is for a window size and nothing else.
     expect(() => profileSchema.parse({ ...base, allocatedRamMb: 1 })).toThrow();
