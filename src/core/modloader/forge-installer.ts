@@ -39,7 +39,7 @@ import { downloadToFile } from '../net/download';
 import { getSettings } from '../config/settings-manager';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
 import { requiredJavaFor } from '../minecraft/java-requirement';
-import { isPrerelease } from '../../shared/loader-version';
+import { compareLoaderVersionsDesc, isPrerelease } from '../../shared/loader-version';
 import type { LoaderVersion, ProgressMessage } from '../../shared/ipc-types';
 import type { VersionMeta } from '../minecraft/types';
 
@@ -142,8 +142,13 @@ export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion
 
   const { recommended } = await forgePromotions(mcVersion);
 
-  // Maven metadata is oldest-first; the newest build is the useful default.
-  return versions.reverse().map((version) => ({
+  // Sorted rather than reversed. Forge's metadata is in no one order: for most
+  // Minecraft versions it lists the newest build first, for a few the oldest,
+  // and for some a run of each. Reversing it put the *oldest* build at the head
+  // of most lists — and the head is what a profile gets when Forge names no
+  // recommended build or the promotions feed cannot be read. For Minecraft 1.21
+  // that pinned 51.0.0 where 51.0.33 was current.
+  return versions.sort(compareLoaderVersionsDesc).map((version) => ({
     version,
     // Forge publishes no prereleases under this artifact; what it does publish
     // is one promoted build per Minecraft version, which is the one to default

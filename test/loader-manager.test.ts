@@ -29,6 +29,25 @@ function serve(body: unknown): void {
   );
 }
 
+/**
+ * Forge's two addresses: the Maven list of every build for every Minecraft
+ * version, in the order given, and the promotions feed — `null` for a feed
+ * that cannot be reached.
+ */
+function serveForge(builds: string[], promos: Record<string, string> | null): void {
+  const versions = builds.map((build) => `<version>${build}</version>`).join('');
+  const xml = `<metadata><versioning><versions>${versions}</versions></versioning></metadata>`;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL) => {
+      if (String(url).endsWith('/maven-metadata.xml')) return new Response(xml, { status: 200 });
+      return promos
+        ? new Response(JSON.stringify({ promos }), { status: 200 })
+        : new Response('unavailable', { status: 503 });
+    }),
+  );
+}
+
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-loader-manager-'));
   process.env.RAVENFORGE_DATA_DIR = root;
@@ -80,6 +99,61 @@ describe('getLoaderVersions', () => {
     // Every one of them is finished software; the editor used to label all but
     // the first "unstable".
     expect(versions.every((v) => v.stable)).toBe(true);
+  });
+
+  it('sorts Forge newest first when its list arrives that way round already', async () => {
+    // Minecraft 1.21, in the order Forge's Maven serves it. The list used to be
+    // reversed on the theory that Maven lists oldest first.
+    serveForge(['1.21-51.0.33', '1.21-51.0.32', '1.21-51.0.1', '1.21-51.0.0', '1.21.1-52.0.1'], {
+      '1.21-latest': '51.0.33',
+    });
+
+    const versions = await mod.getLoaderVersions('forge', '1.21');
+
+    expect(versions.map((v) => v.version)).toEqual(['51.0.33', '51.0.32', '51.0.1', '51.0.0']);
+    // Forge recommends no build for 1.21, so the head of the list is what an
+    // unpinned profile is given — and then keeps.
+    expect(defaultLoaderVersion(versions)).toBe('51.0.33');
+  });
+
+  it('sorts a Forge list that runs one way and then the other', async () => {
+    // Minecraft 1.20.1: newest-first down to the very first build, then the
+    // later ones appended oldest-first. And the promotions feed is down.
+    serveForge(
+      [
+        '1.20.1-47.4.5',
+        '1.20.1-47.4.4',
+        '1.20.1-47.0.0',
+        '1.20.1-47.4.10',
+        '1.20.1-47.4.25',
+        '1.20.1-47.4.26',
+      ],
+      null,
+    );
+
+    const versions = await mod.getLoaderVersions('forge', '1.20.1');
+
+    expect(versions.map((v) => v.version)).toEqual([
+      '47.4.26',
+      '47.4.25',
+      '47.4.10',
+      '47.4.5',
+      '47.4.4',
+      '47.0.0',
+    ]);
+    expect(defaultLoaderVersion(versions)).toBe('47.4.26');
+  });
+
+  it('still prefers the build Forge recommends to the newest one', async () => {
+    serveForge(['1.20.1-47.4.5', '1.20.1-47.4.10', '1.20.1-47.4.26'], {
+      '1.20.1-recommended': '47.4.10',
+      '1.20.1-latest': '47.4.26',
+    });
+
+    const versions = await mod.getLoaderVersions('forge', '1.20.1');
+
+    expect(versions.filter((v) => v.recommended).map((v) => v.version)).toEqual(['47.4.10']);
+    expect(defaultLoaderVersion(versions)).toBe('47.4.10');
   });
 });
 

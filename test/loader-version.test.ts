@@ -87,6 +87,44 @@ describe('compareLoaderVersionsDesc', () => {
       '0.30.0-beta.2',
     ]);
   });
+
+  it('puts Forge builds newest first, in the order Forge lists 1.12.2', () => {
+    // As served: newest-first for most of the list, then the last few builds
+    // appended oldest-first. Neither end of it is the newest.
+    const asServed = [
+      '14.23.5.2860',
+      '14.23.5.2859',
+      '14.23.4.2705',
+      '14.23.0.2491',
+      '14.23.5.2861',
+      '14.23.5.2862',
+      '14.23.5.2864',
+    ];
+    expect([...asServed].sort(compareLoaderVersionsDesc)).toEqual([
+      '14.23.5.2864',
+      '14.23.5.2862',
+      '14.23.5.2861',
+      '14.23.5.2860',
+      '14.23.5.2859',
+      '14.23.4.2705',
+      '14.23.0.2491',
+    ]);
+  });
+
+  it('orders the old Forge builds that name their branch after the hyphen', () => {
+    // 1.7.10 and 1.10.2. The tag is the Minecraft version or a branch, not a
+    // prerelease marker, and builds with and without one are interleaved.
+    expect(
+      ['10.13.0.1150', '10.13.4.1614-1.7.10', '10.13.1.1216-new', '10.13.2.1291'].sort(
+        compareLoaderVersionsDesc,
+      ),
+    ).toEqual(['10.13.4.1614-1.7.10', '10.13.2.1291', '10.13.1.1216-new', '10.13.0.1150']);
+    expect(
+      ['12.18.0.2001-1.10.0', '12.18.3.2511', '12.18.1.2016-failtests', '12.18.1.2011'].sort(
+        compareLoaderVersionsDesc,
+      ),
+    ).toEqual(['12.18.3.2511', '12.18.1.2016-failtests', '12.18.1.2011', '12.18.0.2001-1.10.0']);
+  });
 });
 
 describe('isPrerelease', () => {

@@ -30,6 +30,11 @@ function parts(version: string): { core: number[]; pre: string | null } {
  * back as `0.20.0-beta.9, 0.20.0-beta.7, …, 0.24.0, …`, so taking the first
  * entry as the newest picked a two-year-old beta. A release sorts above its own
  * prereleases, which is the one thing a plain string comparison gets backwards.
+ *
+ * Forge's list goes through here too. Its old builds have four numbers and
+ * often a branch after the hyphen rather than a prerelease tag —
+ * `10.13.4.1614-1.7.10`, `12.18.1.2016-failtests` — but the last number is the
+ * build, which no two share, so the numbers settle it before the tag is read.
  */
 export function compareLoaderVersionsDesc(a: string, b: string): number {
   const left = parts(a);
