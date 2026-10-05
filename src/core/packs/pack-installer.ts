@@ -8,6 +8,9 @@ import { paths } from '../config/paths';
 import { downloadToFile } from '../net/download';
 import { createProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
+import { getModVersions, primaryFile } from '../mods/modrinth-api';
+import { verifyDownload } from '../mods/integrity';
+import { loaderLabel } from '../../shared/labels';
 import { readMrpack, applyOverrides, type MrpackContents, type MrpackFile } from './mrpack';
 import { assertSecureContentUrl } from '../../shared/validators';
 import { formatRamGb, recommendedRamMb, safeMaxRamMb } from '../../shared/memory';
@@ -182,13 +185,17 @@ async function profileForPack(
  * fails halfway leaves a profile the player can see, retry the sync on, or
  * delete — rather than a directory of orphaned jars belonging to nothing.
  */
-export async function importMrpack(filePath: string): Promise<Profile> {
+export async function importMrpack(
+  filePath: string,
+  extras: Pick<Profile, 'iconUrl'> = {},
+): Promise<Profile> {
   const pack = await readMrpack(filePath);
   log.info(`Importing pack ${pack.name} ${pack.version} (${pack.files.length} files)`);
 
   const profile = await profileForPack(pack.name, pack.minecraftVersion, pack.modLoader, {
     modLoaderVersion: pack.modLoaderVersion,
     notes: pack.summary,
+    ...extras,
   });
 
   // Overrides go down before the sync, so a config the pack ships is in place
@@ -199,6 +206,51 @@ export async function importMrpack(filePath: string): Promise<Profile> {
 
   await syncManifest(profile.id, mrpackToManifest(pack));
   return profile;
+}
+
+/**
+ * Install a modpack found by searching Modrinth, as a new profile.
+ *
+ * The newest version of the project that fits what was asked for — a Minecraft
+ * version, a loader, both or neither — and the pack file of that version. From
+ * there it is an ordinary `.mrpack` import: the file is a list of mods with
+ * hashes, and the same sync that installs any other pack installs this one.
+ *
+ * The pack file is checked against the hash Modrinth publishes for it before it
+ * is opened. It decides what gets downloaded and where it is written, so it is
+ * held to the same standard as the jars it names.
+ */
+export async function installModrinthPack(
+  pack: { id: string; name: string; iconUrl?: string },
+  wanted: { gameVersion?: string; loader?: string } = {},
+): Promise<Profile> {
+  const versions = await getModVersions(pack.id, wanted.gameVersion, wanted.loader);
+  const version = versions[0];
+  if (!version) {
+    const fit = [
+      wanted.gameVersion && `Minecraft ${wanted.gameVersion}`,
+      wanted.loader && loaderLabel(wanted.loader),
+    ].filter(Boolean);
+    throw new Error(
+      `${pack.name} has no version${fit.length > 0 ? ` for ${fit.join(' with ')}` : ''}`,
+    );
+  }
+
+  const file = primaryFile(version);
+  log.info(`Installing Modrinth pack ${pack.name} ${version.version_number} (${file.filename})`);
+
+  const scratch = path.join(paths.cacheDir, `pack-${crypto.randomUUID()}`);
+  try {
+    await downloadToFile(file.url, scratch, { maxBytes: MAX_PACK_DOWNLOAD_BYTES, secure: true });
+    await verifyDownload(scratch, { sha512: file.hashes.sha512 }, file.filename);
+    // The project's own icon, so the profile is recognisable in the list. Only
+    // an https address: the renderer's policy would not load anything else.
+    return await importMrpack(scratch, {
+      iconUrl: pack.iconUrl?.startsWith('https://') ? pack.iconUrl : undefined,
+    });
+  } finally {
+    await fs.rm(scratch, { force: true });
+  }
 }
 
 /** A local zip starts with these four bytes; JSON never does. */

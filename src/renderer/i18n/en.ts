@@ -276,6 +276,11 @@ export const en = {
   'packs.scratchTitle': 'Build a pack from scratch',
   'packs.scratchBody':
     'An empty profile. Choose the Minecraft version and loader, add mods yourself.',
+  'packs.modrinthTitle': 'Find a pack on Modrinth',
+  'packs.modrinthBody': 'Search public modpacks and install one as a new profile.',
+  'packs.searchModrinth': 'Search modpacks on Modrinth…',
+  'packs.modrinthNote':
+    'The newest version of the pack that fits the filters above is installed — as a snapshot, which will not update itself.',
   'packs.importTitle': 'Import',
   'packs.importBody':
     'A .mrpack pack file, a link to a pack, or a profile file exported from the launcher.',

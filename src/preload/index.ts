@@ -52,6 +52,7 @@ const api: RavenForgeAPI = {
     createFromManifest: (url) => ipcRenderer.invoke('packs:create-from-manifest', url),
     createFromUrl: (url) => ipcRenderer.invoke('packs:create-from-url', url),
     importMrpack: (filePath) => ipcRenderer.invoke('packs:import-mrpack', filePath),
+    installModrinth: (pack, wanted) => ipcRenderer.invoke('packs:install-modrinth', pack, wanted),
   },
   mods: {
     getInstalled: (profileId) => ipcRenderer.invoke('mods:get-installed', profileId),

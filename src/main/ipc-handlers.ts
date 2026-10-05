@@ -53,6 +53,7 @@ import { planModInstall, planContentInstall } from '../core/mods/compatibility';
 import { listCataloguePacks } from '../core/packs/catalogue';
 import {
   importMrpack,
+  installModrinthPack,
   createProfileFromManifest,
   createProfileFromUrl,
 } from '../core/packs/pack-installer';
@@ -695,6 +696,13 @@ export function registerAllIpcHandlers(): void {
       return ok(await importMrpack(filePath));
     } catch (err) {
       return fail(`Could not import that pack: ${reason(err)}`);
+    }
+  });
+  handle('packs:install-modrinth', async (_event, pack, wanted) => {
+    try {
+      return ok(await installModrinthPack(pack, wanted));
+    } catch (err) {
+      return fail(`Could not install that pack: ${reason(err)}`);
     }
   });
 

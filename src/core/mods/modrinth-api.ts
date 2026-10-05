@@ -12,6 +12,11 @@ import type {
 
 // ── Modrinth API helpers ───────────────────────────────────
 
+/**
+ * Ids and slugs reach the functions below from search results and from pack
+ * manifests, and each becomes a segment of a request path — so each is encoded
+ * where it is used, and a value with a slash in it stays one segment.
+ */
 async function modrinthFetch(endpoint: string): Promise<Response> {
   const res = await fetch(`${MODRINTH_API_BASE}${endpoint}`, {
     headers: {
@@ -250,7 +255,7 @@ export async function getModVersions(
   const loaderList = typeof loaders === 'string' ? [loaders] : (loaders ?? []);
   if (loaderList.length > 0) params.set('loaders', JSON.stringify(loaderList));
 
-  const res = await modrinthFetch(`/project/${projectId}/version?${params}`);
+  const res = await modrinthFetch(`/project/${encodeURIComponent(projectId)}/version?${params}`);
   return (await res.json()) as ModrinthVersion[];
 }
 
@@ -262,7 +267,7 @@ export async function getModVersions(
  * warning is exactly that case.
  */
 export async function getVersion(versionId: string): Promise<ModrinthVersion> {
-  const res = await modrinthFetch(`/version/${versionId}`);
+  const res = await modrinthFetch(`/version/${encodeURIComponent(versionId)}`);
   return (await res.json()) as ModrinthVersion;
 }
 
@@ -343,7 +348,7 @@ export async function getProjectTitle(projectId: string): Promise<string> {
 
   // The promise is cached, not the result, so concurrent callers share one
   // request instead of racing to make the same one.
-  const pending = modrinthFetch(`/project/${projectId}`)
+  const pending = modrinthFetch(`/project/${encodeURIComponent(projectId)}`)
     .then(async (res) => ((await res.json()) as { title: string }).title)
     .catch((err: unknown) => {
       // A failure must not be remembered, or one flaky request would poison the

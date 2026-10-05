@@ -299,6 +299,11 @@ export const pl: Translations = {
     'Nasze serwery chodzą na whiteliście — paczkę zainstalujesz od razu, ale o wejście na serwer trzeba poprosić.',
   'packs.scratchTitle': 'Stwórz własną paczkę od zera',
   'packs.scratchBody': 'Pusty profil. Wybierasz wersję Minecrafta i loader, mody dodajesz sam.',
+  'packs.modrinthTitle': 'Znajdź paczkę na Modrinth',
+  'packs.modrinthBody': 'Przeszukaj publiczne paczki modów i zainstaluj wybraną jako nowy profil.',
+  'packs.searchModrinth': 'Szukaj paczek modów na Modrinth…',
+  'packs.modrinthNote':
+    'Instaluje się najnowsza wersja paczki pasująca do filtrów powyżej — jako migawka, która sama się nie aktualizuje.',
   'packs.importTitle': 'Importuj',
   'packs.importBody':
     'Plik paczki .mrpack, link do paczki albo plik profilu wyeksportowany z launchera.',

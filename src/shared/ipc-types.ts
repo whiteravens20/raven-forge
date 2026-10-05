@@ -149,6 +149,14 @@ export interface InvokeChannels {
   'packs:create-from-url': (url: string) => Promise<IpcResult<Profile>>;
   /** Import a Modrinth `.mrpack` as a new profile — a snapshot, not a subscription. */
   'packs:import-mrpack': (filePath: string) => Promise<IpcResult<Profile>>;
+  /**
+   * Install a modpack found by searching Modrinth: the newest version that fits
+   * the Minecraft version and loader given, or simply the newest.
+   */
+  'packs:install-modrinth': (
+    pack: ModSearchResult,
+    wanted: { gameVersion?: string; loader?: string },
+  ) => Promise<IpcResult<Profile>>;
 
   // -- Mods --
   'mods:get-installed': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
@@ -368,6 +376,7 @@ export interface RavenForgeAPI {
     createFromManifest: InvokeChannels['packs:create-from-manifest'];
     createFromUrl: InvokeChannels['packs:create-from-url'];
     importMrpack: InvokeChannels['packs:import-mrpack'];
+    installModrinth: InvokeChannels['packs:install-modrinth'];
   };
   mods: {
     getInstalled: InvokeChannels['mods:get-installed'];

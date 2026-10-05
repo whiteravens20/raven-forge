@@ -1,7 +1,8 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { useEffect, useState } from 'react';
-import { X, Server, Hammer, Package, ArrowLeft, Download } from 'lucide-react';
+import { X, Server, Hammer, Package, ArrowLeft, Download, Search } from 'lucide-react';
+import { ModrinthPackSearch } from '@components/ModrinthPackSearch';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
@@ -23,16 +24,17 @@ interface Props {
   onCreated: (profileId: string, dropped?: string[]) => void;
 }
 
-type Route = 'choose' | 'white-ravens' | 'import';
+type Route = 'choose' | 'white-ravens' | 'modrinth' | 'import';
 
 /**
  * Where a new profile comes from.
  *
- * Three routes, because "new profile" means three genuinely different things: a
- * pack somebody else maintains and keeps updating, an empty profile to build up
- * by hand, and a pack file you already have. Presenting only the third of those
- * — an empty form — is what the button used to do, and it made the common case
- * (play on the server) the one nobody could find.
+ * Four routes, because "new profile" means four genuinely different things: a
+ * pack somebody else maintains and keeps updating, a public pack to go and
+ * find, an empty profile to build up by hand, and a file you already have.
+ * Presenting only the third of those — an empty form — is what the button used
+ * to do, and it made the common case (play on the server) the one nobody could
+ * find.
  */
 export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const t = useT();
@@ -146,7 +148,9 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
               ? t('packs.title')
               : route === 'white-ravens'
                 ? t('packs.wrTitle')
-                : t('packs.importTitle')}
+                : route === 'modrinth'
+                  ? t('packs.modrinthTitle')
+                  : t('packs.importTitle')}
           </h2>
           <button
             onClick={onCancel}
@@ -169,6 +173,12 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                 badge={t('packs.whitelist')}
                 body={t('packs.wrBody')}
                 onClick={() => setRoute('white-ravens')}
+              />
+              <SourceCard
+                icon={<Search size={18} />}
+                title={t('packs.modrinthTitle')}
+                body={t('packs.modrinthBody')}
+                onClick={() => setRoute('modrinth')}
               />
               <SourceCard
                 icon={<Hammer size={18} />}
@@ -235,6 +245,13 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                 <p className="text-xs text-rf-text-muted">{t('packs.wrSyncNote')}</p>
               )}
             </>
+          )}
+
+          {route === 'modrinth' && (
+            <ModrinthPackSearch
+              onBusy={(installing) => setBusy(installing ? 'modrinth' : null)}
+              onCreated={onCreated}
+            />
           )}
 
           {route === 'import' && (
