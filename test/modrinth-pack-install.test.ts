@@ -48,14 +48,17 @@ const readMrpack = vi.fn(async (_file: string) => ({
   files: [],
   overrides: new Map<string, Buffer>(),
 }));
+const applyOverrides = vi.fn(async (_gameDir: string, _overrides: unknown) => 0);
 vi.mock('../src/core/packs/mrpack', () => ({
   readMrpack: (file: string) => readMrpack(file),
-  applyOverrides: async () => 0,
+  applyOverrides: (gameDir: string, overrides: unknown) => applyOverrides(gameDir, overrides),
 }));
 
 const createProfile = vi.fn(async (data: Partial<Profile>) => ({ ...data, id: 'new' }) as Profile);
+const deleteProfile = vi.fn(async (_profileId: string) => {});
 vi.mock('../src/core/profiles/profile-manager', () => ({
   createProfile: (data: Partial<Profile>) => createProfile(data),
+  deleteProfile: (profileId: string) => deleteProfile(profileId),
 }));
 
 const syncManifest = vi.fn(async (_profileId: string, _manifest?: unknown) => {});
@@ -93,7 +96,9 @@ beforeEach(async () => {
     getModVersions,
     downloadToFile,
     verifyDownload,
+    applyOverrides,
     createProfile,
+    deleteProfile,
     syncManifest,
   ]) {
     mock.mockClear();
@@ -141,7 +146,7 @@ describe('installModrinthPack', () => {
   });
 
   it('makes a profile carrying the project icon, when that is an https address', async () => {
-    const profile = await installer.installModrinthPack({
+    const { profile } = await installer.installModrinthPack({
       ...pack,
       iconUrl: 'https://cdn.modrinth.com/data/1KVo5zza/icon.png',
     });
@@ -152,7 +157,10 @@ describe('installModrinthPack', () => {
   });
 
   it('drops an icon address the renderer would refuse to load', async () => {
-    const profile = await installer.installModrinthPack({ ...pack, iconUrl: 'http://x/icon.png' });
+    const { profile } = await installer.installModrinthPack({
+      ...pack,
+      iconUrl: 'http://x/icon.png',
+    });
 
     expect(profile.iconUrl).toBeUndefined();
   });
@@ -164,5 +172,34 @@ describe('installModrinthPack', () => {
       installer.installModrinthPack(pack, { gameVersion: '1.16.5', loader: 'neoforge' }),
     ).rejects.toThrow('Fabulously Optimized has no version for Minecraft 1.16.5 with NeoForge');
     expect(downloadToFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('an install that fails after the profile was made', () => {
+  it('hands the profile back with the reason, instead of throwing it away', async () => {
+    // A rejection carries only its message. Thrown, this left a half-filled
+    // profile nobody had been told about, and every retry made another.
+    syncManifest.mockRejectedValueOnce(new Error('503 for https://cdn/jei.jar'));
+
+    const outcome = await installer.installModrinthPack(pack);
+
+    expect(outcome.profile).toMatchObject({ id: 'new', name: 'Fabulously Optimized' });
+    expect(outcome.failure).toBe('503 for https://cdn/jei.jar');
+    expect(deleteProfile).not.toHaveBeenCalled();
+  });
+
+  it('reports no failure when everything arrived', async () => {
+    expect(await installer.installModrinthPack(pack)).not.toHaveProperty('failure');
+  });
+
+  it('removes the profile when it stops before the pack was kept', async () => {
+    // The pack is only stored by the sync. A profile abandoned before that has
+    // nothing to finish its install from, so keeping it helps nobody.
+    applyOverrides.mockRejectedValueOnce(new Error('ENOSPC'));
+
+    await expect(installer.installModrinthPack(pack)).rejects.toThrow(/ENOSPC/);
+
+    expect(deleteProfile).toHaveBeenCalledWith('new');
+    expect(syncManifest).not.toHaveBeenCalled();
   });
 });

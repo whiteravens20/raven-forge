@@ -314,6 +314,8 @@ export const pl: Translations = {
   'packs.none': 'Nie opublikowano jeszcze żadnej paczki.',
   'packs.listFailed': 'Nie udało się wczytać listy paczek.',
   'packs.installFailed': 'Nie udało się zainstalować {name}.',
+  'packs.installUnfinished':
+    'Profil „{name}” został utworzony, ale nie wszystkie jego pliki dotarły. Kliknij w profilu „{action}”, a instalacja ruszy dalej od miejsca, w którym stanęła. Podany powód: {error}',
   'packs.importFailed': 'Nie udało się zaimportować tej paczki.',
   'packs.manifestFailed': 'Pod tym adresem nie ma paczki ani manifestu.',
   'packs.wrSyncNote': 'Te profile trzymają się serwera: każda synchronizacja przynosi zmiany.',
@@ -346,6 +348,10 @@ export const pl: Translations = {
   'profiles.fieldServer': 'Serwer',
   'profiles.manifestUrl': 'Manifest URL',
   'profiles.sync': 'Synchronizuj',
+  'profiles.importedPack': 'Zaimportowana paczka',
+  'profiles.importedPackHint':
+    'Migawka — sama się nie aktualizuje. Naprawa sprawdza pliki z paczką, z której ten profil powstał, i pobiera to, czego brakuje.',
+  'profiles.repair': 'Napraw',
   'profiles.quickConnect': 'Quick-Connect: {address}',
   'profiles.notes': 'Notatki',
   'profiles.lastPlayed': 'Ostatnio grano: {date}',

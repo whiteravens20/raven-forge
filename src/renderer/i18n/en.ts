@@ -291,6 +291,8 @@ export const en = {
   'packs.none': 'No packs are published yet.',
   'packs.listFailed': 'Could not load the pack list.',
   'packs.installFailed': 'Could not install {name}.',
+  'packs.installUnfinished':
+    'Profile “{name}” was created, but its files did not all arrive. Press “{action}” on the profile and the install carries on from where it stopped. The reason given: {error}',
   'packs.importFailed': 'Could not import that pack.',
   'packs.manifestFailed': 'That address holds neither a pack nor a manifest.',
   'packs.wrSyncNote': 'These profiles follow the server: every sync brings whatever changed.',
@@ -321,6 +323,10 @@ export const en = {
   'profiles.fieldServer': 'Server',
   'profiles.manifestUrl': 'Manifest URL',
   'profiles.sync': 'Sync',
+  'profiles.importedPack': 'Imported pack',
+  'profiles.importedPackHint':
+    'A snapshot — it does not update itself. Repair checks the files against the pack this profile was made from and downloads whatever is missing.',
+  'profiles.repair': 'Repair',
   'profiles.quickConnect': 'Quick connect: {address}',
   'profiles.notes': 'Notes',
   'profiles.lastPlayed': 'Last played: {date}',

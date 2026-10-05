@@ -15,7 +15,7 @@ import { SearchPager, SearchResultRow } from '@components/SearchResults';
 import { usePagedSearch } from '@hooks/use-paged-search';
 import { useT } from '@renderer/i18n';
 import { isClientModLoader } from '@shared/constants';
-import type { FacetGroups, ModSearchResult } from '@shared/ipc-types';
+import type { FacetGroups, ModSearchResult, PackInstall } from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
@@ -31,11 +31,12 @@ const NO_FACETS: FacetGroups = { loaders: [], groups: [], gameVersions: [] };
  */
 export function ModrinthPackSearch({
   onBusy,
-  onCreated,
+  onInstalled,
 }: {
   /** Told while an install runs, so the dialog can hold itself open. */
   onBusy: (busy: boolean) => void;
-  onCreated: (profileId: string) => void;
+  /** A profile was made — whether or not all of the pack's files arrived. */
+  onInstalled: (install: PackInstall) => void;
 }) {
   const t = useT();
   const search = usePagedSearch();
@@ -91,7 +92,7 @@ export function ModrinthPackSearch({
         gameVersion: filters.gameVersion || undefined,
         loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
       });
-      if (result.success && result.data) onCreated(result.data.id);
+      if (result.success && result.data) onInstalled(result.data);
       else setError(result.error ?? t('packs.installFailed', { name: pack.name }));
     } finally {
       setBusyId(null);

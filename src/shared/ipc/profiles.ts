@@ -61,6 +61,28 @@ export interface ProfileSyncStatus {
   pendingUpdates: number;
   status: 'synced' | 'updates-available' | 'error' | 'never-synced';
   errorMessage?: string;
+  /**
+   * Set for a profile made from a pack file rather than from an address. It
+   * follows nothing, so there is never an update to fetch — but the pack it was
+   * installed from is kept, and a sync checks the profile against that again:
+   * to finish an install that stopped half-way, or to put back what was
+   * deleted by hand.
+   */
+  importedPack?: boolean;
+}
+
+/**
+ * A profile made for a pack, and whether the pack's files all arrived.
+ *
+ * Both, because the profile is created before its files are fetched and exists
+ * either way. Reporting only the failure left a half-filled profile that no
+ * list showed until something else reloaded it, and every "Install again" made
+ * another one beside it.
+ */
+export interface PackInstall {
+  profile: Profile;
+  /** Why the install stopped short, in the main process's own words. */
+  failure?: string;
 }
 
 /**

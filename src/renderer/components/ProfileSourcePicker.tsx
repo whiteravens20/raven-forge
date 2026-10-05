@@ -9,7 +9,7 @@ import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { localized, useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
-import type { CataloguePack } from '@shared/ipc-types';
+import type { CataloguePack, IpcResult, PackInstall, Profile } from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
@@ -18,10 +18,12 @@ interface Props {
   /** Build a profile by hand — hands back to the ordinary create form. */
   onScratch: () => void;
   /**
-   * A profile arrived; `profileId` is the one to select. `dropped` names what a
-   * profile file carried that an import leaves out, for the page to say.
+   * A profile arrived, and is the one to select. Two things may need saying
+   * about it, and the page says them where the profile is on screen: `dropped`
+   * names what a profile file carried that an import leaves out, and
+   * `unfinished` is why a pack's files did not all arrive.
    */
-  onCreated: (profileId: string, dropped?: string[]) => void;
+  onCreated: (profile: Profile, said?: { dropped?: string[]; unfinished?: string }) => void;
 }
 
 type Route = 'choose' | 'white-ravens' | 'modrinth' | 'import';
@@ -71,13 +73,26 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     };
   }, [route, packs, t]);
 
+  /**
+   * Hand a pack install's outcome on.
+   *
+   * A failure here means no profile was made, and is said in this dialog. An
+   * install that made one and then stopped short is not that: the profile
+   * exists and can be synced again, so it goes to the page like any other —
+   * staying here to offer "Install" again is how each retry used to leave
+   * another half-filled profile of the same name behind.
+   */
+  const installed = (result: IpcResult<PackInstall>, fallback: string) => {
+    if (!result.success || !result.data) setError(result.error ?? fallback);
+    else onCreated(result.data.profile, { unfinished: result.data.failure });
+  };
+
   const installPack = async (pack: CataloguePack) => {
     setBusy(pack.slug);
     setError(null);
     const result = await api.packs.createFromManifest(pack.manifestUrl);
     setBusy(null);
-    if (result.success && result.data) onCreated(result.data.id);
-    else setError(result.error ?? t('packs.installFailed', { name: pack.name }));
+    installed(result, t('packs.installFailed', { name: pack.name }));
   };
 
   const importFile = async () => {
@@ -88,8 +103,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     setError(null);
     const result = await api.packs.importMrpack(picked.data);
     setBusy(null);
-    if (result.success && result.data) onCreated(result.data.id);
-    else setError(result.error ?? t('packs.importFailed'));
+    installed(result, t('packs.importFailed'));
   };
 
   // The settings of one profile, as this launcher's own Export wrote them. It
@@ -101,7 +115,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     const result = await api.profiles.import();
     setBusy(null);
     if (!result.success) setError(result.error ?? t('packs.profileFileFailed'));
-    else if (result.data) onCreated(result.data.profile.id, result.data.dropped);
+    else if (result.data) onCreated(result.data.profile, { dropped: result.data.dropped });
   };
 
   // One field for both kinds of link. Which one it is gets decided in the main
@@ -114,8 +128,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     setError(null);
     const result = await api.packs.createFromUrl(url);
     setBusy(null);
-    if (result.success && result.data) onCreated(result.data.id);
-    else setError(result.error ?? t('packs.manifestFailed'));
+    installed(result, t('packs.manifestFailed'));
   };
 
   return (
@@ -250,7 +263,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
           {route === 'modrinth' && (
             <ModrinthPackSearch
               onBusy={(installing) => setBusy(installing ? 'modrinth' : null)}
-              onCreated={onCreated}
+              onInstalled={(install) => onCreated(install.profile, { unfinished: install.failure })}
             />
           )}
 

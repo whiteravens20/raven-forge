@@ -534,13 +534,14 @@ export function ProfilesPage() {
         <ProfileSourcePicker
           onCancel={() => setChoosingSource(false)}
           onScratch={startFromScratch}
-          onCreated={(profileId, dropped) => {
+          onCreated={(profile, said) => {
             setChoosingSource(false);
             // A profile file can carry a Java path, JVM arguments and a pack
             // address, and an import takes none of them. Said here, where the
             // new profile is on screen, so nobody finds out at the first launch.
+            const dropped = said?.dropped ?? [];
             setNotice(
-              dropped && dropped.length > 0
+              dropped.length > 0
                 ? t('profiles.importDropped', {
                     fields: dropped
                       .map((field) => {
@@ -551,7 +552,19 @@ export function ProfilesPage() {
                   })
                 : null,
             );
-            void reload().then(() => select(profileId));
+            // A pack whose files did not all arrive still left a profile, and
+            // this is the screen with the button that finishes the job — so
+            // this is where it is said, naming that button.
+            setActionError(
+              said?.unfinished
+                ? t('packs.installUnfinished', {
+                    name: profile.name,
+                    action: t(profile.manifestUrl ? 'profiles.sync' : 'profiles.repair'),
+                    error: said.unfinished,
+                  })
+                : null,
+            );
+            void reload().then(() => select(profile.id));
           }}
         />
       )}
@@ -695,10 +708,15 @@ function ProfileDetail({
         />
       </div>
 
-      {profile.manifestUrl && (
+      {/* A profile made from a pack file gets the same box. It follows no
+          address, but the pack it was installed from is kept, and syncing
+          against that is how an install that stopped half-way is finished. */}
+      {(profile.manifestUrl || syncStatus?.importedPack) && (
         <div className="space-y-2 rounded-lg border border-rf-border bg-rf-surface p-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-rf-text-muted">{t('profiles.manifestUrl')}</p>
+            <p className="text-xs text-rf-text-muted">
+              {t(profile.manifestUrl ? 'profiles.manifestUrl' : 'profiles.importedPack')}
+            </p>
             <Button
               variant="secondary"
               size="sm"
@@ -707,7 +725,7 @@ function ProfileDetail({
               disabled={syncing}
               onClick={onSync}
             >
-              {t('profiles.sync')}
+              {t(profile.manifestUrl ? 'profiles.sync' : 'profiles.repair')}
             </Button>
             {/* A modpack sync is a long download — let the user stop it. */}
             {syncing && (
@@ -716,7 +734,11 @@ function ProfileDetail({
               </Button>
             )}
           </div>
-          <p className="text-xs font-mono text-rf-text break-all">{profile.manifestUrl}</p>
+          {profile.manifestUrl ? (
+            <p className="text-xs font-mono text-rf-text break-all">{profile.manifestUrl}</p>
+          ) : (
+            <p className="text-xs text-rf-text-muted">{t('profiles.importedPackHint')}</p>
+          )}
           <div className="flex flex-wrap gap-2 pt-1">
             {syncStatus && <SyncBadge status={syncStatus} />}
             {verification && <VerificationBadge verification={verification} />}

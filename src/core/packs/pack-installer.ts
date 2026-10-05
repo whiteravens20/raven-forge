@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { downloadToFile } from '../net/download';
-import { createProfile } from '../profiles/profile-manager';
+import { createProfile, deleteProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
 import { getModVersions, primaryFile } from '../mods/modrinth-api';
 import { verifyDownload } from '../mods/integrity';
@@ -16,7 +16,7 @@ import { assertSecureContentUrl } from '../../shared/validators';
 import { formatRamGb, recommendedRamMb, safeMaxRamMb } from '../../shared/memory';
 import { machineMemoryMb } from '../util/machine-memory';
 import type { ModManifest } from '../../shared/manifest-schema';
-import type { Profile } from '../../shared/ipc-types';
+import type { PackInstall, Profile } from '../../shared/ipc-types';
 
 /**
  * Turning a pack into a profile.
@@ -179,16 +179,34 @@ async function profileForPack(
 }
 
 /**
- * Import a `.mrpack` as a new profile.
+ * Fill a profile that was just made for a pack, and say how that went.
  *
- * The profile is created first and filled second, deliberately: a download that
- * fails halfway leaves a profile the player can see, retry the sync on, or
- * delete — rather than a directory of orphaned jars belonging to nothing.
+ * Said, not thrown. The profile is created first and filled second,
+ * deliberately: a download that fails halfway leaves a profile the player can
+ * see, sync again, or delete — rather than a directory of orphaned jars
+ * belonging to nothing. That only holds if the caller is handed the profile
+ * when the filling fails, and a rejection carries nothing but its message; this
+ * used to throw, so the half-filled profile was one nobody had been told about.
+ *
+ * `supplied` is the pack itself, for an import. The sync keeps it, which is
+ * what a later sync of a profile with no address to ask finishes the job from.
  */
+async function firstSync(profile: Profile, supplied?: ModManifest): Promise<PackInstall> {
+  try {
+    await syncManifest(profile.id, supplied);
+    return { profile };
+  } catch (err) {
+    const failure = err instanceof Error ? err.message : String(err);
+    log.warn(`Created ${profile.name}, but its files did not all arrive: ${failure}`);
+    return { profile, failure };
+  }
+}
+
+/** Import a `.mrpack` as a new profile. */
 export async function importMrpack(
   filePath: string,
   extras: Pick<Profile, 'iconUrl'> = {},
-): Promise<Profile> {
+): Promise<PackInstall> {
   const pack = await readMrpack(filePath);
   log.info(`Importing pack ${pack.name} ${pack.version} (${pack.files.length} files)`);
 
@@ -201,11 +219,18 @@ export async function importMrpack(
   // Overrides go down before the sync, so a config the pack ships is in place
   // the first time the game reads it — and so a manifest-supplied file of the
   // same path wins, which is the order the format intends.
-  const written = await applyOverrides(paths.profileGameDir(profile.id), pack.overrides);
-  if (written > 0) log.info(`Applied ${written} override file(s) for ${pack.name}`);
+  try {
+    const written = await applyOverrides(paths.profileGameDir(profile.id), pack.overrides);
+    if (written > 0) log.info(`Applied ${written} override file(s) for ${pack.name}`);
+  } catch (err) {
+    // The one failure after the profile exists that cannot be picked up again:
+    // the pack is only kept once the sync below has it, so a profile left here
+    // would have nothing to finish its install from.
+    await deleteProfile(profile.id);
+    throw err;
+  }
 
-  await syncManifest(profile.id, mrpackToManifest(pack));
-  return profile;
+  return firstSync(profile, mrpackToManifest(pack));
 }
 
 /**
@@ -223,7 +248,7 @@ export async function importMrpack(
 export async function installModrinthPack(
   pack: { id: string; name: string; iconUrl?: string },
   wanted: { gameVersion?: string; loader?: string } = {},
-): Promise<Profile> {
+): Promise<PackInstall> {
   const versions = await getModVersions(pack.id, wanted.gameVersion, wanted.loader);
   const version = versions[0];
   if (!version) {
@@ -270,7 +295,7 @@ const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
  * pack file is metadata plus config, never the jars — so the cost of being
  * right is one short download.
  */
-export async function createProfileFromUrl(url: string): Promise<Profile> {
+export async function createProfileFromUrl(url: string): Promise<PackInstall> {
   assertSecureContentUrl(url);
 
   const scratch = path.join(paths.cacheDir, `pack-${crypto.randomUUID()}`);
@@ -304,7 +329,7 @@ export async function createProfileFromUrl(url: string): Promise<Profile> {
  * sync re-reads it and reconciles. That is the difference between this and an
  * `.mrpack` import, which is a snapshot of a pack at one version.
  */
-export async function createProfileFromManifest(url: string): Promise<Profile> {
+export async function createProfileFromManifest(url: string): Promise<PackInstall> {
   assertSecureContentUrl(url);
 
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
@@ -333,6 +358,5 @@ export async function createProfileFromManifest(url: string): Promise<Profile> {
     allocatedRamMb: recommendedRam(body.recommendedRamMb),
   });
 
-  await syncManifest(profile.id);
-  return profile;
+  return firstSync(profile);
 }

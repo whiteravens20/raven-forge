@@ -113,8 +113,13 @@ async function readSyncState(profileId: string): Promise<SyncState> {
 async function writeSyncState(profileId: string, state: SyncState): Promise<void> {
   await writeJsonAtomic(paths.profileSyncStateFile(profileId), state);
 
-  const status: ProfileSyncStatus = { profileId, ...state };
-  getMainWindow()?.webContents.send('profiles:sync-status-changed', status);
+  // Read back through the door the renderer knocks on, rather than built from
+  // `state` here: the status says more than the file does, and an event that
+  // left `importedPack` out would take the repair button off the screen.
+  getMainWindow()?.webContents.send(
+    'profiles:sync-status-changed',
+    await getProfileSyncStatus(profileId),
+  );
 }
 
 // ── Manifest cache ─────────────────────────────────────────
@@ -168,7 +173,12 @@ export async function getProfileSyncStatus(profileId: string): Promise<ProfileSy
     return { profileId, pendingUpdates: 0, status: 'error', errorMessage: 'Profile not found' };
   }
   if (!profile.manifestUrl) {
-    return { profileId, pendingUpdates: 0, status: 'never-synced' };
+    // A profile made from a pack file follows no address — but the pack it was
+    // installed from is kept, and that is something a sync can be run against.
+    if (!(await readCachedManifest(profileId))) {
+      return { profileId, pendingUpdates: 0, status: 'never-synced' };
+    }
+    return { profileId, ...(await readSyncState(profileId)), importedPack: true };
   }
 
   return { profileId, ...(await readSyncState(profileId)) };
@@ -486,13 +496,22 @@ async function obtainManifest(
  * cancellation, hash verification, removal of what a pack dropped, the
  * resource-pack order
  * written into `options.txt`, and a lock file the mods page can read. A supplied
- * manifest is cached like a fetched one, so syncing an imported pack again later
- * repairs anything deleted by hand.
+ * manifest is cached like a fetched one, and with no address to ask it is the
+ * cached copy a later sync reconciles against — so syncing an imported pack
+ * again finishes an install that stopped half-way and repairs anything deleted
+ * by hand.
  */
 export async function syncManifest(profileId: string, supplied?: ModManifest): Promise<void> {
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
-  if (!profile.manifestUrl && !supplied) {
+
+  // The pack itself, for a profile that was made from one: handed in by the
+  // import, or read back from where the import left it. This used to stop at
+  // the check below instead, with the pack sitting in the cache unread, so the
+  // one sync an imported profile ever got was the one that created it.
+  const pack =
+    supplied ?? (profile.manifestUrl ? undefined : (await readCachedManifest(profileId))?.manifest);
+  if (!profile.manifestUrl && !pack) {
     throw new Error('Profile has no manifest URL configured');
   }
 
@@ -510,9 +529,9 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     // A supplied manifest was built here from a file the user chose, so there is
     // no publisher to have signed it and nothing for the badge to claim.
     let verification: ManifestVerification | undefined;
-    if (supplied) {
-      manifest = supplied;
-      await writeCachedManifest(profileId, supplied);
+    if (pack) {
+      manifest = pack;
+      await writeCachedManifest(profileId, pack);
     } else {
       ({ manifest, etag, verification } = await obtainManifest(
         profileId,
@@ -539,7 +558,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     // a different game directory in all but name — worlds are upgraded in place
     // and do not go back — so those are said in the log and left for a person.
     if (
-      !supplied &&
+      !pack &&
       manifest.modLoader === profile.modLoader &&
       manifest.modLoaderVersion &&
       manifest.modLoaderVersion !== profile.modLoaderVersion
@@ -549,7 +568,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
           `${profile.modLoaderVersion ?? 'no build'} to ${manifest.modLoaderVersion}`,
       );
       await updateProfile(profileId, { modLoaderVersion: manifest.modLoaderVersion });
-    } else if (!supplied && manifest.modLoader !== profile.modLoader) {
+    } else if (!pack && manifest.modLoader !== profile.modLoader) {
       log.warn(
         `Manifest targets ${manifest.modLoader} but profile ${profile.name} runs ${profile.modLoader}`,
       );
