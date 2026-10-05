@@ -653,12 +653,8 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
 
         // A version bump changes the filename; drop the file it replaced, at
         // whichever of the two names that file was under.
-        if (previous && previous.fileName !== resolved.fileName) {
-          try {
-            await fs.rm(modFilePath(modsDir, previous.fileName, enabled), { force: true });
-          } catch {
-            /* ok */
-          }
+        if (previous && !isSameModFile(previous.fileName, resolved.fileName)) {
+          await fs.rm(modFilePath(modsDir, previous.fileName, enabled), { force: true });
         }
         fetched++;
       }
@@ -732,7 +728,16 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       const userInstalled = mods.filter((m) => !m.fromManifest);
       const stale = mods.filter((m) => m.fromManifest && !keptIds.has(m.id));
       for (const mod of stale) {
-        await fs.rm(modFilePath(modsDir, mod.fileName, mod.enabled), { force: true });
+        // Unless something the pack still ships is now living in that file. A
+        // pack that renames an entry and keeps its jar drops the old id and
+        // adds a new one with the same file name; deleting "the old mod's
+        // file" would delete the new mod's.
+        const inUse = [...synced, ...userInstalled].some((kept) =>
+          isSameModFile(kept.fileName, mod.fileName),
+        );
+        if (!inUse) {
+          await fs.rm(modFilePath(modsDir, mod.fileName, mod.enabled), { force: true });
+        }
         log.info(`Removed ${mod.name} from ${profile.name}: the pack no longer ships it`);
       }
       mods.splice(0, mods.length, ...synced, ...userInstalled);
