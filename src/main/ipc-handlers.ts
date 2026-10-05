@@ -10,8 +10,13 @@ import { assertTrustedSender } from './security';
 import { getSettings, updateSettings, resetSettings } from '../core/config/settings-manager';
 import { applyProxySettings } from '../core/net/proxy';
 import { paths } from '../core/config/paths';
-import { dataRootSource, dataRootUnavailable, defaultDataRoot } from '../core/config/data-root';
-import { applyDataRoot, planDataRootChange } from '../core/config/data-root-move';
+import {
+  dataRootSource,
+  dataRootUnavailable,
+  defaultDataRoot,
+  writeDataRootPointer,
+} from '../core/config/data-root';
+import { applyDataRoot, pathConcerns, planDataRootChange } from '../core/config/data-root-move';
 import { fetchNews, fetchAnnouncements } from '../core/news/news-fetcher';
 import {
   getAllProfiles,
@@ -185,12 +190,24 @@ export function registerAllIpcHandlers(): void {
       log.warn(`Refused to open a path outside the launcher's data directory: ${targetPath}`);
       return fail("That path is outside the launcher's data directory");
     }
+    // Asked first, because the system is not always able to say: handed a path
+    // that does not exist, `shell.openPath` on Linux neither opens anything nor
+    // answers, and the button that asked would wait for ever.
     try {
-      await shell.openPath(targetPath);
-      return ok(undefined);
-    } catch (err) {
-      return fail(`Failed to open path: ${reason(err)}`);
+      await fs.stat(targetPath);
+    } catch {
+      return fail('That folder is not there');
     }
+    // `shell.openPath` does not throw: it resolves with a message when the
+    // system could not open the thing, and with an empty string when it could.
+    // Discarding that made every "open folder" button here report success on a
+    // machine with no file manager to open one with.
+    const failure = await shell.openPath(targetPath);
+    return failure ? fail(failure) : ok(undefined);
+  });
+  handle('system:relaunch', () => {
+    app.relaunch();
+    app.quit();
   });
   handle('system:open-url', async (_event, url: string) => {
     // Only allow https:// and http:// URLs for security
@@ -335,6 +352,7 @@ export function registerAllIpcHandlers(): void {
         defaultPath: defaultDataRoot(),
         source: dataRootSource(),
         unavailable: dataRootUnavailable(),
+        ...pathConcerns(paths.root),
       });
     } catch (err) {
       return fail(`Failed to read the data directory: ${reason(err)}`);
@@ -362,26 +380,37 @@ export function registerAllIpcHandlers(): void {
     }
   });
   /**
+   * The move, and then a restart — which the renderer asks for separately, with
+   * `system:relaunch`, once it has shown how the move ended.
+   *
    * The restart is not a convenience. Every module that has already read a path
    * — the settings cache, the java manager, an in-flight download — is holding
    * the old root, and there is no version of re-pointing them all that is worth
-   * trusting with somebody's saves. Coming back up is the one way that is.
+   * trusting with somebody's saves. Coming back up is the one way that is. It
+   * used to follow the move by itself after 600 ms, which left no moment in
+   * which to say that some of the old copies could not be removed.
    */
   handle('settings:apply-data-root', async (_event, target: string) => {
     try {
-      await applyDataRoot(target, (event) => {
-        getMainWindow()?.webContents.send('progress:data-root', event);
-      });
+      return ok(
+        await applyDataRoot(target, (event) => {
+          getMainWindow()?.webContents.send('progress:data-root', event);
+        }),
+      );
     } catch (err) {
       return fail(`Failed to move the data directory: ${reason(err)}`);
     }
-    // Long enough for this reply to reach the renderer, which is showing the
-    // restart notice it is about to be replaced by.
-    setTimeout(() => {
-      app.relaunch();
-      app.quit();
-    }, 600);
-    return ok(undefined);
+  });
+  handle('settings:forget-data-root', async () => {
+    try {
+      // Only for a folder that cannot be reached. With one that can, this would
+      // be a way to walk away from the data without the dialog that says so.
+      if (!dataRootUnavailable()) return fail('The data directory is reachable');
+      await writeDataRootPointer(null);
+      return ok(undefined);
+    } catch (err) {
+      return fail(`Failed to forget the data directory: ${reason(err)}`);
+    }
   });
 
   // ── News & Announcements ────────────────────────────────

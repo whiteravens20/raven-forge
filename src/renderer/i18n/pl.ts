@@ -565,13 +565,16 @@ export const pl: Translations = {
   'settings.trustedKeyFailed': 'Nie udało się dodać klucza',
   'settings.dataFolder': 'Folder danych',
   'settings.dataFolderHint':
-    'Profile, mody, pliki gry i pobrane wersje Javy. Po instalacji paczki to kilka gigabajtów.',
+    'Profile, mody, pliki gry, pobrane wersje Javy, logi i raporty z awarii. Po instalacji paczki to kilka gigabajtów. Pełna lista z rozmiarami jest poniżej.',
   'settings.dataFolderChange': 'Przenieś…',
   'settings.dataFolderRestore': 'Wróć do domyślnego',
   'settings.dataFolderEnv':
     'Dla tej instalacji ustawia go RAVENFORGE_DATA_DIR, więc nie zmienisz go tutaj.',
   'settings.dataFolderUnavailable':
-    'Nie udało się otworzyć wybranego folderu {path}, więc launcher korzysta z domyślnego. To, co tam było, dalej tam jest.',
+    'Nie udało się otworzyć wybranego folderu {path} — dysk jest odłączony albo folder zniknął — więc launcher korzysta z domyślnego. To, co tam było, dalej tam jest; podłącz dysk i uruchom launcher ponownie.',
+  'settings.dataFolderForget': 'Zapomnij ten folder',
+  'settings.dataFolderForgetHint':
+    'Launcher przestanie go szukać i zostanie przy folderze domyślnym. Niczego w niedostępnym folderze nie rusza.',
   'settings.crashReportsFolder': 'Raporty z awarii',
   'settings.logs': 'Logi',
   'settings.showLogs': 'Pokaż logi',
@@ -779,21 +782,39 @@ export const pl: Translations = {
   'dataRoot.title': 'Przenieś folder danych',
   'dataRoot.from': 'Teraz',
   'dataRoot.to': 'Nowe miejsce',
-  'dataRoot.move': 'Przeniesione zostanie {size}. W starym miejscu nic nie zostaje.',
+  'dataRoot.moveSameVolume':
+    'Przeniesione zostanie {size}. To ten sam dysk, więc pliki zostaną przesunięte bez kopiowania — potrwa to chwilę.',
+  'dataRoot.moveCopy':
+    'Przeniesione zostanie {size}. Pliki zostaną skopiowane na drugi dysk, porównane z oryginałem i dopiero wtedy usunięte ze starego miejsca. Gdyby coś się nie udało, wszystko zostaje tam, gdzie było.',
+  'dataRoot.staysHome':
+    'W starym folderze zostanie tylko to, co nie jest danymi: plik data-root.txt, który wskazuje nowe miejsce, i folder browser z plikami okna launchera.',
+  'dataRoot.staysNothing': 'Stary folder zostanie opróżniony i usunięty.',
+  'dataRoot.replacesDebris':
+    'W nowym miejscu są puste pliki launchera albo pozostałość po niedokończonym przenoszeniu — zostaną zastąpione.',
+  'dataRoot.warnSpaces':
+    'Ta ścieżka zawiera spacje. Minecraft sobie z tym radzi, ale część modów i narzędzi nie — bezpieczniejszy jest folder bez spacji.',
+  'dataRoot.warnNonAscii':
+    'Ta ścieżka zawiera znaki spoza podstawowego alfabetu (na przykład polskie litery). Część modów sobie z nimi nie radzi — bezpieczniejszy jest folder z samych liter A–Z, cyfr i myślników.',
+  'dataRoot.done': 'Gotowe — launcher korzysta teraz z nowego folderu.',
+  'dataRoot.leftovers':
+    'Tych starych kopii nie udało się usunąć. Dane są bezpieczne w nowym miejscu, a te pliki są już zbędne — możesz je skasować ręcznie:',
   'dataRoot.adopt':
-    'W tym folderze są już dane launchera, więc zostaną użyte tak, jak są — nic nie jest kopiowane, a to, co w obecnym folderze, tam zostaje.',
+    'W tym folderze są już profile launchera, więc zostanie użyty tak, jak jest — nic nie jest kopiowane, a to, co jest w obecnym folderze, tam zostaje.',
   'dataRoot.free': 'Wolne miejsce w miejscu docelowym: {free}',
   'dataRoot.restartNotice': 'Po przeniesieniu launcher uruchomi się ponownie.',
   'dataRoot.confirm': 'Przenieś i uruchom ponownie',
   'dataRoot.confirmAdopt': 'Użyj tego folderu i uruchom ponownie',
   'dataRoot.moving': 'Przenoszenie danych…',
-  'dataRoot.restarting': 'Gotowe — ponowne uruchomienie launchera…',
+  'dataRoot.restarting': 'Launcher zaraz uruchomi się ponownie…',
   'dataRoot.failed': 'Nie udało się przenieść folderu danych: {error}',
   'dataRoot.problem.same': 'To już jest używany folder.',
   'dataRoot.problem.nested': 'Ten folder jest wewnątrz obecnego — wybierz taki spoza niego.',
   'dataRoot.problem.notWritable': 'Do tego folderu nie da się nic zapisać.',
+  'dataRoot.problem.notEmpty':
+    'W tym folderze są inne pliki, a podfolder „raven-forge-launcher”, który launcher by w nim utworzył, też jest zajęty. Wybierz inne miejsce.',
   'dataRoot.problem.noSpace': 'Za mało miejsca: do przeniesienia {size}, wolne {free}.',
   'dataRoot.problem.envLocked':
     'O miejscu na dane dla tej instalacji decyduje RAVENFORGE_DATA_DIR.',
-  'dataRoot.problem.gameRunning': 'Najpierw zamknij grę — działa z tego folderu.',
+  'dataRoot.problem.gameRunning':
+    'Najpierw zamknij grę i poczekaj, aż skończy się pobieranie — launcher pracuje teraz na tych plikach.',
 };

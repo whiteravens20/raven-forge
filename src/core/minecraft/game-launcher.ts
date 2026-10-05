@@ -637,14 +637,6 @@ export function isGameRunning(profileId: string): boolean {
   return runningProcesses.has(profileId);
 }
 
-/**
- * Any profile at all. Asked before the data directory moves: the game holds
- * open handles all over the profile it is running from, and on Windows that
- * alone makes the directory unmovable.
- */
-export function anyGameRunning(): boolean {
-  return runningProcesses.size > 0;
-}
 
 /**
  * Profiles between "launch pressed" and `spawn`.
@@ -658,6 +650,17 @@ export function anyGameRunning(): boolean {
  * same JRE directory, which `extractArchive` begins by deleting.
  */
 const preparing = new Set<string>();
+
+/**
+ * Any profile at all, playing or being got ready. Asked before the data
+ * directory moves: a running game holds open handles all over the profile it
+ * runs from, and a launch still downloading is writing into the very
+ * directories that are about to be carried away — files it creates after the
+ * move has listed what to take would be deleted with the originals.
+ */
+export function isLaunchInProgress(): boolean {
+  return runningProcesses.size > 0 || preparing.size > 0;
+}
 
 export async function launchGame(options: LaunchOptions): Promise<void> {
   if (runningProcesses.has(options.profileId)) {

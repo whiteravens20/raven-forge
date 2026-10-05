@@ -113,6 +113,7 @@ const api: RavenForgeAPI = {
     chooseDataRoot: () => ipcRenderer.invoke('settings:choose-data-root'),
     planDataRoot: (target) => ipcRenderer.invoke('settings:plan-data-root', target),
     applyDataRoot: (target) => ipcRenderer.invoke('settings:apply-data-root', target),
+    forgetDataRoot: () => ipcRenderer.invoke('settings:forget-data-root'),
   },
   news: {
     get: () => ipcRenderer.invoke('news:get'),
@@ -132,6 +133,7 @@ const api: RavenForgeAPI = {
   },
   system: {
     getInfo: () => ipcRenderer.invoke('system:get-info'),
+    relaunch: () => ipcRenderer.invoke('system:relaunch'),
     openPath: (p) => ipcRenderer.invoke('system:open-path', p),
     openUrl: (url) => ipcRenderer.invoke('system:open-url', url),
     selectFile: (filters) => ipcRenderer.invoke('system:select-file', filters),

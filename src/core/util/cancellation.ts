@@ -48,6 +48,14 @@ export function endJob(profileId: string): void {
 }
 
 /** Returns false when there was nothing running for that profile. */
+/**
+ * Whether any long download is under way, for anything that must not start
+ * while one is — moving the data directory out from under it, above all.
+ */
+export function hasActiveJobs(): boolean {
+  return controllers.size > 0;
+}
+
 export function cancelJob(profileId: string): boolean {
   const controller = controllers.get(profileId);
   if (!controller) return false;

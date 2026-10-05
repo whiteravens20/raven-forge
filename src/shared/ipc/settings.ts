@@ -49,9 +49,13 @@ export type DataRootSource = 'default' | 'pointer' | 'env';
 export interface DataRootInfo {
   /** Where the data is right now. */
   path: string;
-  /** Where it would be with nothing configured. */
+  /** Where it would be with nothing configured: the launcher's home. */
   defaultPath: string;
   source: DataRootSource;
+  /** The path has a space in it, which some mods and tools mishandle. */
+  hasSpaces: boolean;
+  /** The path has a character outside ASCII in it — the same concern. */
+  hasNonAscii: boolean;
   /**
    * A configured root that could not be reached — an unplugged drive — with the
    * default standing in. The UI has to say so, or the launcher merely looks
@@ -62,6 +66,11 @@ export interface DataRootInfo {
 
 /** What choosing a directory would do, worked out before anything is touched. */
 export interface DataRootPlan {
+  /**
+   * Where the data would end up. Not always the folder that was picked: one
+   * that already holds other things gets a folder of the launcher's own inside
+   * it, and this names that.
+   */
   target: string;
   /**
    * `move` carries the current data across. `adopt` leaves it where it is and
@@ -72,6 +81,22 @@ export interface DataRootPlan {
   bytesToMove: number;
   /** Free space at the target, when the platform will say. */
   freeBytes?: number;
+  /** On the volume the data is on now, so nothing has to be copied. */
+  sameVolume: boolean;
+  /**
+   * The target holds the launcher's file names with no profiles behind them —
+   * what an interrupted move leaves, or a launcher that only stood in there —
+   * and they would be replaced.
+   */
+  replacesDebris?: boolean;
+  /**
+   * The data would be leaving the launcher's home, which stays where it is and
+   * keeps the pointer and the embedded browser's files.
+   */
+  leavesHome?: boolean;
+  /** See {@link DataRootInfo.hasSpaces}; about the target. */
+  hasSpaces: boolean;
+  hasNonAscii: boolean;
   /** Set when the choice cannot be applied; the UI explains it and offers no button. */
   problem?: DataRootProblem;
 }
@@ -83,9 +108,23 @@ export type DataRootProblem =
   | 'nested'
   /** Cannot be written to. */
   | 'notWritable'
+  /** Holds other files, and so does the folder the launcher would make in it. */
+  | 'notEmpty'
   /** Less free space than the move needs. */
   | 'noSpace'
   /** `RAVENFORGE_DATA_DIR` decides for this install. */
   | 'envLocked'
-  /** A game is running out of the directory. */
+  /** A game is running out of the directory, or one is being got ready. */
   | 'gameRunning';
+
+/**
+ * How a move ended.
+ *
+ * `leftovers` are originals that were copied across and then could not be
+ * removed. The data is safe in the new place either way; these are the old
+ * copies, and the person who moved them has to be told where they still are.
+ */
+export interface DataRootMoveResult {
+  target: string;
+  leftovers: string[];
+}

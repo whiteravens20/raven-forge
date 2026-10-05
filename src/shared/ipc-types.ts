@@ -55,7 +55,13 @@ import type {
   ShaderLoaderState,
 } from './ipc/mods';
 import type { JavaInstallation, JavaProbe } from './ipc/java';
-import type { GlobalSettings, TrustedKey, DataRootInfo, DataRootPlan } from './ipc/settings';
+import type {
+  GlobalSettings,
+  TrustedKey,
+  DataRootInfo,
+  DataRootMoveResult,
+  DataRootPlan,
+} from './ipc/settings';
 import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
 import type { ManifestVerification, UpdateCheck, UpdateInfo } from './ipc/updater';
@@ -264,8 +270,17 @@ export interface InvokeChannels {
   /** Opens a directory picker; `null` when it was dismissed. */
   'settings:choose-data-root': () => Promise<IpcResult<DataRootPlan | null>>;
   'settings:plan-data-root': (target: string) => Promise<IpcResult<DataRootPlan>>;
-  /** Moves the data and restarts the launcher into the new location. */
-  'settings:apply-data-root': (target: string) => Promise<IpcResult<void>>;
+  /**
+   * Moves the data and points the launcher at it. The launcher has to restart
+   * to use it — `system:relaunch` — and the result says whether anything was
+   * left behind that the player should know about first.
+   */
+  'settings:apply-data-root': (target: string) => Promise<IpcResult<DataRootMoveResult>>;
+  /**
+   * Stop pointing at a data folder that cannot be reached, and use the home.
+   * Nothing is moved or deleted; what is in the unreachable folder stays there.
+   */
+  'settings:forget-data-root': () => Promise<IpcResult<void>>;
 
   // -- News & Announcements --
   'news:get': () => Promise<IpcResult<FeedResult<NewsItem>>>;
@@ -283,6 +298,8 @@ export interface InvokeChannels {
 
   // -- System --
   'system:get-info': () => Promise<IpcResult<SystemInfo>>;
+  /** Quit and start again — after the data folder has changed. */
+  'system:relaunch': () => Promise<void>;
   'system:open-path': (path: string) => Promise<IpcResult<void>>;
   'system:open-url': (url: string) => Promise<IpcResult<void>>;
   'system:select-file': (
@@ -433,6 +450,7 @@ export interface RavenForgeAPI {
     chooseDataRoot: InvokeChannels['settings:choose-data-root'];
     planDataRoot: InvokeChannels['settings:plan-data-root'];
     applyDataRoot: InvokeChannels['settings:apply-data-root'];
+    forgetDataRoot: InvokeChannels['settings:forget-data-root'];
   };
   news: {
     get: InvokeChannels['news:get'];
@@ -452,6 +470,7 @@ export interface RavenForgeAPI {
   };
   system: {
     getInfo: InvokeChannels['system:get-info'];
+    relaunch: InvokeChannels['system:relaunch'];
     openPath: InvokeChannels['system:open-path'];
     openUrl: InvokeChannels['system:open-url'];
     selectFile: InvokeChannels['system:select-file'];

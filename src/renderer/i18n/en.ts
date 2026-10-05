@@ -535,13 +535,16 @@ export const en = {
   'settings.trustedKeyFailed': 'Could not add the key',
   'settings.dataFolder': 'Data folder',
   'settings.dataFolderHint':
-    'Profiles, mods, game files and the managed Java runtimes. Several gigabytes once a pack is installed.',
+    'Profiles, mods, game files, downloaded Java runtimes, logs and crash reports. Several gigabytes once a pack is installed. The full list, with sizes, is below.',
   'settings.dataFolderChange': 'Move…',
   'settings.dataFolderRestore': 'Back to the default',
   'settings.dataFolderEnv':
     'Set for this install by RAVENFORGE_DATA_DIR, so it cannot be changed here.',
   'settings.dataFolderUnavailable':
-    'The chosen folder {path} could not be reached, so the launcher is using the default one. Anything you had there is still there.',
+    'The chosen folder {path} could not be opened — the drive is unplugged or the folder is gone — so the launcher is using the default one. What was there is still there; plug the drive in and start the launcher again.',
+  'settings.dataFolderForget': 'Forget that folder',
+  'settings.dataFolderForgetHint':
+    'The launcher stops looking for it and stays with the default folder. Nothing in the unreachable folder is touched.',
   'settings.crashReportsFolder': 'Crash reports',
   'settings.logs': 'Logs',
   'settings.showLogs': 'Show logs',
@@ -552,23 +555,41 @@ export const en = {
   'dataRoot.title': 'Move the data folder',
   'dataRoot.from': 'Now',
   'dataRoot.to': 'New location',
-  'dataRoot.move': '{size} moves across. Nothing is left behind in the old location.',
+  'dataRoot.moveSameVolume':
+    '{size} moves across. It is the same disk, so the files are moved without being copied — this takes a moment.',
+  'dataRoot.moveCopy':
+    '{size} moves across. The files are copied to the other disk, compared with the originals, and only then removed from the old location. If anything goes wrong, everything stays where it was.',
+  'dataRoot.staysHome':
+    'Only what is not data stays in the old folder: the file data-root.txt, which points at the new location, and the folder browser, which holds the launcher window’s own files.',
+  'dataRoot.staysNothing': 'The old folder is emptied and removed.',
+  'dataRoot.replacesDebris':
+    'The new location holds empty launcher files, or what an unfinished move left behind — they are replaced.',
+  'dataRoot.warnSpaces':
+    'This path has spaces in it. Minecraft copes, but some mods and tools do not — a folder without spaces is the safer choice.',
+  'dataRoot.warnNonAscii':
+    'This path has characters outside the basic alphabet in it (accented letters, for example). Some mods cannot cope with them — a folder made of A–Z, digits and hyphens is the safer choice.',
+  'dataRoot.done': 'Done — the launcher now uses the new folder.',
+  'dataRoot.leftovers':
+    'These old copies could not be removed. The data is safe in the new location and these files are no longer needed — you can delete them by hand:',
   'dataRoot.adopt':
-    'That folder already holds launcher data, so it will be used as it is — nothing is copied, and what is in the current folder stays there.',
+    'That folder already holds launcher profiles, so it is used as it is — nothing is copied, and what is in the current folder stays there.',
   'dataRoot.free': 'Free at the destination: {free}',
   'dataRoot.restartNotice': 'The launcher restarts once the move is done.',
   'dataRoot.confirm': 'Move and restart',
   'dataRoot.confirmAdopt': 'Use this folder and restart',
   'dataRoot.moving': 'Moving data…',
-  'dataRoot.restarting': 'Done — restarting the launcher…',
+  'dataRoot.restarting': 'The launcher is about to restart…',
   'dataRoot.failed': 'The data folder could not be moved: {error}',
   'dataRoot.problem.same': 'That is already the folder in use.',
   'dataRoot.problem.nested': 'That folder is inside the current one — pick one outside it.',
   'dataRoot.problem.notWritable': 'Nothing can be written to that folder.',
+  'dataRoot.problem.notEmpty':
+    'That folder holds other files, and the “raven-forge-launcher” folder the launcher would make inside it is taken as well. Pick somewhere else.',
   'dataRoot.problem.noSpace': 'Not enough room: {size} to move, {free} free.',
   'dataRoot.problem.envLocked':
     'RAVENFORGE_DATA_DIR decides where the data lives for this install.',
-  'dataRoot.problem.gameRunning': 'Close the game first — it is running out of this folder.',
+  'dataRoot.problem.gameRunning':
+    'Close the game first, and wait for any download to finish — the launcher is working on these files right now.',
 
   // ── Log viewer ───────────────────────────────────────────
   'logs.title': 'Launcher logs',
