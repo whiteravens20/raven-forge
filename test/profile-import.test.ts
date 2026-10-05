@@ -82,6 +82,21 @@ describe('readImportedProfile', () => {
     expect(data).not.toHaveProperty('totalPlayTimeMinutes');
   });
 
+  it('brings neither picture across, and keeps a built-in avatar', () => {
+    // The file one names a file the new profile does not have. The remote one
+    // would be fetched on every render from an address the sender chose.
+    const { data, dropped } = importOf({
+      iconPath: 'icon.png',
+      iconUrl: 'https://example.net/who-opened-this.png',
+      iconPreset: 'raven',
+    });
+    expect(data).not.toHaveProperty('iconPath');
+    expect(data).not.toHaveProperty('iconUrl');
+    expect(data.iconPreset).toBe('raven');
+    // Not worth a notice: nothing the player set up is missing a part.
+    expect(dropped).toEqual([]);
+  });
+
   it('does not let unknown fields ride along', () => {
     const { data } = importOf({ somethingElse: 'x' });
     expect(data).not.toHaveProperty('somethingElse');

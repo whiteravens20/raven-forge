@@ -389,10 +389,19 @@ export async function duplicateProfile(profileId: string, name?: string): Promis
   });
 }
 
+/**
+ * A profile as a file to hand to somebody else.
+ *
+ * Without the two fields that are only true on this machine. The Java path is
+ * a path into this computer, with the account's name in it as often as not,
+ * and an import drops it in any case; the image is a file in the profile's
+ * directory, which the export does not carry.
+ */
 export async function exportProfile(profileId: string): Promise<string> {
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
-  return JSON.stringify(profile, null, 2);
+  const { customJavaPath: _java, iconPath: _icon, ...shared } = profile;
+  return JSON.stringify(shared, null, 2);
 }
 
 /**
@@ -473,6 +482,12 @@ export function readImportedProfile(json: string): ImportedProfile {
     customJavaPath: _java,
     javaArgs: _jargs,
     manifestUrl: _murl,
+    // Neither picture comes along. The file one names a file the new profile
+    // does not have. The remote one is an address the launcher would fetch
+    // every time the profile is drawn, chosen by whoever wrote the file — which
+    // tells them when the launcher is open, and from where.
+    iconPath: _icon,
+    iconUrl: _iconUrl,
     ...data
   } = parsed.data;
 

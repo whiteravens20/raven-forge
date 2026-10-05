@@ -377,6 +377,21 @@ describe('exportProfile', () => {
     expect(imported.dropped).toEqual([]);
   });
 
+  it('leaves out what is only true on this machine', async () => {
+    // An export gets posted in a channel. The Java path has the account's name
+    // in it as often as not, and the image is a file the export does not carry.
+    const created = await mgr.createProfile({
+      ...newProfile('Ravens'),
+      customJavaPath: '/home/somebody/jdk-21/bin/java',
+      iconPath: 'icon.png',
+      javaArgs: '-Dfml.readTimeout=120',
+    });
+    const exported = JSON.parse(await mgr.exportProfile(created.id)) as Record<string, unknown>;
+    expect(exported).not.toHaveProperty('customJavaPath');
+    expect(exported).not.toHaveProperty('iconPath');
+    expect(exported).toMatchObject({ name: 'Ravens', javaArgs: '-Dfml.readTimeout=120' });
+  });
+
   it('does not let an export carry a Java path into a new profile', async () => {
     const created = await mgr.createProfile(newProfile('Ravens'));
     const json = JSON.stringify({ ...created, customJavaPath: '/tmp/not-a-jvm' });
