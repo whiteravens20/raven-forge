@@ -588,7 +588,6 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     // Client-side sync: server-only mods are not installed into a player instance.
     const entries = manifest.mods.filter((m) => m.side === 'client' || m.side === 'both');
     const existing = await readLockFile(profileId);
-    const synced: InstalledMod[] = [];
 
     // Checking comes first and downloading second, as two passes with two
     // counters, because the single pass they replace could not tell the two
@@ -704,42 +703,31 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         installing: true,
       });
 
+    // A version bump changes the filename; this drops the file it replaced, at
+    // whichever of the two names that file is under while the mod is `enabled`.
+    const dropReplaced = async ({ previous, resolved }: PlannedMod, enabled: boolean) => {
+      if (previous && !isSameModFile(previous.fileName, resolved.fileName)) {
+        await fs.rm(modFilePath(modsDir, previous.fileName, enabled), { force: true });
+      }
+    };
+
     // As many at a time as the downloads setting says. That setting was only
     // ever read for the game's own libraries and assets, so a pack of two
     // hundred mods came down one file after another whatever it was set to.
     await forEachConcurrently(
       plannedMods.filter((p) => !p.present),
       settings.downloadConcurrency,
-      async ({ entry, resolved, destPath, previous, enabled }) => {
+      async (planned) => {
+        const { entry, resolved, destPath } = planned;
         throwIfCancelled(signal, 'Sync');
         reportDownload({ key: 'progress.msg.downloadingFile', vars: { name: entry.name } });
 
         log.info(`Downloading mod: ${entry.name} (${resolved.fileName})`);
         await fetchModEntry(entry, resolved, destPath, signal);
-
-        // A version bump changes the filename; drop the file it replaced, at
-        // whichever of the two names that file was under.
-        if (previous && !isSameModFile(previous.fileName, resolved.fileName)) {
-          await fs.rm(modFilePath(modsDir, previous.fileName, enabled), { force: true });
-        }
+        await dropReplaced(planned, planned.enabled);
         fetched++;
       },
     );
-
-    // In the manifest's order, whatever order the files arrived in.
-    for (const { entry, resolved, enabled } of plannedMods) {
-      synced.push({
-        id: entry.id,
-        name: entry.name,
-        version: resolved.version,
-        source: entry.source,
-        fileName: resolved.fileName,
-        required: entry.required,
-        side: entry.side,
-        enabled,
-        fromManifest: true,
-      });
-    }
 
     // Config overrides, resolved relative to the profile's .minecraft directory.
     const appliedConfigs: Record<string, string> = {};
@@ -785,7 +773,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     // as many as there were, pressing Sync changed nothing because the same
     // sync left them there again — and they could not be removed by hand
     // either, since a pack's mods have no Remove button.
-    const keptIds = new Set(synced.map((m) => m.id));
+    const keptIds = new Set(plannedMods.map((p) => p.entry.id));
 
     // Read again here, under the lock, rather than reusing the snapshot taken
     // before the downloads: minutes have passed, and a mod the player installed
@@ -799,7 +787,42 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     // still loaded by the game, never looked at by a sync again. This way a
     // failure leaves the list as it was, the sync says why it stopped, and the
     // next one tries again.
-    const dropped = await mutateLockFile(profileId, async (mods) => {
+    const { synced, dropped } = await mutateLockFile(profileId, async (mods) => {
+      // In the manifest's order, whatever order the files arrived in.
+      const synced: InstalledMod[] = [];
+      for (const planned of plannedMods) {
+        const { entry, resolved } = planned;
+
+        // Whether the mod is switched on is asked again here too. The plan
+        // answered it before the downloads, and a player who switched a mod
+        // off while they ran had its file renamed and that recorded — after
+        // which the plan's answer was written back over theirs. The mod came
+        // out of the sync marked on with its file under the other name, so the
+        // next sync called it missing and fetched it again beside that file.
+        const enabled = mods.find((m) => m.id === entry.id)?.enabled ?? planned.enabled;
+        if (enabled !== planned.enabled) {
+          // What this sync fetched is under the name the plan gave it, and what
+          // it replaced was moved by the switch before the cleanup looked.
+          const fetchedAs = modFilePath(modsDir, resolved.fileName, planned.enabled);
+          if (await fileExists(fetchedAs)) {
+            await fs.rename(fetchedAs, modFilePath(modsDir, resolved.fileName, enabled));
+          }
+          await dropReplaced(planned, enabled);
+        }
+
+        synced.push({
+          id: entry.id,
+          name: entry.name,
+          version: resolved.version,
+          source: entry.source,
+          fileName: resolved.fileName,
+          required: entry.required,
+          side: entry.side,
+          enabled,
+          fromManifest: true,
+        });
+      }
+
       const userInstalled = mods.filter((m) => !m.fromManifest);
       const stale = mods.filter((m) => m.fromManifest && !keptIds.has(m.id));
       for (const mod of stale) {
@@ -816,7 +839,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         log.info(`Removed ${mod.name} from ${profile.name}: the pack no longer ships it`);
       }
       mods.splice(0, mods.length, ...synced, ...userInstalled);
-      return stale;
+      return { synced, dropped: stale };
     });
 
     await writeSyncState(profileId, {

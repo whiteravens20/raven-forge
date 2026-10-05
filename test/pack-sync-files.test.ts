@@ -25,8 +25,8 @@ let profile: Profile;
 const published = new Map<string, string | null>();
 /** Every URL asked for, in order. */
 const fetched: string[] = [];
-/** Runs before each download — the hook a test uses to cancel mid-sync. */
-let beforeDownload: (url: string) => void = () => {};
+/** Runs before each download — the hook a test uses to act in the middle of a sync. */
+let beforeDownload: (url: string) => void | Promise<void> = () => {};
 /** Runs once a download is on disk, with the path it was written to. */
 let afterDownload: (dest: string) => Promise<void> = async () => {};
 
@@ -48,7 +48,7 @@ vi.mock('../src/core/profiles/profile-manager', () => ({
 vi.mock('../src/core/mods/content-manager', () => ({ syncContentFromManifest: async () => {} }));
 vi.mock('../src/core/net/download', () => ({
   downloadToFile: async (url: string, dest: string) => {
-    beforeDownload(url);
+    await beforeDownload(url);
     fetched.push(url);
     const body = published.get(url);
     if (body === null || body === undefined) throw new Error(`503 for ${url}`);
@@ -196,6 +196,51 @@ describe('cancelling a sync', () => {
     expect(isCancellation(outcome)).toBe(true);
     // And the profile is left as it was, not flagged as failed.
     expect((await getProfileSyncStatus('p1')).status).toBe('never-synced');
+  });
+});
+
+describe('a mod switched off while its pack is syncing', () => {
+  /** Switch JEI off at the moment the sync starts fetching `trigger`. */
+  const switchOffDuring = (trigger: { url: string }) => {
+    beforeDownload = async (url) => {
+      if (url === trigger.url) await toggleModEnabled('p1', 'jei', false);
+    };
+  };
+
+  it('stays off, and is not fetched again beside the file that was switched off', async () => {
+    const jei = mod('jei');
+    const mekanism = mod('mekanism');
+    await syncManifest('p1', pack([jei]));
+
+    switchOffDuring(mekanism);
+    await syncManifest('p1', pack([jei, mekanism]));
+
+    // The list was rewritten from what the sync had read before the downloads,
+    // so the mod came out of it marked on, with its file under the other name.
+    expect(await jars()).toEqual(['jei.jar.disabled', 'mekanism.jar']);
+    expect((await lock()).find((m) => m.id === 'jei')?.enabled).toBe(false);
+
+    beforeDownload = () => {};
+    fetched.length = 0;
+    await syncManifest('p1', pack([jei, mekanism]));
+
+    expect(fetched).toEqual([]);
+    expect(await jars()).toEqual(['jei.jar.disabled', 'mekanism.jar']);
+  });
+
+  it('stays off when the same sync brings a new build of it', async () => {
+    await syncManifest('p1', pack([mod('jei', { file: 'jei-1.jar', body: 'build one' })]));
+
+    const mekanism = mod('mekanism');
+    switchOffDuring(mekanism);
+    await syncManifest(
+      'p1',
+      pack([mekanism, mod('jei', { file: 'jei-2.jar', body: 'build two' })]),
+    );
+
+    // One file, the new build, under the name its state implies.
+    expect(await jars()).toEqual(['jei-2.jar.disabled', 'mekanism.jar']);
+    expect((await lock()).find((m) => m.id === 'jei')?.enabled).toBe(false);
   });
 });
 
