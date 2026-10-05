@@ -310,6 +310,67 @@ describe.skipIf(!posix)('a launch', () => {
   });
 });
 
+/**
+ * Log4Shell. Minecraft 1.7.2 to 1.18 resolve `${jndi:…}` in anything they log,
+ * chat included, unless they are started with a configuration that stops it.
+ */
+describe.skipIf(!posix)('a game whose log4j looks things up', () => {
+  const CONFIG = '-Dlog4j.configurationFile=';
+
+  /** Give the version this log4j, already on disk like every other file. */
+  async function withLog4j(version: string): Promise<void> {
+    const libPath = `org/apache/logging/log4j/log4j-core/${version}/log4j-core-${version}.jar`;
+    const jar = await place(path.join(cacheDir(), 'libraries', libPath), `log4j-core ${version}`);
+    state.meta!.libraries = [
+      {
+        name: `org.apache.logging.log4j:log4j-core:${version}`,
+        downloads: { artifact: { path: libPath, url: NOT_FETCHED, ...jar } },
+      },
+    ];
+  }
+
+  it('is started with the configuration that stops it', async () => {
+    await withLog4j('2.8.1');
+    await launch('exit 0');
+    await exitInfo();
+
+    const config = (await gameArgs()).find((arg) => arg.startsWith(CONFIG))?.slice(CONFIG.length);
+    expect(config).toBe(path.join(cacheDir(), 'log4j', 'client-no-lookups.xml'));
+    expect(await fs.readFile(config!, 'utf-8')).toContain('%msg{nolookups}');
+  });
+
+  it('gets the stricter one when its log4j cannot switch lookups off', async () => {
+    await withLog4j('2.0-beta9');
+    await launch('exit 0');
+    await exitInfo();
+
+    const config = (await gameArgs()).find((arg) => arg.startsWith(CONFIG))?.slice(CONFIG.length);
+    expect(config).toBe(path.join(cacheDir(), 'log4j', 'client-regex-filter.xml'));
+    expect(await fs.readFile(config!, 'utf-8')).toContain('RegexFilter');
+  });
+
+  it('is left to a configuration the player names themselves', async () => {
+    // The JVM keeps the last `-D` it is given for a property, so the launcher's
+    // has to come first for the profile's own to be the one that counts.
+    await withLog4j('2.8.1');
+    await launch('exit 0', { javaArgs: `${CONFIG}/opt/pack/log4j2.xml` });
+    await exitInfo();
+
+    const configs = (await gameArgs()).filter((arg) => arg.startsWith(CONFIG));
+    expect(configs).toHaveLength(2);
+    expect(configs.at(-1)).toBe(`${CONFIG}/opt/pack/log4j2.xml`);
+  });
+
+  it('is not what a current version is, and that one is started as it always was', async () => {
+    await withLog4j('2.24.1');
+    await launch('exit 0');
+    await exitInfo();
+
+    expect((await gameArgs()).filter((arg) => arg.startsWith(CONFIG))).toEqual([]);
+    await expect(fs.access(path.join(cacheDir(), 'log4j'))).rejects.toThrow();
+  });
+});
+
 describe.skipIf(!posix)('the end of a game', () => {
   it('reports a game that closed normally as exactly that', async () => {
     await launch('exit 0');

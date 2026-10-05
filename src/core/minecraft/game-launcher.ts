@@ -33,6 +33,7 @@ import {
 
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
 import { customResolution, resolveConditionalArgs, substituteVars } from './launch-args';
+import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
 import { applyFullscreen, applyLanguage } from './options-file';
 import { LaunchRefusedError } from './launch-errors';
@@ -370,6 +371,12 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
     `-Djava.library.path=${nativesDir}`,
     '-Dminecraft.launcher.brand=raven-forge',
   ];
+
+  // Ahead of the version's own arguments and the profile's, because the last
+  // `-D` for a property is the one the JVM keeps: a loader or a player that
+  // names a logging configuration of their own still gets it.
+  const log4jConfig = await log4jConfigArgument(path.join(paths.cacheDir, 'log4j'), meta.libraries);
+  if (log4jConfig) jvmArgs.push(log4jConfig);
 
   if (meta.arguments?.jvm) {
     const resolved = resolveConditionalArgs(meta.arguments.jvm, features);
