@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { mergeVersionMeta } from '../src/core/minecraft/version-manifest';
-import type { VersionMeta } from '../src/core/minecraft/types';
+import type { Library, Rule, VersionMeta } from '../src/core/minecraft/types';
 
 /**
  * Merging a loader profile onto vanilla decides what ends up on the classpath.
@@ -119,5 +119,183 @@ describe('mergeVersionMeta', () => {
     mergeVersionMeta(vanilla, fabric);
     expect(JSON.stringify(vanilla)).toBe(parentBefore);
     expect(JSON.stringify(fabric)).toBe(childBefore);
+  });
+});
+
+/**
+ * Minecraft 1.16.5 as Mojang serves it, cut down to two LWJGL modules.
+ *
+ * From 1.13 to 1.18.2 a library with natives is not one entry but up to four
+ * under the same name: the macOS build and the build for everything else, and
+ * then each of those again with a `natives` map pointing into `classifiers`.
+ * Nothing but `rules` tells them apart. The order is the file's own — every jar
+ * first, every natives entry after — and the macOS entry leads each pair, which
+ * is what made "keep the first one" the worst possible rule.
+ */
+const jar = (path: string) => ({
+  path,
+  sha1: 'c'.repeat(40),
+  size: 1,
+  url: `https://libraries.minecraft.net/${path}`,
+});
+const OSX_ONLY: Rule[] = [{ action: 'allow', os: { name: 'osx' } }];
+const NOT_OSX: Rule[] = [{ action: 'allow' }, { action: 'disallow', os: { name: 'osx' } }];
+
+function lwjglJars(artifact: string): Library[] {
+  const dir = `org/lwjgl/${artifact}`;
+  return [
+    {
+      name: `org.lwjgl:${artifact}:3.2.1`,
+      downloads: { artifact: jar(`${dir}/3.2.1/${artifact}-3.2.1.jar`) },
+      rules: OSX_ONLY,
+    },
+    {
+      name: `org.lwjgl:${artifact}:3.2.2`,
+      downloads: { artifact: jar(`${dir}/3.2.2/${artifact}-3.2.2.jar`) },
+      rules: NOT_OSX,
+    },
+  ];
+}
+
+function lwjglNatives(artifact: string): Library[] {
+  const dir = `org/lwjgl/${artifact}`;
+  return [
+    {
+      name: `org.lwjgl:${artifact}:3.2.1`,
+      downloads: {
+        artifact: jar(`${dir}/3.2.1/${artifact}-3.2.1.jar`),
+        classifiers: { 'natives-macos': jar(`${dir}/3.2.1/${artifact}-3.2.1-natives-macos.jar`) },
+      },
+      natives: { osx: 'natives-macos' },
+      rules: OSX_ONLY,
+    },
+    {
+      name: `org.lwjgl:${artifact}:3.2.2`,
+      downloads: {
+        artifact: jar(`${dir}/3.2.2/${artifact}-3.2.2.jar`),
+        classifiers: {
+          'natives-linux': jar(`${dir}/3.2.2/${artifact}-3.2.2-natives-linux.jar`),
+          'natives-windows': jar(`${dir}/3.2.2/${artifact}-3.2.2-natives-windows.jar`),
+        },
+      },
+      natives: { linux: 'natives-linux', windows: 'natives-windows' },
+      rules: NOT_OSX,
+    },
+  ];
+}
+
+const text2speech = 'com/mojang/text2speech/1.11.3/text2speech-1.11.3';
+
+const vanilla1165: VersionMeta = {
+  ...vanilla,
+  id: '1.16.5',
+  assets: '1.16',
+  javaVersion: { component: 'jre-legacy', majorVersion: 8 },
+  libraries: [
+    {
+      name: 'org.apache.logging.log4j:log4j-core:2.8.1',
+      downloads: {
+        artifact: jar('org/apache/logging/log4j/log4j-core/2.8.1/log4j-core-2.8.1.jar'),
+      },
+    },
+    ...lwjglJars('lwjgl'),
+    ...lwjglJars('lwjgl-glfw'),
+    ...lwjglNatives('lwjgl'),
+    ...lwjglNatives('lwjgl-glfw'),
+    { name: 'com.mojang:text2speech:1.11.3', downloads: { artifact: jar(`${text2speech}.jar`) } },
+    {
+      name: 'com.mojang:text2speech:1.11.3',
+      downloads: {
+        artifact: jar(`${text2speech}.jar`),
+        classifiers: {
+          'natives-linux': jar(`${text2speech}-natives-linux.jar`),
+          'natives-windows': jar(`${text2speech}-natives-windows.jar`),
+        },
+      },
+      natives: { linux: 'natives-linux', windows: 'natives-windows' },
+      extract: { exclude: ['META-INF/'] },
+    },
+  ],
+};
+
+/** Fabric's profile for it: its own libraries, none of them the game's. */
+const fabric1165: Partial<VersionMeta> = {
+  id: 'fabric-loader-0.19.5-1.16.5',
+  inheritsFrom: '1.16.5',
+  mainClass: 'net.fabricmc.loader.impl.launch.knot.KnotClient',
+  libraries: [
+    { name: 'org.ow2.asm:asm:9.10.1', url: 'https://maven.fabricmc.net/' },
+    { name: 'net.fabricmc:intermediary:1.16.5', url: 'https://maven.fabricmc.net/' },
+    { name: 'net.fabricmc:fabric-loader:0.19.5', url: 'https://maven.fabricmc.net/' },
+  ],
+  arguments: { game: [], jvm: ['-DFabricMcEmu= net.minecraft.client.main.Main '] },
+};
+
+describe('mergeVersionMeta on a version that lists a library several times', () => {
+  const merged = mergeVersionMeta(vanilla1165, fabric1165);
+
+  it('keeps every entry the parent gives one library, not just the first', () => {
+    // The first is the macOS one. Keeping only that left Linux and Windows with
+    // no LWJGL at all once the rules had been applied.
+    const lwjgl = merged.libraries.filter((l) => l.name.startsWith('org.lwjgl:lwjgl:'));
+    expect(lwjgl.map((l) => [l.name, l.rules, l.natives])).toEqual([
+      ['org.lwjgl:lwjgl:3.2.1', OSX_ONLY, undefined],
+      ['org.lwjgl:lwjgl:3.2.2', NOT_OSX, undefined],
+      ['org.lwjgl:lwjgl:3.2.1', OSX_ONLY, { osx: 'natives-macos' }],
+      ['org.lwjgl:lwjgl:3.2.2', NOT_OSX, { linux: 'natives-linux', windows: 'natives-windows' }],
+    ]);
+  });
+
+  it('keeps the natives of every library that has them', () => {
+    // The entry with the `natives` map always comes after the plain jar of the
+    // same name, so it was the one dropped — on 1.13 to 1.14.3 the jars survived
+    // and the game died in LWJGL for want of a `.so`.
+    const withNatives = merged.libraries.filter((l) => l.natives?.linux).map((l) => l.name);
+    expect(withNatives).toEqual([
+      'org.lwjgl:lwjgl:3.2.2',
+      'org.lwjgl:lwjgl-glfw:3.2.2',
+      'com.mojang:text2speech:1.11.3',
+    ]);
+  });
+
+  it('adds the loader in front and takes nothing of the parent away', () => {
+    expect(merged.libraries.map((l) => l.name)).toEqual([
+      ...fabric1165.libraries!.map((l) => l.name),
+      ...vanilla1165.libraries.map((l) => l.name),
+    ]);
+  });
+
+  it('lets the loader replace a library, in every form the parent listed it', () => {
+    // Its own log4j replaces the game's one entry; its own LWJGL module means
+    // all four of the game's entries for that module go, not just one of them.
+    const child: Partial<VersionMeta> = {
+      ...fabric1165,
+      libraries: [
+        { name: 'org.apache.logging.log4j:log4j-core:2.15.0', url: 'https://maven.example/' },
+        { name: 'org.lwjgl:lwjgl-glfw:3.3.1', url: 'https://maven.example/' },
+      ],
+    };
+    const names = mergeVersionMeta(vanilla1165, child).libraries.map((l) => l.name);
+
+    expect(names.filter((n) => n.includes(':log4j-core:'))).toEqual([
+      'org.apache.logging.log4j:log4j-core:2.15.0',
+    ]);
+    expect(names.filter((n) => n.startsWith('org.lwjgl:lwjgl-glfw:'))).toEqual([
+      'org.lwjgl:lwjgl-glfw:3.3.1',
+    ]);
+    // The module the loader said nothing about is untouched.
+    expect(names.filter((n) => n.startsWith('org.lwjgl:lwjgl:'))).toHaveLength(4);
+  });
+
+  it('does not drop a library the loader itself lists twice', () => {
+    // A loader profile is free to use the same per-OS shape Mojang does.
+    const child: Partial<VersionMeta> = {
+      ...fabric1165,
+      libraries: [...lwjglJars('lwjgl-openal')],
+    };
+    const openal = mergeVersionMeta(vanilla1165, child).libraries.filter((l) =>
+      l.name.startsWith('org.lwjgl:lwjgl-openal:'),
+    );
+    expect(openal.map((l) => l.rules)).toEqual([OSX_ONLY, NOT_OSX]);
   });
 });

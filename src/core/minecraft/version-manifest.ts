@@ -117,12 +117,12 @@ export async function getVersionMeta(versionId: string): Promise<VersionMeta> {
 // mainClass and extra arguments, and inherit everything else from the parent.
 
 /**
- * Dedupe key for libraries across the inheritance chain: `group:artifact` plus
- * the classifier when there is one.
+ * What a child's library has to share with a parent's to replace it:
+ * `group:artifact`, plus the classifier when there is one.
  *
  * The classifier matters — modern versions list one entry per OS
  * (`com.mojang:jtracy:1.0.37:natives-linux`, `…:natives-windows`, …). Keying on
- * `group:artifact` alone would keep whichever came first and silently drop the
+ * `group:artifact` alone would let a loader's copy of one of them displace the
  * natives for every other platform.
  */
 function libraryKey(name: string): string {
@@ -134,20 +134,28 @@ function libraryKey(name: string): string {
 /**
  * Merge a child version meta (loader profile) onto its parent (vanilla).
  *
- * Child wins for scalar fields it defines. Libraries are concatenated with the
- * child first — the loader's own copies of shared artifacts (ASM, Guava, ...)
- * must take precedence on the classpath — and deduped by `group:artifact`.
- * Arguments are parent-then-child so loader tweaks are applied last.
+ * Child wins for scalar fields it defines. Libraries are the child's first —
+ * the loader's own copies of shared artifacts (ASM, Guava, ...) must take
+ * precedence on the classpath — followed by every parent library the child does
+ * not define under the same {@link libraryKey}. Arguments are parent-then-child
+ * so loader tweaks are applied last.
+ *
+ * Only the child displaces. This used to drop a repeated key wherever it came
+ * from, parent against parent included, and Mojang repeats keys on purpose: from
+ * 1.13 to 1.18.2 every LWJGL module is listed up to four times — the macOS
+ * build, the build for everything else, and each of those again carrying its
+ * `natives` — told apart by `rules`, not by name. The first of the four is the
+ * macOS one, so that was the survivor, the rules then removed it on Linux and
+ * Windows, and every modded profile on those versions started with no LWJGL on
+ * the classpath at all. Vanilla never went through here and kept working.
  */
 export function mergeVersionMeta(parent: VersionMeta, child: Partial<VersionMeta>): VersionMeta {
-  const seen = new Set<string>();
-  const libraries: VersionMeta['libraries'] = [];
-  for (const lib of [...(child.libraries ?? []), ...parent.libraries]) {
-    const key = libraryKey(lib.name);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    libraries.push(lib);
-  }
+  const own = child.libraries ?? [];
+  const replaced = new Set(own.map((lib) => libraryKey(lib.name)));
+  const libraries: VersionMeta['libraries'] = [
+    ...own,
+    ...parent.libraries.filter((lib) => !replaced.has(libraryKey(lib.name))),
+  ];
 
   const merged: VersionMeta = {
     ...parent,
