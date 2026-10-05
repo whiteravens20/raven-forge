@@ -84,6 +84,27 @@ describe('loadSettings', () => {
     expect((await fs.readdir(root)).some((f) => f.includes('.broken-'))).toBe(true);
   });
 
+  it('keeps a stored trusted key the verifier cannot use, and the file with it', async () => {
+    // Builds before the key check stored whatever was pasted into the form. Such
+    // a key verifies nothing and still switches enforcement on; dropping it on
+    // the way in would switch enforcement off with nobody having asked, and
+    // refusing it would move the whole file aside.
+    const cutShort = {
+      name: 'Cut short',
+      publicKey: 'MCowBQYDK2VwAyEA',
+      addedAt: '2026-01-01T00:00:00.000Z',
+    };
+    await fs.writeFile(
+      settingsFile(),
+      JSON.stringify({ ...DEFAULT_SETTINGS, theme: 'light', trustedPublicKeys: [cutShort] }),
+    );
+    const { loadSettings } = await loadModule();
+    const settings = await loadSettings();
+    expect(settings.theme).toBe('light');
+    expect(settings.trustedPublicKeys).toEqual([cutShort]);
+    expect((await fs.readdir(root)).some((f) => f.includes('.broken-'))).toBe(false);
+  });
+
   it.skipIf(asRoot)('does not overwrite a file nobody could read', async () => {
     // Unreadable is not the same as absent. A permissions problem answered by
     // writing defaults is a permissions problem that eats the settings.

@@ -1,0 +1,154 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import nacl from 'tweetnacl';
+import { encodeBase64 } from 'tweetnacl-util';
+import { WHITE_RAVENS_PUBLIC_KEY } from '../src/shared/branding';
+import type { GlobalSettings, IpcResult } from '../src/shared/ipc-types';
+
+/**
+ * What a handler answers, asked the way the renderer asks it.
+ *
+ * `ipc-contract.test.ts` settles that every channel has a handler. This is for
+ * the handlers that decide something themselves rather than passing a call
+ * straight through — where the decision lives in neither `src/core/` nor the
+ * renderer, and so is covered by the tests of neither.
+ */
+
+type Listener = (event: unknown, ...args: unknown[]) => unknown;
+
+const { handlers, mainFrame } = vi.hoisted(() => ({
+  handlers: new Map<string, Listener>(),
+  mainFrame: {},
+}));
+
+let root: string;
+
+vi.mock('electron', () => ({
+  app: {
+    getPath: () => path.join(root, 'userData'),
+    getVersion: () => '0.0.0-test',
+    isPackaged: false,
+  },
+  ipcMain: {
+    handle: (channel: string, listener: Listener) => handlers.set(channel, listener),
+  },
+  dialog: {},
+  shell: { openExternal: () => Promise.resolve(), openPath: () => Promise.resolve('') },
+  session: { defaultSession: { setProxy: () => Promise.resolve() } },
+  safeStorage: { isEncryptionAvailable: () => false },
+  BrowserWindow: class {},
+}));
+
+vi.mock('../src/main/logger', () => ({
+  log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
+}));
+
+// The sender guard wants a window whose main frame the call came from.
+vi.mock('../src/main/window', () => ({
+  getMainWindow: () => ({
+    isDestroyed: () => false,
+    webContents: { mainFrame, send: () => {} },
+  }),
+}));
+
+/** Invoke a channel as the launcher's own page would. */
+function call<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
+  const listener = handlers.get(channel);
+  if (!listener) throw new Error(`No handler registered for ${channel}`);
+  return Promise.resolve(listener({ senderFrame: mainFrame }, ...args)) as Promise<IpcResult<T>>;
+}
+
+beforeEach(async () => {
+  root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-handlers-'));
+  process.env.RAVENFORGE_DATA_DIR = path.join(root, 'data');
+  await fs.mkdir(process.env.RAVENFORGE_DATA_DIR, { recursive: true });
+
+  vi.resetModules();
+  handlers.clear();
+  const { reloadDataRoot } = await import('../src/core/config/data-root');
+  reloadDataRoot();
+  const { registerAllIpcHandlers } = await import('../src/main/ipc-handlers');
+  registerAllIpcHandlers();
+});
+
+afterEach(async () => {
+  delete process.env.RAVENFORGE_DATA_DIR;
+  await fs.rm(root, { recursive: true, force: true });
+});
+
+describe('settings:add-trusted-key', () => {
+  const key = (publicKey: string, name = 'Raven SMP') => ({
+    name,
+    publicKey,
+    addedAt: '2026-01-01T00:00:00.000Z',
+  });
+  const real = () => encodeBase64(nacl.sign.keyPair().publicKey);
+
+  it('stores a real key and answers with the settings that now hold it', async () => {
+    const added = key(real());
+    const result = await call<GlobalSettings>('settings:add-trusted-key', added);
+    expect(result.success).toBe(true);
+    expect(result.data?.trustedPublicKeys).toEqual([added]);
+
+    // And it is what a later read finds, so the renderer need not save it again.
+    const stored = await call<GlobalSettings>('settings:get');
+    expect(stored.data?.trustedPublicKeys).toEqual([added]);
+  });
+
+  it('refuses something that is not a key, and stores nothing', async () => {
+    // Stored, it could verify nothing and would still switch enforcement on:
+    // every third-party manifest refused from then on.
+    for (const wrong of ['not-a-key', 'MCowBQYDK2VwAyEA', real().slice(0, 20)]) {
+      const result = await call<GlobalSettings>('settings:add-trusted-key', key(wrong));
+      expect(result.success, wrong).toBe(false);
+      expect(result.error).toMatch(/not an Ed25519 public key/);
+    }
+    expect((await call<GlobalSettings>('settings:get')).data?.trustedPublicKeys).toEqual([]);
+  });
+
+  it('refuses a key that is already there', async () => {
+    const added = key(real());
+    await call('settings:add-trusted-key', added);
+    const again = await call<GlobalSettings>(
+      'settings:add-trusted-key',
+      key(added.publicKey, 'Twice'),
+    );
+    expect(again.success).toBe(false);
+    expect((await call<GlobalSettings>('settings:get')).data?.trustedPublicKeys).toEqual([added]);
+  });
+
+  it('refuses the built-in key, which the list would hide and never let go of', async () => {
+    const result = await call<GlobalSettings>(
+      'settings:add-trusted-key',
+      key(WHITE_RAVENS_PUBLIC_KEY),
+    );
+    expect(result.success).toBe(false);
+    expect((await call<GlobalSettings>('settings:get')).data?.trustedPublicKeys).toEqual([]);
+  });
+
+  it('does not report a key with no name as stored', async () => {
+    const result = await call<GlobalSettings>('settings:add-trusted-key', key(real(), ''));
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('settings:remove-trusted-key', () => {
+  it('answers with the settings that are left', async () => {
+    const kept = {
+      name: 'Kept',
+      publicKey: encodeBase64(nacl.sign.keyPair().publicKey),
+      addedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const gone = { ...kept, name: 'Gone', publicKey: encodeBase64(nacl.sign.keyPair().publicKey) };
+    await call('settings:add-trusted-key', kept);
+    await call('settings:add-trusted-key', gone);
+
+    const result = await call<GlobalSettings>('settings:remove-trusted-key', gone.publicKey);
+    expect(result.success).toBe(true);
+    expect(result.data?.trustedPublicKeys).toEqual([kept]);
+  });
+});

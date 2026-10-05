@@ -13,12 +13,8 @@ import { StorageMap } from '@components/StorageMap';
 import { Spinner } from '@components/ui/Spinner';
 import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
 import { isBuiltInKey, trustedKeyRing } from '@shared/branding';
-import type {
-  ThemeMode,
-  LauncherBehaviorOnLaunch,
-  TrustedKey,
-  UpdateCheck,
-} from '@shared/ipc-types';
+import { EXAMPLE_PUBLIC_KEY, isEd25519PublicKey } from '@shared/trusted-key';
+import type { ThemeMode, LauncherBehaviorOnLaunch, UpdateCheck } from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
@@ -44,10 +40,16 @@ export function SettingsPage() {
   ];
   const update = useSettingsStore((s) => s.update);
   const reset = useSettingsStore((s) => s.reset);
+  const addTrustedKey = useSettingsStore((s) => s.addTrustedKey);
+  const removeTrustedKey = useSettingsStore((s) => s.removeTrustedKey);
   const refreshFeeds = useNewsStore((s) => s.refresh);
 
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyValue, setNewKeyValue] = useState('');
+  /** Why the key in the form was not added. */
+  const [keyError, setKeyError] = useState<string | null>(null);
+  /** Why a key on the list is still there. */
+  const [keyListError, setKeyListError] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
 
   if (!settings) {
@@ -58,28 +60,33 @@ export function SettingsPage() {
     );
   }
 
-  const addTrustedKey = async () => {
-    if (!newKeyName.trim() || !newKeyValue.trim()) return;
-    const key: TrustedKey = {
-      name: newKeyName.trim(),
-      publicKey: newKeyValue.trim(),
-      addedAt: new Date().toISOString(),
-    };
-    const result = await api.settings.addTrustedKey(key);
-    if (result.success) {
-      await update({ trustedPublicKeys: [...settings.trustedPublicKeys, key] });
-      setNewKeyName('');
-      setNewKeyValue('');
-    } else {
-      alert(result.error ?? t('settings.trustedKeyFailed'));
+  const handleAddKey = async () => {
+    const name = newKeyName.trim();
+    const publicKey = newKeyValue.trim();
+    if (!name || !publicKey) return;
+    // Both refused here first, in the player's language. The main process
+    // checks the same two things and can only say so in English.
+    if (!isEd25519PublicKey(publicKey)) {
+      setKeyError(t('settings.trustedKeyInvalid'));
+      return;
     }
+    if (trustedKeyRing(settings.trustedPublicKeys).some((k) => k.publicKey === publicKey)) {
+      setKeyError(t('settings.trustedKeyDuplicate'));
+      return;
+    }
+    const failure = await addTrustedKey({ name, publicKey, addedAt: new Date().toISOString() });
+    if (failure !== null) {
+      setKeyError(failure || t('settings.trustedKeyFailed'));
+      return;
+    }
+    setKeyError(null);
+    setNewKeyName('');
+    setNewKeyValue('');
   };
 
-  const removeTrustedKey = async (publicKey: string) => {
-    await api.settings.removeTrustedKey(publicKey);
-    await update({
-      trustedPublicKeys: settings.trustedPublicKeys.filter((k) => k.publicKey !== publicKey),
-    });
+  const handleRemoveKey = async (publicKey: string) => {
+    const failure = await removeTrustedKey(publicKey);
+    setKeyListError(failure === null ? null : failure || t('settings.trustedKeyRemoveFailed'));
   };
 
   return (
@@ -183,6 +190,10 @@ export function SettingsPage() {
         <div className="space-y-2">
           {trustedKeyRing(settings.trustedPublicKeys).map((key) => {
             const builtIn = isBuiltInKey(key.publicKey);
+            // Only a key stored before the form checked them can be one of
+            // these, and it is kept until the player removes it — see
+            // `trustedKeySchema`.
+            const unusable = !isEd25519PublicKey(key.publicKey);
             return (
               <div
                 key={key.publicKey}
@@ -200,18 +211,28 @@ export function SettingsPage() {
                           date: new Date(key.addedAt).toLocaleDateString(locale),
                         })}
                   </p>
+                  {unusable && (
+                    <p className="mt-1 text-xs text-rf-danger">
+                      {t('settings.trustedKeyUnusable')}
+                    </p>
+                  )}
                 </div>
                 {!builtIn && (
                   <Button
                     variant="danger"
                     size="sm"
                     icon={<Trash2 size={12} />}
-                    onClick={() => removeTrustedKey(key.publicKey)}
+                    onClick={() => void handleRemoveKey(key.publicKey)}
                   />
                 )}
               </div>
             );
           })}
+          {keyListError && (
+            <p role="alert" className="text-xs text-rf-danger">
+              {keyListError}
+            </p>
+          )}
         </div>
 
         <CheckboxRow
@@ -225,19 +246,26 @@ export function SettingsPage() {
           <Input
             label={t('settings.trustedKeyName')}
             value={newKeyName}
-            onChange={(e) => setNewKeyName(e.target.value)}
+            onChange={(e) => {
+              setNewKeyName(e.target.value);
+              setKeyError(null);
+            }}
             placeholder={t('settings.trustedKeyNamePlaceholder')}
           />
           <Input
             label={t('settings.trustedKeyValue')}
             value={newKeyValue}
-            onChange={(e) => setNewKeyValue(e.target.value)}
-            placeholder="MCowBQYDK2VwAyEA..."
+            onChange={(e) => {
+              setNewKeyValue(e.target.value);
+              setKeyError(null);
+            }}
+            placeholder={EXAMPLE_PUBLIC_KEY}
+            error={keyError ?? undefined}
           />
           <div className="col-span-2">
             <Button
               icon={<Plus size={14} />}
-              onClick={addTrustedKey}
+              onClick={() => void handleAddKey()}
               disabled={!newKeyName.trim() || !newKeyValue.trim()}
             >
               {t('settings.trustedKeyAdd')}

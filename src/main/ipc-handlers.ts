@@ -100,6 +100,8 @@ import type {
 } from '../shared/ipc-types';
 import { AuthServersUnreachableError } from '../core/auth/auth-errors';
 import { launchRefusal } from '../core/minecraft/launch-errors';
+import { trustedKeyRing } from '../shared/branding';
+import { isEd25519PublicKey } from '../shared/trusted-key';
 
 /** Log tail limits — enough to diagnose a crash, small enough to ship over IPC. */
 const LOG_TAIL_DEFAULT_LINES = 500;
@@ -329,13 +331,24 @@ export function registerAllIpcHandlers(): void {
   });
   handle('settings:add-trusted-key', async (_event, key: TrustedKey) => {
     try {
+      // The schema does not ask this: it reads back keys stored before anything
+      // checked them, and has to take those as they are.
+      if (!isEd25519PublicKey(key.publicKey)) {
+        return fail('That is not an Ed25519 public key — it has to be 32 bytes in base64');
+      }
       const settings = await getSettings();
-      const exists = settings.trustedPublicKeys.some((k) => k.publicKey === key.publicKey);
-      if (exists) return fail('Key already exists');
-      await updateSettings({
-        trustedPublicKeys: [...settings.trustedPublicKeys, key],
-      });
-      return ok(undefined);
+      // Against the whole ring, built-in key included. Stored a second time,
+      // that one would switch enforcement on from an entry the list hides and
+      // offers no button to remove.
+      const exists = trustedKeyRing(settings.trustedPublicKeys).some(
+        (k) => k.publicKey === key.publicKey,
+      );
+      if (exists) return fail('That key is already trusted');
+      return ok(
+        await updateSettings({
+          trustedPublicKeys: [...settings.trustedPublicKeys, key],
+        }),
+      );
     } catch (err) {
       return fail(`Failed to add trusted key: ${reason(err)}`);
     }
@@ -343,10 +356,11 @@ export function registerAllIpcHandlers(): void {
   handle('settings:remove-trusted-key', async (_event, publicKey: string) => {
     try {
       const settings = await getSettings();
-      await updateSettings({
-        trustedPublicKeys: settings.trustedPublicKeys.filter((k) => k.publicKey !== publicKey),
-      });
-      return ok(undefined);
+      return ok(
+        await updateSettings({
+          trustedPublicKeys: settings.trustedPublicKeys.filter((k) => k.publicKey !== publicKey),
+        }),
+      );
     } catch (err) {
       return fail(`Failed to remove trusted key: ${reason(err)}`);
     }

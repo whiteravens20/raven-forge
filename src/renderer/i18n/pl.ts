@@ -563,6 +563,12 @@ export const pl: Translations = {
   'settings.trustedKeyValue': 'Klucz publiczny (base64)',
   'settings.trustedKeyAdd': 'Dodaj klucz',
   'settings.trustedKeyFailed': 'Nie udało się dodać klucza',
+  'settings.trustedKeyInvalid':
+    'To nie jest klucz publiczny Ed25519. Taki klucz to 32 bajty w base64: 44 znaki, z których ostatni to „=”. Blok PEM albo klucz w postaci eksportowanej przez OpenSSL to dłuższy format i nie zadziała.',
+  'settings.trustedKeyDuplicate': 'Ten klucz jest już na liście.',
+  'settings.trustedKeyUnusable':
+    'To nie jest klucz publiczny Ed25519: niczego nie zweryfikuje, a będąc na liście i tak włącza wymaganie podpisu. Usuń go.',
+  'settings.trustedKeyRemoveFailed': 'Nie udało się usunąć klucza',
   'settings.dataFolder': 'Folder danych',
   'settings.dataFolderHint':
     'Profile, mody, pliki gry, pobrane wersje Javy, logi i raporty z awarii. Po instalacji paczki to kilka gigabajtów. Pełna lista z rozmiarami jest poniżej.',

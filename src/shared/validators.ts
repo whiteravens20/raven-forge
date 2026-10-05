@@ -52,6 +52,18 @@ export function assertSecureContentUrl(value: string): void {
   }
 }
 
+/**
+ * A trusted key as it is stored — which is looser than a key that can be added.
+ *
+ * `settings:add-trusted-key` takes only a key the verifier can use
+ * (`isEd25519PublicKey`). This shape reads back what is already in
+ * `settings.json`, and builds before that check stored whatever was pasted into
+ * the form. Such an entry verifies nothing, and its presence still switches
+ * enforcement on, so every third-party manifest is refused. It is kept as it
+ * is, and the Settings page says what is wrong with it: leaving it out on the
+ * way in would turn enforcement off behind the back of the person who had
+ * turned it on, and refusing it here would move the whole file aside.
+ */
 const trustedKeySchema = z.object({
   name: z.string().min(1),
   publicKey: z.string().min(1),

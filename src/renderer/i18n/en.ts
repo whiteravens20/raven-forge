@@ -533,6 +533,12 @@ export const en = {
   'settings.trustedKeyValue': 'Public key (base64)',
   'settings.trustedKeyAdd': 'Add key',
   'settings.trustedKeyFailed': 'Could not add the key',
+  'settings.trustedKeyInvalid':
+    'That is not an Ed25519 public key. One is 32 bytes in base64: 44 characters, the last of them “=”. A PEM block, or a key as OpenSSL exports it, is a longer format and will not work.',
+  'settings.trustedKeyDuplicate': 'That key is already on the list.',
+  'settings.trustedKeyUnusable':
+    'Not an Ed25519 public key: it can verify nothing, and being on the list it still makes a signature required. Remove it.',
+  'settings.trustedKeyRemoveFailed': 'Could not remove the key',
   'settings.dataFolder': 'Data folder',
   'settings.dataFolderHint':
     'Profiles, mods, game files, downloaded Java runtimes, logs and crash reports. Several gigabytes once a pack is installed. The full list, with sizes, is below.',

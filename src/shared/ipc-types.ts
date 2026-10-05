@@ -264,8 +264,12 @@ export interface InvokeChannels {
   'settings:get': () => Promise<IpcResult<GlobalSettings>>;
   'settings:update': (updates: Partial<GlobalSettings>) => Promise<IpcResult<GlobalSettings>>;
   'settings:reset': () => Promise<IpcResult<GlobalSettings>>;
-  'settings:add-trusted-key': (key: TrustedKey) => Promise<IpcResult<void>>;
-  'settings:remove-trusted-key': (publicKey: string) => Promise<IpcResult<void>>;
+  /**
+   * Both answer with the settings as they now stand, so the renderer has
+   * nothing left to save: it used to write the same list back a second time.
+   */
+  'settings:add-trusted-key': (key: TrustedKey) => Promise<IpcResult<GlobalSettings>>;
+  'settings:remove-trusted-key': (publicKey: string) => Promise<IpcResult<GlobalSettings>>;
   'settings:get-data-root': () => Promise<IpcResult<DataRootInfo>>;
   /** Opens a directory picker; `null` when it was dismissed. */
   'settings:choose-data-root': () => Promise<IpcResult<DataRootPlan | null>>;
