@@ -308,6 +308,53 @@ describe.skipIf(!posix)('a launch', () => {
       { level: 'info', message: '[12:00:01] [main/INFO]: Stopping!' },
     ]);
   });
+
+  it('puts back together a line the pipe delivered in two pieces', async () => {
+    // A pipe is read whenever there is something in it, which is not the same
+    // as whenever a line has ended. The second piece used to become a line of
+    // its own, with no level on it.
+    await launch(
+      [
+        `printf '[12:00:00] [main/ERROR]: first half,'`,
+        'sleep 0.2',
+        `printf ' second half\\n'`,
+        'exit 0',
+      ].join('\n'),
+    );
+    await exitInfo();
+
+    expect(gameLines().map(({ level, message }) => ({ level, message }))).toEqual([
+      { level: 'error', message: '[12:00:00] [main/ERROR]: first half, second half' },
+    ]);
+  });
+
+  it('puts back together a character the pipe delivered in two pieces', async () => {
+    // `ż` is two bytes. Decoded one chunk at a time, each of them is U+FFFD.
+    await launch(
+      [
+        `printf 'za\\305'`,
+        'sleep 0.2',
+        `printf '\\274\\303\\263\\305\\202\\304\\207 g\\304\\231\\305\\233l\\304\\205\\n'`,
+        'exit 0',
+      ].join('\n'),
+    );
+    await exitInfo();
+
+    expect(gameLines().map((line) => line.message)).toEqual(['zażółć gęślą']);
+  });
+
+  it('reads the line endings Windows writes', async () => {
+    await launch([`printf 'one\\r\\ntwo\\r\\n'`, 'exit 0'].join('\n'));
+    await exitInfo();
+
+    expect(gameLines().map((line) => line.message)).toEqual(['one', 'two']);
+  });
+
+  it('keeps the last thing a dying game said, though it never finished the line', async () => {
+    await launch([`printf 'java.lang.OutOfMemoryError: Java heap space'`, 'exit 1'].join('\n'));
+
+    expect((await exitInfo()).logTail).toEqual(['java.lang.OutOfMemoryError: Java heap space']);
+  });
 });
 
 /**

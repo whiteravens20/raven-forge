@@ -4,6 +4,8 @@ import { app } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import readline from 'node:readline';
+import type { Readable } from 'node:stream';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { getMainWindow } from '../../main/window';
@@ -530,25 +532,21 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
       break;
   }
 
-  child.stdout?.on('data', (data: Buffer) => {
-    const lines = data.toString().split(/\r?\n/);
-    for (const line of lines) {
-      if (line) {
-        log.info(`[MC:${profile.name}] ${line}`);
-        emitLogLine(profile.id, line);
-      }
-    }
-  });
-
-  child.stderr?.on('data', (data: Buffer) => {
-    const lines = data.toString().split(/\r?\n/);
-    for (const line of lines) {
-      if (line) {
-        log.warn(`[MC:${profile.name}] ${line}`);
-        emitLogLine(profile.id, line);
-      }
-    }
-  });
+  // Read as lines, not as chunks. A pipe hands over whatever has arrived, so a
+  // chunk ends wherever it happens to — mid-line, and mid-character for anything
+  // outside ASCII. Splitting each chunk on its own made two lines out of one,
+  // the second without the level tag `detectLogLevel` reads, and turned the two
+  // halves of a split `ż` into replacement characters.
+  const passOn = (stream: Readable | null, record: (text: string) => void) => {
+    if (!stream) return;
+    readline.createInterface({ input: stream, crlfDelay: Infinity }).on('line', (line) => {
+      if (!line) return;
+      record(`[MC:${profile.name}] ${line}`);
+      emitLogLine(profile.id, line);
+    });
+  };
+  passOn(child.stdout, (text) => log.info(text));
+  passOn(child.stderr, (text) => log.warn(text));
 
   child.on('exit', (code, signal) => {
     void (async () => {
