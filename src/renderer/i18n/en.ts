@@ -103,7 +103,6 @@ export const en = {
   'common.remove': 'Remove',
   'common.delete': 'Delete',
   'common.edit': 'Edit',
-  'common.duplicate': 'Duplicate',
   'common.export': 'Export',
   'common.import': 'Import',
   'common.back': 'Back',
@@ -197,6 +196,10 @@ export const en = {
   'profiles.emptyHint': 'Add your first profile with the + button',
   'profiles.pickOrCreate': 'Select a profile, or create a new one',
   'profiles.copyName': '{name} (copy)',
+  'profiles.duplicate': 'Duplicate, with its mods, settings and worlds',
+  'profiles.duplicated':
+    'The copy has the same mods, configs, shaders, resource packs and worlds as the original. The world backups stay with the original.',
+  'profiles.duplicateFailed': 'Could not duplicate the profile.',
   'profiles.openFolder': 'Open profile folder',
   'profiles.exportPack': 'Export as a modpack (.mrpack)',
   'profiles.exportPackFailed': 'Could not export that profile as a pack.',

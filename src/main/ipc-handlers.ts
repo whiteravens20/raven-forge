@@ -573,6 +573,11 @@ export function registerAllIpcHandlers(): void {
   });
   handle('profiles:duplicate', async (_event, profileId: string, name?: string) => {
     try {
+      // The copy takes the worlds, and a world the game has open copies as a
+      // half-written region file.
+      if (isGameRunning(profileId)) {
+        return fail('Close the game first — its worlds cannot be copied while it is open.');
+      }
       return ok(await duplicateProfile(profileId, name));
     } catch (err) {
       return fail(`Failed to duplicate profile: ${reason(err)}`);

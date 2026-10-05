@@ -137,6 +137,9 @@ export function ProfilesPage() {
   const updateProfile = useProfileStore((s) => s.update);
   const removeProfile = useProfileStore((s) => s.remove);
   const duplicateProfile = useProfileStore((s) => s.duplicate);
+  const duplicating = useProfileStore((s) =>
+    s.selectedProfileId ? s.duplicating.has(s.selectedProfileId) : false,
+  );
   const reload = useProfileStore((s) => s.load);
 
   const t = useT();
@@ -316,6 +319,20 @@ export function ProfilesPage() {
     }
   };
 
+  const handleDuplicate = async () => {
+    if (!selectedProfile) return;
+    setActionError(null);
+    setNotice(null);
+    const r = await duplicateProfile(
+      selectedProfile.id,
+      t('profiles.copyName', { name: selectedProfile.name }),
+    );
+    // Said either way: the copy is everything but the world backups, and
+    // whoever goes looking for those in it should not conclude they were lost.
+    if (r.success) setNotice(t('profiles.duplicated'));
+    else setActionError(r.error ?? t('profiles.duplicateFailed'));
+  };
+
   const handleExport = async () => {
     if (!selectedId) return;
     const r = await api.profiles.export(selectedId);
@@ -442,7 +459,9 @@ export function ProfilesPage() {
             seen by the person who caused it. */}
         {actionError && (
           <div className="mx-auto mb-4 max-w-2xl">
-            <Banner type="urgent">{actionError}</Banner>
+            <Banner type="urgent" dismissible onDismiss={() => setActionError(null)}>
+              {actionError}
+            </Banner>
           </div>
         )}
         {notice && (
@@ -492,12 +511,8 @@ export function ProfilesPage() {
             syncing={syncing}
             onCancelSync={handleCancelSync}
             onEdit={startEdit}
-            onDuplicate={() =>
-              duplicateProfile(
-                selectedProfile.id,
-                t('profiles.copyName', { name: selectedProfile.name }),
-              )
-            }
+            onDuplicate={() => void handleDuplicate()}
+            duplicating={duplicating}
             onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
             onExportPack={handleExportPack}
@@ -580,6 +595,7 @@ interface DetailProps {
   onCancelSync: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
+  duplicating: boolean;
   onDelete: () => void;
   onExport: () => void;
   onExportPack: () => void;
@@ -599,6 +615,7 @@ function ProfileDetail({
   onCancelSync,
   onEdit,
   onDuplicate,
+  duplicating,
   onDelete,
   onExport,
   onExportPack,
@@ -629,8 +646,9 @@ function ProfileDetail({
             variant="ghost"
             size="sm"
             icon={<Copy size={14} />}
+            loading={duplicating}
             onClick={onDuplicate}
-            title={t('common.duplicate')}
+            title={t('profiles.duplicate')}
           />
           <Button
             variant="ghost"

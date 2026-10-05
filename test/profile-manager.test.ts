@@ -366,6 +366,103 @@ describe('duplicateProfile', () => {
     const created = await mgr.createProfile(newProfile('Ravens'));
     expect((await mgr.duplicateProfile(created.id, '   ')).name).toBe('Ravens (copy)');
   });
+
+  /** Write a file somewhere under a profile's directory, making the way to it. */
+  async function put(profileId: string, relative: string, content = relative): Promise<void> {
+    const file = path.join(root, 'profiles', profileId, relative);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, content);
+  }
+
+  const has = (profileId: string, relative: string) =>
+    fs.stat(path.join(root, 'profiles', profileId, relative)).then(
+      () => true,
+      () => false,
+    );
+
+  it('copies what the profile is made of', async () => {
+    // It used to copy the record alone: a profile with a hundred mods came back
+    // as an empty one of the same name.
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    const kept = [
+      'installed.lock',
+      'shaders.lock',
+      '.minecraft/mods/sodium.jar',
+      '.minecraft/mods/off.jar.disabled',
+      '.minecraft/config/sodium-options.json',
+      '.minecraft/resourcepacks/faithful.zip',
+      '.minecraft/shaderpacks/complementary.zip',
+      '.minecraft/options.txt',
+      '.minecraft/saves/New World/level.dat',
+      '.minecraft/saves/New World/region/r.0.0.mca',
+    ];
+    for (const file of kept) await put(created.id, file);
+
+    const copy = await mgr.duplicateProfile(created.id, 'Ravens (copy)');
+    for (const file of kept) {
+      expect(await has(copy.id, file), file).toBe(true);
+      expect(
+        await fs.readFile(path.join(root, 'profiles', copy.id, file), 'utf-8'),
+        `${file} holds what the original held`,
+      ).toBe(file);
+    }
+  });
+
+  it('leaves the world backups and the game logs with the original', async () => {
+    // The backups are copies already, of the original's worlds on another day.
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    const left = [
+      'backups/2026-01-01T00-00-00-000/saves/New World/level.dat',
+      '.minecraft/logs/latest.log',
+      '.minecraft/crash-reports/crash-2026-01-01.txt',
+    ];
+    for (const file of left) await put(created.id, file);
+    await put(created.id, '.minecraft/mods/sodium.jar');
+
+    const copy = await mgr.duplicateProfile(created.id, 'Ravens (copy)');
+    for (const file of left) {
+      expect(await has(copy.id, file), file).toBe(false);
+      expect(await has(created.id, file), `${file} is still the original's`).toBe(true);
+    }
+    expect(await has(copy.id, '.minecraft/mods/sodium.jar')).toBe(true);
+  });
+
+  it('gives the copy an image of its own', async () => {
+    // The copy used to show the original's file, and lost it the day the
+    // original was deleted.
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    await put(created.id, 'icon.png', 'png');
+    await mgr.updateProfile(created.id, { iconPath: 'icon.png' });
+
+    const copy = await mgr.duplicateProfile(created.id, 'Ravens (copy)');
+    expect(copy.iconPath).toBe('icon.png');
+    expect(await has(copy.id, 'icon.png')).toBe(true);
+
+    await mgr.deleteProfile(created.id, true);
+    expect(await has(copy.id, 'icon.png')).toBe(true);
+  });
+
+  it('still copies the settings of a profile whose directory is gone', async () => {
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    await fs.rm(path.join(root, 'profiles', created.id), { recursive: true, force: true });
+    await expect(mgr.duplicateProfile(created.id, 'Ravens (copy)')).resolves.toMatchObject({
+      name: 'Ravens (copy)',
+    });
+  });
+
+  it.skipIf(asRoot)('leaves no half-made profile behind when the copy fails', async () => {
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    await put(created.id, '.minecraft/mods/a.jar');
+    await put(created.id, '.minecraft/mods/unreadable.jar');
+    const unreadable = path.join(root, 'profiles', created.id, '.minecraft/mods/unreadable.jar');
+    await fs.chmod(unreadable, 0o000);
+
+    await expect(mgr.duplicateProfile(created.id, 'Ravens (copy)')).rejects.toThrow();
+
+    await fs.chmod(unreadable, 0o600);
+    expect((await mgr.getAllProfiles()).map((p) => p.name)).toEqual(['Ravens']);
+    expect(await fs.readdir(path.join(root, 'profiles'))).toEqual([created.id]);
+  });
 });
 
 describe('exportProfile', () => {

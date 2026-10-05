@@ -92,7 +92,6 @@ export const pl: Translations = {
   'common.remove': 'Usuń',
   'common.delete': 'Usuń',
   'common.edit': 'Edytuj',
-  'common.duplicate': 'Duplikuj',
   'common.export': 'Eksportuj',
   'common.import': 'Importuj',
   'common.back': 'Wstecz',
@@ -189,6 +188,10 @@ export const pl: Translations = {
   'profiles.emptyHint': 'Dodaj pierwszy profil przyciskiem +',
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
   'profiles.copyName': '{name} (kopia)',
+  'profiles.duplicate': 'Duplikuj razem z modami, ustawieniami i światami',
+  'profiles.duplicated':
+    'Kopia ma te same mody, konfiguracje, shadery, paczki zasobów i światy co oryginał. Kopie zapasowe światów zostały przy oryginale.',
+  'profiles.duplicateFailed': 'Nie udało się zduplikować profilu.',
   'profiles.openFolder': 'Otwórz folder profilu',
   'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
   'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',

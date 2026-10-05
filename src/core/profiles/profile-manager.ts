@@ -368,7 +368,27 @@ export async function recordPlaySession(profileId: string, playTimeMinutes: numb
 }
 
 /**
+ * What a copy of a profile does not take with it, relative to the profile's
+ * directory.
+ *
+ * The world backups are copies already, and of the original's worlds as they
+ * were on some other day; taken along they would double the largest thing in
+ * the profile for nothing. The other two are the game's diagnostics about
+ * sessions the copy never played.
+ */
+const NOT_DUPLICATED = new Set([
+  'backups',
+  path.join('.minecraft', 'logs'),
+  path.join('.minecraft', 'crash-reports'),
+]);
+
+/**
  * Copy a profile, under a name the caller chooses.
+ *
+ * The files as well as the record: mods, configs, resource packs, shaders,
+ * worlds and the profile's own image. This used to copy only the entry in
+ * `profiles.json`, so "Duplicate" on a profile somebody had spent an evening
+ * building answered with an empty one of the same name.
  *
  * The name is a parameter because it is *persisted*. It used to be built here
  * as `${name} (kopia)` — Polish, baked into `profiles.json`, where switching
@@ -381,12 +401,30 @@ export async function duplicateProfile(profileId: string, name?: string): Promis
   if (!source) throw new Error(`Profile ${profileId} not found`);
 
   const { id: _id, createdAt: _ca, updatedAt: _ua, ...data } = source;
-  return createProfile({
+  const copy = await createProfile({
     ...data,
     name: name?.trim() || `${source.name} (copy)`,
     lastPlayed: undefined,
     totalPlayTimeMinutes: undefined,
   });
+
+  const from = paths.profileDir(source.id);
+  try {
+    // A profile whose directory was removed by hand still has settings worth
+    // copying, and nothing else to copy.
+    if ((await listDir(from)).length > 0) {
+      await fs.cp(from, paths.profileDir(copy.id), {
+        recursive: true,
+        filter: (entry) => !NOT_DUPLICATED.has(path.relative(from, entry)),
+      });
+    }
+    return copy;
+  } catch (err) {
+    // A copy that stopped part-way is a profile that looks whole and is
+    // missing whichever mods had not been reached. Better none than that one.
+    await deleteProfile(copy.id).catch(() => undefined);
+    throw err;
+  }
 }
 
 /**

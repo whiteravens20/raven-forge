@@ -1,7 +1,7 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { create } from 'zustand';
-import type { Profile } from '@shared/ipc-types';
+import type { IpcResult, Profile } from '@shared/ipc-types';
 
 const api = window.ravenforge;
 
@@ -16,13 +16,22 @@ interface ProfileStore {
   update: (profileId: string, updates: Partial<Profile>) => Promise<void>;
   /** `deleteFiles: false` unlists the profile but leaves its directory intact. */
   remove: (profileId: string, deleteFiles: boolean) => Promise<void>;
-  duplicate: (profileId: string, name?: string) => Promise<void>;
+  /**
+   * Profiles being copied right now, by the id of the original.
+   *
+   * Kept here and not in the page, because a copy carries the profile's mods
+   * and takes as long as they do: leaving the page and coming back used to find
+   * the button idle again, and a second press made a second copy.
+   */
+  duplicating: Set<string>;
+  duplicate: (profileId: string, name?: string) => Promise<IpcResult<Profile>>;
 }
 
 export const useProfileStore = create<ProfileStore>((set, get) => ({
   profiles: [],
   selectedProfileId: null,
   loading: false,
+  duplicating: new Set(),
 
   load: async () => {
     set({ loading: true });
@@ -67,10 +76,20 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   },
 
   duplicate: async (profileId, name) => {
-    const result = await api.profiles.duplicate(profileId, name);
-    if (result.success && result.data) {
-      await get().load();
-      set({ selectedProfileId: result.data.id });
+    set((state) => ({ duplicating: new Set(state.duplicating).add(profileId) }));
+    try {
+      const result = await api.profiles.duplicate(profileId, name);
+      if (result.success && result.data) {
+        await get().load();
+        set({ selectedProfileId: result.data.id });
+      }
+      return result;
+    } finally {
+      set((state) => {
+        const next = new Set(state.duplicating);
+        next.delete(profileId);
+        return { duplicating: next };
+      });
     }
   },
 }));
