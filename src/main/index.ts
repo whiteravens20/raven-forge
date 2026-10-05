@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import { initLogger, log } from './logger';
 import { establishAppHome } from './home';
 import type { AppHome } from '../core/config/app-home';
@@ -84,6 +84,16 @@ function registerAppLifecycle(home: AppHome): void {
     // After the logger and before anything that can throw: these exist to write
     // to the log, so registering them earlier would only lose what they caught.
     registerCrashHandlers();
+
+    // No spell checking. The launcher has a handful of one-line fields, and on
+    // Linux the checker fetches a dictionary for the system's language from a
+    // Google address the privacy page does not list — three megabytes, at every
+    // first start, for a feature nobody asked for. Switching the checker off is
+    // not enough: the dictionaries are loaded for whatever languages are set,
+    // enabled or not, so the list is emptied too. Before the first window, which
+    // is what starts that load; the Microsoft sign-in window shares this session.
+    session.defaultSession.setSpellCheckerLanguages([]);
+    session.defaultSession.setSpellCheckerEnabled(false);
 
     // The window is opened before any of the setup below it. None of that setup
     // is slow — six mkdirs and a settings file — but all of it used to run with

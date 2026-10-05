@@ -35,6 +35,7 @@ export function createMainWindow(): BrowserWindow {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      spellcheck: false,
     },
   });
 
