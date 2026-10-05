@@ -20,7 +20,7 @@ import {
   primaryFile,
   type ModrinthVersion,
 } from './modrinth-api';
-import { readLockFile, mutateLockFile, modFilePath } from './lock-file';
+import { readLockFile, mutateLockFile, modFilePath, isSameModFile } from './lock-file';
 import { requiredDependencies } from './compatibility';
 import { acceptedLoaders } from '../../shared/constants';
 import { downloadToFile } from '../net/download';
@@ -848,7 +848,13 @@ export async function installResolvedMod(
 ): Promise<InstalledMod> {
   const modsDir = paths.profileModsDir(profileId);
   await fs.mkdir(modsDir, { recursive: true });
-  const destPath = path.join(modsDir, resolved.fileName);
+
+  // A mod the player switched off stays off across an update, the same rule a
+  // pack sync follows. Written under its plain name regardless, the new build
+  // came back enabled and the old one was left behind as `<name>.jar.disabled`.
+  const replacedId = replaces ?? identity.id;
+  const enabled = (await readLockFile(profileId)).find((m) => m.id === replacedId)?.enabled ?? true;
+  const destPath = modFilePath(modsDir, resolved.fileName, enabled);
 
   log.info(`Installing mod ${identity.name} (${resolved.fileName}) from ${identity.source}`);
   await downloadToFile(resolved.url, destPath, { secure: true });
@@ -871,19 +877,20 @@ export async function installResolvedMod(
     sha256: hash,
     required: false,
     side: 'both',
-    enabled: true,
+    enabled,
     fromManifest: false,
   };
 
   await mutateLockFile(profileId, async (mods) => {
-    const previous = replaces ?? identity.id;
-    const idx = mods.findIndex((m) => m.id === previous);
+    const idx = mods.findIndex((m) => m.id === replacedId);
     if (idx >= 0) {
-      // Remove old file
-      try {
-        await fs.rm(path.join(modsDir, mods[idx].fileName), { force: true });
-      } catch {
-        /* ok */
+      // The file this build replaces — unless it is the same file. Plenty of
+      // projects republish under one name, and deleting "the old jar" by that
+      // name then deleted the new one: the list said updated and `mods/` no
+      // longer held the mod.
+      const previous = mods[idx];
+      if (!isSameModFile(previous.fileName, resolved.fileName)) {
+        await fs.rm(modFilePath(modsDir, previous.fileName, previous.enabled), { force: true });
       }
       mods[idx] = installed;
     } else {

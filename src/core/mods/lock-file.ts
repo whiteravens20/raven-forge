@@ -77,3 +77,15 @@ export function mutateLockFile<T>(
 export function modFilePath(modsDir: string, fileName: string, enabled: boolean): string {
   return path.join(modsDir, enabled ? fileName : `${fileName}.disabled`);
 }
+
+/**
+ * Whether two file names are the same file in a profile's `mods/` directory.
+ *
+ * Asked before deleting "the file this one replaces", because the answer is
+ * sometimes yes. An author republishes under the name they used last time, and
+ * on Windows `Mod.jar` and `mod.jar` are one file whatever the strings say —
+ * and deleting the old name then deletes the build that was just downloaded.
+ */
+export function isSameModFile(a: string, b: string): boolean {
+  return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
