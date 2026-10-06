@@ -1401,7 +1401,7 @@ function ProfileForm({
               <p className="text-xs text-rf-text-muted">{t('profileForm.snapshotHint')}</p>
             )}
           </div>
-        ) : (
+        ) : mcVersionsFailed ? (
           // Only reachable when Mojang's manifest could not be fetched and no
           // cached copy exists — a free field beats blocking profile creation.
           <Input
@@ -1409,7 +1409,18 @@ function ProfileForm({
             value={draft.minecraftVersion}
             onChange={(e) => set('minecraftVersion', e.target.value)}
             placeholder="1.21.4"
-            error={mcVersionsFailed ? t('profileForm.versionsFailed') : undefined}
+            error={t('profileForm.versionsFailed')}
+          />
+        ) : (
+          // Still on its way. This used to be the free field above, which then
+          // turned into a dropdown under the cursor — and for as long as the
+          // list took, looked like the way a version is meant to be chosen.
+          <Select
+            label={t('profileForm.mcVersion')}
+            options={[{ value: '', label: t('profileForm.versionsLoading') }]}
+            value=""
+            onChange={() => {}}
+            disabled
           />
         )}
         <Select
@@ -1446,15 +1457,23 @@ function ProfileForm({
             value={draft.modLoaderVersion ?? ''}
             onChange={(e) => set('modLoaderVersion', e.target.value || undefined)}
           />
-        ) : (
-          // The list is still loading, or could not be fetched. Left empty, the
-          // build is chosen at the first launch, which needs the network anyway.
+        ) : loaderVersionsFailed ? (
+          // The list could not be fetched. Left empty, the build is chosen at
+          // the first launch, which needs the network anyway.
           <Input
             label={t('profileForm.loaderVersion')}
             value={draft.modLoaderVersion ?? ''}
             onChange={(e) => set('modLoaderVersion', e.target.value || undefined)}
             placeholder={t('profileForm.loaderVersionAuto')}
-            error={loaderVersionsFailed ? t('profileForm.versionsFailed') : undefined}
+            error={t('profileForm.versionsFailed')}
+          />
+        ) : (
+          <Select
+            label={t('profileForm.loaderVersion')}
+            options={[{ value: '', label: t('profileForm.versionsLoading') }]}
+            value=""
+            onChange={() => {}}
+            disabled
           />
         )}
         <RamField
@@ -1609,6 +1628,10 @@ function ProfileForm({
             urlProblem ||
             portProblem ||
             ramProblem ||
+            // A new profile takes the newest release once the list has come.
+            // Saved before that, it would be made on the version this form
+            // falls back to, which is on screen nowhere.
+            (isCreate && mcVersions.length === 0 && !mcVersionsFailed) ||
             // The form says in red that this loader has nothing for this
             // version, and used to save the pair all the same.
             (draft.modLoader !== 'vanilla' && noLoaderBuilds)
