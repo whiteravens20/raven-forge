@@ -247,6 +247,73 @@ describe('planModInstall', () => {
     expect(plan.issues).toEqual([{ kind: 'dependency-no-build', names: ['Fabric API'] }]);
   });
 
+  it('follows a dependency to what it needs in turn', async () => {
+    // Applied Mekanistics needs AE2, and AE2 needs GuideME, which the addon
+    // never mentions. Stopping at AE2 installed a profile that crashed on the
+    // third mod's absence.
+    const requires = (projectId: string) => [
+      { version_id: null, project_id: projectId, dependency_type: 'required' as const },
+    ];
+    const builds: Record<string, ModrinthVersion> = {
+      p1: build({ dependencies: requires('ae2') }),
+      ae2: build({
+        id: 'ae2-v',
+        project_id: 'ae2',
+        version_number: '19.0.1',
+        dependencies: requires('guideme'),
+      }),
+      guideme: build({ id: 'guide-v', project_id: 'guideme', version_number: '21.1.0' }),
+    };
+    getModVersions.mockImplementation((id: string): ModrinthVersion[] => [builds[id]]);
+    getProjectTitle.mockImplementation(
+      async (id: string) => ({ ae2: 'AE2', guideme: 'GuideME' })[id],
+    );
+
+    const plan = await planModInstall(FABRIC_1214, MOD, []);
+
+    expect(plan.dependencies).toEqual([
+      { id: 'ae2', name: 'AE2', version: '19.0.1' },
+      { id: 'guideme', name: 'GuideME', version: '21.1.0' },
+    ]);
+    expect(plan.issues).toEqual([]);
+  });
+
+  it('does not go round for ever when two mods require each other', async () => {
+    const requires = (projectId: string) => [
+      { version_id: null, project_id: projectId, dependency_type: 'required' as const },
+    ];
+    const builds: Record<string, ModrinthVersion> = {
+      p1: build({ dependencies: requires('other') }),
+      other: build({ id: 'other-v', project_id: 'other', dependencies: requires('p1') }),
+    };
+    getModVersions.mockImplementation((id: string): ModrinthVersion[] => [builds[id]]);
+    getProjectTitle.mockResolvedValue('The Other Half');
+
+    const plan = await planModInstall(FABRIC_1214, MOD, []);
+
+    // Once each: the mod being installed is not its own dependency.
+    expect(plan.dependencies.map((d) => d.id)).toEqual(['other']);
+  });
+
+  it('names a missing build two levels down as plainly as one level down', async () => {
+    const requires = (projectId: string) => [
+      { version_id: null, project_id: projectId, dependency_type: 'required' as const },
+    ];
+    const builds: Record<string, ModrinthVersion[]> = {
+      p1: [build({ dependencies: requires('ae2') })],
+      ae2: [build({ id: 'ae2-v', project_id: 'ae2', dependencies: requires('guideme') })],
+      guideme: [],
+    };
+    getModVersions.mockImplementation((id: string): ModrinthVersion[] => builds[id]);
+    getProjectTitle.mockImplementation(
+      async (id: string) => ({ ae2: 'AE2', guideme: 'GuideME' })[id],
+    );
+
+    const plan = await planModInstall(FABRIC_1214, MOD, []);
+
+    expect(plan.issues).toEqual([{ kind: 'dependency-no-build', names: ['GuideME'] }]);
+  });
+
   it('ignores optional and embedded dependencies', async () => {
     respond({
       bothNarrowed: [

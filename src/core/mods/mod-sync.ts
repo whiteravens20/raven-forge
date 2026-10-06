@@ -13,15 +13,9 @@ import {
 import { paths } from '../config/paths';
 import { getSettings } from '../config/settings-manager';
 import { getAllProfiles, getProfile, updateProfile } from '../profiles/profile-manager';
-import {
-  getModVersions,
-  getProjectTitle,
-  getVersion,
-  primaryFile,
-  type ModrinthVersion,
-} from './modrinth-api';
+import { getModVersions, getVersion, primaryFile, type ModrinthVersion } from './modrinth-api';
 import { readLockFile, mutateLockFile, modFilePath, isSameModFile } from './lock-file';
-import { requiredDependencies } from './compatibility';
+import { resolveDependencies } from './compatibility';
 import { acceptedLoaders } from '../../shared/constants';
 import { downloadToFile } from '../net/download';
 import { assertSecureAnswer, readJsonCapped } from '../net/json';
@@ -1060,7 +1054,8 @@ export async function installModrinthVersion(
 }
 
 /**
- * Install a build's missing required dependencies into the profile.
+ * Install everything a build cannot start without into the profile: what it
+ * requires, and what those require in turn.
  *
  * Resolved against the profile rather than against the pin where the two
  * disagree: a `version_id` the publisher named is honoured when it fits this
@@ -1078,27 +1073,20 @@ export async function installRequiredDependencies(
   const profile = await getProfile(profileId);
   if (!profile) return [];
 
-  const loaders = acceptedLoaders(profile.modLoader);
-  const installed = await readLockFile(profileId);
-  const added: string[] = [];
-
-  for (const dep of requiredDependencies(version, installed)) {
-    const candidates = await getModVersions(dep.projectId, profile.minecraftVersion, loaders);
-    const match = dep.versionId
-      ? (candidates.find((v) => v.id === dep.versionId) ?? candidates[0])
-      : candidates[0];
-    if (!match) {
-      log.warn(`Dependency ${dep.projectId} has no build for MC ${profile.minecraftVersion}`);
-      continue;
-    }
-
-    // The project's title, not the build's — `ModrinthVersion.name` is a label
-    // like "[1.21.4] Sodium 0.6.5", which reads badly in a sentence.
-    const name = await getProjectTitle(dep.projectId);
-    await installModrinthVersion(profileId, dep.projectId, name, match);
-    added.push(name);
+  const { resolved, unresolved } = await resolveDependencies(
+    version,
+    profile,
+    await readLockFile(profileId),
+  );
+  for (const name of unresolved) {
+    log.warn(`Dependency ${name} has no build for MC ${profile.minecraftVersion}`);
   }
 
+  const added: string[] = [];
+  for (const dep of resolved) {
+    await installModrinthVersion(profileId, dep.projectId, dep.name, dep.version);
+    added.push(dep.name);
+  }
   return added;
 }
 
