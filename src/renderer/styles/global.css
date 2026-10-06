@@ -187,6 +187,14 @@ p.text-rf-danger {
   user-select: text;
 }
 
+/* The Play button breathes to draw the eye, which is the kind of motion this
+   setting exists to switch off. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-glow {
+    animation: none;
+  }
+}
+
 /* Tailwind v3's Preflight gave buttons `cursor: pointer`; v4 dropped it and left
    the browser default, which is an arrow. Nearly everything clickable in this
    launcher is a `<button>` — the external links on the About page, the "open
