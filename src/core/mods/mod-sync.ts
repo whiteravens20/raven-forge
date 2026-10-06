@@ -895,7 +895,7 @@ async function runSync(profileId: string, supplied?: ModManifest): Promise<void>
     });
     throw err;
   } finally {
-    endJob(profileId);
+    endJob(profileId, signal);
   }
 }
 

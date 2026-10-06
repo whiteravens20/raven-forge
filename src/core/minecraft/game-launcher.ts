@@ -151,13 +151,6 @@ function launchFeatures(profile: Profile): Record<string, boolean> {
 // ── Game launcher ──────────────────────────────────────────
 
 /**
- * Run the prepare phase and spawn the game.
- *
- * Wrapped by `launchGame` so the job registration is torn down on every exit
- * path — a throw between `beginJob` and the spawn would otherwise leave a dead
- * controller behind, and the UI would keep offering to cancel nothing.
- */
-/**
  * Refuse a `-Xmx` the machine cannot back, before anything is downloaded.
  *
  * A heap larger than physical memory is not a configuration that runs: on
@@ -254,7 +247,19 @@ export function afterGameWhenClosed(state: {
   return state.windowVisible || state.othersRunning ? 'stay' : 'quit';
 }
 
-async function runLaunch(options: LaunchOptions): Promise<void> {
+/** The cancellable job a launch registered, once it has: `launchGame` ends it. */
+interface LaunchJob {
+  signal?: AbortSignal;
+}
+
+/**
+ * Run the prepare phase and spawn the game.
+ *
+ * Wrapped by `launchGame` so the job registration is torn down on every exit
+ * path — a throw between `beginJob` and the spawn would otherwise leave a dead
+ * controller behind, and the UI would keep offering to cancel nothing.
+ */
+async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> {
   const stored = await getProfile(options.profileId);
   if (!stored) throw new Error(`Profile ${options.profileId} not found`);
 
@@ -290,6 +295,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   // Everything from here to spawn is cancellable: it can run for minutes and
   // the user has no other way out short of killing the launcher.
   const signal = beginJob(profile.id);
+  job.signal = signal;
 
   // Resolve paths
   const gameDir = paths.profileGameDir(profile.id);
@@ -497,7 +503,7 @@ async function runLaunch(options: LaunchOptions): Promise<void> {
   });
 
   // The process is up; nothing left to cancel.
-  endJob(profile.id);
+  endJob(profile.id, signal);
 
   // Launch now tracked in gameRunning map for isGameRunning
   runningProcesses.set(profile.id, child);
@@ -764,11 +770,15 @@ export async function launchGame(options: LaunchOptions): Promise<void> {
   }
 
   preparing.add(options.profileId);
+  const job: LaunchJob = {};
   try {
     // Whichever way the preparation ends, its progress bars end with it.
-    await withProgress(() => runLaunch(options));
+    await withProgress(() => runLaunch(options, job));
   } catch (err) {
-    endJob(options.profileId);
+    // Only a job this launch registered. One refused before it got that far has
+    // none, and ending "the profile's job" here used to unregister a sync that
+    // was running for the same profile.
+    if (job.signal) endJob(options.profileId, job.signal);
     // Cancelling is the user's own decision, not a failure to report back.
     if (isCancellation(err)) {
       log.info(`Launch cancelled for profile ${options.profileId}`);

@@ -30,7 +30,7 @@ const {
 beforeEach(() => {
   // Every test starts with nothing registered; ids are per-test so this is
   // belt and braces rather than shared state being untangled.
-  for (const id of ['p1', 'p2']) endJob(id);
+  for (const id of ['p1', 'p2']) cancelJob(id);
 });
 
 describe('beginJob / cancelJob', () => {
@@ -51,9 +51,20 @@ describe('beginJob / cancelJob', () => {
 
   it('does not cancel a job that has already ended', () => {
     const signal = beginJob('p1');
-    endJob('p1');
+    endJob('p1', signal);
     expect(cancelJob('p1')).toBe(false);
     expect(signal.aborted).toBe(false);
+  });
+
+  it('leaves the job that replaced it registered when a replaced job ends', () => {
+    // A sync is running, a launch starts for the same profile and replaces it.
+    // The sync still reaches its `finally` — and that used to unregister the
+    // launch, which then ran on with Cancel answering "nothing to cancel".
+    const sync = beginJob('p1');
+    const launch = beginJob('p1');
+    endJob('p1', sync);
+    expect(cancelJob('p1')).toBe(true);
+    expect(launch.aborted).toBe(true);
   });
 
   it('aborts a stale job rather than leaving the new one uncancellable', () => {
