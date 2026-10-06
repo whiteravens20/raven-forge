@@ -170,6 +170,8 @@ export interface CataloguePack {
   summaryI18n?: Record<string, string>;
   minecraftVersion: string;
   modLoader: string;
+  /** What the pack asks for, when it asks for something a machine could give. */
+  recommendedRamMb?: number;
   modCount: number;
   totalDownloadBytes: number;
   manifestUrl: string;

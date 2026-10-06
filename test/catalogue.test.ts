@@ -55,6 +55,7 @@ describe('listCataloguePacks', () => {
       summary: 'Performance and quality-of-life pack.',
       minecraftVersion: '26.2',
       modLoader: 'fabric',
+      recommendedRamMb: 4096,
       modCount: 25,
       totalDownloadBytes: 30472224,
       manifestUrl: 'https://whiteravens20.github.io/raven-packs/ravenmc/manifest.json',
@@ -151,6 +152,25 @@ describe('listCataloguePacks', () => {
     const [pack] = await listCataloguePacks();
     expect(pack.summary).toBe('');
     expect(pack.modCount).toBe(0);
+    expect(pack.recommendedRamMb).toBeUndefined();
+  });
+
+  it('leaves a RAM figure that makes no sense off the pack, and keeps the pack', async () => {
+    respondWith({
+      indexVersion: 1,
+      packs: [
+        entry({ slug: 'huge', recommendedRamMb: 2 * 1024 * 1024 }),
+        entry({ slug: 'words', recommendedRamMb: 'plenty' }),
+        entry({ slug: 'fine', recommendedRamMb: 6144 }),
+      ],
+    });
+
+    const packs = await listCataloguePacks();
+    expect(packs.map((p) => [p.slug, p.recommendedRamMb])).toEqual([
+      ['huge', undefined],
+      ['words', undefined],
+      ['fine', 6144],
+    ]);
   });
 
   it('is not put off by fields it has no use for changing shape', async () => {

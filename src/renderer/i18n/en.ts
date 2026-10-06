@@ -323,6 +323,9 @@ export const en = {
   'packs.wrSyncNote': 'These profiles follow the server: every sync brings whatever changed.',
   'packs.mods.one': '{count} mod',
   'packs.mods.other': '{count} mods',
+  'packs.ram': '{ram} of RAM',
+  'packs.ramShort':
+    'It asks for {wanted} of memory and this computer can spare {spare}, so it may run poorly here.',
   'packs.profileFileTitle': 'A profile file (.json)',
   'packs.profileFileBody':
     'The settings of one profile, as saved by “Export” in this launcher: Minecraft version, loader, RAM, server. No mods and no worlds — a .mrpack pack carries those.',

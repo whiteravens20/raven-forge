@@ -353,6 +353,9 @@ export const pl: Translations = {
   'packs.mods.few': '{count} mody',
   'packs.mods.many': '{count} modów',
   'packs.mods.other': '{count} moda',
+  'packs.ram': '{ram} RAM',
+  'packs.ramShort':
+    'Paczka potrzebuje {wanted} pamięci, a ten komputer może przeznaczyć {spare} — gra może tu działać słabo.',
   'packs.profileFileTitle': 'Plik profilu (.json)',
   'packs.profileFileBody':
     'Ustawienia jednego profilu zapisane przyciskiem „Eksportuj” w tym launcherze: wersja Minecrafta, loader, RAM, serwer. Bez modów i światów — te przenosi paczka .mrpack.',

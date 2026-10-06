@@ -14,7 +14,12 @@ import { getModVersions, primaryFile } from '../mods/modrinth-api';
 import { loaderLabel } from '../../shared/labels';
 import { readMrpack, applyOverrides, type MrpackContents, type MrpackFile } from './mrpack';
 import { assertSecureContentUrl } from '../../shared/validators';
-import { formatRamGb, recommendedRamMb, safeMaxRamMb } from '../../shared/memory';
+import {
+  formatRamGb,
+  isPlausiblePackRam,
+  recommendedRamMb,
+  safeMaxRamMb,
+} from '../../shared/memory';
 import { machineMemoryMb } from '../util/machine-memory';
 import type { ModManifest } from '../../shared/manifest-schema';
 import type { InstalledMod, PackInstall, Profile } from '../../shared/ipc-types';
@@ -148,12 +153,11 @@ export function mrpackToManifest(pack: MrpackContents): ModManifest {
  * than produce a JVM that cannot start. The upper bound is the machine's, not a
  * constant: a pack built around a 32 GB desktop recommending 16 GB is being
  * helpful, and installing it on an 8 GB laptop should not write a number that
- * machine cannot honour. Clamped rather than warned about because nobody typed
- * it — the log says what happened, and the profile editor shows the result.
+ * machine cannot honour. Clamped here, and warned about before this: a White
+ * Ravens pack's card says so while the pack is still only being looked at.
  */
 function recommendedRam(value: unknown): number | undefined {
-  if (typeof value !== 'number' || !Number.isInteger(value)) return undefined;
-  if (value < 512 || value > 65536) return undefined;
+  if (!isPlausiblePackRam(value)) return undefined;
   const ceiling = safeMaxRamMb(machineMemoryMb());
   if (value <= ceiling) return value;
   log.info(

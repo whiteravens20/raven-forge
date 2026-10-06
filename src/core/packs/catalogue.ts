@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { log } from '../../main/logger';
 import { WHITE_RAVENS_PACKS_URL, isFirstPartyManifestUrl } from '../../shared/branding';
 import { assertSecureAnswer, readJsonCapped } from '../net/json';
+import { isPlausiblePackRam } from '../../shared/memory';
 import type { CataloguePack } from '../../shared/ipc-types';
 
 /**
@@ -36,6 +37,9 @@ const catalogueSchema = z.object({
       summaryI18n: z.record(z.string(), z.string()).optional(),
       minecraft: z.string().min(1),
       loader: z.object({ type: z.string() }),
+      // Whatever it holds: it is only shown, and a figure that makes no sense
+      // is left off the card instead of taking the catalogue down with it.
+      recommendedRamMb: z.unknown().optional(),
       counts: z.object({ mods: z.number() }).partial().optional(),
       totalDownloadBytes: z.number().optional(),
       // Null when the catalogue was built without PACK_BASE_URL. A pack with no
@@ -89,6 +93,7 @@ export async function listCataloguePacks(): Promise<CataloguePack[]> {
     summaryI18n: pack.summaryI18n,
     minecraftVersion: pack.minecraft,
     modLoader: pack.loader.type,
+    recommendedRamMb: isPlausiblePackRam(pack.recommendedRamMb) ? pack.recommendedRamMb : undefined,
     modCount: pack.counts?.mods ?? 0,
     totalDownloadBytes: pack.totalDownloadBytes ?? 0,
     manifestUrl: pack.manifestUrl!,

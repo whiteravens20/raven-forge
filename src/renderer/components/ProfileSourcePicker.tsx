@@ -9,8 +9,10 @@ import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { localized, useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
+import { formatRamGb, ramAdvice, safeMaxRamMb } from '@shared/memory';
 import type { CataloguePack, IpcResult, PackInstall, Profile } from '@shared/ipc-types';
 import { useDialogFocus } from '@hooks/use-dialog-focus';
+import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 
 const api = window.ravenforge;
 
@@ -43,6 +45,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const t = useT();
   const dialogRef = useDialogFocus<HTMLDivElement>();
   const locale = useLocale();
+  const machineMemoryMb = useMachineMemoryMb();
   const [route, setRoute] = useState<Route>('choose');
   const [packs, setPacks] = useState<CataloguePack[] | null>(null);
   /** True when the catalogue could not be fetched — which is not "no packs". */
@@ -265,7 +268,21 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                       MC {pack.minecraftVersion} • {loaderLabel(pack.modLoader)} •{' '}
                       {t.plural('packs.mods', pack.modCount)}
                       {pack.totalDownloadBytes > 0 && ` • ${formatBytes(pack.totalDownloadBytes)}`}
+                      {pack.recommendedRamMb !== undefined &&
+                        ` • ${t('packs.ram', { ram: formatRamGb(pack.recommendedRamMb) })}`}
                     </p>
+                    {/* Before the download, which is the moment it can still
+                        change somebody's mind. The install gives the profile
+                        what the machine can spare either way. */}
+                    {pack.recommendedRamMb !== undefined &&
+                      ramAdvice(pack.recommendedRamMb, machineMemoryMb) !== 'ok' && (
+                        <p className="mt-0.5 text-xs text-rf-warning">
+                          {t('packs.ramShort', {
+                            wanted: formatRamGb(pack.recommendedRamMb),
+                            spare: formatRamGb(safeMaxRamMb(machineMemoryMb)),
+                          })}
+                        </p>
+                      )}
                   </div>
                   <Button
                     size="sm"

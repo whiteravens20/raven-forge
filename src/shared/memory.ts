@@ -55,6 +55,18 @@ export function recommendedRamMb(totalMb: number | undefined): number {
 }
 
 /**
+ * Whether a pack's own RAM figure is one to take seriously.
+ *
+ * It is written by whoever published the pack and ends up on a `-Xmx` line, so
+ * it gets bounds of its own: a whole number of megabytes between the least a
+ * modern game starts on and more than any pack has reason to ask for. A pack
+ * that says 2 TB has said nothing.
+ */
+export function isPlausiblePackRam(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 512 && value <= 65536;
+}
+
+/**
  * `ok` — fits. `tight` — more than the machine can spare, and the game will
  * swap, stutter, or be killed once it grows into it. `over` — more than the
  * machine physically has, which is not a configuration that runs: the JVM
