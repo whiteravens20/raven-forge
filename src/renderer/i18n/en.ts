@@ -167,6 +167,11 @@ export const en = {
   'launchError.javaTooOld':
     'This profile is set to launch with {path}, which is Java {found}, and this version of Minecraft needs Java {required}. It would start and then stop with an error about class file versions. Clear the field to use the runtime the launcher installs itself.',
   'contentError.notZip': 'That file is not a zip archive.',
+  'contentError.notJar': 'That file is not a mod: a mod is a .jar file.',
+  'contentError.needsLoader':
+    'This profile runs plain Minecraft, which reads no mods. Choose a mod loader for the profile first.',
+  'contentError.wrongLoader':
+    'That mod is made for {made}, and this profile runs {profile}. It would not be loaded.',
   'contentError.notResourcePack':
     'That archive is not a resource pack: there is no pack.mcmeta at its top level.',
   'contentError.nestedResourcePack':
@@ -489,6 +494,8 @@ export const en = {
   'mods.downloads.one': '{count} download',
   'mods.downloads.other': '{count} downloads',
   'mods.installedWithDeps': 'Installed {name}, along with what it needs: {deps}',
+  'mods.addedFile': 'Added {name}.',
+  'mods.addFileFailed': 'Could not add that file.',
   'mods.checkUpdates': 'Check for updates',
   'mods.checkUpdatesFailed': 'Could not check for updates.',
   'mods.updatesFound.one': '{count} mod has a newer build.',

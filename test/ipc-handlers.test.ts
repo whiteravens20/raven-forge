@@ -7,7 +7,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import nacl from 'tweetnacl';
 import { encodeBase64 } from 'tweetnacl-util';
 import { WHITE_RAVENS_PUBLIC_KEY } from '../src/shared/branding';
-import type { GlobalSettings, InstalledMod, IpcResult, Profile } from '../src/shared/ipc-types';
+import type {
+  GlobalSettings,
+  InstalledMod,
+  IpcResult,
+  ModAddition,
+  Profile,
+} from '../src/shared/ipc-types';
 import { ZipWriter } from './helpers/zip';
 
 /**
@@ -156,6 +162,7 @@ describe('changing a profile’s files under its running game', () => {
   it.each([
     ['mods:sync-manifest', []],
     ['mods:install-from-search', [{ id: 'lithium' }]],
+    ['mods:add-from-file', []],
     ['mods:uninstall', ['sodium']],
     ['mods:toggle-enabled', ['sodium', false]],
     ['mods:update', [['sodium']]],
@@ -253,6 +260,54 @@ describe('content:add-from-file', () => {
 
     expect(result.success).toBe(false);
     expect(picked.asked).toBe(0);
+  });
+});
+
+describe('mods:add-from-file', () => {
+  // Asking Modrinth what a jar is must not leave the machine from a test, and
+  // an answer that cannot be had is a case of its own: the jar is a plain file.
+  beforeEach(() =>
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed'))),
+  );
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('asks for the jar itself and adds the one that was picked', async () => {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Modded'))).data!;
+    const zip = new ZipWriter();
+    zip.add('fabric.mod.json', '{"id":"example"}');
+    const jar = path.join(root, 'example-1.0.jar');
+    await fs.writeFile(jar, zip.toBuffer());
+    picked.files = [jar];
+
+    const result = await call<ModAddition | null>('mods:add-from-file', id);
+
+    expect(result).toMatchObject({ success: true, data: { name: 'example-1.0' } });
+    const lock = JSON.parse(
+      await fs.readFile(path.join(root, 'data', 'profiles', id, 'installed.lock'), 'utf-8'),
+    );
+    expect(lock).toMatchObject([{ fileName: 'example-1.0.jar', source: 'local' }]);
+  });
+
+  it('answers a refusal with words the page can say in its own language', async () => {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Modded'))).data!;
+    const zip = new ZipWriter();
+    zip.add('META-INF/neoforge.mods.toml', 'modLoader="javafml"');
+    const jar = path.join(root, 'example-neoforge.jar');
+    await fs.writeFile(jar, zip.toBuffer());
+    picked.files = [jar];
+
+    const result = await call('mods:add-from-file', id);
+
+    expect(result.success).toBe(false);
+    expect(result.errorMessage).toEqual({
+      key: 'contentError.wrongLoader',
+      vars: { made: 'NeoForge', profile: 'Fabric' },
+    });
+  });
+
+  it('says nothing happened when the dialog is closed', async () => {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Modded'))).data!;
+    expect(await call('mods:add-from-file', id)).toEqual({ success: true, data: null });
   });
 });
 

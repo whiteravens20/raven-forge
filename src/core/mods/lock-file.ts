@@ -79,7 +79,7 @@ export function modFilePath(modsDir: string, fileName: string, enabled: boolean)
 }
 
 /**
- * Whether two file names are the same file in a profile's `mods/` directory.
+ * Whether two file names are the same file in one of a profile's folders.
  *
  * Asked before deleting "the file this one replaces", because the answer is
  * sometimes yes. An author republishes under the name they used last time, and

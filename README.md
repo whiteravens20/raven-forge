@@ -19,7 +19,8 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Mod Auto-Sync** — fetch server manifest → check its signature → diff → parallel download → verify each hash → install
 - **Mod Browser** — search Modrinth from the launcher, filtered to your profile
 - **Compatibility Checks** — warns before an install that does not fit the profile, and pulls in required dependencies
-- **Mod Updates** — checks what you installed by hand against Modrinth by file hash, so a jar you dropped in yourself is recognised too, and updates them in place
+- **Mods From A File** — add a jar you already have: it is checked to be for the profile's loader, recognised by its contents when Modrinth publishes that very build — so its updates and the mods it needs are handled like any other — and listed as a plain file when not
+- **Mod Updates** — checks what you installed by hand against Modrinth by file hash, so a jar you added from a file is recognised too, and updates them in place
 - **Pack Export** — write a profile back out as a `.mrpack`: a small file of references, with anything Modrinth does not host carried inside it
 - **World Backups** — copy a profile's worlds aside, restore them again, and get asked before a Minecraft version change touches them
 - **Data Folder You Choose** — profiles, assets and the managed JREs are gigabytes; point them at another drive from Settings and the launcher carries what is already there, or picks up a folder it used before. `RAVENFORGE_DATA_DIR` decides instead for a portable install

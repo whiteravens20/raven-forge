@@ -65,6 +65,7 @@ import {
 } from '../core/packs/pack-installer';
 import { exportProfileAsMrpack } from '../core/packs/mrpack-export';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
+import { addModFromFile } from '../core/mods/local-mod';
 import {
   addContentFromFile,
   listContent,
@@ -841,6 +842,26 @@ export function registerAllIpcHandlers(): void {
       return ok(await installModFromSearch(profileId, mod, version));
     } catch (err) {
       return fail(`Failed to install mod: ${reason(err)}`);
+    }
+  });
+  handle('mods:add-from-file', async (_event, profileId: string) => {
+    try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
+      const win = getMainWindow();
+      if (!win) return fail('No window available');
+
+      // Asked here for the same reason as for a shader or a resource pack: a
+      // channel that took a path would put any file on the disk on the game's
+      // class path.
+      const chosen = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        defaultPath: app.getPath('downloads'),
+        filters: [{ name: 'Minecraft mod', extensions: ['jar'] }],
+      });
+      if (chosen.canceled || chosen.filePaths.length === 0) return ok(null);
+      return ok(await addModFromFile(profileId, chosen.filePaths[0]));
+    } catch (err) {
+      return fail(`Failed to add that file: ${reason(err)}`, undefined, refusalOf(err));
     }
   });
   handle('mods:check-install', async (_event, profileId, mod) => {

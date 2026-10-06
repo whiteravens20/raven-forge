@@ -12,6 +12,7 @@ import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
 import { fileMatches, type HashedEntry } from './integrity';
+import { isSameModFile } from './lock-file';
 import type { ContentKind, InstalledMod } from '../../shared/ipc-types';
 import {
   fileNameFromUrl,
@@ -20,6 +21,7 @@ import {
   type ShaderEntry,
 } from '../../shared/manifest-schema';
 import { RefusedError } from '../util/refusal';
+import { isSameFile } from '../util/same-file';
 import { STOP, eachEntry } from '../util/zip-read';
 
 function targetDir(kind: ContentKind, profileId: string): string {
@@ -217,19 +219,6 @@ async function assertPackLayout(kind: ContentKind, file: string): Promise<void> 
   );
 }
 
-/** Whether two paths are one file on disk, whatever they are spelled like. */
-async function isSameFile(a: string, b: string): Promise<boolean> {
-  try {
-    const [first, second] = await Promise.all([
-      fs.stat(a, { bigint: true }),
-      fs.stat(b, { bigint: true }),
-    ]);
-    return first.dev === second.dev && first.ino === second.ino;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Add a shader or a resource pack the player already has as a file.
  *
@@ -257,9 +246,7 @@ export async function addContentFromFile(
   const dest = path.join(dir, fileName);
 
   const added = await mutateIndex(kind, profileId, async (items) => {
-    // Without regard to case: on Windows and macOS two names that differ only
-    // in that are one file, and the second would land on top of the first.
-    const idx = items.findIndex((item) => item.fileName.toLowerCase() === fileName.toLowerCase());
+    const idx = items.findIndex((item) => isSameModFile(item.fileName, fileName));
     const existing = idx >= 0 ? items[idx] : undefined;
     if (existing?.fromManifest) {
       throw new RefusedError(

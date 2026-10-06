@@ -232,6 +232,18 @@ export interface ModInstallResult {
   dependencies: string[];
 }
 
+/**
+ * A mod added from a file on this computer.
+ *
+ * The page did not choose the file, so it is told what it turned out to be:
+ * the mod's own name where Modrinth knows the file, and the file's otherwise.
+ */
+export interface ModAddition {
+  name: string;
+  /** What had to come with it, as for a mod picked out of the search. */
+  dependencies: string[];
+}
+
 export interface ModSearchFilters {
   query: string;
   /** Defaults to `mod`. Shaders and resource packs live in the same search index. */

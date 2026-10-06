@@ -59,6 +59,7 @@ const api: RavenForgeAPI = {
     syncManifest: (profileId) => ipcRenderer.invoke('mods:sync-manifest', profileId),
     installFromSearch: (profileId, mod, version) =>
       ipcRenderer.invoke('mods:install-from-search', profileId, mod, version),
+    addFromFile: (profileId) => ipcRenderer.invoke('mods:add-from-file', profileId),
     checkInstall: (profileId, mod) => ipcRenderer.invoke('mods:check-install', profileId, mod),
     uninstall: (profileId, modId) => ipcRenderer.invoke('mods:uninstall', profileId, modId),
     toggleEnabled: (profileId, modId, enabled) =>

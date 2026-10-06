@@ -155,6 +155,11 @@ export const pl: Translations = {
   'launchError.javaTooOld':
     'Ten profil ma startować przez {path}, czyli Javę {found}, a ta wersja Minecrafta potrzebuje Javy {required}. Gra wystartowałaby i zaraz padła z błędem o wersji plików klas. Wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
   'contentError.notZip': 'Ten plik nie jest archiwum zip.',
+  'contentError.notJar': 'Ten plik nie jest modem: mod to plik .jar.',
+  'contentError.needsLoader':
+    'Ten profil uruchamia czystego Minecrafta, który nie wczytuje modów. Najpierw wybierz loader w profilu.',
+  'contentError.wrongLoader':
+    'Ten mod jest przeznaczony dla: {made}, a ten profil działa na {profile}. Nie zostałby wczytany.',
   'contentError.notResourcePack':
     'To archiwum nie jest paczką zasobów: na jego najwyższym poziomie nie ma pliku pack.mcmeta.',
   'contentError.nestedResourcePack':
@@ -520,6 +525,8 @@ export const pl: Translations = {
   'mods.downloads.many': '{count} pobrań',
   'mods.downloads.other': '{count} pobrania',
   'mods.installedWithDeps': 'Zainstalowano {name}, a wraz z nim to, czego potrzebuje: {deps}',
+  'mods.addedFile': 'Dodano: {name}.',
+  'mods.addFileFailed': 'Nie udało się dodać tego pliku.',
   'mods.checkUpdates': 'Sprawdź aktualizacje',
   'mods.checkUpdatesFailed': 'Nie udało się sprawdzić aktualizacji.',
   'mods.updatesFound.one': '{count} mod ma nowszą wersję.',

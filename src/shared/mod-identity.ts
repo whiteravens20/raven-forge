@@ -11,8 +11,9 @@ export type InstalledIdentity = Pick<InstalledMod, 'id'> &
  *
  * An entry can be known by three names. Something installed from the search has
  * the project id as its own `id`. A pack names its entries as it likes —
- * `fabric-api` — and says which project that is beside it. A jar dropped in by
- * hand has neither, until an update check recognises it by its contents.
+ * `fabric-api` — and says which project that is beside it. A jar that came
+ * inside a pack, or was added from a file while Modrinth could not be asked,
+ * has neither, until an update check recognises it by its contents.
  *
  * Only the first used to be compared, so a profile made from a pack was not
  * seen to hold what the pack had put there: installing a mod that needs Fabric

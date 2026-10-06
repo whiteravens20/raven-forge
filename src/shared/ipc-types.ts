@@ -47,6 +47,7 @@ import type {
   FacetGroups,
   InstallPlan,
   InstalledMod,
+  ModAddition,
   ModInstallResult,
   ModSearchFilters,
   ModSearchPage,
@@ -182,6 +183,11 @@ export interface InvokeChannels {
     mod: ModSearchResult,
     version?: string,
   ) => Promise<IpcResult<ModInstallResult>>;
+  /**
+   * Add a mod from a jar on this computer. Which file is asked in the main
+   * process; `null` is the player closing that dialog.
+   */
+  'mods:add-from-file': (profileId: string) => Promise<IpcResult<ModAddition | null>>;
   /** What installing this mod would do to the profile, before anything is downloaded. */
   'mods:check-install': (
     profileId: string,
@@ -444,6 +450,7 @@ export interface RavenForgeAPI {
     getInstalled: InvokeChannels['mods:get-installed'];
     syncManifest: InvokeChannels['mods:sync-manifest'];
     installFromSearch: InvokeChannels['mods:install-from-search'];
+    addFromFile: InvokeChannels['mods:add-from-file'];
     checkInstall: InvokeChannels['mods:check-install'];
     uninstall: InvokeChannels['mods:uninstall'];
     toggleEnabled: InvokeChannels['mods:toggle-enabled'];

@@ -16,9 +16,9 @@ import { errorText } from '../util/error-text';
  * Keeping hand-installed mods current.
  *
  * A profile that follows a manifest has this already — the sync is the update
- * mechanism. A mod picked out of the Modrinth browser, or a jar an imported
- * pack carried inside itself, had nothing: it stayed at the build it arrived
- * as until somebody noticed and reinstalled it.
+ * mechanism. A mod picked out of the Modrinth browser, a jar added from a file
+ * or one an imported pack carried inside itself had nothing: it stayed at the
+ * build it arrived as until somebody noticed and reinstalled it.
  *
  * Mods are identified by hashing the jar rather than by what `installed.lock`
  * says they are. That costs a read of every file, and buys two things worth
@@ -28,7 +28,8 @@ import { errorText } from '../util/error-text';
  * across projects.
  *
  * Only what the lock file lists is looked at. A jar dropped into `mods/` by
- * hand is in no list the launcher keeps, and stays the player's own business.
+ * hand is in no list the launcher keeps until it is added from the Mods page,
+ * and until then stays the player's own business.
  */
 
 /**

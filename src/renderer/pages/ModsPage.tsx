@@ -1,7 +1,7 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { useState, useCallback, useEffect } from 'react';
-import { Search, Download, Package, RefreshCw, ArrowUpCircle } from 'lucide-react';
+import { Search, Download, Package, RefreshCw, ArrowUpCircle, FilePlus } from 'lucide-react';
 import { usePagedSearch } from '@hooks/use-paged-search';
 import { InstalledEntryInfo, SearchPager, SearchResultRow } from '@components/SearchResults';
 import { projectKey, useProjectDetails } from '@hooks/use-project-details';
@@ -77,6 +77,8 @@ export function ModsPage() {
   const [plan, setPlan] = useState<{ mod: ModSearchResult; plan: InstallPlan } | null>(null);
   /** Something worth saying that is not a failure — dependencies that arrived. */
   const [note, setNote] = useState<string | null>(null);
+  /** A jar is being asked for, checked and copied in. */
+  const [addingFile, setAddingFile] = useState(false);
   /** The last update check's counts, or null before one has run this session. */
   const [updateCheck, setUpdateCheck] = useState<ModUpdateSummary | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
@@ -154,6 +156,44 @@ export function ModsPage() {
       }
       await install(mod, check.data.versionId);
     });
+  };
+
+  /**
+   * Add a mod the player already has as a jar.
+   *
+   * Which file is asked by the main process, so all this hears back is what it
+   * turned out to be — or nothing, when the dialog was closed.
+   */
+  const handleAddFile = async () => {
+    if (!selectedId || addingFile) return;
+    setError(null);
+    setNote(null);
+    setAddingFile(true);
+    try {
+      const result = await api.mods.addFromFile(selectedId);
+      if (!result.success) {
+        // A refusal is about the file that was picked, and comes with words
+        // for it: what is wrong with it, and what would work instead.
+        setError(
+          result.errorMessage
+            ? t(result.errorMessage.key, result.errorMessage.vars)
+            : (result.error ?? t('mods.addFileFailed')),
+        );
+      } else if (result.data) {
+        const { name, dependencies } = result.data;
+        setNote(
+          dependencies.length > 0
+            ? t('mods.installedWithDeps', { name, deps: dependencies.join(', ') })
+            : t('mods.addedFile', { name }),
+        );
+        // Where it has just appeared.
+        setTab('installed');
+      }
+      // Read again either way: a jar can be in place and what it needs not.
+      await loadInstalled();
+    } finally {
+      setAddingFile(false);
+    }
   };
 
   /** Download a build the profile has already agreed to. */
@@ -317,6 +357,19 @@ export function ModsPage() {
               {t('mods.checkUpdates')}
             </Button>
           )}
+          {/* For what Modrinth does not have: a mod published elsewhere, a
+              build an author handed out. */}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<FilePlus size={14} />}
+            loading={addingFile}
+            disabled={gameBusy}
+            title={gameBusy ? t('mods.gameBusy') : undefined}
+            onClick={() => void handleAddFile()}
+          >
+            {t('content.addFile')}
+          </Button>
           <div className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5">
             <button
               aria-pressed={tab === 'installed'}
@@ -452,7 +505,10 @@ export function ModsPage() {
                   details={details[projectKey(mod)]}
                   fallbackIcon={<Package size={18} className="shrink-0 text-rf-text-muted" />}
                 >
-                  {mod.version} • {t(`mods.source.${mod.source}`)}
+                  {/* A file off the disk has no version anybody recorded. */}
+                  {mod.source === 'local'
+                    ? t('mods.source.local')
+                    : `${mod.version} • ${t(`mods.source.${mod.source}`)}`}
                   {mod.fromManifest && ` • ${t('mods.fromManifest')}`}
                   {mod.updateAvailable && (
                     <span className="text-rf-accent-text">
