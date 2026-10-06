@@ -1485,7 +1485,14 @@ function ProfileForm({
           onClick={onSave}
           icon={<Save size={14} />}
           disabled={
-            !draft.name.trim() || sizeProblem !== null || urlProblem || portProblem || ramProblem
+            !draft.name.trim() ||
+            sizeProblem !== null ||
+            urlProblem ||
+            portProblem ||
+            ramProblem ||
+            // The form says in red that this loader has nothing for this
+            // version, and used to save the pair all the same.
+            (draft.modLoader !== 'vanilla' && noLoaderBuilds)
           }
         >
           {t('common.save')}
