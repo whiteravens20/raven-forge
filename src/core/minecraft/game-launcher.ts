@@ -274,6 +274,27 @@ async function exists(file: string): Promise<boolean> {
   }
 }
 
+/**
+ * The binary to start the game with: `javaw.exe` where there is one.
+ *
+ * `java.exe` is a console program, and the packaged launcher has no console for
+ * it to share, so Windows opens one — a black window that stays for the whole
+ * session and takes the game with it when closed. `javaw.exe` is the same JVM
+ * without one; its output still arrives down the pipes. Hiding the window
+ * through `windowsHide` instead is not an option for a game: that also tells the
+ * process to start with its first window hidden.
+ */
+export async function windowlessJava(
+  javaPath: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string> {
+  if (platform !== 'win32' || path.basename(javaPath).toLowerCase() !== 'java.exe') {
+    return javaPath;
+  }
+  const javaw = path.join(path.dirname(javaPath), 'javaw.exe');
+  return (await exists(javaw)) ? javaw : javaPath;
+}
+
 /** The cancellable job a launch registered, once it has: `launchGame` ends it. */
 interface LaunchJob {
   signal?: AbortSignal;
@@ -526,9 +547,10 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     await applyLanguage(gameDir, profile.gameLanguage);
   }
 
-  log.info(`Launching: ${java.path} ${finalArgs.join(' ').substring(0, 200)}...`);
+  const javaBinary = await windowlessJava(java.path);
+  log.info(`Launching: ${javaBinary} ${finalArgs.join(' ').substring(0, 200)}...`);
 
-  const child = spawn(java.path, finalArgs, {
+  const child = spawn(javaBinary, finalArgs, {
     cwd: gameDir,
     detached: false,
     stdio: ['ignore', 'pipe', 'pipe'],

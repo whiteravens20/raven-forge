@@ -75,7 +75,10 @@ function getManagedJavaPath(majorVersion: number): string {
  */
 export async function probeJava(binPath: string): Promise<number | null> {
   try {
-    const { stderr } = await execFileAsync(binPath, ['-version'], { timeout: 5000 });
+    const { stderr } = await execFileAsync(binPath, ['-version'], {
+      timeout: 5000,
+      windowsHide: true,
+    });
     return parseJavaVersion(stderr);
   } catch {
     return null;
@@ -414,6 +417,7 @@ async function extractArchive(
     }
     await execFileAsync('tar', [unpack, archivePath, '-C', staging, '--strip-components=1'], {
       signal,
+      windowsHide: true,
     });
 
     // Ensure bin/java is executable
@@ -492,7 +496,10 @@ export async function ensureJavaVersion(
 async function runtimeWorks(javaPath: string): Promise<boolean> {
   try {
     await fs.access(javaPath, fss.constants.X_OK);
-    const { stderr } = await execFileAsync(javaPath, ['-version'], { timeout: 10000 });
+    const { stderr } = await execFileAsync(javaPath, ['-version'], {
+      timeout: 10000,
+      windowsHide: true,
+    });
     log.info(`Verified Java ${parseJavaVersion(stderr)} at ${javaPath}`);
     return true;
   } catch {

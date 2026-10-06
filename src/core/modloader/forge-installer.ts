@@ -482,7 +482,13 @@ async function runInstaller(
       // ten minutes. `cwd`, because the installer writes its log beside wherever
       // it was started — which was the folder the launcher happened to be run
       // from.
-      { timeout: INSTALLER_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, signal, cwd: destDir },
+      {
+        timeout: INSTALLER_TIMEOUT_MS,
+        maxBuffer: 16 * 1024 * 1024,
+        signal,
+        cwd: destDir,
+        windowsHide: true,
+      },
     );
     log.info(`${label} installer finished.\n${stdout}`);
     if (stderr.trim()) log.warn(`${label} installer stderr:\n${stderr}`);
