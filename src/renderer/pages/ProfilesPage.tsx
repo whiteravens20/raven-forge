@@ -281,10 +281,11 @@ export function ProfilesPage() {
       return;
     }
     // The guard every other effect on this page has, and this one did not.
-    // `manifest.verify` goes to the network, so switching profiles while it is
-    // in flight used to land profile A's sync state and signature badge on the
-    // screen showing profile B — and a signature badge is the one thing here
-    // that must never be about a different pack than the one being read.
+    // Both answers come back a moment after they are asked for, so switching
+    // profiles in between used to land profile A's sync state and signature
+    // badge on the screen showing profile B — and a signature badge is the one
+    // thing here that must never be about a different pack than the one being
+    // read.
     let cancelled = false;
     void api.profiles.getSyncStatus(selectedId).then((r) => {
       if (!cancelled && r.success && r.data) setSyncStatus(r.data);

@@ -5,9 +5,8 @@
 
 export interface SystemInfo {
   /**
-   * `app.getVersion()` — the version of the build that is actually running.
-   * Not the `APP_VERSION` constant, which is a second copy of the same number
-   * and drifts from package.json the first time someone bumps only one.
+   * `app.getVersion()` — the version of the build that is actually running,
+   * read from the one place it is written, package.json.
    */
   launcherVersion: string;
   platform: 'win32' | 'linux' | 'darwin';

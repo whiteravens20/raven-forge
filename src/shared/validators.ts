@@ -13,8 +13,8 @@ import { isSafeFileName } from './manifest-schema';
 import { GAME_LANGUAGE_PATTERN } from './game-languages';
 
 // ── Runtime validators for IPC payloads ───────────────────
-// These schemas validate data at IPC boundaries.
-// Types are inferred from schemas via z.infer<typeof schema>.
+// These schemas validate data at IPC boundaries. The types they are checked
+// against are the hand-written ones in `./ipc/`, not inferred from here.
 
 /**
  * Whether a URL is safe to fetch content the launcher then *acts on* — a
@@ -177,11 +177,12 @@ export const profileSchema = z.object({
   /**
    * The game's window. All three degrade to "unset" instead of failing the
    * parse, and that is deliberate: this schema is not only the editor's gate —
-   * every play session ends in an `updateProfile` that runs the whole profile
-   * through it, so a file hand-edited to a resolution the game cannot make
-   * would otherwise become a profile whose play time can never be recorded
-   * again. Refusing to start over a window size would be the wrong trade; the
-   * editor is where a bad number gets argued with.
+   * every later change goes through `updateProfile`, which runs the whole
+   * profile through it, so a file hand-edited to a resolution the game cannot
+   * make would otherwise become a profile whose icon can never be changed and
+   * whose loader build a launch can never pin. Refusing all of that over a
+   * window size would be the wrong trade; the editor is where a bad number
+   * gets argued with.
    *
    * Width and height are still checked at launch, in `customResolution`, since
    * `profiles.json` is read back without going through this at all.

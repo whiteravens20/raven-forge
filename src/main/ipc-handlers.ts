@@ -218,8 +218,9 @@ export function registerAllIpcHandlers(): void {
     // `shell.openPath` runs whatever the OS associates with the target — an
     // `.exe` or `.bat` on Windows, a `.desktop` entry on Linux — so an
     // unrestricted one is a way to execute an arbitrary file by asking the
-    // renderer nicely. Every real caller passes a directory the main process
-    // itself produced, so confining it to those costs nothing.
+    // renderer nicely. Every real caller passes a folder, or a crash report,
+    // that the main process itself produced, so confining it to the launcher's
+    // own data costs nothing.
     if (!paths.isInsideLauncherData(targetPath)) {
       log.warn(`Refused to open a path outside the launcher's data directory: ${targetPath}`);
       return fail("That path is outside the launcher's data directory");

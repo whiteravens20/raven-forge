@@ -76,7 +76,7 @@ function entryName(file: MrpackFile): string {
  *
  * Files are sorted by where the pack puts them, because that is the only signal
  * the format gives: `mods/` becomes mods, `resourcepacks/` and `shaderpacks/`
- * become their own lists so the content page can order and toggle them, and
+ * become their own lists so the content page can show and order them, and
  * anything else becomes a config file, which is the manifest's term for "a
  * fetched file at an exact path".
  *

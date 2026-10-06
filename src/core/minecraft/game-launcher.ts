@@ -610,7 +610,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   // The process is up; nothing left to cancel.
   endJob(profile.id, signal);
 
-  // Launch now tracked in gameRunning map for isGameRunning
+  // From here `isGameRunning` answers yes for this profile.
   runningProcesses.set(profile.id, child);
   clearBuffer(profile.id);
 

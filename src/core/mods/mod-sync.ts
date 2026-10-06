@@ -953,10 +953,10 @@ export function downloadFor(version: ModrinthVersion): {
  *
  * `replaces` names a lock entry to stand in for, where that is not simply the
  * one with the same id. An update found by hashing the jar is exactly that
- * case: a mod dropped into `mods/` by hand is recorded under a generated
- * `local-…` id, and the build replacing it is a Modrinth project with a project
- * id of its own. Without this the entry would be appended beside the old one,
- * leaving the profile with two records and two jars of the same mod.
+ * case: a jar a pack carried inside itself is recorded under a `bundled-…` id,
+ * and the build replacing it is a Modrinth project with a project id of its
+ * own. Without this the entry would be appended beside the old one, leaving the
+ * profile with two records and two jars of the same mod.
  */
 export async function installResolvedMod(
   profileId: string,

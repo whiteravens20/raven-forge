@@ -120,8 +120,8 @@ export function ModsPage() {
       // Mekanism in it.
       gameVersion: filters.gameVersion || undefined,
       // Typed and separate from `categories`, even though Modrinth files
-      // loaders under the same facet key — the profile's loader is a
-      // constraint, not a tag the user picked.
+      // loaders under the same facet key: it is a dropdown of its own in the
+      // filter row, and the build offered for a result is chosen against it.
       loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
       categories: categoriesWithoutLoader(filters),
     });
