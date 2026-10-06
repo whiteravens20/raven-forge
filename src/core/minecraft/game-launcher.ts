@@ -51,7 +51,7 @@ import {
 import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
 import { applyProfileOptions, languageCodeFor } from './options-file';
-import { LaunchRefusedError } from './launch-errors';
+import { RefusedError } from '../util/refusal';
 import { errorText } from '../util/error-text';
 
 // Track running processes by profileId
@@ -219,7 +219,7 @@ function assertRamFits(profile: Profile): void {
   const allocated = formatRamGb(profile.allocatedRamMb);
   const total = formatRamGb(totalMb);
   const recommended = formatRamGb(recommendedRamMb(totalMb));
-  throw new LaunchRefusedError(
+  throw new RefusedError(
     { key: 'launchError.ramTooBig', vars: { allocated, total, recommended } },
     `This profile allocates ${allocated} of RAM and this machine has ${total}. Minecraft cannot ` +
       `start with more memory than the machine has — lower it in the profile editor, where ` +
@@ -246,7 +246,7 @@ export async function withLoaderVersion(profile: Profile): Promise<Profile> {
 
   const label = loaderLabel(profile.modLoader);
   const refuse = (cause?: unknown) =>
-    new LaunchRefusedError(
+    new RefusedError(
       {
         key: 'launchError.loaderVersionUnknown',
         vars: { loader: label, version: profile.minecraftVersion },
@@ -354,7 +354,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   const authState = await getAuthState();
   const account = authState.accounts.find((a) => a.id === authState.activeAccountId);
   if (!account) {
-    throw new LaunchRefusedError(
+    throw new RefusedError(
       { key: 'launchError.noAccount' },
       'No active account — please log in first',
     );
@@ -885,13 +885,13 @@ export function isLaunchInProgress(): boolean {
 
 export async function launchGame(options: LaunchOptions): Promise<void> {
   if (runningProcesses.has(options.profileId)) {
-    throw new LaunchRefusedError(
+    throw new RefusedError(
       { key: 'launchError.alreadyRunning' },
       'Game is already running for this profile',
     );
   }
   if (preparing.has(options.profileId)) {
-    throw new LaunchRefusedError(
+    throw new RefusedError(
       { key: 'launchError.alreadyPreparing' },
       'This profile is already being prepared',
     );

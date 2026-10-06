@@ -388,7 +388,7 @@ describe.skipIf(!posix)('a launch', () => {
   });
 
   it('asks for an account before it fetches anything', async () => {
-    const { launchRefusal } = await import('../src/core/minecraft/launch-errors');
+    const { refusalOf } = await import('../src/core/util/refusal');
     state.noActiveAccount = true;
     // The version itself cannot be read, so a launch that got as far as
     // preparing files would fail on that instead.
@@ -396,7 +396,7 @@ describe.skipIf(!posix)('a launch', () => {
 
     const err = await launch('exit 0').catch((e: unknown) => e);
 
-    expect(launchRefusal(err)).toEqual({ key: 'launchError.noAccount' });
+    expect(refusalOf(err)).toEqual({ key: 'launchError.noAccount' });
   });
 });
 
@@ -681,9 +681,9 @@ describe.skipIf(!posix)('a game that is running', () => {
     await launch('exec sleep 30');
     expect(launcher.isGameRunning('p1')).toBe(true);
 
-    const { launchRefusal } = await import('../src/core/minecraft/launch-errors');
+    const { refusalOf } = await import('../src/core/util/refusal');
     const err = await launcher.launchGame({ profileId: 'p1' }).catch((e: unknown) => e);
-    expect(launchRefusal(err)).toEqual({ key: 'launchError.alreadyRunning' });
+    expect(refusalOf(err)).toEqual({ key: 'launchError.alreadyRunning' });
   });
 
   it('is stopped on request, and is not reported stopped until it has', async () => {

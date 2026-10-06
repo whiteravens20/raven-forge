@@ -9,7 +9,7 @@ import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { ADOPTIUM_API } from '../../shared/constants';
 import { parseJavaVersion } from '../minecraft/java-requirement';
-import { LaunchRefusedError } from '../minecraft/launch-errors';
+import { RefusedError } from '../util/refusal';
 import { emitProgress } from '../util/progress';
 import { downloadToFile } from '../net/download';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
@@ -105,7 +105,7 @@ export async function resolveChosenJava(
 ): Promise<JavaInstallation> {
   const version = await probeJava(binPath);
   if (version === null) {
-    throw new LaunchRefusedError(
+    throw new RefusedError(
       { key: 'launchError.javaNotRuntime', vars: { path: binPath } },
       `This profile is set to launch with ${binPath}, and that is not a Java runtime this ` +
         `machine can run. Point it somewhere else in the profile editor, or clear the field to ` +
@@ -113,7 +113,7 @@ export async function resolveChosenJava(
     );
   }
   if (version < requiredVersion) {
-    throw new LaunchRefusedError(
+    throw new RefusedError(
       {
         key: 'launchError.javaTooOld',
         vars: { path: binPath, found: version, required: requiredVersion },

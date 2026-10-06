@@ -71,13 +71,13 @@ async function loadModule(): Promise<Manager> {
 /**
  * The sayable form of a refusal, read the way the IPC layer reads it.
  *
- * Imported after `loadModule()` on purpose: `launchRefusal` is an `instanceof`
+ * Imported after `loadModule()` on purpose: `refusalOf` is an `instanceof`
  * check, and a module registry reset between the throw and the check would give
- * two different `LaunchRefusedError` classes and a silent `undefined`.
+ * two different `RefusedError` classes and a silent `undefined`.
  */
 async function refusalOf(err: unknown) {
-  const { launchRefusal } = await import('../src/core/minecraft/launch-errors');
-  return launchRefusal(err);
+  const refusal = await import('../src/core/util/refusal');
+  return refusal.refusalOf(err);
 }
 
 /**

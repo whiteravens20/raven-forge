@@ -105,7 +105,7 @@ import type {
   ShaderLoaderResult,
 } from '../shared/ipc-types';
 import { AuthServersUnreachableError } from '../core/auth/auth-errors';
-import { launchRefusal } from '../core/minecraft/launch-errors';
+import { refusalOf } from '../core/util/refusal';
 import { trustedKeyRing } from '../shared/branding';
 import { isEd25519PublicKey } from '../shared/trusted-key';
 
@@ -1065,7 +1065,7 @@ export function registerAllIpcHandlers(): void {
       }
       // A refusal carries the same sentence twice: English here for the log,
       // and a key the renderer says in the player's language.
-      return fail(`Failed to launch game: ${reason(err)}`, undefined, launchRefusal(err));
+      return fail(`Failed to launch game: ${reason(err)}`, undefined, refusalOf(err));
     }
   });
   handle('game:kill', async (_event, profileId: string) => {

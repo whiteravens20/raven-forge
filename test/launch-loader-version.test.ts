@@ -47,7 +47,7 @@ const profile: Profile = {
 };
 
 const { withLoaderVersion } = await import('../src/core/minecraft/game-launcher');
-const { launchRefusal } = await import('../src/core/minecraft/launch-errors');
+const { refusalOf } = await import('../src/core/util/refusal');
 
 beforeEach(() => {
   resolveDefaultLoaderVersion.mockReset();
@@ -88,7 +88,7 @@ describe('withLoaderVersion', () => {
 
     // A refusal with a key, not a bare failure: the renderer says this one in
     // the player's language, and it names the two things to go and change.
-    expect(launchRefusal(err)).toEqual({
+    expect(refusalOf(err)).toEqual({
       key: 'launchError.loaderVersionUnknown',
       vars: { loader: 'NeoForge', version: '1.21.1' },
     });
@@ -100,7 +100,7 @@ describe('withLoaderVersion', () => {
 
     const err = await withLoaderVersion(profile).catch((e: unknown) => e);
 
-    expect(launchRefusal(err)?.key).toBe('launchError.loaderVersionUnknown');
+    expect(refusalOf(err)?.key).toBe('launchError.loaderVersionUnknown');
     // The cause stays in the English message, which is what the log records.
     expect((err as Error).message).toMatch(/fetch failed/);
   });
