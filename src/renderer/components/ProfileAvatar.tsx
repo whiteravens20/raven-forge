@@ -66,6 +66,9 @@ export function ProfileAvatar({ profile, size = 40, className = '' }: ProfileAva
     let active = true;
     void api.profiles.getIcon(profile.id).then((result) => {
       const url = result.success ? (result.data ?? null) : null;
+      // The key carries the profile's last change, so every edit made a new
+      // entry and left the one before it: a whole picture kept per save.
+      invalidateAvatarCache(profile.id);
       cache.set(key, url);
       if (active) setIcon(url);
     });
