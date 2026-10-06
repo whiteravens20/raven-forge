@@ -81,7 +81,7 @@ import {
   killGame,
   isGameBusy,
   isGameRunning,
-  getLogTail,
+  getLogLines,
 } from '../core/minecraft/game-launcher';
 import { getVersionManifest } from '../core/minecraft/version-manifest';
 import { cancelJob, isCancellation } from '../core/util/cancellation';
@@ -1047,9 +1047,9 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to list running games: ${reason(err)}`);
     }
   });
-  handle('game:get-log-tail', async (_event, profileId: string, lines?: number) => {
+  handle('game:get-log-tail', async (_event, profileId: string) => {
     try {
-      return ok(getLogTail(profileId, lines));
+      return ok(getLogLines(profileId));
     } catch (err) {
       return fail(`Failed to read game log: ${reason(err)}`);
     }

@@ -261,7 +261,7 @@ export interface InvokeChannels {
    */
   'game:get-running': () => Promise<IpcResult<string[]>>;
   /** Recent stdout already buffered in main, so a console opened mid-game is not blank. */
-  'game:get-log-tail': (profileId: string, lines?: number) => Promise<IpcResult<string[]>>;
+  'game:get-log-tail': (profileId: string) => Promise<IpcResult<GameLogLine[]>>;
   /** Minecraft version ids from Mojang, newest first. Releases only unless asked. */
   'game:get-versions': (includeSnapshots?: boolean) => Promise<IpcResult<string[]>>;
   /**
@@ -353,7 +353,8 @@ export interface EventChannels {
   'progress:abandoned': (operationId: string) => void;
 
   // -- Game Events --
-  'game:log': (profileId: string, line: GameLogLine) => void;
+  /** What the game has printed since the last one — sent only while the console is switched on. */
+  'game:log': (profileId: string, lines: GameLogLine[]) => void;
   'game:started': (profileId: string) => void;
   'game:exited': (info: GameExitInfo) => void;
 
@@ -382,7 +383,7 @@ export interface EventChannels {
  *
  * Example usage in React:
  *   const profiles = await window.ravenforge.profiles.getAll();
- *   window.ravenforge.on('game:log', (profileId, line) => { ... });
+ *   window.ravenforge.on('game:log', (profileId, lines) => { ... });
  */
 export interface RavenForgeAPI {
   auth: {

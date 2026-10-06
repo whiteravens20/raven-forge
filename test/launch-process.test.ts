@@ -191,7 +191,7 @@ async function gameArgs(): Promise<string[]> {
   return raw.replace(/\n$/, '').split('\n');
 }
 
-const gameLines = () => sentOn('game:log').map((args) => args[1] as GameLogLine);
+const gameLines = () => sentOn('game:log').flatMap((args) => args[1] as GameLogLine[]);
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-launch-'));
@@ -358,6 +358,25 @@ describe.skipIf(!posix)('a launch', () => {
     expect((await exitInfo()).logTail).toEqual(['java.lang.OutOfMemoryError: Java heap space']);
   });
 
+  it('sends the console what was printed together as one message', async () => {
+    // A loader prints thousands of lines in its first seconds. One message
+    // each had the renderer rebuilding a list thousands of times over.
+    await launch([`printf 'one\\ntwo\\nthree\\n'`, 'exit 0'].join('\n'));
+    await exitInfo();
+
+    expect(gameLines().map((line) => line.message)).toEqual(['one', 'two', 'three']);
+    expect(sentOn('game:log').length).toBeLessThan(3);
+  });
+
+  it('sends the console nothing while it is switched off, and still keeps the lines', async () => {
+    state.settings.showLiveConsole = false;
+    await launch([`echo 'java.lang.IllegalStateException: boom'`, 'exit 1'].join('\n'));
+
+    // The crash card reads the same buffer, and that is not the console's to switch off.
+    expect((await exitInfo()).logTail).toEqual(['java.lang.IllegalStateException: boom']);
+    expect(sentOn('game:log')).toEqual([]);
+  });
+
   it('keeps an argument with a quoted space in it whole', async () => {
     await launch('exit 0', { javaArgs: '-Dpack.name="Raven Forge" -XX:+UseG1GC' });
     await exitInfo();
@@ -494,7 +513,10 @@ describe.skipIf(!posix)('the session token', () => {
 
     const redacted = `${SESSION}<redacted>:069a79f444e94726a5befca90e38aaf5)`;
     expect(launcher.getLogTail('p1')).toEqual([redacted, 'ready']);
-    expect(gameLines().map((line) => line.message)).toEqual([redacted, 'ready']);
+    // A moment later: the console is sent what has gathered, not each line.
+    await vi.waitFor(() =>
+      expect(gameLines().map((line) => line.message)).toEqual([redacted, 'ready']),
+    );
     // The line is still logged — it is the token that is not.
     expect(state.logged).toContain(`[MC:Survival] ${redacted}`);
     expect(state.logged.join('\n')).not.toContain(TOKEN);

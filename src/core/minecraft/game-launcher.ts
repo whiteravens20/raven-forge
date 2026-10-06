@@ -83,23 +83,29 @@ export function endedInFailure(
   return signal !== null || code !== 0;
 }
 
-// Per-profile log ring buffer (last 500 lines)
-const logBuffers = new Map<string, string[]>();
+/** How much of a game's output is kept for the console and the crash card. */
+const LOG_LINES_KEPT = 500;
 
-function pushLog(profileId: string, line: string): void {
-  const buf = logBuffers.get(profileId) ?? [];
-  buf.push(line);
-  if (buf.length > 500) buf.shift();
-  logBuffers.set(profileId, buf);
-}
+// Per-profile log ring buffer
+const logBuffers = new Map<string, GameLogLine[]>();
 
 function clearBuffer(profileId: string): void {
   logBuffers.delete(profileId);
+  unsent.delete(profileId);
 }
 
+/** The newest output of a profile's game, oldest line first. */
+export function getLogLines(profileId: string): GameLogLine[] {
+  return logBuffers.get(profileId) ?? [];
+}
+
+/** The last `n` lines as plain text, which is what a crash report quotes. */
 export function getLogTail(profileId: string, n = 100): string[] {
-  const buf = logBuffers.get(profileId) ?? [];
-  return buf.slice(-n);
+  return n > 0
+    ? getLogLines(profileId)
+        .slice(-n)
+        .map((line) => line.message)
+    : [];
 }
 
 /**
@@ -122,19 +128,48 @@ export function detectLogLevel(line: string): GameLogLine['level'] {
   return 'info';
 }
 
+/** How long lines are gathered before the console is sent them. */
+const LOG_FLUSH_MS = 100;
+
+/** Lines the renderer has not been sent yet, per profile. */
+const unsent = new Map<string, GameLogLine[]>();
+let flushTimer: NodeJS.Timeout | undefined;
+
+/**
+ * Hand the console what has arrived since the last time.
+ *
+ * In batches, and only while the console is switched on. A loader's startup is
+ * several thousand lines in a few seconds; one message each kept the renderer
+ * busy re-rendering a list — whether or not anything was showing it, and the
+ * setting that shows it is off unless somebody turned it on.
+ */
+async function flushLogLines(): Promise<void> {
+  flushTimer = undefined;
+  const batches = [...unsent];
+  unsent.clear();
+  if (!(await getSettings()).showLiveConsole) return;
+  for (const [profileId, lines] of batches) {
+    getMainWindow()?.webContents.send('game:log', profileId, lines);
+  }
+}
+
 function emitLogLine(profileId: string, rawLine: string): void {
-  const trimmed = rawLine.trimEnd();
-  pushLog(profileId, trimmed);
-
-  const level = detectLogLevel(trimmed);
-
+  const message = rawLine.trimEnd();
   const line: GameLogLine = {
     timestamp: new Date().toISOString(),
-    level,
-    message: trimmed,
+    level: detectLogLevel(message),
+    message,
   };
 
-  getMainWindow()?.webContents.send('game:log', profileId, line);
+  const buf = logBuffers.get(profileId) ?? [];
+  buf.push(line);
+  if (buf.length > LOG_LINES_KEPT) buf.shift();
+  logBuffers.set(profileId, buf);
+
+  const waiting = unsent.get(profileId) ?? [];
+  waiting.push(line);
+  unsent.set(profileId, waiting);
+  flushTimer ??= setTimeout(() => void flushLogLines(), LOG_FLUSH_MS);
 }
 
 // ── Argument building ──────────────────────────────────────
@@ -715,6 +750,8 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
         log.warn(`Could not record play time for ${profile.name}:`, err);
       }
 
+      // The console gets the game's last words before it is told the game is over.
+      await flushLogLines();
       getMainWindow()?.webContents.send('game:exited', exitInfo);
       clearBuffer(profile.id);
       if (closedForGame) finishClosing(crashed);
