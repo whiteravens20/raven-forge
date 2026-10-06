@@ -234,6 +234,39 @@ describe('syncContentFromManifest', () => {
     ).resolves.toBe(1);
   });
 
+  it('removes the build a newer one replaced', async () => {
+    // A version bump changes the file name. The old zip used to stay in the
+    // folder beside the new one, in no list, for good.
+    const first = { ...manifestPack('server-pack', 'build one'), fileName: 'server-pack-1.zip' };
+    await content.syncContentFromManifest('resourcepacks', PROFILE, [first], '1.21.4');
+    expect(await fs.readdir(packsDir())).toEqual(['server-pack-1.zip']);
+
+    const second = { ...manifestPack('server-pack', 'build two'), fileName: 'server-pack-2.zip' };
+    await content.syncContentFromManifest('resourcepacks', PROFILE, [second], '1.21.4');
+
+    expect(await fs.readdir(packsDir())).toEqual(['server-pack-2.zip']);
+    expect((await content.listContent('resourcepacks', PROFILE)).map((i) => i.fileName)).toEqual([
+      'server-pack-2.zip',
+    ]);
+    expect(await fs.readFile(optionsFile(), 'utf-8')).not.toContain('server-pack-1.zip');
+  });
+
+  it('keeps a replaced file that another entry has taken over', async () => {
+    // Two entries swap file names in one manifest: neither file is anybody's
+    // leftover.
+    const a1 = { ...manifestPack('a', 'pack a'), fileName: 'one.zip' };
+    const b1 = { ...manifestPack('b', 'pack b'), fileName: 'two.zip' };
+    await content.syncContentFromManifest('resourcepacks', PROFILE, [a1, b1], '1.21.4');
+
+    const a2 = { ...manifestPack('a', 'pack a'), fileName: 'two.zip' };
+    const b2 = { ...manifestPack('b', 'pack b'), fileName: 'one.zip' };
+    await content.syncContentFromManifest('resourcepacks', PROFILE, [a2, b2], '1.21.4');
+
+    expect((await fs.readdir(packsDir())).sort()).toEqual(['one.zip', 'two.zip']);
+    expect(await fs.readFile(path.join(packsDir(), 'two.zip'), 'utf-8')).toBe('pack a');
+    expect(await fs.readFile(path.join(packsDir(), 'one.zip'), 'utf-8')).toBe('pack b');
+  });
+
   it('refuses a file whose hash is not the one the manifest published', async () => {
     const entry = manifestPack('server-pack', 'server-bytes');
     served['/server-pack.zip'] = 'something-else-entirely';

@@ -234,6 +234,8 @@ export async function syncContentFromManifest(
 
   const existing = await readIndex(kind, profileId);
   const fromManifest: InstalledMod[] = [];
+  /** Files of entries that now go by another file name — the builds they replaced. */
+  const replaced: string[] = [];
 
   for (const entry of entries) {
     const previous = existing.find((item) => item.id === entry.id);
@@ -278,6 +280,7 @@ export async function syncContentFromManifest(
     }
 
     const dest = path.join(dir, fileName);
+    if (previous && previous.fileName !== fileName) replaced.push(previous.fileName);
 
     // Skip the download when the file on disk already matches the manifest.
     if (previous && (await fileMatches(dest, entry))) {
@@ -311,6 +314,15 @@ export async function syncContentFromManifest(
       enabled: true,
       fromManifest: true,
     });
+  }
+
+  // A version bump changes the file name, and the build it replaced has to go
+  // with it. The mods path has always done this; here the old zip stayed in the
+  // folder beside the new one, listed nowhere, until somebody found it. Only
+  // once everything has arrived, and never a file another entry now goes by.
+  const inUse = new Set(fromManifest.map((item) => item.fileName));
+  for (const fileName of replaced) {
+    if (!inUse.has(fileName)) await fs.rm(path.join(dir, fileName), { force: true });
   }
 
   // Drop manifest-managed items the manifest dropped.
