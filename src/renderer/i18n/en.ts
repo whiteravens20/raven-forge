@@ -228,6 +228,8 @@ export const en = {
     'Another {count} files ({size}) are not on Modrinth, so they were written into the pack itself.',
   'profiles.exportPackSkipped.one': 'Left out one item that is switched off.',
   'profiles.exportPackSkipped.other': 'Left out {count} items that are switched off.',
+  'profiles.exportPackCarried.one': 'One file of this computer’s settings went in with it.',
+  'profiles.exportPackCarried.other': '{count} files of this computer’s settings went in with it.',
 
   // ── Worlds and backups ───────────────────────────────────
   'worlds.title': 'Worlds',

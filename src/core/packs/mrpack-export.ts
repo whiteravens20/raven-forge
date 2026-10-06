@@ -399,7 +399,7 @@ export async function exportProfileAsMrpack(
     files: files.length,
     bundled: bundle.length,
     bundledBytes,
-    overrides: written,
+    settingsFiles: written,
     skippedDisabled: disabled,
   };
 }

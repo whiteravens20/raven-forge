@@ -234,6 +234,10 @@ export const pl: Translations = {
   'profiles.exportPackSkipped.few': 'Pominięto {count} dodatki, które są wyłączone.',
   'profiles.exportPackSkipped.many': 'Pominięto {count} dodatków, które są wyłączone.',
   'profiles.exportPackSkipped.other': 'Pominięto {count} dodatków, które są wyłączone.',
+  'profiles.exportPackCarried.one': 'Dołączono 1 plik ustawień z tego komputera.',
+  'profiles.exportPackCarried.few': 'Dołączono {count} pliki ustawień z tego komputera.',
+  'profiles.exportPackCarried.many': 'Dołączono {count} plików ustawień z tego komputera.',
+  'profiles.exportPackCarried.other': 'Dołączono {count} plików ustawień z tego komputera.',
 
   // ── Światy i kopie ───────────────────────────────────────
   'worlds.title': 'Światy',

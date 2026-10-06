@@ -685,6 +685,9 @@ export function ProfilesPage() {
                 })}`}
               {exported.skippedDisabled > 0 &&
                 ` ${t.plural('profiles.exportPackSkipped', exported.skippedDisabled)}`}
+              {/* Said, because it is theirs: whoever gets the pack gets these. */}
+              {exported.settingsFiles > 0 &&
+                ` ${t.plural('profiles.exportPackCarried', exported.settingsFiles)}`}
             </Banner>
           </div>
         )}

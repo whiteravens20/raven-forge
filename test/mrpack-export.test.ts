@@ -217,7 +217,7 @@ describe('exportProfileAsMrpack', () => {
     await write('saves/MyWorld/level.dat', 'not configuration');
 
     const summary = await exportProfileAsMrpack('p1', dest());
-    expect(summary.overrides).toBe(3);
+    expect(summary.settingsFiles).toBe(3);
 
     const carried = Object.keys(await overridesOf(dest()));
     expect(carried.sort()).toEqual([
@@ -313,7 +313,7 @@ describe('exportProfileAsMrpack', () => {
 
     const summary = await exportProfileAsMrpack('p1', dest(), { settings: false });
 
-    expect(summary.overrides).toBe(0);
+    expect(summary.settingsFiles).toBe(0);
     // The mods are the pack; only the settings were the question.
     expect(Object.keys(await overridesOf(dest()))).toEqual(['mods/private.jar']);
   });

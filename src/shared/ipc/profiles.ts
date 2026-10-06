@@ -149,8 +149,8 @@ export interface MrpackExport {
   /** Files carried inside the archive because Modrinth does not host them. */
   bundled: number;
   bundledBytes: number;
-  /** Config files and `options.txt` carried along in `overrides/`. */
-  overrides: number;
+  /** Files of the author's own settings carried along: `options.txt` and the `config` folder. */
+  settingsFiles: number;
   /** Content left out because it is switched off in the profile. */
   skippedDisabled: number;
 }
