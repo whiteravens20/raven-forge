@@ -4,7 +4,11 @@ import { autoUpdater } from 'electron-updater';
 import { app } from 'electron';
 import { log } from '../../main/logger';
 import { getMainWindow } from '../../main/window';
+import { abandonProgress, emitProgress } from '../util/progress';
 import type { UpdateCheck, UpdateInfo, UpdateUnsupportedReason } from '../../shared/ipc-types';
+
+/** The one bar the update download draws. */
+const UPDATE_OPERATION = 'launcher-update';
 
 let initialized = false;
 let pendingUpdate: UpdateInfo | null = null;
@@ -33,8 +37,8 @@ export function initUpdater(): void {
   });
 
   autoUpdater.on('download-progress', (progress) => {
-    getMainWindow()?.webContents.send('progress:launcher-update', {
-      operationId: 'launcher-update',
+    emitProgress('progress:launcher-update', {
+      operationId: UPDATE_OPERATION,
       progress: progress.percent / 100,
       message: {
         key: 'progress.msg.updateDownloading',
@@ -58,6 +62,9 @@ export function initUpdater(): void {
 
   autoUpdater.on('error', (err) => {
     log.warn(`Updater error: ${err.message}`);
+    // A download that died half-way reports nothing further, and its bar
+    // would stay at whatever it had reached.
+    abandonProgress(UPDATE_OPERATION);
   });
 }
 

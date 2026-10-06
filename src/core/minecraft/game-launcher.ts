@@ -25,6 +25,7 @@ import { resolveLaunchMeta } from '../modloader/loader-profile';
 import { getVersionMeta } from './version-manifest';
 import { ensureClientJar, ensureLibraries, ensureAssets } from './asset-downloader';
 import { beginJob, endJob, isCancellation, throwIfCancelled } from '../util/cancellation';
+import { withProgress } from '../util/progress';
 import { machineMemoryMb } from '../util/machine-memory';
 import { formatRamGb, ramAdvice, recommendedRamMb } from '../../shared/memory';
 import {
@@ -759,7 +760,8 @@ export async function launchGame(options: LaunchOptions): Promise<void> {
 
   preparing.add(options.profileId);
   try {
-    await runLaunch(options);
+    // Whichever way the preparation ends, its progress bars end with it.
+    await withProgress(() => runLaunch(options));
   } catch (err) {
     endJob(options.profileId);
     // Cancelling is the user's own decision, not a failure to report back.

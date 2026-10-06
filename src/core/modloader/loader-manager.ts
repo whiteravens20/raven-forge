@@ -2,7 +2,7 @@
 
 import { log } from '../../main/logger';
 import { FABRIC_META_API, QUILT_META_API } from '../../shared/constants';
-import { getMainWindow } from '../../main/window';
+import { emitProgress } from '../util/progress';
 import { getForgeVersions, getNeoForgeVersions, installForgeLike } from './forge-installer';
 import { loaderProfilePath, readLoaderProfile } from './loader-profile';
 import { withTimeout } from '../util/cancellation';
@@ -15,7 +15,7 @@ import {
 import type { ModLoaderType, ProgressEvent, LoaderVersion } from '../../shared/ipc-types';
 
 function emitLoaderProgress(event: ProgressEvent): void {
-  getMainWindow()?.webContents.send('progress:loader-install', event);
+  emitProgress('progress:loader-install', event);
 }
 
 // ── Fabric and Quilt ───────────────────────────────────────

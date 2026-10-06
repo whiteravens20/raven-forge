@@ -11,7 +11,7 @@ import { ADOPTIUM_API } from '../../shared/constants';
 import { verifyDownload } from '../mods/integrity';
 import { parseJavaVersion } from '../minecraft/java-requirement';
 import { LaunchRefusedError } from '../minecraft/launch-errors';
-import { getMainWindow } from '../../main/window';
+import { emitProgress } from '../util/progress';
 import { downloadToFile } from '../net/download';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
@@ -202,7 +202,7 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
 }
 
 function emitJavaProgress(event: ProgressEvent): void {
-  getMainWindow()?.webContents.send('progress:java-download', event);
+  emitProgress('progress:java-download', event);
 }
 
 // ── Download & install from Adoptium ───────────────────────

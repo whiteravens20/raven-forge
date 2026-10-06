@@ -101,6 +101,10 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
       };
       api.on(channel, handler);
     }
+    // An operation that failed or was cancelled never reports 1, so its entry
+    // had nothing to remove it: the box stayed up, on every page, until the
+    // same operation ran again to the end.
+    api.on('progress:abandoned', (operationId) => get().clear(operationId));
   },
 
   clear: (operationId) => {

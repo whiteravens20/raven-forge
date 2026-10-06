@@ -345,6 +345,12 @@ export interface EventChannels {
   'progress:game-assets': (event: ProgressEvent) => void;
   'progress:launcher-update': (event: ProgressEvent) => void;
   'progress:data-root': (event: ProgressEvent) => void;
+  /**
+   * An operation is over without having finished — it failed or was cancelled —
+   * and whatever bar it had goes. One that finishes says so itself, with
+   * `progress: 1`.
+   */
+  'progress:abandoned': (operationId: string) => void;
 
   // -- Game Events --
   'game:log': (profileId: string, line: GameLogLine) => void;

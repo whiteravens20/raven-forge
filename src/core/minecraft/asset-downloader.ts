@@ -12,7 +12,7 @@ import { downloadToFile } from '../net/download';
 import { MOJANG_RESOURCES } from '../../shared/constants';
 import { hashFile } from '../mods/integrity';
 import { getSettings } from '../config/settings-manager';
-import { getMainWindow } from '../../main/window';
+import { emitProgress } from '../util/progress';
 import { getMojangOsName } from './launch-args';
 import type { AssetIndex, DownloadInfo, Library, VersionMeta } from './types';
 import type { ProgressEvent, ProgressMessage } from '../../shared/ipc-types';
@@ -254,7 +254,7 @@ function shouldIncludeLibrary(lib: Library): boolean {
 }
 
 function emitAssetProgress(event: ProgressEvent): void {
-  getMainWindow()?.webContents.send('progress:game-assets', event);
+  emitProgress('progress:game-assets', event);
 }
 
 // ── Maven coordinates ──────────────────────────────────────

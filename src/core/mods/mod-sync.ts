@@ -27,6 +27,7 @@ import { downloadToFile } from '../net/download';
 import { readJsonCapped } from '../net/json';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { forEachConcurrently } from '../util/concurrency';
+import { emitProgress, withProgress } from '../util/progress';
 import { syncContentFromManifest } from './content-manager';
 import { fileMatches, verifyDownload, expectedHash, type HashedEntry } from './integrity';
 import { configVersion, shouldApplyConfigOverride } from './config-overrides';
@@ -50,14 +51,9 @@ import type {
   ModInstallResult,
   ProfileSyncStatus,
   ModSearchResult,
-  ProgressEvent,
   ProgressMessage,
   TrustedKey,
 } from '../../shared/ipc-types';
-
-function emitProgress(channel: 'progress:mod-sync', event: ProgressEvent): void {
-  getMainWindow()?.webContents.send(channel, event);
-}
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -514,7 +510,11 @@ async function obtainManifest(
  * again finishes an install that stopped half-way and repairs anything deleted
  * by hand.
  */
-export async function syncManifest(profileId: string, supplied?: ModManifest): Promise<void> {
+export function syncManifest(profileId: string, supplied?: ModManifest): Promise<void> {
+  return withProgress(() => runSync(profileId, supplied));
+}
+
+async function runSync(profileId: string, supplied?: ModManifest): Promise<void> {
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
 
