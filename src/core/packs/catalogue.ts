@@ -19,7 +19,9 @@ import type { CataloguePack } from '../../shared/ipc-types';
 
 const catalogueSchema = z.object({
   indexVersion: z.literal(1),
-  generatedAt: z.string().optional(),
+  // Only what the picker shows is named. A field of the wrong type refuses the
+  // whole catalogue, so every one listed here that nothing reads is a way for
+  // a harmless change on the packs site to empty the list in every launcher.
   packs: z.array(
     z.object({
       slug: z.string().min(1),
@@ -33,19 +35,13 @@ const catalogueSchema = z.object({
       // field is the one that can never change shape.
       summaryI18n: z.record(z.string(), z.string()).optional(),
       minecraft: z.string().min(1),
-      loader: z.object({ type: z.string(), version: z.string().optional() }),
-      recommendedRamMb: z.number().optional(),
-      server: z.object({ ip: z.string(), port: z.number().optional() }).nullable().optional(),
-      counts: z
-        .object({ mods: z.number(), resourcePacks: z.number(), shaders: z.number() })
-        .partial()
-        .optional(),
+      loader: z.object({ type: z.string() }),
+      counts: z.object({ mods: z.number() }).partial().optional(),
       totalDownloadBytes: z.number().optional(),
       // Null when the catalogue was built without PACK_BASE_URL. A pack with no
       // manifest cannot be installed, so it is dropped rather than listed as
       // something that fails on click.
       manifestUrl: z.string().url().nullable().optional(),
-      mrpackUrl: z.string().url().nullable().optional(),
     }),
   ),
 });
@@ -93,8 +89,6 @@ export async function listCataloguePacks(): Promise<CataloguePack[]> {
     summaryI18n: pack.summaryI18n,
     minecraftVersion: pack.minecraft,
     modLoader: pack.loader.type,
-    recommendedRamMb: pack.recommendedRamMb,
-    serverIp: pack.server?.ip,
     modCount: pack.counts?.mods ?? 0,
     totalDownloadBytes: pack.totalDownloadBytes ?? 0,
     manifestUrl: pack.manifestUrl!,

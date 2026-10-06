@@ -170,8 +170,6 @@ export interface CataloguePack {
   summaryI18n?: Record<string, string>;
   minecraftVersion: string;
   modLoader: string;
-  recommendedRamMb?: number;
-  serverIp?: string;
   modCount: number;
   totalDownloadBytes: number;
   manifestUrl: string;

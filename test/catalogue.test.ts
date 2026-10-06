@@ -55,8 +55,6 @@ describe('listCataloguePacks', () => {
       summary: 'Performance and quality-of-life pack.',
       minecraftVersion: '26.2',
       modLoader: 'fabric',
-      recommendedRamMb: 4096,
-      serverIp: 'mc.example.net',
       modCount: 25,
       totalDownloadBytes: 30472224,
       manifestUrl: 'https://whiteravens20.github.io/raven-packs/ravenmc/manifest.json',
@@ -153,7 +151,20 @@ describe('listCataloguePacks', () => {
     const [pack] = await listCataloguePacks();
     expect(pack.summary).toBe('');
     expect(pack.modCount).toBe(0);
-    expect(pack.serverIp).toBeUndefined();
+  });
+
+  it('is not put off by fields it has no use for changing shape', async () => {
+    // Everything the picker does not show is the packs site's own business.
+    respondWith({
+      indexVersion: 1,
+      generatedAt: 20261006,
+      packs: [
+        entry({ server: 'mc.example.net', mrpackUrl: null, counts: { mods: 3, shaders: 'x' } }),
+      ],
+    });
+
+    const [pack] = await listCataloguePacks();
+    expect(pack.modCount).toBe(3);
   });
 
   it('refuses a catalogue whose shape it does not recognise', async () => {
