@@ -238,17 +238,15 @@ describe('native libraries', () => {
     const file = path.join(natives(), 'liblwjgl.so');
     await fs.mkdir(natives(), { recursive: true });
     await fs.writeFile(file, 'an older, longer build of it');
-    // Held open the way a running game holds it.
-    const held = await fs.open(file, 'r');
+    // A second name for the same file, which is what a running game's mapping
+    // of it amounts to: if the bytes under it change, the game's did.
+    const mapped = path.join(dir, 'as-the-running-game-has-it');
+    await fs.link(file, mapped);
 
-    try {
-      await ensureLibraries(libs(), metaOf([jar]), natives());
+    await ensureLibraries(libs(), metaOf([jar]), natives());
 
-      expect(await fs.readFile(file, 'utf-8')).toBe('linux build');
-      expect((await held.readFile('utf-8')).toString()).toBe('an older, longer build of it');
-    } finally {
-      await held.close();
-    }
+    expect(await fs.readFile(file, 'utf-8')).toBe('linux build');
+    expect(await fs.readFile(mapped, 'utf-8')).toBe('an older, longer build of it');
     expect(await fs.readdir(natives())).toEqual(['liblwjgl.so']);
   });
 
