@@ -101,6 +101,72 @@ describe('getLoaderVersions', () => {
     expect(versions.every((v) => v.stable)).toBe(true);
   });
 
+  /** A build as the two services describe it: its version, and the ASM it runs on. */
+  const built = (version: string, asm: string, stable?: boolean) => ({
+    loader: { version, stable },
+    launcherMeta: { libraries: { common: [{ name: `org.ow2.asm:asm:${asm}` }] } },
+  });
+
+  it('offers only the Fabric builds that can start the Minecraft version asked about', async () => {
+    // Fabric lists every build it has for every version. These five are on the
+    // list for 26.3 and for 1.21.4 alike.
+    const listed = [
+      built('0.19.5', '9.10.1', true),
+      built('0.16.14', '9.8'),
+      built('0.16.13', '9.7.1'),
+      built('0.14.20', '9.5'),
+      built('0.14.19', '9.4'),
+    ];
+
+    serve(listed);
+    // Java 25: 0.16.13 and older stop at "Unsupported class file major version 69".
+    expect((await mod.getLoaderVersions('fabric', '26.3')).map((v) => v.version)).toEqual([
+      '0.19.5',
+      '0.16.14',
+    ]);
+
+    serve(listed);
+    // Java 21, which 0.14.20 is the first to read.
+    expect((await mod.getLoaderVersions('fabric', '1.21.4')).map((v) => v.version)).toEqual([
+      '0.19.5',
+      '0.16.14',
+      '0.16.13',
+      '0.14.20',
+    ]);
+  });
+
+  it('offers only the Quilt builds that start a Minecraft shipped without mappings', async () => {
+    serve([
+      built('0.29.0', '9.8'),
+      built('0.30.0-beta.3', '9.9'),
+      built('0.31.0-beta.4', '9.10.1'),
+      built('0.30.1', '9.10.1'),
+      built('0.30.0-beta.4', '9.9'),
+      built('0.28.1', '9.7.1'),
+    ]);
+
+    const versions = await mod.getLoaderVersions('quilt', '26.3');
+
+    expect(versions.map((v) => v.version)).toEqual(['0.31.0-beta.4', '0.30.1', '0.30.0-beta.4']);
+    expect(defaultLoaderVersion(versions)).toBe('0.30.1');
+  });
+
+  it('goes by the Java a version’s own metadata names, when a launch has left that on disk', async () => {
+    // A snapshot's id says nothing of its Java, and the rule for those is the
+    // newest. Its metadata, once fetched, says 21 — which 0.14.20 reads.
+    await fs.mkdir(path.join(root, 'cache'), { recursive: true });
+    await fs.writeFile(
+      path.join(root, 'cache', '24w14a.json'),
+      JSON.stringify({ id: '24w14a', javaVersion: { majorVersion: 21 } }),
+    );
+    serve([built('0.19.5', '9.10.1'), built('0.14.20', '9.5')]);
+
+    expect((await mod.getLoaderVersions('fabric', '24w14a')).map((v) => v.version)).toEqual([
+      '0.19.5',
+      '0.14.20',
+    ]);
+  });
+
   it('sorts Forge newest first when its list arrives that way round already', async () => {
     // Minecraft 1.21, in the order Forge's Maven serves it. The list used to be
     // reversed on the theory that Maven lists oldest first.

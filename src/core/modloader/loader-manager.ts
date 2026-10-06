@@ -17,6 +17,9 @@ import {
   defaultLoaderVersion,
   isPrerelease,
 } from '../../shared/loader-version';
+import { getCachedVersionMeta } from '../minecraft/version-manifest';
+import { requiredJavaFor } from '../minecraft/java-requirement';
+import { startsMinecraft, type LoaderEntry, type MetaLoader } from './loader-fit';
 import type { ModLoaderType, ProgressEvent, LoaderVersion } from '../../shared/ipc-types';
 
 function emitLoaderProgress(event: ProgressEvent): void {
@@ -27,12 +30,10 @@ function emitLoaderProgress(event: ProgressEvent): void {
 // The two publish the same thing at the same kind of address: a list of loader
 // builds per Minecraft version, and for each a ready-made version profile.
 
-const META_LOADERS = {
+const META_LOADERS: Record<MetaLoader, { api: string; label: string }> = {
   fabric: { api: FABRIC_META_API, label: 'Fabric' },
   quilt: { api: QUILT_META_API, label: 'Quilt' },
-} as const;
-
-type MetaLoader = keyof typeof META_LOADERS;
+};
 
 async function getMetaLoaderVersions(
   loader: MetaLoader,
@@ -52,10 +53,17 @@ async function getMetaLoaderVersions(
   }
   if (!res.ok) throw new Error(`${label} API error: ${res.status}`);
 
-  const data = (await res.json()) as Array<{ loader: { version: string; stable?: boolean } }>;
+  const data = (await res.json()) as LoaderEntry[];
+
+  // What the service lists is every build there is, whatever the Minecraft
+  // version; what is offered is the ones that start this one. The Java is what
+  // Mojang's metadata says when a launch has already fetched it, and what the
+  // release number says otherwise — nobody is asked just to draw a list.
+  const java = requiredJavaFor(mcVersion, await getCachedVersionMeta(mcVersion));
 
   return (
     data
+      .filter((entry) => startsMinecraft(loader, entry, mcVersion, java))
       .map((entry) => ({
         version: entry.loader.version,
         stable: !isPrerelease(entry.loader.version),
