@@ -27,6 +27,8 @@ const published = new Map<string, string | null>();
 const fetched: string[] = [];
 /** Runs before each download — the hook a test uses to cancel mid-sync. */
 let beforeDownload: (url: string) => void = () => {};
+/** Runs once a download is on disk, with the path it was written to. */
+let afterDownload: (dest: string) => Promise<void> = async () => {};
 
 vi.mock('../src/main/window', () => ({ getMainWindow: () => null }));
 vi.mock('../src/main/logger', () => ({
@@ -52,6 +54,7 @@ vi.mock('../src/core/net/download', () => ({
     if (body === null || body === undefined) throw new Error(`503 for ${url}`);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, body);
+    await afterDownload(dest);
   },
 }));
 vi.mock('../src/core/config/paths', () => ({
@@ -115,6 +118,7 @@ beforeEach(async () => {
   published.clear();
   fetched.length = 0;
   beforeDownload = () => {};
+  afterDownload = async () => {};
   updateProfile.mockClear();
   profile = {
     id: 'p1',
@@ -230,6 +234,43 @@ describe('updating a mod installed by hand', () => {
 
     expect(await jars()).toEqual(['moonlight-2.jar.disabled']);
     expect((await lock())[0].enabled).toBe(false);
+  });
+});
+
+describe('a file that has just been downloaded', () => {
+  // The downloader hashes the bytes as it writes them, so there is nothing left
+  // to read the file for. Making it unreadable the moment it lands is how that
+  // is seen from here — which only means anything where a mode bit can stop a
+  // read at all.
+  const readsCannotBeRefused = process.platform === 'win32' || process.getuid?.() === 0;
+  const makeUnreadable = (dest: string) => fs.chmod(dest, 0o000);
+
+  it.skipIf(readsCannotBeRefused)('is not read back from disk by a pack sync', async () => {
+    afterDownload = makeUnreadable;
+
+    // Every jar used to be read again from start to finish, for a sha256 that
+    // nothing in the launcher ever looked at.
+    await syncManifest('p1', pack([mod('jei'), mod('mekanism')]));
+
+    expect((await lock()).map((m) => m.id)).toEqual(['jei', 'mekanism']);
+  });
+
+  it.skipIf(readsCannotBeRefused)('is not read back by an install from the browser', async () => {
+    afterDownload = makeUnreadable;
+    published.set(urlOf('moonlight.jar'), 'build one');
+
+    await installResolvedMod(
+      'p1',
+      { id: 'moonlight', name: 'Moonlight Lib', source: 'modrinth' },
+      {
+        url: urlOf('moonlight.jar'),
+        fileName: 'moonlight.jar',
+        version: '1.0.0',
+        hashes: { sha256: sha256('build one') },
+      },
+    );
+
+    expect((await lock()).map((m) => m.id)).toEqual(['moonlight']);
   });
 });
 

@@ -27,13 +27,7 @@ import { downloadToFile } from '../net/download';
 import { readJsonCapped } from '../net/json';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { syncContentFromManifest } from './content-manager';
-import {
-  sha256File,
-  fileMatches,
-  verifyDownload,
-  expectedHash,
-  type HashedEntry,
-} from './integrity';
+import { fileMatches, verifyDownload, expectedHash, type HashedEntry } from './integrity';
 import { configVersion, shouldApplyConfigOverride } from './config-overrides';
 import { pendingChanges } from './pack-diff';
 import { getMainWindow } from '../../main/window';
@@ -383,7 +377,7 @@ async function fetchModEntry(
   resolved: ResolvedDownload,
   destPath: string,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<void> {
   const hashes = pinnedHashes(entry, resolved);
 
   if (resolved.localPath) {
@@ -404,10 +398,6 @@ async function fetchModEntry(
       verify: { hashes, label: entry.name },
     });
   }
-
-  // installed.lock always records sha256 so local integrity checks stay uniform,
-  // whichever algorithm the manifest happened to publish.
-  return sha256File(destPath);
 }
 
 // ── Manifest sync ──────────────────────────────────────────
@@ -640,8 +630,8 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       destPath: string;
       previous?: InstalledMod;
       enabled: boolean;
-      /** Set when the file is already there and matches — nothing to fetch. */
-      hash?: string;
+      /** The file is already there and matches — nothing to fetch. */
+      present: boolean;
     }
 
     const plannedMods: PlannedMod[] = [];
@@ -662,12 +652,9 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
       // very end, so a first install that failed at mod sixty had recorded
       // nothing, and the retry fetched the first fifty-nine again — on every
       // launch, for as long as that one URL stayed broken.
-      let hash: string | undefined;
-      if (await fileMatches(destPath, pinnedHashes(entry, resolved))) {
-        hash = previous?.sha256 ?? (await sha256File(destPath));
-      }
+      const present = await fileMatches(destPath, pinnedHashes(entry, resolved));
 
-      plannedMods.push({ entry, resolved, destPath, previous, enabled, hash });
+      plannedMods.push({ entry, resolved, destPath, previous, enabled, present });
       checked++;
     }
 
@@ -702,7 +689,7 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     }
 
     const downloadTotal =
-      plannedMods.filter((p) => !p.hash).length + plannedConfigs.filter((c) => c.write).length;
+      plannedMods.filter((p) => !p.present).length + plannedConfigs.filter((c) => c.write).length;
     let fetched = 0;
 
     const reportDownload = (message: ProgressMessage, currentFile?: string) =>
@@ -719,12 +706,12 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
     for (const planned of plannedMods) {
       const { entry, resolved, destPath, previous, enabled } = planned;
 
-      if (!planned.hash) {
+      if (!planned.present) {
         throwIfCancelled(signal, 'Sync');
         reportDownload({ key: 'progress.msg.downloadingFile', vars: { name: entry.name } });
 
         log.info(`Downloading mod: ${entry.name} (${resolved.fileName})`);
-        planned.hash = await fetchModEntry(entry, resolved, destPath, signal);
+        await fetchModEntry(entry, resolved, destPath, signal);
 
         // A version bump changes the filename; drop the file it replaced, at
         // whichever of the two names that file was under.
@@ -740,7 +727,6 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         version: resolved.version,
         source: entry.source,
         fileName: resolved.fileName,
-        sha256: planned.hash,
         required: entry.required,
         side: entry.side,
         enabled,
@@ -956,16 +942,12 @@ export async function installResolvedMod(
     verify: { hashes: resolved.hashes, label: identity.name },
   });
 
-  // installed.lock always records sha256, whatever the source published.
-  const hash = await sha256File(destPath);
-
   const installed: InstalledMod = {
     id: identity.id,
     name: identity.name,
     version: resolved.version,
     source: identity.source,
     fileName: resolved.fileName,
-    sha256: hash,
     required: false,
     side: 'both',
     enabled,

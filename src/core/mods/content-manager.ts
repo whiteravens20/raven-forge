@@ -11,7 +11,7 @@ import { getVersion, getModVersions, getProjectTitle, primaryFile } from './modr
 import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
-import { sha256File, fileMatches, type HashedEntry } from './integrity';
+import { fileMatches, type HashedEntry } from './integrity';
 import type { InstalledMod } from '../../shared/ipc-types';
 import {
   fileNameFromUrl,
@@ -158,14 +158,12 @@ export async function installContent(
     displayName = fileName.replace(/\.zip$/i, '');
     const dest = path.join(dir, fileName);
     await fs.copyFile(localPath, dest);
-    const hash = await sha256File(dest);
     const installed: InstalledMod = {
       id: `local-${crypto.randomUUID()}`,
       name: displayName,
       version: 'local',
       source: 'local',
       fileName,
-      sha256: hash,
       required: false,
       side: 'client',
       enabled: true,
@@ -187,7 +185,6 @@ export async function installContent(
     secure: true,
     verify: expectedHashes && { hashes: expectedHashes, label: displayName },
   });
-  const hash = await sha256File(dest);
 
   const installed: InstalledMod = {
     id: modrinthProjectId ?? `url-${crypto.randomUUID()}`,
@@ -195,7 +192,6 @@ export async function installContent(
     version,
     source: modrinthProjectId ? 'modrinth' : 'url',
     fileName,
-    sha256: hash,
     required: false,
     side: 'client',
     enabled: true,
@@ -222,7 +218,7 @@ export async function installContent(
 /**
  * Reconcile a profile's shaders / resource packs against a server manifest.
  *
- * Entries already present with a matching sha256 are left alone. Items
+ * Entries already present with a matching hash are left alone. Items
  * previously installed *from a manifest* that the manifest no longer lists are
  * removed; anything the user installed themselves is never touched.
  */
@@ -295,7 +291,6 @@ export async function syncContentFromManifest(
       secure: true,
       verify: { hashes: { ...apiHashes, ...entry }, label: entry.name },
     });
-    const hash = await sha256File(dest);
 
     fromManifest.push({
       id: entry.id,
@@ -303,7 +298,6 @@ export async function syncContentFromManifest(
       version,
       source: entry.source === 'modrinth' ? 'modrinth' : 'url',
       fileName,
-      sha256: hash,
       required: true,
       side: 'client',
       enabled: true,

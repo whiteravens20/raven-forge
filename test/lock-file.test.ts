@@ -41,7 +41,6 @@ const mod = (id: string): InstalledMod => ({
   version: '1',
   source: 'local',
   fileName: `${id}.jar`,
-  sha256: 'x',
   required: false,
   side: 'both',
   enabled: true,

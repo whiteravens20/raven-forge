@@ -35,10 +35,6 @@ export async function hashFile(filePath: string, algorithm: HashAlgorithm): Prom
   return hash.digest('hex');
 }
 
-export async function sha256File(filePath: string): Promise<string> {
-  return hashFile(filePath, 'sha256');
-}
-
 /**
  * The hash a downloaded file should be checked against.
  *

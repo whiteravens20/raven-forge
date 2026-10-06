@@ -14,7 +14,6 @@ export interface InstalledMod {
   version: string;
   source: ModSource;
   fileName: string;
-  sha256?: string;
   required: boolean;
   side: ModSide;
   enabled: boolean;
