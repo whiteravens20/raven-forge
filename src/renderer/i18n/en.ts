@@ -496,6 +496,9 @@ export const en = {
   'accounts.setActive': 'Set active',
   'accounts.manage': 'Account settings',
   'accounts.logout': 'Sign out',
+  'accounts.logoutAsk':
+    'Sign {name} out of the launcher? The saved sign-in is removed from this computer.',
+  'accounts.failed': 'That did not work.',
   'accounts.loginFailed': 'Sign-in failed',
   'accounts.plaintextTitle': 'Credentials are not in the system keychain',
   'accounts.plaintextBody':

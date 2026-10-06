@@ -17,8 +17,8 @@ interface AuthStore extends AuthState {
   load: () => Promise<void>;
   loginMicrosoft: () => AuthResult;
   loginOffline: (username: string) => AuthResult;
-  logout: (accountId: string) => Promise<void>;
-  setActive: (accountId: string) => Promise<void>;
+  logout: (accountId: string) => AuthResult;
+  setActive: (accountId: string) => AuthResult;
   refresh: (accountId: string) => AuthResult;
 }
 
@@ -64,13 +64,21 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: async (accountId: string) => {
-    await api.auth.logout(accountId);
+    const result = await api.auth.logout(accountId);
+    // Read back either way: a sign-out that failed half-way has still changed
+    // something, and the list has to show what is actually there.
     await get().load();
+    return result.success ? null : (result.error ?? '');
   },
 
   setActive: async (accountId: string) => {
-    await api.auth.setActive(accountId);
+    const result = await api.auth.setActive(accountId);
+    // Only once main has agreed. It used to be marked active here whatever the
+    // answer, so a refusal left the page showing an account the launcher was
+    // not going to play as.
+    if (!result.success) return result.error ?? '';
     set({ activeAccountId: accountId });
+    return null;
   },
 
   refresh: async (accountId: string) => {

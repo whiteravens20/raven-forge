@@ -526,6 +526,9 @@ export const pl: Translations = {
   'accounts.setActive': 'Ustaw aktywne',
   'accounts.manage': 'Ustawienia konta',
   'accounts.logout': 'Wyloguj',
+  'accounts.logoutAsk':
+    'Wylogować konto {name} z launchera? Zapisane logowanie zostanie usunięte z tego komputera.',
+  'accounts.failed': 'To się nie udało.',
   'accounts.loginFailed': 'Logowanie nie powiodło się',
   'accounts.plaintextTitle': 'Dane logowania poza pęcherzem kluczy',
   'accounts.plaintextBody':

@@ -7,6 +7,7 @@ import { useAuthStore } from '@stores/auth-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { useT } from '@renderer/i18n';
+import { ConfirmButton } from '@components/ui/ConfirmButton';
 import { openLink } from '@renderer/open';
 
 /**
@@ -73,8 +74,8 @@ export function AccountsPage() {
   const [error, setError] = useState<string | null>(null);
 
   /** `null` is success; an empty message means main failed without saying why. */
-  const show = (failure: string | null) =>
-    setError(failure === null ? null : failure || t('accounts.loginFailed'));
+  const show = (failure: string | null, fallback = t('accounts.loginFailed')) =>
+    setError(failure === null ? null : failure || fallback);
 
   const handleMicrosoftLogin = async () => {
     show(await loginMicrosoft());
@@ -196,7 +197,15 @@ export function AccountsPage() {
               </div>
               <div className="flex gap-1">
                 {account.id !== activeAccountId && (
-                  <Button variant="ghost" size="sm" onClick={() => setActive(account.id)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      void setActive(account.id).then((failure) =>
+                        show(failure, t('accounts.failed')),
+                      )
+                    }
+                  >
                     {t('accounts.setActive')}
                   </Button>
                 )}
@@ -213,14 +222,18 @@ export function AccountsPage() {
                     {t('accounts.manage')}
                   </Button>
                 )}
-                <Button
-                  variant="danger"
-                  size="sm"
+                {/* Asked first: for a Microsoft account it removes the saved
+                    sign-in, and getting it back means the whole login again. */}
+                <ConfirmButton
                   icon={<LogOut size={12} />}
-                  onClick={() => logout(account.id)}
+                  question={t('accounts.logoutAsk', { name: account.username })}
+                  confirmLabel={t('accounts.logout')}
+                  onConfirm={() =>
+                    void logout(account.id).then((failure) => show(failure, t('accounts.failed')))
+                  }
                 >
                   {t('accounts.logout')}
-                </Button>
+                </ConfirmButton>
               </div>
             </div>
           ))
