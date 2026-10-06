@@ -153,6 +153,20 @@ export async function getInstalledMods(profileId: string): Promise<InstalledMod[
   return readLockFile(profileId);
 }
 
+/**
+ * The part of the stored state the profile page shows.
+ *
+ * Picked out by name. The whole record used to be spread into the answer, which
+ * sent the page the ETag, the signature finding and the list of config files
+ * this profile has been given — none of it asked for, and none of it declared.
+ */
+async function shownSyncState(
+  profileId: string,
+): Promise<Pick<ProfileSyncStatus, 'pendingUpdates' | 'status' | 'errorMessage'>> {
+  const { pendingUpdates, status, errorMessage } = await readSyncState(profileId);
+  return { pendingUpdates, status, errorMessage };
+}
+
 export async function getProfileSyncStatus(profileId: string): Promise<ProfileSyncStatus> {
   const profile = await getProfile(profileId);
   if (!profile) {
@@ -164,10 +178,10 @@ export async function getProfileSyncStatus(profileId: string): Promise<ProfileSy
     if (!(await readCachedManifest(profileId))) {
       return { profileId, pendingUpdates: 0, status: 'never-synced' };
     }
-    return { profileId, ...(await readSyncState(profileId)), importedPack: true };
+    return { profileId, ...(await shownSyncState(profileId)), importedPack: true };
   }
 
-  return { profileId, ...(await readSyncState(profileId)) };
+  return { profileId, ...(await shownSyncState(profileId)) };
 }
 
 /**

@@ -56,8 +56,6 @@ export interface Profile {
 
 export interface ProfileSyncStatus {
   profileId: string;
-  lastSyncedAt?: string;
-  manifestEtag?: string;
   pendingUpdates: number;
   status: 'synced' | 'updates-available' | 'error' | 'never-synced';
   errorMessage?: string;
