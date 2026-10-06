@@ -215,7 +215,13 @@ export function ModsPage() {
       const { updated, failed } = result.data;
       if (updated.length > 0) setNote(t('mods.updated', { names: updated.join(', ') }));
       if (failed.length > 0) {
-        setError(t('mods.updateFailed', { names: failed.map((f) => f.name).join(', ') }));
+        // With the reason each one gave. The names alone said that something
+        // went wrong and left out the only part that says what to do about it.
+        setError(
+          t('mods.updateFailed', {
+            names: failed.map((f) => (f.error ? `${f.name} (${f.error})` : f.name)).join('; '),
+          }),
+        );
       }
       // The counts came from the check, and installing has just invalidated
       // them. The badges below come from the reloaded list, which is current.
