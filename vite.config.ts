@@ -26,7 +26,6 @@ export default defineConfig({
       '@components': path.resolve(__dirname, 'src/renderer/components'),
       '@hooks': path.resolve(__dirname, 'src/renderer/hooks'),
       '@stores': path.resolve(__dirname, 'src/renderer/stores'),
-      '@pages': path.resolve(__dirname, 'src/renderer/pages'),
     },
   },
   server: {

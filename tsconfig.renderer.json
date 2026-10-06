@@ -18,8 +18,7 @@
       "@renderer/*": ["src/renderer/*"],
       "@components/*": ["src/renderer/components/*"],
       "@hooks/*": ["src/renderer/hooks/*"],
-      "@stores/*": ["src/renderer/stores/*"],
-      "@pages/*": ["src/renderer/pages/*"]
+      "@stores/*": ["src/renderer/stores/*"]
     }
   },
   "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "src/shared/**/*.ts"],
