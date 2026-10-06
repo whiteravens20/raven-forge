@@ -37,7 +37,12 @@ import {
 } from '../diagnostics/crash-report';
 
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
-import { customResolution, resolveConditionalArgs, substituteVars } from './launch-args';
+import {
+  customResolution,
+  resolveConditionalArgs,
+  splitArguments,
+  substituteVars,
+} from './launch-args';
 import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
 import { applyFullscreen, applyLanguage } from './options-file';
@@ -452,7 +457,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
 
   // Custom JVM args from profile
   if (profile.javaArgs) {
-    jvmArgs.push(...profile.javaArgs.split(/\s+/).filter(Boolean));
+    jvmArgs.push(...splitArguments(profile.javaArgs));
   }
 
   // Main class

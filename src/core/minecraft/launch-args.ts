@@ -129,6 +129,38 @@ export function resolveConditionalArgs(
   return result;
 }
 
+/**
+ * Split a line of JVM arguments the way a shell would: on blanks, except inside
+ * quotes, which group and are then dropped.
+ *
+ * Splitting on every blank turned `-Dname="a b"` into two arguments, and the
+ * second of them — `b"` — landed where the JVM expects the main class.
+ */
+export function splitArguments(line: string): string[] {
+  const args: string[] = [];
+  let current = '';
+  let started = false;
+  let quote: string | null = null;
+  for (const char of line) {
+    if (quote) {
+      if (char === quote) quote = null;
+      else current += char;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      started = true;
+    } else if (/\s/.test(char)) {
+      if (started) args.push(current);
+      current = '';
+      started = false;
+    } else {
+      current += char;
+      started = true;
+    }
+  }
+  if (started) args.push(current);
+  return args;
+}
+
 export function substituteVars(args: string[], vars: Record<string, string>): string[] {
   return args.map((arg) => arg.replace(/\$\{(\w+)}/g, (_, key: string) => vars[key] ?? ''));
 }

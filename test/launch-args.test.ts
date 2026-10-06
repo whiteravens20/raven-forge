@@ -6,6 +6,7 @@ import {
   ruleMatches,
   rulesAllow,
   resolveConditionalArgs,
+  splitArguments,
   substituteVars,
   type RuleHost,
 } from '../src/core/minecraft/launch-args';
@@ -130,6 +131,35 @@ describe('resolveConditionalArgs', () => {
       value: '-Dfoo=bar',
     };
     expect(resolveConditionalArgs([arg], {}, linux)).toEqual([]);
+  });
+});
+
+describe('splitArguments', () => {
+  it('splits on blanks, however many', () => {
+    expect(splitArguments('  -Xss2M   -XX:+UseG1GC\t-Dfoo=bar ')).toEqual([
+      '-Xss2M',
+      '-XX:+UseG1GC',
+      '-Dfoo=bar',
+    ]);
+  });
+
+  it('keeps what is inside quotes together and drops the quotes', () => {
+    expect(splitArguments(`-Dname="a b" -Dpath='C:\\My Games\\x'`)).toEqual([
+      '-Dname=a b',
+      '-Dpath=C:\\My Games\\x',
+    ]);
+  });
+
+  it('keeps an argument that is deliberately empty', () => {
+    expect(splitArguments('-Dempty "" -Dafter')).toEqual(['-Dempty', '', '-Dafter']);
+  });
+
+  it('answers with nothing for a line of blanks', () => {
+    expect(splitArguments('   ')).toEqual([]);
+  });
+
+  it('takes an unclosed quote to run to the end', () => {
+    expect(splitArguments('-Dname="a b')).toEqual(['-Dname=a b']);
   });
 });
 

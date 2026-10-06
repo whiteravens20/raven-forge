@@ -355,6 +355,17 @@ describe.skipIf(!posix)('a launch', () => {
 
     expect((await exitInfo()).logTail).toEqual(['java.lang.OutOfMemoryError: Java heap space']);
   });
+
+  it('keeps an argument with a quoted space in it whole', async () => {
+    await launch('exit 0', { javaArgs: '-Dpack.name="Raven Forge" -XX:+UseG1GC' });
+    await exitInfo();
+
+    const args = await gameArgs();
+    expect(args).toContain('-Dpack.name=Raven Forge');
+    expect(args).toContain('-XX:+UseG1GC');
+    // What used to happen: the second half went where the main class belongs.
+    expect(args).not.toContain('Forge"');
+  });
 });
 
 /**
