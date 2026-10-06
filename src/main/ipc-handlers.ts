@@ -141,6 +141,25 @@ function fail<T>(error: string, code?: IpcErrorCode, errorMessage?: ErrorMessage
  */
 const reason = errorText;
 
+/** Settled once the launcher has finished starting — see {@link holdHandlersUntil}. */
+let started: Promise<unknown> = Promise.resolve();
+
+/**
+ * Have every handler wait for the launcher to finish starting before it runs.
+ *
+ * The window is opened first and the page asks for its news the moment it is
+ * up, while the settings are still being read and the proxy has not been set.
+ * On a quick disk the proxy won that race every time; on a slow one the first
+ * requests went out directly, past the proxy somebody had configured to keep
+ * exactly that from happening. Waiting makes it a rule rather than a habit.
+ *
+ * The window's own buttons do not wait: a launcher slow to start must still be
+ * one that can be closed.
+ */
+export function holdHandlersUntil(ready: Promise<unknown>): void {
+  started = ready;
+}
+
 /**
  * `ipcMain.handle`, with the caller checked first.
  *
@@ -152,8 +171,9 @@ function handle(
   channel: string,
   listener: (event: IpcMainInvokeEvent, ...args: never[]) => unknown,
 ): void {
-  ipcMain.handle(channel, (event, ...args) => {
+  ipcMain.handle(channel, async (event, ...args) => {
     assertTrustedSender(event, channel);
+    if (!channel.startsWith('window:')) await started;
     return listener(event, ...(args as never[]));
   });
 }

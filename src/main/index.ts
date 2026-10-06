@@ -6,7 +6,7 @@ import { establishAppHome } from './home';
 import type { AppHome } from '../core/config/app-home';
 import { createMainWindow, getMainWindow } from './window';
 import { installContentSecurityPolicy } from './security';
-import { registerAllIpcHandlers } from './ipc-handlers';
+import { holdHandlersUntil, registerAllIpcHandlers } from './ipc-handlers';
 import { loadSettings } from '../core/config/settings-manager';
 import { ensureDataDirectories } from './init';
 import { applyProxySettings, proxyCredentialsFor } from '../core/net/proxy';
@@ -61,6 +61,33 @@ function registerCrashHandlers(): void {
  * created in the first tick of the handler, so losing the race would put a
  * second window on screen and take it away again.
  */
+/** How long the page's requests wait for a start that has not finished. */
+const STARTUP_PATIENCE_MS = 15_000;
+
+/**
+ * Make the data folders and put the proxy in place.
+ *
+ * Never rejects and never takes for ever: what waits on it is every request
+ * the page makes, and a data folder on a drive that does not answer must leave
+ * a launcher that says so rather than one that says nothing.
+ */
+async function startUp(): Promise<void> {
+  const setup = (async () => {
+    await ensureDataDirectories();
+    await applyProxySettings(await loadSettings());
+  })().catch((err: unknown) => log.error('Failed to initialize:', err));
+
+  let timer: NodeJS.Timeout | undefined;
+  const patience = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      log.warn(`Still starting after ${STARTUP_PATIENCE_MS / 1000} s — carrying on without it`);
+      resolve();
+    }, STARTUP_PATIENCE_MS);
+  });
+  await Promise.race([setup, patience]);
+  clearTimeout(timer);
+}
+
 function registerAppLifecycle(home: AppHome): void {
   app.on('second-instance', () => {
     // The launcher's own window, not whichever one happens to be first: a
@@ -104,15 +131,13 @@ function registerAppLifecycle(home: AppHome): void {
     // document, and handlers have to exist before the renderer can invoke one.
     installContentSecurityPolicy();
     registerAllIpcHandlers();
-    createMainWindow();
 
-    try {
-      await ensureDataDirectories();
-      // Before anything fetches: the updater check below is an outbound request.
-      await applyProxySettings(await loadSettings());
-    } catch (err) {
-      log.error('Failed to initialize:', err);
-    }
+    // Before anything fetches. The handlers wait for this, so the page's first
+    // requests cannot be on their way before the proxy is in place.
+    const started = startUp();
+    holdHandlersUntil(started);
+    createMainWindow();
+    await started;
 
     initUpdater();
     void checkForUpdates();

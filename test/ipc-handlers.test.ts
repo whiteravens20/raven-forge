@@ -192,6 +192,43 @@ describe('settings:update', () => {
   });
 });
 
+describe('a launcher that has not finished starting', () => {
+  const soon = () => new Promise((resolve) => setTimeout(resolve, 30));
+
+  it('keeps the page’s requests waiting until it has', async () => {
+    // The page asks for its news as soon as it is up, and the proxy is set a
+    // moment after. Whichever was quicker used to win.
+    const { holdHandlersUntil } = await import('../src/main/ipc-handlers');
+    let finish = () => {};
+    holdHandlersUntil(new Promise<void>((resolve) => (finish = resolve)));
+
+    let answered = false;
+    const asked = call('settings:get').then(() => (answered = true));
+    await soon();
+    expect(answered).toBe(false);
+
+    finish();
+    await asked;
+    expect(answered).toBe(true);
+  });
+
+  it('answers the window’s own buttons all the same', async () => {
+    const { holdHandlersUntil } = await import('../src/main/ipc-handlers');
+    holdHandlersUntil(new Promise<void>(() => {}));
+
+    // The stand-in window has no `isMaximized`, so this answers by failing —
+    // which it can only do by having run.
+    const outcome = await Promise.race([
+      call('window:is-maximized').then(
+        () => 'ran',
+        () => 'ran',
+      ),
+      soon().then(() => 'waited'),
+    ]);
+    expect(outcome).toBe('ran');
+  });
+});
+
 describe('settings:add-trusted-key', () => {
   const key = (publicKey: string, name = 'Raven SMP') => ({
     name,
