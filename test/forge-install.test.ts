@@ -209,4 +209,14 @@ describe.skipIf(!posix)('installing Forge', () => {
     // Left listening for `afterEach`, which closes it.
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   });
+
+  it('ends as a cancellation when it is called off', async () => {
+    const javaPath = await writeFakeJava();
+    const { isCancellation } = await import('../src/core/util/cancellation');
+
+    const err = await install({ javaPath, signal: AbortSignal.abort() }).catch((e: unknown) => e);
+
+    expect(isCancellation(err)).toBe(true);
+    expect(await installerRuns()).toEqual([]);
+  });
 });

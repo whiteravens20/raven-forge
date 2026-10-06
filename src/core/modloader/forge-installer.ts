@@ -39,7 +39,7 @@ import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
 import { downloadToFile } from '../net/download';
 import { getSettings } from '../config/settings-manager';
-import { throwIfCancelled, withTimeout } from '../util/cancellation';
+import { CancelledError, throwIfCancelled, withTimeout } from '../util/cancellation';
 import { requiredJavaFor } from '../minecraft/java-requirement';
 import { compareLoaderVersionsDesc, isPrerelease } from '../../shared/loader-version';
 import type { LoaderVersion, ProgressMessage } from '../../shared/ipc-types';
@@ -487,8 +487,20 @@ async function runInstaller(
   } catch (err) {
     // The installer's own output is the only useful diagnostic; an exit code
     // on its own says nothing anyone can act on.
-    const detail = err as { stdout?: string; stderr?: string; message?: string };
+    //
+    // Neither of these two is the installer failing, and both used to be
+    // reported as that: a cancel came back as an error to show the player, and
+    // a timeout as "installer failed" with whatever it had last printed.
+    if (signal?.aborted) throw new CancelledError('Loader install');
+    const detail = err as { stdout?: string; stderr?: string; message?: string; killed?: boolean };
     log.error(`${label} installer failed:\n${detail.stdout ?? ''}\n${detail.stderr ?? ''}`);
+    if (detail.killed) {
+      throw new Error(
+        `${label} ${loaderVersion} installer was still running after ` +
+          `${INSTALLER_TIMEOUT_MS / 60_000} minutes and was stopped.`,
+        { cause: err },
+      );
+    }
     throw new Error(
       `${label} ${loaderVersion} installer failed. Last output: ${
         (detail.stderr || detail.stdout || detail.message || '')
