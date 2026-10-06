@@ -656,7 +656,6 @@ export const en = {
   'progress.files.other': '{done}/{total} files',
 
   // Progress lines named by the main process — see `ProgressKey` in ipc-types.
-  'progress.msg.downloading': 'Downloading…',
   // Two lines for the two halves of a pack sync, so the counter under the bar
   // says which one it is counting.
   'progress.msg.checkingFiles': 'Checking the installed files…',

@@ -70,7 +70,6 @@ export interface ErrorMessage {
  * where it is resolved.
  */
 export type ProgressKey =
-  | 'progress.msg.downloading'
   | 'progress.msg.downloadingFile'
   | 'progress.msg.checkingFiles'
   | 'progress.msg.checkingLibraries'
