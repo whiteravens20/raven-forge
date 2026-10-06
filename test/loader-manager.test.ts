@@ -156,6 +156,23 @@ describe('getLoaderVersions', () => {
     expect(defaultLoaderVersion(versions)).toBe('47.4.10');
   });
 
+  it('marks the build Forge recommends when the list gives it a branch after its number', async () => {
+    // Minecraft 1.7.10, as served: the promotions feed says `10.13.4.1614` and
+    // the list calls the same build `10.13.4.1614-1.7.10`.
+    serveForge(
+      ['1.7.10-10.13.4.1614-1.7.10', '1.7.10-10.13.4.1566-1.7.10', '1.7.10-10.13.0.1150'],
+      {
+        '1.7.10-recommended': '10.13.4.1614',
+      },
+    );
+
+    const versions = await mod.getLoaderVersions('forge', '1.7.10');
+
+    expect(versions.filter((v) => v.recommended).map((v) => v.version)).toEqual([
+      '10.13.4.1614-1.7.10',
+    ]);
+  });
+
   it.each([
     // What each service really sends for Minecraft 1.12.2.
     ['fabric', 400, '[]'],

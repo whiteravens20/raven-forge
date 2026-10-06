@@ -151,7 +151,10 @@ export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion
     // is one promoted build per Minecraft version, which is the one to default
     // to. The rest are builds that happen to exist, not unstable ones.
     stable: true,
-    recommended: version === recommended,
+    // By its number, which is all the promotions feed gives. The list carries
+    // some builds with a branch after it — `10.13.4.1614-1.7.10` — and compared
+    // whole, Forge recommended nothing for 1.7.10, 1.8.9 or 1.9.4.
+    recommended: recommended !== undefined && version.split('-')[0] === recommended,
   }));
 }
 
