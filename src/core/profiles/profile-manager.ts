@@ -9,8 +9,6 @@ import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
 import { profileSchema } from '../../shared/validators';
-import { recommendedRamMb } from '../../shared/memory';
-import { machineMemoryMb } from '../util/machine-memory';
 import type {
   OrphanedProfile,
   Profile,
@@ -136,11 +134,6 @@ export async function createProfile(
   const profile: Profile = profileSchema.parse({
     ...data,
     id: crypto.randomUUID(),
-    // The last word on RAM for callers that express no preference — profile
-    // import, and anything that grows a profile out of something other than the
-    // form. A machine is under it to ask, so it is asked; only when it cannot
-    // be measured does this land on the flat default.
-    allocatedRamMb: data.allocatedRamMb ?? recommendedRamMb(machineMemoryMb()),
     createdAt: now,
     updatedAt: now,
   });

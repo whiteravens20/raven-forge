@@ -83,10 +83,12 @@ describe('createProfile', () => {
     expect(onDisk[0]).not.toHaveProperty('somethingNobodyDeclared');
   });
 
-  it('picks a RAM figure when the caller expresses no preference', async () => {
+  it('refuses a profile that names no RAM figure', async () => {
+    // Every caller has one to give: the form, an import and a pack install all
+    // settle it before they get here.
     const { allocatedRamMb: _drop, ...data } = newProfile('Ravens');
-    const profile = await mgr.createProfile(data as never);
-    expect(profile.allocatedRamMb).toBeGreaterThan(0);
+    await expect(mgr.createProfile(data as never)).rejects.toThrow(/allocatedRamMb/);
+    expect(await mgr.getAllProfiles()).toHaveLength(0);
   });
 });
 
