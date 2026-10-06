@@ -874,9 +874,9 @@ export const pl: Translations = {
   'privacy.dest.loaders.when': 'przy wyborze i instalacji loadera',
   'privacy.dest.modrinth.who': 'Modrinth',
   'privacy.dest.modrinth.when':
-    'gdy szukasz modów i paczek, otwierasz listę zainstalowanych albo sprawdzasz aktualizacje',
+    'gdy szukasz modów i paczek, otwierasz listę zainstalowanych, sprawdzasz aktualizacje albo dodajesz mod z pliku',
   'privacy.dest.modrinth.sends':
-    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Otwarcie listy modów, shaderów albo paczek zasobów profilu wysyła identyfikatory tych, które masz — tak launcher pobiera ich opisy i ikony, a odpowiedź pamięta przez tydzień. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
+    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Otwarcie listy modów, shaderów albo paczek zasobów profilu wysyła identyfikatory tych, które masz — tak launcher pobiera ich opisy i ikony, a odpowiedź pamięta przez tydzień. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu, a dodanie moda z pliku — skrót tego jednego pliku. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'aktualności i ogłoszenia, lista paczek serwerowych i same paczki',
   'privacy.dest.updates.who': 'GitHub',

@@ -874,9 +874,9 @@ export const en = {
   'privacy.dest.loaders.when': 'when choosing and installing a loader',
   'privacy.dest.modrinth.who': 'Modrinth',
   'privacy.dest.modrinth.when':
-    'when you look for mods and packs, open the list of what is installed, or check for updates',
+    'when you look for mods and packs, open the list of what is installed, check for updates, or add a mod from a file',
   'privacy.dest.modrinth.sends':
-    'What you type in the search box, and the filters you set. Opening a profile’s list of mods, shaders or resource packs sends the identifiers of the ones you have — that is how the launcher fetches their descriptions and icons, and it remembers the answer for a week. Checking for updates, or exporting a pack, also sends a hash of each mod file in that profile. Nothing that says who you are — the request introduces the launcher that is asking, not a person.',
+    'What you type in the search box, and the filters you set. Opening a profile’s list of mods, shaders or resource packs sends the identifiers of the ones you have — that is how the launcher fetches their descriptions and icons, and it remembers the answer for a week. Checking for updates, or exporting a pack, also sends a hash of each mod file in that profile, and adding a mod from a file sends the hash of that one file. Nothing that says who you are — the request introduces the launcher that is asking, not a person.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'news, the list of server packs, and the packs themselves',
   'privacy.dest.updates.who': 'GitHub',
