@@ -33,30 +33,40 @@
 !endif
 
 ; An install made by an older build sits in "…\Raven Forge Launcher", and the
-; registry says so, so that is where the installer proposes to put this one.
+; registry says so, so that is the folder the installer proposes.
 ;
-; An update leaves it there. Updates run silently, the directory page is never
-; shown, and moving a working install out from under its shortcuts is not
+; An update leaves it there. Updates run silently, no page is shown and none of
+; this runs, and moving a working install out from under its shortcuts is not
 ; something to do without anybody asking.
 ;
-; Run by hand, the installer proposes the same place under the new name
-; instead. Left alone it would do worse than keep the old one: the directory
-; page checks that the folder carries the app's name and, finding the old
-; spelling, appends the new — installing into
+; Run by hand, the installer puts this version in the same place under the new
+; name. Left alone the old name would do worse than stay: the step after the
+; directory page checks that the folder carries the app's name and, finding the
+; old spelling, appends the new — installing into
 ; "…\Raven Forge Launcher\raven-forge-launcher". The previous copy is removed
 ; from where it was by the installer's own handling of an existing install,
 ; which goes by the registry and not by this variable.
-!macro customInit
-  ${IfNot} ${Silent}
-    StrLen $R0 "\${APP_PRODUCT_FILENAME}"
-    StrCpy $R1 $INSTDIR "" -$R0
-    ${If} $R1 == "\${APP_PRODUCT_FILENAME}"
-      StrLen $R2 $INSTDIR
-      IntOp $R2 $R2 - $R0
-      StrCpy $R1 $INSTDIR $R2
-      StrCpy $INSTDIR "$R1\${APP_FILENAME}"
-    ${EndIf}
+!macro ravenForgeInstallFolder
+  StrLen $R0 "\${APP_PRODUCT_FILENAME}"
+  StrCpy $R1 $INSTDIR "" -$R0
+  ${If} $R1 == "\${APP_PRODUCT_FILENAME}"
+    StrLen $R2 $INSTDIR
+    IntOp $R2 $R2 - $R0
+    StrCpy $R1 $INSTDIR $R2
+    StrCpy $INSTDIR "$R1\${APP_FILENAME}"
   ${EndIf}
+!macroend
+
+; It has to happen here, between the directory page and the copying, and not
+; when the installer starts: the "for whom" page sets the folder from the
+; registry again as it is left, which undoes anything settled before it. A page
+; with nothing on it — the function names the folder and skips itself.
+!macro customPageAfterChangeDir
+  Page custom ravenForgeNameInstallFolder
+  Function ravenForgeNameInstallFolder
+    !insertmacro ravenForgeInstallFolder
+    Abort
+  FunctionEnd
 !macroend
 
 ; ── The player's data on uninstall ──────────────────────────────────────────
