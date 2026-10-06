@@ -17,7 +17,7 @@ fix ships.
 
 Please include:
 
-- The version (`package.json` `version`, or Info → the version line in the app) and your OS.
+- The version (`package.json` `version`, or the version line under Settings → Updates in the app) and your OS.
 - What an attacker gains, and what they need in order to try it.
 - Reproduction steps, or a proof of concept.
 - Any relevant log fragments — **with tokens and usernames redacted** (see below).
@@ -66,13 +66,18 @@ download.
 - **Every downloaded file is hash-checked** before it is installed. `sha512` wins
   over `sha256` when a manifest carries both (`src/core/mods/integrity.ts`).
   A mismatch deletes the file and fails the sync — it is never installed "anyway".
-- **Manifests can be signed** with Ed25519 (`tweetnacl`) and are verified against
-  a per-profile public key before their contents are acted on
-  (`src/core/updater/manifest-verify.ts`). The signature covers a canonical JSON
-  form of the whole manifest with keys sorted **recursively** — see
-  [`docs/MANIFEST-SCHEMA.md`](docs/MANIFEST-SCHEMA.md).
-- Signature verification is only as strong as the key distribution. A profile
-  with no `publicKey` configured gets no signature guarantee at all, only hashes.
+- **Manifests can be signed** with Ed25519 (`tweetnacl`) and are verified before
+  their contents are acted on (`src/core/updater/manifest-verify.ts`). The
+  signature covers a canonical JSON form of the whole manifest with keys sorted
+  **recursively** — see [`docs/MANIFEST-SCHEMA.md`](docs/MANIFEST-SCHEMA.md).
+- **Which key counts depends on where the manifest came from.** One from the
+  White Ravens packs site is held to the key compiled into the launcher, and to
+  no other: it must verify, on every install, whatever is in Settings. Any other
+  manifest is checked against the keys the player has added under Settings →
+  Trusted keys, which apply to every profile.
+- Signature verification is only as strong as the key distribution. With no key
+  added, a manifest from anywhere else gets no signature guarantee at all, only
+  hashes.
 - The places where a wrong answer is silent rather than loud carry tests in
   `test/` — hash selection and comparison, canonicalization, launch-argument
   assembly, offline UUID derivation, and every refusal that has to hold: a path
@@ -165,7 +170,7 @@ Every one of those is itemised, with what it sends, in
 [docs/PRIVACY.md](docs/PRIVACY.md) ([po polsku](docs/PRIVACY.pl.md)) — which is
 also where the local data, the credential store and the known gaps are described
 in full. The launcher shows the same picture for the running install under
-Info → Privacy.
+About → Privacy.
 
 ---
 
@@ -173,9 +178,11 @@ Info → Privacy.
 
 Listed on purpose. An honest list beats a clean-looking one.
 
-- **No signature requirement.** Manifest signing is opt-in per profile. A profile
-  pointed at an unsigned manifest trusts whoever controls that URL, bounded only
-  by the hashes that same manifest supplies.
+- **No signature requirement for third-party manifests.** Until a trusted key is
+  added in Settings, a profile pointed at an unsigned manifest that is not White
+  Ravens' own trusts whoever controls that URL, bounded only by the hashes that
+  same manifest supplies. Adding a key turns the requirement on for every such
+  manifest.
 - **Mods are not sandboxed.** A Minecraft mod is arbitrary Java running with your
   user's privileges. Raven Forge verifies that you got _the file the manifest
   named_; it cannot tell you that file is safe. Only add manifest sources you

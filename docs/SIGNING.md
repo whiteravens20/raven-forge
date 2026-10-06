@@ -9,7 +9,7 @@ and solve different problems:
 | **Scheme**        | Authenticode (Windows), X.509                    | Ed25519 detached signature                               |
 | **Key holder**    | the launcher maintainer                          | the server/pack admin                                    |
 | **Verified by**   | Windows / SmartScreen at install time            | the launcher at sync time                                |
-| **Configured in** | `electron-builder.config.js`, release CI secrets | Settings → Trusted Keys, per profile                     |
+| **Configured in** | `electron-builder.config.js`, release CI secrets | Settings → Trusted keys, for every profile               |
 | **Tooling**       | electron-builder                                 | `raven-packs` (`scripts/keygen.mjs`, `scripts/sign.mjs`) |
 
 A signed installer says nothing about the mods it later downloads, and a signed

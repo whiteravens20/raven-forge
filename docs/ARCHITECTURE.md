@@ -30,7 +30,7 @@ raven-forge/
 ├── build/installer.nsh           # the NSIS uninstaller's keep-or-delete question
 ├── electron-builder.config.js    # NSIS + .deb + AppImage targets
 ├── eslint.config.mjs             # flat-config, react-hooks + @typescript-eslint
-├── tsconfig.json                 # umbrella project for typecheck-all
+├── tsconfig.json                 # base of tsconfig.test.json, and an editor's map from a file to its project
 ├── tsconfig.main.json            # main + preload + core + shared (Node ESM)
 ├── tsconfig.renderer.json        # renderer (DOM)
 ├── vite.config.ts                # renderer build + path aliases
@@ -54,7 +54,7 @@ raven-forge/
     │   ├── main.tsx, App.tsx
     │   ├── pages/                # one per route
     │   ├── components/           # ui/ (Button, Input, Select, Switch, Banner, …) + layout/
-    │   ├── stores/               # Zustand stores (auth, profiles, news, settings, launch)
+    │   ├── stores/               # Zustand stores (auth, game, news, notice, profile, progress, settings, updater)
     │   ├── hooks/                # cross-page React hooks (e.g. the machine's memory)
     │   ├── i18n/                 # UI string dictionaries (pl, en) + the t() helper
     │   └── styles/global.css     # @import "tailwindcss", @theme tokens, per-theme --rf-*
@@ -70,7 +70,7 @@ raven-forge/
     │   ├── net/                  # proxy dispatcher + the shared download helper
     │   ├── updater/              # electron-updater wiring, manifest signature verification
     │   ├── profiles/             # profile CRUD, import/export, world backups
-    │   ├── news/                 # news + announcement fetcher with mock fallback
+    │   ├── news/                 # news + announcement fetcher; a feed that cannot be read is said so, never filled in
     │   ├── util/                 # atomic writes, cancellation, path containment, machine memory
     │   └── config/               # paths.ts, app-home.ts, data-root.ts, data-root-move.ts, storage-map.ts, settings-manager.ts, defaults.ts
     └── shared/                   # types + validators consumed by both processes
@@ -247,15 +247,26 @@ sequenceDiagram
     Boot->>App: requestSingleInstanceLock()
     App->>App: app.whenReady()
     App->>Boot: initLogger() (electron-log → <data root>/logs/main.log)
+    App->>Win: CSP + permission policy on the session, no application menu when packaged
     App->>IPC: registerAllIpcHandlers()
-    App->>Win: createMainWindow()
-    App->>Init: ensureDataDirectories() (profiles, loaders, java, cache, logs, crash-reports)
-    App->>Settings: loadSettings() — Zod-validated, defaults written if missing
+    App->>Init: startUp() begins: ensureDataDirectories() (profiles, loaders, java, cache, logs, crash-reports)
+    App->>Settings: …then loadSettings() — Zod-validated, defaults written if missing — and the proxy from them
+    App->>IPC: holdHandlersUntil(startUp) — every channel but the window's own waits for it, 15 s at most
+    App->>Win: createMainWindow() — shown at once, not on ready-to-show
     Win->>Win: BrowserWindow(frameless, contextIsolation:true, preload)
     Win->>Renderer: loadURL(VITE_DEV_SERVER_URL) | loadFile(dist/renderer/index.html)
     Renderer->>Renderer: App mounts → stores load() in parallel (auth, profiles, settings, news)
-    Renderer->>Win: ready-to-show → window.show()
+    IPC->>Renderer: answers, once startUp() has finished
+    App->>App: initUpdater(), checkForUpdates(), checkAllProfilesForPackUpdates()
 ```
+
+The window is created before the setup has finished, on purpose: the setup is
+six `mkdir`s and one file, and it used to run with nothing on screen. What makes
+that safe is the hold on the handlers — the page can ask at once, and is
+answered only when the data folders exist and the proxy is in place, so its
+first request cannot leave by the wrong route. Until a store has had its first
+answer it reports itself as not loaded, and the pages say "loading" rather than
+"no profiles" or "not signed in".
 
 ### Where the launcher lives
 
@@ -316,9 +327,9 @@ The `package.json` `main` field points at `dist/main/index.js`; the preload refe
 
 ## Tests
 
-`npm test` — Vitest, plain Node, `test/**/*.test.ts`. Electron and `keytar` are
-aliased to stubs (`test/stubs/electron.ts`); everything below that seam is the
-real module, not a mock of one.
+`npm test` — Vitest, plain Node, `test/**/*.test.ts`. Electron is aliased to a
+stub (`test/stubs/electron.ts`); everything below that seam is the real module,
+not a mock of one.
 
 | Layer                  | How it is tested                                                                                                                                                            |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

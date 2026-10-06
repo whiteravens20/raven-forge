@@ -1,6 +1,6 @@
 # Raven Forge — visual assets
 
-All files are self-contained SVG (no external refs, no live `<text>`, no JS). Every file has a `viewBox` and no fixed `width`/`height`, so scale freely. Verified to parse as XML; sizes below are as-shipped.
+The drawings are self-contained SVG (no external refs, no JS; live `<text>` only in the README banner, as its row says). Every file has a `viewBox` and no fixed `width`/`height`, so scale freely. Verified to parse as XML; sizes below are as-shipped.
 
 Design direction: flat/near-black grounds, a single geometric raven mark (built from straight edges, not freehand curves), violet `#7c3aed` used once per asset as a deliberate accent rather than a running color. No chrome, bevels, flames, or neon — restrained, grid-built, contemporary.
 
@@ -35,5 +35,4 @@ Design direction: flat/near-black grounds, a single geometric raven mark (built 
 
 ## Deliberately left out / limitations
 
-- **No rasterized outputs** (`.png`, `.ico`, `.icns`) — this machine has no general-purpose rasterizer (no ImageMagick/rsvg/Inkscape/sharp) to batch-export sizes. `icon.svg` is the source of truth; generating platform icon formats from it is a build-time step for whoever wires up `electron-builder`.
-- **No favicon/`.ico` multi-resolution bundle** — same reason; `icon-mono.svg` and `icon.svg` are the only shipped forms.
+- **The bitmaps are generated, then committed** — `icons/icon.png` (512×512, the Linux targets) and `icons/icon.ico` (16 to 256, the Windows installer), with `build/installer-sidebar.bmp` beside them, are written by `npm run icons` from `icons/icon.svg`. The drawing stays the source of truth: change it, run the script, commit what it wrote. There is no `.icns`, because there is no macOS build.

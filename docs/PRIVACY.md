@@ -65,7 +65,7 @@ if anything fails on the way it puts things back as they were, and if something
 could not be removed from the old place it lists exactly what.
 
 You never have to find either by hand. **Settings → Data** and the in-app
-privacy page (Info → Privacy) list every place the launcher writes to on this
+privacy page (About → Privacy) list every place the launcher writes to on this
 computer, with the path, the size measured on your disk, and a button that
 opens it.
 
