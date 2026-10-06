@@ -101,8 +101,9 @@ Two cases skip the question deliberately:
 sudo apt remove raven-forge-launcher
 ```
 
-This removes `/opt/Raven Forge Launcher`, the `/usr/bin` symlink, the desktop
-entry and the AppArmor profile. **Your data folder is not touched, and `apt
+This removes `/opt/raven-forge-launcher` — `/opt/Raven Forge Launcher`, where
+the package is an older one — the `/usr/bin` symlink, the desktop entry and the
+AppArmor profile. **Your data folder is not touched, and `apt
 purge` does not touch it either.** That is not an oversight: a Debian package is
 not allowed to delete files in a user's home directory, because a package is
 installed once for a machine while the data belongs to each account separately.

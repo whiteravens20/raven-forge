@@ -89,6 +89,27 @@ jobs:
           grep -q '^StartupWMClass=' /tmp/entry.desktop \
             || { echo "::error::.desktop entry lost StartupWMClass — check linux.syncDesktopName"; exit 1; }
 
+          # The program lives in a folder named like the package. electron-builder
+          # names it after the product, and with the product's display name that
+          # was `/opt/Raven Forge Launcher`: a path every script has to quote, and
+          # the one place left on Linux where the launcher's name had spaces in it.
+          # The AppArmor profile and the desktop entry are written from the same
+          # name, so they are held to it here as well.
+          dpkg-deb --fsys-tarfile "${deb[0]}" | tar -t > /tmp/files.txt
+          grep -qx './opt/raven-forge-launcher/raven-forge-launcher' /tmp/files.txt \
+            || { echo "::error::the binary is not at /opt/raven-forge-launcher/raven-forge-launcher"; exit 1; }
+          if grep -q ' ' /tmp/files.txt; then
+            echo "::error::the package installs a path with a space in it:"; grep ' ' /tmp/files.txt | head; exit 1
+          fi
+          dpkg-deb --fsys-tarfile "${deb[0]}" | tar -xO ./opt/raven-forge-launcher/resources/apparmor-profile \
+            | grep -q '"/opt/raven-forge-launcher/raven-forge-launcher"' \
+            || { echo "::error::the AppArmor profile does not name /opt/raven-forge-launcher/raven-forge-launcher"; exit 1; }
+          grep -q '^Exec=/opt/raven-forge-launcher/raven-forge-launcher' /tmp/entry.desktop \
+            || { echo "::error::the desktop entry does not start /opt/raven-forge-launcher/raven-forge-launcher"; exit 1; }
+          # What the player reads is still the product's own name.
+          grep -qx 'Name=Raven Forge Launcher' /tmp/entry.desktop \
+            || { echo "::error::the desktop entry is no longer called Raven Forge Launcher"; exit 1; }
+
           ls -lh out/*.deb out/*.AppImage
 
       # `fpm` does not run dpkg-shlibdeps, so the dependency list in
@@ -110,7 +131,7 @@ jobs:
             set -e
             apt-get update -qq >/dev/null
             apt-get install -y -qq --no-install-recommends /pkg/*.deb xvfb xauth >/dev/null
-            if ldd "/opt/Raven Forge Launcher/raven-forge-launcher" | grep "not found"; then
+            if ldd /opt/raven-forge-launcher/raven-forge-launcher | grep "not found"; then
               echo "::error::the package does not declare every library the binary links"
               exit 1
             fi
