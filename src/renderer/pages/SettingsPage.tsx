@@ -377,7 +377,12 @@ function TextSetting({
   }, [value]);
 
   const commit = async () => {
-    if (draft === value) return;
+    // Back to what is stored is not a refusal any more, whatever was said about
+    // the text that was there a moment ago.
+    if (draft === value) {
+      setError(null);
+      return;
+    }
     setError((await onCommit(draft)) ? null : invalidMessage);
   };
 
