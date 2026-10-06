@@ -38,7 +38,8 @@ function contentSecurityPolicy(dev: boolean): string {
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
     "img-src 'self' data: https:",
-    "connect-src 'self' https:",
+    // The page asks the main process for everything and fetches nothing itself.
+    "connect-src 'self'",
   ].join('; ');
 }
 
