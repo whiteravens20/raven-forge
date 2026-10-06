@@ -31,7 +31,7 @@ import {
 } from '../../shared/constants';
 import { getVersionMeta } from '../minecraft/version-manifest';
 import { verifyDownload, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
-import { ensureJavaVersion } from '../java/java-manager';
+import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
 import { loaderCacheDir } from './loader-paths';
 import { loaderProfilePath } from './loader-profile';
 import { writeJsonAtomic } from '../util/atomic-file';
@@ -371,6 +371,13 @@ async function ensureVanillaClientForInstaller(
   await verifyDownload(jarPath, { sha1: meta.downloads.client.sha1 }, `client jar ${mcVersion}`);
 }
 
+/** What an install may be told beyond which build it is. */
+export interface LoaderInstallOptions {
+  signal?: AbortSignal;
+  /** The Java the profile names, when it names one: the installer runs on it too. */
+  javaPath?: string;
+}
+
 /**
  * Install Forge or NeoForge and leave a version profile where
  * `loader-profile.ts` will find it.
@@ -384,7 +391,7 @@ export async function installForgeLike(
   loaderVersion: string,
   mcVersion: string,
   onProgress: (fraction: number, message: ProgressMessage) => void,
-  signal?: AbortSignal,
+  { signal, javaPath }: LoaderInstallOptions = {},
 ): Promise<void> {
   const label = loader === 'forge' ? 'Forge' : 'NeoForge';
   const destDir = loaderCacheDir(loader, mcVersion, loaderVersion);
@@ -422,9 +429,14 @@ export async function installForgeLike(
   await ensureLauncherProfilesStub(installRoot);
 
   // The installer is a modern Java application in its own right; the JRE the
-  // *game* needs is the right floor for it too.
+  // *game* needs is the right floor for it too — and the one the profile names
+  // is the one to use, as the game will. Fetching a managed runtime regardless
+  // made a profile with its own Java depend on a download it had opted out of.
   onProgress(0.25, { key: 'progress.msg.preparingJava' });
-  const java = await ensureJavaVersion(requiredJavaFor(mcVersion, vanillaMeta), signal);
+  const required = requiredJavaFor(mcVersion, vanillaMeta);
+  const java = javaPath
+    ? await resolveChosenJava(javaPath, required)
+    : await ensureJavaVersion(required, signal);
 
   onProgress(0.35, { key: 'progress.msg.runningInstaller', vars: { loader: label } });
   log.info(`Running ${label} installer: ${installerPath} --installClient ${installRoot}`);

@@ -3,7 +3,12 @@
 import { log } from '../../main/logger';
 import { FABRIC_META_API, QUILT_META_API } from '../../shared/constants';
 import { emitProgress } from '../util/progress';
-import { getForgeVersions, getNeoForgeVersions, installForgeLike } from './forge-installer';
+import {
+  getForgeVersions,
+  getNeoForgeVersions,
+  installForgeLike,
+  type LoaderInstallOptions,
+} from './forge-installer';
 import { loaderProfilePath, readLoaderProfile } from './loader-profile';
 import { withTimeout } from '../util/cancellation';
 import { writeJsonAtomic } from '../util/atomic-file';
@@ -129,12 +134,12 @@ export async function installLoader(
   loader: ModLoaderType,
   loaderVersion: string,
   mcVersion: string,
-  signal?: AbortSignal,
+  options: LoaderInstallOptions = {},
 ): Promise<void> {
   switch (loader) {
     case 'fabric':
     case 'quilt':
-      return installMetaLoader(loader, loaderVersion, mcVersion, signal);
+      return installMetaLoader(loader, loaderVersion, mcVersion, options.signal);
     case 'forge':
     case 'neoforge':
       return installForgeLike(
@@ -148,7 +153,7 @@ export async function installLoader(
             message,
             installing: progress < 1,
           }),
-        signal,
+        options,
       );
     case 'vanilla':
       return; // nothing to install

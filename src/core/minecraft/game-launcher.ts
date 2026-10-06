@@ -348,12 +348,10 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     );
     if (!installed) {
       log.info(`Loader ${profile.modLoader} ${profile.modLoaderVersion} missing — installing...`);
-      await installLoader(
-        profile.modLoader,
-        profile.modLoaderVersion,
-        profile.minecraftVersion,
+      await installLoader(profile.modLoader, profile.modLoaderVersion, profile.minecraftVersion, {
         signal,
-      );
+        javaPath: profile.customJavaPath,
+      });
     }
   }
 
