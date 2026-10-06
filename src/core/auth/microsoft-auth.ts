@@ -511,7 +511,7 @@ export async function setActiveAccount(accountId: string): Promise<void> {
   pushAuthState();
 }
 
-export async function refreshAccount(accountId: string): Promise<MinecraftAccount> {
+async function refreshAccount(accountId: string): Promise<MinecraftAccount> {
   const existing = await getAccount(accountId);
   if (!existing) throw new Error(`Account ${accountId} not found`);
 

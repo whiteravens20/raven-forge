@@ -19,7 +19,6 @@ interface AuthStore extends AuthState {
   loginOffline: (username: string) => AuthResult;
   logout: (accountId: string) => AuthResult;
   setActive: (accountId: string) => AuthResult;
-  refresh: (accountId: string) => AuthResult;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -80,13 +79,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // not going to play as.
     if (!result.success) return result.error ?? '';
     set({ activeAccountId: accountId });
-    return null;
-  },
-
-  refresh: async (accountId: string) => {
-    const result = await api.auth.refresh(accountId);
-    if (!result.success) return result.error ?? '';
-    await get().load();
     return null;
   },
 }));

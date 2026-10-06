@@ -85,7 +85,6 @@ export interface InvokeChannels {
   'auth:logout': (accountId: string) => Promise<IpcResult<void>>;
   'auth:get-state': () => Promise<IpcResult<AuthState>>;
   'auth:set-active': (accountId: string) => Promise<IpcResult<void>>;
-  'auth:refresh': (accountId: string) => Promise<IpcResult<MinecraftAccount>>;
 
   // -- Profiles --
   'profiles:get-all': () => Promise<IpcResult<Profile[]>>;
@@ -396,7 +395,6 @@ export interface RavenForgeAPI {
     logout: InvokeChannels['auth:logout'];
     getState: InvokeChannels['auth:get-state'];
     setActive: InvokeChannels['auth:set-active'];
-    refresh: InvokeChannels['auth:refresh'];
   };
   profiles: {
     getAll: InvokeChannels['profiles:get-all'];

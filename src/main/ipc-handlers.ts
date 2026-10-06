@@ -93,7 +93,6 @@ import {
   logoutAccount,
   getAuthState,
   setActiveAccount,
-  refreshAccount,
 } from '../core/auth/microsoft-auth';
 import type {
   IpcResult,
@@ -539,13 +538,6 @@ export function registerAllIpcHandlers(): void {
       return ok(undefined);
     } catch (err) {
       return fail(`Failed to set active account: ${reason(err)}`);
-    }
-  });
-  handle('auth:refresh', async (_event, accountId: string) => {
-    try {
-      return ok(await refreshAccount(accountId));
-    } catch (err) {
-      return fail(`Token refresh failed: ${reason(err)}`);
     }
   });
 

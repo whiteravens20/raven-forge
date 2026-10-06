@@ -17,7 +17,6 @@ const api: RavenForgeAPI = {
     logout: (accountId) => ipcRenderer.invoke('auth:logout', accountId),
     getState: () => ipcRenderer.invoke('auth:get-state'),
     setActive: (accountId) => ipcRenderer.invoke('auth:set-active', accountId),
-    refresh: (accountId) => ipcRenderer.invoke('auth:refresh', accountId),
   },
   profiles: {
     getAll: () => ipcRenderer.invoke('profiles:get-all'),
