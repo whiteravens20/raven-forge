@@ -149,6 +149,8 @@ export const pl: Translations = {
     'Nie udało się ustalić wersji {loader} dla Minecraft {version}. Sprawdź połączenie albo wybierz wersję loadera w edytorze profilu.',
   'launchError.loaderFileMissing':
     'Brakuje pliku loadera {file} albo jest on uszkodzony, a wytworzyć go może tylko instalator loadera. Uruchom profil jeszcze raz, mając połączenie z siecią — loader zainstaluje się wtedy ponownie.',
+  'launchError.loaderBuildTooOld':
+    '{loader} to wydanie starsze niż te, które ten launcher potrafi zainstalować. Wybierz nowsze wydanie loadera w edytorze profilu.',
   'launchError.javaNotRuntime':
     'Ten profil ma startować przez {path}, a to nie jest środowisko Java, które ten komputer potrafi uruchomić. Wskaż w edytorze profilu coś innego albo wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
   'launchError.javaTooOld':

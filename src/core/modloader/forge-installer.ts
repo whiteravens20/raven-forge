@@ -18,6 +18,8 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { log } from '../../main/logger';
@@ -29,21 +31,23 @@ import {
   NEOFORGE_MAVEN_ROOT,
 } from '../../shared/constants';
 import { getVersionMeta } from '../minecraft/version-manifest';
-import type { HashAlgorithm, HashedEntry } from '../mods/integrity';
+import { hashFile, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
-import { ensureClientJar } from '../minecraft/asset-downloader';
+import { ensureClientJar, parseMavenCoords } from '../minecraft/asset-downloader';
 import { loaderCacheDir } from './loader-paths';
 import { isLoaderProfileComplete, loaderProfilePath } from './loader-profile';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
-import { readZipEntry } from '../util/zip-read';
+import { RefusedError } from '../util/refusal';
+import { resolveWithin } from '../util/safe-path';
+import { STOP, eachEntry, openEntry, readZipEntry } from '../util/zip-read';
 import { downloadToFile } from '../net/download';
 import { getSettings } from '../config/settings-manager';
 import { CancelledError, throwIfCancelled, withTimeout } from '../util/cancellation';
 import { requiredJavaFor } from '../minecraft/java-requirement';
 import { compareLoaderVersionsDesc, isPrerelease } from '../../shared/loader-version';
 import type { LoaderVersion, ProgressMessage } from '../../shared/ipc-types';
-import type { VersionMeta } from '../minecraft/types';
+import type { Library, VersionMeta } from '../minecraft/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -349,6 +353,116 @@ async function ensureVanillaClientForInstaller(
   await ensureClientJar(versionsDir, mcVersion, meta.downloads.client, { signal });
 }
 
+/** What a Forge installer up to 1.12.2 carries where a later one has `version.json`. */
+interface LegacyInstallProfile {
+  install: {
+    /** Maven coordinates the Forge jar is to be known by. */
+    path: string;
+    /** The name that jar has inside the installer. */
+    filePath: string;
+  };
+  versionInfo: Partial<VersionMeta>;
+}
+
+async function readLegacyProfile(installerPath: string): Promise<LegacyInstallProfile | null> {
+  const raw = await readZipEntry(installerPath, 'install_profile.json');
+  if (!raw) return null;
+  try {
+    const { install, versionInfo } = JSON.parse(
+      raw.toString('utf-8'),
+    ) as Partial<LegacyInstallProfile>;
+    if (typeof install?.path !== 'string' || typeof install.filePath !== 'string') return null;
+    if (typeof versionInfo?.mainClass !== 'string') return null;
+    return { install, versionInfo };
+  } catch {
+    return null;
+  }
+}
+
+/** Copy one entry of the installer out, whole or not at all, and say what it hashes to. */
+async function extractEntry(
+  installerPath: string,
+  entryName: string,
+  dest: string,
+): Promise<{ sha1: string; size: number } | null> {
+  const part = `${dest}.part`;
+  let found = false;
+  try {
+    await eachEntry(installerPath, async (zip, entry) => {
+      if (entry.fileName !== entryName) return;
+      await pipeline(await openEntry(zip, entry), createWriteStream(part));
+      found = true;
+      return STOP;
+    });
+    if (!found) return null;
+    const made = { sha1: await hashFile(part, 'sha1'), size: (await fs.stat(part)).size };
+    await fs.rename(part, dest);
+    return made;
+  } finally {
+    await fs.rm(part, { force: true });
+  }
+}
+
+/**
+ * Install a Forge build from the years before its installer had anything to run.
+ *
+ * Up to 1.12.2 installing Forge on a client came to two things: the Forge jar
+ * copied out of the installer into the libraries folder, and a version profile
+ * that names it. There is nothing to patch ahead of time — the game does that
+ * to itself as it starts — so there is no Java process here either, and no
+ * wait. The installer's own way of doing those two things is a window with a
+ * button on it, which is why it is not simply run like the later ones.
+ */
+async function installLegacy(
+  loader: ForgeLikeLoader,
+  loaderVersion: string,
+  mcVersion: string,
+  installerPath: string,
+  { install, versionInfo }: LegacyInstallProfile,
+  label: string,
+): Promise<void> {
+  // A profile that extends nothing is the form before 1.7.10, and some of that
+  // version's first builds still have it. It names every library of the game
+  // itself, in a way that no longer says where to get them.
+  if (!versionInfo.inheritsFrom) {
+    throw new RefusedError(
+      { key: 'launchError.loaderBuildTooOld', vars: { loader: `${label} ${loaderVersion}` } },
+      `${label} ${loaderVersion} has a version profile from before profiles extended one another`,
+    );
+  }
+
+  const coords = parseMavenCoords(install.path);
+  if (!coords) throw new Error(`${label} installer names its jar as ${install.path}`);
+
+  await fs.mkdir(paths.librariesDir, { recursive: true });
+  const jar = await resolveWithin(paths.librariesDir, coords.path);
+  const made = await extractEntry(installerPath, install.filePath, jar);
+  if (!made) throw new Error(`${label} installer does not contain ${install.filePath}`);
+
+  let named = false;
+  const libraries = (versionInfo.libraries ?? []).map((library): Library => {
+    if (library.name !== install.path) {
+      // The oldest of these still say `http://`, for hosts that have long
+      // answered on https; the downloader takes a library over nothing else.
+      return library.url?.startsWith('http://')
+        ? { ...library, url: `https://${library.url.slice('http://'.length)}` }
+        : library;
+    }
+    named = true;
+    // Its own jar, as the later installers list theirs: a hash, a size, and no
+    // address, because the only place it comes from is the installer. That is
+    // what has the launch look for it rather than fetch it, and install Forge
+    // again when it has gone.
+    return { name: library.name, downloads: { artifact: { path: coords.path, url: '', ...made } } };
+  });
+  if (!named) throw new Error(`${label} installer's profile does not list ${install.path}`);
+
+  await writeJsonAtomic(loaderProfilePath(loader, loaderVersion, mcVersion), {
+    ...versionInfo,
+    libraries,
+  });
+}
+
 /** What an install may be told beyond which build it is. */
 export interface LoaderInstallOptions {
   signal?: AbortSignal;
@@ -417,13 +531,30 @@ async function runInstaller(
     signal,
   );
 
+  const installed = async (versionId: string) => {
+    // The installer jar is 4–8 MB and has done its job.
+    await fs.rm(installerPath, { force: true });
+    onProgress(1, {
+      key: 'progress.msg.loaderInstalled',
+      vars: { loader: `${label} ${loaderVersion}` },
+    });
+    log.info(`Installed ${label} ${loaderVersion} for MC ${mcVersion} (version id ${versionId})`);
+  };
+
   // Read the profile out of the installer before running it: it names the
   // version id the installer is about to produce, so nothing below has to guess.
   const embedded = await readZipEntry(installerPath, 'version.json');
   if (!embedded) {
-    throw new Error(
-      `${label} ${loaderVersion} installer contains no version.json — it is not a client installer this launcher can use.`,
-    );
+    const legacy = await readLegacyProfile(installerPath);
+    if (!legacy) {
+      throw new Error(
+        `${label} ${loaderVersion} installer contains no version.json — it is not a client installer this launcher can use.`,
+      );
+    }
+    onProgress(0.9, { key: 'progress.msg.savingProfile' });
+    await installLegacy(loader, loaderVersion, mcVersion, installerPath, legacy, label);
+    await installed(legacy.versionInfo.id ?? `${mcVersion}-${loader}-${loaderVersion}`);
+    return;
   }
   const embeddedProfile = JSON.parse(embedded.toString('utf-8')) as Partial<VersionMeta>;
   const versionId = embeddedProfile.id;
@@ -518,12 +649,5 @@ async function runInstaller(
     JSON.parse(profileJson) as unknown,
   );
 
-  // The installer jar is 4–8 MB and has done its job.
-  await fs.rm(installerPath, { force: true });
-
-  onProgress(1, {
-    key: 'progress.msg.loaderInstalled',
-    vars: { loader: `${label} ${loaderVersion}` },
-  });
-  log.info(`Installed ${label} ${loaderVersion} for MC ${mcVersion} (version id ${versionId})`);
+  await installed(versionId);
 }

@@ -100,6 +100,13 @@ export function acceptedLoaders(modLoader: string): ClientModLoader[] {
 export const MOJANG_VERSION_MANIFEST =
   'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
 export const MOJANG_RESOURCES = 'https://resources.download.minecraft.net';
+/**
+ * Where a library named with no repository of its own is fetched from. That is
+ * the rule the version format has always had, and the one a Forge profile up to
+ * 1.12.2 leans on: `net.minecraft:launchwrapper:1.12` is all it says about the
+ * class the game is started through.
+ */
+export const MOJANG_LIBRARIES = 'https://libraries.minecraft.net';
 export const MC_SERVICES_API = 'https://api.minecraftservices.com';
 
 // ── Auth endpoints ────────────────────────────────────────
