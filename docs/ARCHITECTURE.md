@@ -266,8 +266,17 @@ or NeoForge build is made for one version, so a new version starts out with
 every build offered.
 
 A build that is not offered can still be named by a pack. It is installed as the
-pack asks; where that cannot be done the launch says so, and where the loader
-then gives up, the crash report carries the loader's own words.
+pack asks, and not refused: the lists cannot see everything that decides whether
+a build starts — a profile with a Java of its own starts builds the fetched one
+does not. What the launcher does instead is say so when it matters. When the
+launch of such a profile fails, or its game crashes, the line beside the failure
+says that the build is not one the launcher offers and may be the reason, and
+who can change it — the player in the profile editor, or the pack's author when
+the profile follows a pack. The crash report says the same on its `Mod loader`
+line. It is the lists' own rules put to one build (`loaderBuildStarts`),
+answered from the build's name and from the libraries its installed profile
+lists, so nothing is fetched to explain a failure that a missing network may
+have caused.
 
 **A build has more than one name.** Forge's list spells some builds with a
 branch after the number — `10.13.4.1614-1.7.10` — while its own recommendation
