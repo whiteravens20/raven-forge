@@ -40,7 +40,7 @@ import { useLocale, useT, type TranslationKey } from '@renderer/i18n';
 import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '@shared/constants';
 import { GAME_LANGUAGES } from '@shared/game-languages';
 import { loaderLabel } from '@shared/labels';
-import { defaultLoaderVersion } from '@shared/loader-version';
+import { defaultLoaderVersion, listedLoaderVersion } from '@shared/loader-version';
 import { recommendedRamMb } from '@shared/memory';
 import type {
   ModLoaderType,
@@ -1267,9 +1267,13 @@ function ProfileForm({
       // "latest" in this field had no version, so its loader was never
       // installed and it started as plain Minecraft. The default is therefore
       // written into the draft, where it is visible and is what gets saved.
+      //
+      // On the list under another spelling counts as on it, and the draft takes
+      // the list's: a pack names a Forge build by its number alone.
       const { draft: current, onChange: apply } = latest.current;
-      if (!versions.some((v) => v.version === current.modLoaderVersion)) {
-        apply({ ...current, modLoaderVersion: defaultLoaderVersion(versions) });
+      const listed = listedLoaderVersion(versions, current.modLoaderVersion, current.modLoader);
+      if (listed === undefined || listed !== current.modLoaderVersion) {
+        apply({ ...current, modLoaderVersion: listed ?? defaultLoaderVersion(versions) });
       }
     });
     return () => {

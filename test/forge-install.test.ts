@@ -270,6 +270,39 @@ describe('installing a Forge build from before 1.12.2’s last', () => {
     expect(await isLoaderProfileComplete('forge', OLD_BUILD, OLD_MC)).toBe(true);
   });
 
+  it('finds the build a pack names by its number alone', async () => {
+    // A Modrinth pack for 1.7.10 says `10.13.4.1614`. There is no installer at
+    // the address that makes; Forge's list has the build with a branch after it.
+    await serveOldInstaller(oldProfile);
+    served['/forge/maven-metadata.xml'] = Buffer.from(
+      `<metadata><versioning><versions><version>${OLD_MC}-10.13.4.1566-1.7.10</version>` +
+        `<version>${OLD_MC}-${OLD_BUILD}</version></versions></versioning></metadata>`,
+    );
+
+    await mod.installForgeLike('forge', '10.13.4.1614', OLD_MC, () => {});
+
+    // Kept under the name the profile has for it, which is the one it is asked for by.
+    const profile = path.join(
+      root,
+      'loaders',
+      'forge',
+      `${OLD_MC}-10.13.4.1614`,
+      'forge-profile.json',
+    );
+    expect(JSON.parse(await fs.readFile(profile, 'utf-8'))).toMatchObject({ inheritsFrom: OLD_MC });
+  });
+
+  it('still says a build is not published when the list has nothing by that number either', async () => {
+    await serveOldInstaller(oldProfile);
+    served['/forge/maven-metadata.xml'] = Buffer.from(
+      `<metadata><versioning><versions><version>${OLD_MC}-${OLD_BUILD}</version></versions></versioning></metadata>`,
+    );
+
+    await expect(mod.installForgeLike('forge', '10.13.4.9999', OLD_MC, () => {})).rejects.toThrow(
+      /does not publish this build/,
+    );
+  });
+
   it('refuses, in words the player can act on, a profile that extends nothing', async () => {
     const { refusalOf } = await import('../src/core/util/refusal');
     // The form before 1.7.10, which some of that version's first builds kept.

@@ -45,7 +45,11 @@ import { downloadToFile } from '../net/download';
 import { getSettings } from '../config/settings-manager';
 import { CancelledError, throwIfCancelled, withTimeout } from '../util/cancellation';
 import { requiredJavaFor } from '../minecraft/java-requirement';
-import { compareLoaderVersionsDesc, isPrerelease } from '../../shared/loader-version';
+import {
+  compareLoaderVersionsDesc,
+  forgeBuildNumber,
+  isPrerelease,
+} from '../../shared/loader-version';
 import type { LoaderVersion, ProgressMessage } from '../../shared/ipc-types';
 import type { Library, VersionMeta } from '../minecraft/types';
 
@@ -184,7 +188,7 @@ export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion
     // By its number, which is all the promotions feed gives. The list carries
     // some builds with a branch after it — `10.13.4.1614-1.7.10` — and compared
     // whole, Forge recommended nothing for 1.7.10, 1.8.9 or 1.9.4.
-    recommended: recommended !== undefined && version.split('-')[0] === recommended,
+    recommended: recommended !== undefined && forgeBuildNumber(version) === recommended,
   }));
 }
 
@@ -284,6 +288,28 @@ async function mavenChecksum(url: string, signal?: AbortSignal): Promise<HashedE
   return null;
 }
 
+/** The repository was asked for an installer and has no such file. */
+class NotPublishedError extends Error {}
+
+/**
+ * The build on Forge's own list that a profile's Forge version names, when it
+ * is not spelled the way the list spells it.
+ *
+ * A pack names a Forge build by its number, `10.13.4.1614`. For a handful of
+ * Minecraft versions the build is published with a branch after it —
+ * `1.7.10-10.13.4.1614-1.7.10` — and the installer's address is made of that
+ * whole name. One pack in a few writes the whole coordinate instead, Minecraft
+ * version first, which is read the same way.
+ */
+async function forgeBuildOnList(given: string, mcVersion: string): Promise<string | undefined> {
+  const prefix = `${mcVersion}-`;
+  const number = forgeBuildNumber(given.startsWith(prefix) ? given.slice(prefix.length) : given);
+  const xml = await fetchText(`${FORGE_MAVEN_ROOT}/maven-metadata.xml`, 'Forge Maven');
+  return forgeVersionsFor(parseMavenVersions(xml), mcVersion).find(
+    (build) => forgeBuildNumber(build) === number,
+  );
+}
+
 /** Whether the repository has the file at all — asked only when it has no checksum for it. */
 async function isPublished(url: string, signal?: AbortSignal): Promise<boolean> {
   try {
@@ -308,7 +334,7 @@ async function downloadInstaller(
   // A build that does not exist has no checksum either, and must not be
   // answered with advice about unverified installers.
   if (!expected && !(await isPublished(url, signal))) {
-    throw new Error(`${label} does not publish this build: ${url} was not found`);
+    throw new NotPublishedError(`${label} does not publish this build: ${url} was not found`);
   }
 
   // Refused before a byte is fetched. This jar is executed as a Java process a
@@ -550,12 +576,21 @@ async function runInstaller(
   onProgress(0.05, { key: 'progress.msg.installerDownloading', vars: { loader: label } });
   const installerPath = path.join(destDir, 'installer.jar');
   throwIfCancelled(signal, 'Loader install');
-  await downloadInstaller(
-    installerUrl(loader, loaderVersion, mcVersion),
-    installerPath,
-    label,
-    signal,
-  );
+  const fetchInstaller = (build: string) =>
+    downloadInstaller(installerUrl(loader, build, mcVersion), installerPath, label, signal);
+  try {
+    await fetchInstaller(loaderVersion);
+  } catch (err) {
+    // Not there under the name the profile has for it. Before saying so, see
+    // whether Forge's list has the build under a longer one: only now, so that
+    // the list is not fetched for the builds found at the first address, which
+    // is nearly all of them.
+    if (!(err instanceof NotPublishedError) || loader !== 'forge') throw err;
+    const listed = await forgeBuildOnList(loaderVersion, mcVersion).catch(() => undefined);
+    if (!listed || listed === loaderVersion) throw err;
+    log.info(`Forge ${loaderVersion} is published as ${listed}`);
+    await fetchInstaller(listed);
+  }
 
   const installed = async (versionId: string) => {
     // The installer jar is 4–8 MB and has done its job.
