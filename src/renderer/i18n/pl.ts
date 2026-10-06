@@ -511,6 +511,7 @@ export const pl: Translations = {
   'mods.updateTo': 'nowa: {version}',
   'mods.updated': 'Zaktualizowano: {names}',
   'mods.updateFailed': 'Nie udało się zaktualizować: {names}',
+  'mods.updateNotDone': 'Nie udało się zaktualizować modów.',
   'mods.toggleFailed': 'Nie udało się przełączyć moda {name}.',
   'mods.removeFailed': 'Nie udało się usunąć moda {name}.',
   'mods.gameBusy': 'Nie w trakcie gry ani jej uruchamiania — gra korzysta z tych plików.',

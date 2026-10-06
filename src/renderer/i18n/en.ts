@@ -478,6 +478,7 @@ export const en = {
   'mods.updateTo': 'new: {version}',
   'mods.updated': 'Updated: {names}',
   'mods.updateFailed': 'Could not update: {names}',
+  'mods.updateNotDone': 'Could not update the mods.',
   'mods.toggleFailed': 'Could not switch {name}.',
   'mods.removeFailed': 'Could not remove {name}.',
   'mods.gameBusy': 'Not while the game is running or starting — it is using these files.',

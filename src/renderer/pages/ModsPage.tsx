@@ -206,7 +206,7 @@ export function ModsPage() {
     await working(modIds, async () => {
       const result = await api.mods.update(selectedId, modIds);
       if (!result.success || !result.data) {
-        setError(result.error ?? t('mods.checkUpdatesFailed'));
+        setError(result.error ?? t('mods.updateNotDone'));
         return;
       }
       // Both halves get said. A run that updated nine mods and lost one is not
