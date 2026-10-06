@@ -29,16 +29,32 @@ export function ProfileDeleteDialog({ profileId, profileName, onCancel, onConfir
   const t = useT();
   const [deleteFiles, setDeleteFiles] = useState(true);
   const [summary, setSummary] = useState<ProfileFileSummary | null>(null);
+  /** The count could not be taken, so nothing is known about what is in there. */
+  const [countFailed, setCountFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void api.profiles.getFileSummary(profileId).then((r) => {
-      if (!cancelled && r.success && r.data) setSummary(r.data);
+      if (cancelled) return;
+      if (r.success && r.data) {
+        setSummary(r.data);
+      } else {
+        // With no count there is no worlds warning to show, so the box that
+        // deletes them is not left ticked on the player's behalf.
+        setCountFailed(true);
+        setDeleteFiles(false);
+      }
     });
     return () => {
       cancelled = true;
     };
   }, [profileId]);
+
+  // "Delete with files" waits for the count. The box is ticked from the start
+  // and the count of a large profile takes a moment — pressed in that moment,
+  // the button deleted the worlds before the line that warns about them had
+  // been drawn.
+  const counting = !summary && !countFailed;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -107,7 +123,9 @@ export function ProfileDeleteDialog({ profileId, profileName, onCancel, onConfir
                         ...(summary.worlds > 0 ? [t.plural('delete.worlds', summary.worlds)] : []),
                       ].join(' • ') + ` • ${formatBytes(summary.bytes)}`
                     : t('delete.nothingInstalled', { size: formatBytes(summary.bytes) })
-                  : t('delete.counting')}
+                  : countFailed
+                    ? t('delete.countFailed')
+                    : t('delete.counting')}
               </span>
             </span>
           </label>
@@ -131,7 +149,12 @@ export function ProfileDeleteDialog({ profileId, profileName, onCancel, onConfir
           <Button variant="ghost" size="sm" onClick={onCancel}>
             {t('common.cancel')}
           </Button>
-          <Button variant="danger" size="sm" onClick={() => onConfirm(deleteFiles)}>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={deleteFiles && counting}
+            onClick={() => onConfirm(deleteFiles)}
+          >
             {deleteFiles ? t('delete.confirmWithFiles') : t('delete.confirmKeepFiles')}
           </Button>
         </footer>

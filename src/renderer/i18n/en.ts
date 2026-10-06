@@ -253,6 +253,7 @@ export const en = {
     'The profile disappears from the launcher either way. What happens to its files is up to you.',
   'delete.alsoFiles': 'Delete the files too',
   'delete.counting': 'Checking what is there…',
+  'delete.countFailed': 'What is in the folder could not be counted — there may be worlds in it.',
   'delete.nothingInstalled': 'Nothing installed • {size}',
   'delete.mods.one': '{count} mod',
   'delete.mods.other': '{count} mods',

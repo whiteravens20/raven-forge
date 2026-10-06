@@ -265,6 +265,7 @@ export const pl: Translations = {
     'Profil zniknie z launchera tak czy inaczej. To, co stanie się z jego plikami, zależy od Ciebie.',
   'delete.alsoFiles': 'Usuń również pliki',
   'delete.counting': 'Sprawdzam, co tam jest…',
+  'delete.countFailed': 'Nie udało się policzyć zawartości folderu — mogą w nim być światy.',
   'delete.nothingInstalled': 'Nic nie zainstalowano • {size}',
   'delete.mods.one': '{count} mod',
   'delete.mods.few': '{count} mody',
