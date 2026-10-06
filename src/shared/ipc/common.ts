@@ -51,6 +51,7 @@ export type ErrorKey =
   | 'launchError.noAccount'
   | 'launchError.ramTooBig'
   | 'launchError.loaderVersionUnknown'
+  | 'launchError.loaderFileMissing'
   | 'launchError.javaNotRuntime'
   | 'launchError.javaTooOld'
   | 'contentError.notZip'

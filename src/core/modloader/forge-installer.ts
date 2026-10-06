@@ -33,7 +33,7 @@ import type { HashAlgorithm, HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
 import { ensureClientJar } from '../minecraft/asset-downloader';
 import { loaderCacheDir } from './loader-paths';
-import { loaderProfilePath, readLoaderProfile } from './loader-profile';
+import { isLoaderProfileComplete, loaderProfilePath } from './loader-profile';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
 import { readZipEntry } from '../util/zip-read';
@@ -351,6 +351,15 @@ export interface LoaderInstallOptions {
   signal?: AbortSignal;
   /** The Java the profile names, when it names one: the installer runs on it too. */
   javaPath?: string;
+  /**
+   * Run the installer over a build that already counts as installed.
+   *
+   * It is the one thing that can vouch for what it made: run again, it checks
+   * every file against its own list and makes again the ones that are missing
+   * or wrong, in seconds when none is. Most of those files appear in no version
+   * profile, so nothing else here can so much as tell they have gone.
+   */
+  repair?: boolean;
 }
 
 /**
@@ -374,7 +383,8 @@ export function installForgeLike(
   // the same files.
   return serializeByKey('forge-like-install', async () => {
     // Whoever held the turn before may have installed this very build.
-    if (await readLoaderProfile(loader, loaderVersion, mcVersion)) return;
+    if (!options.repair && (await isLoaderProfileComplete(loader, loaderVersion, mcVersion)))
+      return;
     await runInstaller(loader, loaderVersion, mcVersion, onProgress, options);
   });
 }

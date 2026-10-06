@@ -6,6 +6,7 @@ import { createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { log } from '../../main/logger';
 import { CancelledError, isCancellation, throwIfCancelled } from '../util/cancellation';
+import { RefusedError } from '../util/refusal';
 import { forEachConcurrently } from '../util/concurrency';
 import { serializeByKey } from '../util/serialize';
 import { eachEntry, openEntry } from '../util/zip-read';
@@ -370,6 +371,7 @@ export async function ensureLibraries(
   const settings = await getSettings();
   const concurrency = settings.downloadConcurrency;
   const tasks: DownloadTask[] = [];
+  const installerMade: DownloadTask[] = [];
   const classpath: string[] = [];
   const nativeJars: Array<{ jarPath: string; exclude: string[] }> = [];
 
@@ -383,7 +385,10 @@ export async function ensureLibraries(
       // arguments point them at, so a copy made here was never the one loaded.
       const artifact = lib.downloads.artifact;
       const dest = path.join(librariesDir, artifact.path);
-      tasks.push({ url: artifact.url, dest, sha1: artifact.sha1, size: artifact.size });
+      const task = { url: artifact.url, dest, sha1: artifact.sha1, size: artifact.size };
+      // No address means a loader's installer made the file on this machine:
+      // there is nothing to fetch, only something to find.
+      (artifact.url === '' ? installerMade : tasks).push(task);
       classpath.push(dest);
     } else if (lib.url) {
       // Maven-style entry from a loader profile — no hashes are guaranteed, but
@@ -410,7 +415,20 @@ export async function ensureLibraries(
     }
   }
 
-  log.info(`Ensuring ${tasks.length} libraries...`);
+  // Before anything is fetched: a launch that cannot be started is better
+  // refused now than after its downloads. Asked to download one of these, the
+  // launcher tried an empty address three times and reported what the
+  // downloader says about addresses that are not https.
+  const thorough = options.thorough ?? false;
+  for (const { dest, sha1, size } of installerMade) {
+    if (await fileExistsAndValid(dest, sha1, size, thorough)) continue;
+    throw new RefusedError(
+      { key: 'launchError.loaderFileMissing', vars: { file: path.basename(dest) } },
+      `${dest} is made by the loader's installer and is missing or damaged`,
+    );
+  }
+
+  log.info(`Ensuring ${tasks.length + installerMade.length} libraries...`);
   await downloadBatch(tasks, concurrency, {
     ...options,
     operationId: `libraries-${meta.id}`,

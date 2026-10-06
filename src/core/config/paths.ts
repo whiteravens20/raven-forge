@@ -113,6 +113,15 @@ export const paths = {
     return path.join(getDataRoot(), DIR_CACHE);
   },
 
+  /**
+   * cache/libraries/ — the game's jars and the loaders', in the Maven layout.
+   * A Forge or NeoForge installer pointed at `cacheDir` writes into this folder
+   * of its own accord, which is why it is under the cache and named this.
+   */
+  get librariesDir() {
+    return path.join(getDataRoot(), DIR_CACHE, 'libraries');
+  },
+
   /** logs/ — application logs (electron-log). */
   get logsDir() {
     return path.join(getDataRoot(), DIR_LOGS);

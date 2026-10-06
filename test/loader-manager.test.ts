@@ -209,6 +209,39 @@ describe('isLoaderInstalled', () => {
     expect(await mod.isLoaderInstalled('fabric', '0.17.2', '1.21.4')).toBe(false);
   });
 
+  it('is false while a file only the installer could have made is missing', async () => {
+    // Forge's own profile for 1.21.1, down to the one library it gives no
+    // address for: the installer patches that client together on the spot.
+    const made = 'net/minecraftforge/forge/1.21.1-52.1.0/forge-1.21.1-52.1.0-client.jar';
+    const forge = path.join(root, 'loaders', 'forge', '1.21.1-52.1.0');
+    await fs.mkdir(forge, { recursive: true });
+    await fs.writeFile(
+      path.join(forge, 'forge-profile.json'),
+      JSON.stringify({
+        mainClass: 'net.minecraftforge.bootstrap.ForgeBootstrap',
+        libraries: [
+          {
+            name: 'org.ow2.asm:asm:9.7.1',
+            downloads: { artifact: { path: 'x', url: 'https://x' } },
+          },
+          {
+            name: 'net.minecraftforge:forge:1.21.1-52.1.0:client',
+            downloads: { artifact: { path: made, url: '' } },
+          },
+        ],
+      }),
+    );
+
+    expect(await mod.isLoaderInstalled('forge', '52.1.0', '1.21.1')).toBe(false);
+
+    const file = path.join(root, 'cache', 'libraries', made);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, 'the patched client');
+
+    // The other library is somebody's to download, and is not asked about here.
+    expect(await mod.isLoaderInstalled('forge', '52.1.0', '1.21.1')).toBe(true);
+  });
+
   it('has nothing to install for vanilla', async () => {
     expect(await mod.isLoaderInstalled('vanilla', '', '1.21.4')).toBe(true);
   });

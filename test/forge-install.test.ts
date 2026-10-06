@@ -73,23 +73,38 @@ async function buildInstaller(): Promise<Buffer> {
   return bytes;
 }
 
+/** The one file of the build that the installer makes and nobody serves. */
+const PATCHED = `net/minecraftforge/forge/${MC}-${BUILD}/forge-${MC}-${BUILD}-client.jar`;
+const patchedClient = () => path.join(root, 'cache', 'libraries', PATCHED);
+
 /**
  * Something that answers `-version` as Java 17 and, run as an installer, leaves
- * what one leaves: the version profile under the install root. It also writes
+ * what one leaves: the version profile under the install root, and the patched
+ * client that profile lists with no address to fetch it from. It also writes
  * down where it was started and how often.
  */
 async function writeFakeJava(): Promise<string> {
   const bin = path.join(root, 'jdk', 'bin', 'java');
   const id = `${MC}-forge-${BUILD}`;
+  const profile = JSON.stringify({
+    id,
+    mainClass: 'cpw.mods.bootstraplauncher.BootstrapLauncher',
+    libraries: [
+      {
+        name: `net.minecraftforge:forge:${MC}-${BUILD}:client`,
+        downloads: { artifact: { path: PATCHED, url: '' } },
+      },
+    ],
+  });
   await fs.mkdir(path.dirname(bin), { recursive: true });
   await fs.writeFile(
     bin,
     `#!/bin/sh\n` +
       `if [ "$1" = "-version" ]; then echo 'openjdk version "17.0.9" 2023-10-17' >&2; exit 0; fi\n` +
       `echo "$PWD" >> "${root}/installer-runs"\n` +
-      `mkdir -p "$4/versions/${id}"\n` +
-      `echo '{"id":"${id}","mainClass":"cpw.mods.bootstraplauncher.BootstrapLauncher"}' ` +
-      `> "$4/versions/${id}/${id}.json"\n`,
+      `mkdir -p "$4/versions/${id}" "$4/libraries/${path.posix.dirname(PATCHED)}"\n` +
+      `echo 'the patched client' > "$4/libraries/${PATCHED}"\n` +
+      `echo '${profile}' > "$4/versions/${id}/${id}.json"\n`,
     { mode: 0o755 },
   );
   return bin;
@@ -164,6 +179,38 @@ describe.skipIf(!posix)('installing Forge', () => {
     await Promise.all([install({ javaPath }), install({ javaPath })]);
 
     expect(await installerRuns()).toHaveLength(1);
+  });
+
+  it('leaves a build that is installed alone', async () => {
+    const javaPath = await writeFakeJava();
+
+    await install({ javaPath });
+    await install({ javaPath });
+
+    expect(await installerRuns()).toHaveLength(1);
+  });
+
+  it('runs the installer again when a file only it can make has gone', async () => {
+    // The profile is still there, and used to be all that was asked about: the
+    // build counted as installed, and the launch then tried to download the
+    // missing file from the empty address the profile gives for it.
+    const javaPath = await writeFakeJava();
+    await install({ javaPath });
+    await fs.rm(patchedClient());
+
+    await install({ javaPath });
+
+    expect(await installerRuns()).toHaveLength(2);
+    expect(await fs.readFile(patchedClient(), 'utf-8')).toBe('the patched client\n');
+  });
+
+  it('runs the installer over a build that is installed when asked to check it', async () => {
+    const javaPath = await writeFakeJava();
+    await install({ javaPath });
+
+    await install({ javaPath, repair: true });
+
+    expect(await installerRuns()).toHaveLength(2);
   });
 
   it('fetches the client jar again when the one on disk is not the real one', async () => {

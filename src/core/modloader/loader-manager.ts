@@ -9,7 +9,7 @@ import {
   installForgeLike,
   type LoaderInstallOptions,
 } from './forge-installer';
-import { loaderProfilePath, readLoaderProfile } from './loader-profile';
+import { isLoaderProfileComplete, loaderProfilePath } from './loader-profile';
 import { withTimeout } from '../util/cancellation';
 import { writeJsonAtomic } from '../util/atomic-file';
 import {
@@ -172,7 +172,8 @@ export async function installLoader(
 
 /**
  * Whether a loader build is installed — which is to say, whether the version
- * profile its install leaves behind is there and usable.
+ * profile its install leaves behind is there and usable, with the files only
+ * that install could have made.
  *
  * Asked of the profile's contents and not merely of the file's existence. The
  * launch reinstalls whatever this says is missing, so a profile that will not
@@ -185,5 +186,5 @@ export async function isLoaderInstalled(
   mcVersion: string,
 ): Promise<boolean> {
   if (loader === 'vanilla') return true;
-  return (await readLoaderProfile(loader, loaderVersion, mcVersion)) !== null;
+  return isLoaderProfileComplete(loader, loaderVersion, mcVersion);
 }

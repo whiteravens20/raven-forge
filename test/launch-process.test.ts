@@ -53,6 +53,10 @@ const { state } = vi.hoisted(() => ({
     profile: undefined as Profile | undefined,
     meta: undefined as VersionMeta | undefined,
     played: [] as Array<{ profileId: string; minutes: number }>,
+    /** Every time a Forge installer was asked for, and whether as a repair. */
+    installs: [] as Array<{ repair: boolean }>,
+    /** What that installer does when it is run; nothing unless a test says. */
+    installer: undefined as (() => Promise<void>) | undefined,
   },
 }));
 
@@ -103,6 +107,22 @@ vi.mock('../src/core/mods/mod-sync', () => ({ syncManifest: async () => {} }));
 vi.mock('../src/core/discord/rich-presence', () => ({
   setGamePresence: async () => {},
   clearGamePresence: async () => {},
+}));
+
+// The installer is a Java program fetched from Forge's repository; when the
+// launch asks for it, and how, is what is under test here.
+vi.mock('../src/core/modloader/forge-installer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/core/modloader/forge-installer')>()),
+  installForgeLike: async (
+    _loader: string,
+    _build: string,
+    _mcVersion: string,
+    _onProgress: unknown,
+    options: { repair?: boolean } = {},
+  ) => {
+    state.installs.push({ repair: options.repair ?? false });
+    await state.installer?.();
+  },
 }));
 
 vi.mock('../src/core/minecraft/version-manifest', async (importOriginal) => ({
@@ -198,6 +218,8 @@ beforeEach(async () => {
   state.sent.length = 0;
   state.logged.length = 0;
   state.played.length = 0;
+  state.installs.length = 0;
+  state.installer = undefined;
   state.noActiveAccount = false;
   state.settings = {
     downloadConcurrency: 4,
@@ -459,6 +481,117 @@ describe.skipIf(!posix)('a version from before 1.7.10', () => {
     await exitInfo();
 
     expect((await gameSide())[1]).toBe('-');
+  });
+});
+
+describe.skipIf(!posix)('a Forge profile', () => {
+  const forge = { modLoader: 'forge', modLoaderVersion: '54.1.0' } as const;
+  const PATCHED = 'net/minecraftforge/forge/1.21.4-54.1.0/forge-1.21.4-54.1.0-client.jar';
+  const patched = () => path.join(cacheDir(), 'libraries', PATCHED);
+
+  /**
+   * What installing Forge leaves: its version profile, and the patched client
+   * that profile lists with a hash, a size and no address to fetch it from.
+   */
+  async function installForge(): Promise<void> {
+    const client = await place(patched(), 'the patched client');
+    const dir = path.join(root, 'data', 'loaders', 'forge', '1.21.4-54.1.0');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, 'forge-profile.json'),
+      JSON.stringify({
+        id: '1.21.4-forge-54.1.0',
+        inheritsFrom: '1.21.4',
+        mainClass: 'net.minecraftforge.bootstrap.ForgeBootstrap',
+        libraries: [
+          {
+            name: 'net.minecraftforge:forge:1.21.4-54.1.0:client',
+            downloads: { artifact: { path: PATCHED, url: '', ...client } },
+          },
+        ],
+      }),
+    );
+  }
+
+  it('starts on what its install left, without the installer', async () => {
+    await installForge();
+
+    await launch('exit 0', forge);
+    await exitInfo();
+
+    expect(state.installs).toEqual([]);
+    const args = await gameArgs();
+    expect(args).toContain('net.minecraftforge.bootstrap.ForgeBootstrap');
+    expect(args[args.indexOf('-cp') + 1].split(':')).toContain(patched());
+  });
+
+  it('has the installer run again when a file only that can make has gone', async () => {
+    await installForge();
+    await fs.rm(patched());
+    state.installer = async () => {
+      await place(patched(), 'the patched client');
+    };
+
+    await launch('exit 0', forge);
+    await exitInfo();
+
+    expect(state.installs).toEqual([{ repair: false }]);
+  });
+
+  it('is refused in words the player can act on when that file cannot be made again', async () => {
+    const { refusalOf } = await import('../src/core/util/refusal');
+    await installForge();
+    await fs.rm(patched());
+
+    // The installer runs and leaves nothing. This used to end as three attempts
+    // to download from an empty address, reported in the downloader's words.
+    const err = await launch('exit 0', forge).catch((e: unknown) => e);
+
+    expect(refusalOf(err)).toEqual({
+      key: 'launchError.loaderFileMissing',
+      vars: { file: 'forge-1.21.4-54.1.0-client.jar' },
+    });
+  });
+
+  it('has the installer check what it made on the launch after a crash', async () => {
+    await installForge();
+    await launch('exit 1', forge);
+    await exitInfo();
+    expect(state.installs).toEqual([]);
+    state.sent.length = 0;
+
+    await launch('exit 0', forge);
+    await exitInfo();
+
+    expect(state.installs).toEqual([{ repair: true }]);
+  });
+
+  it('still starts after a crash when the installer cannot be had', async () => {
+    await installForge();
+    await launch('exit 1', forge);
+    await exitInfo();
+    state.sent.length = 0;
+    state.installer = async () => {
+      throw new Error('Could not reach maven.minecraftforge.net to check the installer');
+    };
+
+    await launch('exit 0', forge);
+
+    expect((await exitInfo()).crashed).toBe(false);
+    expect(state.logged.join('\n')).toContain('Could not check the Forge install again');
+  });
+
+  it('is not started after a crash on a patched client that no longer matches', async () => {
+    const { refusalOf } = await import('../src/core/util/refusal');
+    await installForge();
+    await launch('exit 1', forge);
+    await exitInfo();
+    // Same size, different bytes — and an installer that did not put it right.
+    await fs.writeFile(patched(), 'THE PATCHED CLIENT');
+
+    const err = await launch('exit 0', forge).catch((e: unknown) => e);
+
+    expect(refusalOf(err)?.key).toBe('launchError.loaderFileMissing');
   });
 });
 

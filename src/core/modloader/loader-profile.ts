@@ -8,6 +8,7 @@ import {
   mergeVersionMeta,
   resolveVersionChain,
 } from '../minecraft/version-manifest';
+import { paths } from '../config/paths';
 import { loaderCacheDir } from './loader-paths';
 import { loaderLabel } from '../../shared/labels';
 import type { VersionMeta } from '../minecraft/types';
@@ -51,6 +52,49 @@ export async function readLoaderProfile(
   } catch {
     return null;
   }
+}
+
+/**
+ * The libraries of a loader profile that only its installer can make, as paths
+ * under the libraries folder.
+ *
+ * Forge lists what its installer writes on the player's own machine — its own
+ * jar up to 1.16.5, the patched client from 1.20.4 — with a hash, a size, and
+ * an empty address, because there is nowhere to fetch it from.
+ */
+export function installerMadeLibraries(profile: Pick<Partial<VersionMeta>, 'libraries'>): string[] {
+  return (profile.libraries ?? []).flatMap((library) => {
+    const artifact = library.downloads?.artifact;
+    return artifact && artifact.url === '' ? [artifact.path] : [];
+  });
+}
+
+/**
+ * Whether a loader build is installed: its profile is there and usable, and so
+ * is every file that profile says only the installer could have made.
+ *
+ * The second half is what a launch cannot put right by itself. Lost to a
+ * cleared cache or an overeager antivirus, such a file used to be "downloaded"
+ * from its empty address three times, and the profile then failed the same way
+ * at every start: the loader still counted as installed, so nothing ever ran
+ * the installer again.
+ */
+export async function isLoaderProfileComplete(
+  loader: InstallableLoader,
+  loaderVersion: string,
+  mcVersion: string,
+): Promise<boolean> {
+  const profile = await readLoaderProfile(loader, loaderVersion, mcVersion);
+  if (!profile) return false;
+
+  for (const made of installerMadeLibraries(profile)) {
+    try {
+      await fs.access(path.join(paths.librariesDir, made));
+    } catch {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
