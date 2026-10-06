@@ -100,7 +100,6 @@ export const modEntrySchema = z.object({
   localPath: z.string().optional(),
   fileName: fileNameField,
   ...integrityFields,
-  required: z.boolean().default(true),
   side: z.enum(['client', 'server', 'both']).default('client'),
 });
 

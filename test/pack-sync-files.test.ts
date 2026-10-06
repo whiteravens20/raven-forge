@@ -95,7 +95,6 @@ function mod(id: string, opts: { file?: string; body?: string } = {}) {
     url: urlOf(fileName),
     fileName,
     sha256: sha256(body),
-    required: true,
     side: 'both' as const,
   };
 }
@@ -408,7 +407,6 @@ describe('a pack that names a Modrinth build by its id', () => {
         version: 'pinnedId',
         source: 'modrinth',
         projectId: 'AANobbMI',
-        required: true,
         side: 'both',
       } as unknown as ReturnType<typeof mod>,
     ]);

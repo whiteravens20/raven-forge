@@ -93,8 +93,6 @@ function unlisted(fileName: string, extension: string): InstalledMod {
     version: 'local',
     source: 'local',
     fileName,
-    required: false,
-    side: 'client',
     enabled: true,
     fromManifest: false,
   };

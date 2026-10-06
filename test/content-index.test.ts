@@ -233,7 +233,7 @@ describe('syncContentFromManifest', () => {
 
     expect(count).toBe(1);
     const items = await content.listContent('resourcepacks', PROFILE);
-    expect(items[0]).toMatchObject({ id: 'server-pack', fromManifest: true, required: true });
+    expect(items[0]).toMatchObject({ id: 'server-pack', fromManifest: true });
     expect(await fs.readFile(path.join(packsDir(), 'server-pack.zip'), 'utf-8')).toBe(
       'server-bytes',
     );

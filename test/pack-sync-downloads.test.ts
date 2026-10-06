@@ -78,7 +78,6 @@ function mod(id: string, opts: { file?: string; body?: string; version?: string 
     url: `${base}/mods/${fileName}`,
     fileName,
     sha256: sha256(body),
-    required: true,
     side: 'both' as const,
   };
 }

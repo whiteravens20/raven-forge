@@ -83,7 +83,6 @@ function mod(id: string) {
     url: urlOf(`${id}.jar`),
     fileName: `${id}.jar`,
     sha256: crypto.createHash('sha256').update(body).digest('hex'),
-    required: true,
     side: 'both' as const,
   };
 }

@@ -84,8 +84,6 @@ function mod(over: Partial<InstalledMod> & { id: string; fileName: string }): In
     name: over.id,
     version: '1.0.0',
     source: 'modrinth',
-    required: false,
-    side: 'both',
     enabled: true,
     fromManifest: false,
     ...over,

@@ -6,7 +6,6 @@
 import type { ModLoaderType } from './profiles';
 
 export type ModSource = 'modrinth' | 'url' | 'local';
-export type ModSide = 'client' | 'server' | 'both';
 
 export interface InstalledMod {
   id: string;
@@ -20,8 +19,6 @@ export interface InstalledMod {
   version: string;
   source: ModSource;
   fileName: string;
-  required: boolean;
-  side: ModSide;
   enabled: boolean;
   /** true = from server manifest, false = user-installed */
   fromManifest: boolean;
@@ -36,9 +33,9 @@ export interface InstalledMod {
  * survives a restart and so installing quotes the id back — the player gets the
  * build they were shown, not whatever became newest since.
  *
- * `projectId` is here because the lock entry may not carry it: a jar dropped
- * into `mods/` by hand is recognised by its hash, and this is where the project
- * it turned out to belong to is written down.
+ * `projectId` is here because the lock entry may not carry it: a jar a pack
+ * carried inside itself is recognised by its hash, and this is where the
+ * project it turned out to belong to is written down.
  */
 export interface ModUpdate {
   versionId: string;

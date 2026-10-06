@@ -135,8 +135,6 @@ describe('changing a profile’s files under its running game', () => {
           version: '0.6.0',
           source: 'modrinth',
           fileName: 'sodium.jar',
-          required: false,
-          side: 'client',
           enabled: true,
           fromManifest: false,
         },

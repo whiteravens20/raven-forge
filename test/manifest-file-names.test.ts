@@ -62,6 +62,14 @@ describe('modEntrySchema', () => {
     const parsed = modEntrySchema.safeParse({ ...base, fileName: '../../evil.jar' });
     expect(parsed.success).toBe(false);
   });
+
+  it('takes an entry that still says `required`, and makes nothing of it', () => {
+    // Published manifests carry the word. Nothing in the launcher ever acted on
+    // it — every mod can be switched off — so it is read past, not refused.
+    const parsed = modEntrySchema.safeParse({ ...base, required: false });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).not.toHaveProperty('required');
+  });
 });
 
 describe('fileNameFromUrl', () => {

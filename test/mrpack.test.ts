@@ -332,10 +332,9 @@ describe('mrpackToManifest', () => {
     });
     const manifest = mrpackToManifest(await readMrpack(await pack('optional', contents)));
 
-    expect(manifest.mods).toHaveLength(1);
     // `optional` means the player may switch it off, not that the launcher may
     // decline to fetch it.
-    expect(manifest.mods[0].required).toBe(false);
+    expect(manifest.mods).toHaveLength(1);
   });
 
   it('produces a manifest that passes the launcher schema', async () => {

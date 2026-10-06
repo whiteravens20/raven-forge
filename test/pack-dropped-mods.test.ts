@@ -84,7 +84,6 @@ function packWith(...ids: string[]): ModManifest {
         url,
         fileName: `${id}.jar`,
         sha256: crypto.createHash('sha256').update(body).digest('hex'),
-        required: true,
         side: 'both' as const,
       };
     }),
@@ -151,8 +150,6 @@ describe('a mod the pack stops shipping', () => {
       version: '6.0.0',
       source: 'modrinth',
       fileName: 'journeymap.jar',
-      required: false,
-      side: 'both',
       enabled: true,
       fromManifest: false,
     };

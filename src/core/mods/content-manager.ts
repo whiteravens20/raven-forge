@@ -165,8 +165,6 @@ export async function installContent(
       version: 'local',
       source: 'local',
       fileName,
-      required: false,
-      side: 'client',
       enabled: true,
       fromManifest: false,
     };
@@ -193,8 +191,6 @@ export async function installContent(
     version,
     source: modrinthProjectId ? 'modrinth' : 'url',
     fileName,
-    required: false,
-    side: 'client',
     enabled: true,
     fromManifest: false,
   };
@@ -310,8 +306,6 @@ export async function syncContentFromManifest(
       version,
       source: entry.source === 'modrinth' ? 'modrinth' : 'url',
       fileName,
-      required: true,
-      side: 'client',
       enabled: true,
       fromManifest: true,
     });

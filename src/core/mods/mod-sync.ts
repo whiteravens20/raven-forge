@@ -826,8 +826,6 @@ async function runSync(profileId: string, supplied?: ModManifest): Promise<void>
           version: entry.version,
           source: entry.source,
           fileName: resolved.fileName,
-          required: entry.required,
-          side: entry.side,
           enabled,
           fromManifest: true,
         });
@@ -988,8 +986,6 @@ export async function installResolvedMod(
     version: resolved.version,
     source: identity.source,
     fileName: resolved.fileName,
-    required: false,
-    side: 'both',
     enabled,
     fromManifest: false,
   };

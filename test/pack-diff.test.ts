@@ -19,7 +19,6 @@ const entry = (id: string, version: string, side: ModEntry['side'] = 'client'): 
     source: 'url',
     url: `https://example.test/${id}-${version}.jar`,
     fileName: `${id}-${version}.jar`,
-    required: true,
     side,
   }) as ModEntry;
 
@@ -30,8 +29,6 @@ const installed = (id: string, version: string, fromManifest = true): InstalledM
     version,
     source: 'url',
     fileName: `${id}-${version}.jar`,
-    required: true,
-    side: 'client',
     enabled: true,
     fromManifest,
   }) as InstalledMod;

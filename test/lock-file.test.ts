@@ -41,8 +41,6 @@ const mod = (id: string): InstalledMod => ({
   version: '1',
   source: 'local',
   fileName: `${id}.jar`,
-  required: false,
-  side: 'both',
   enabled: true,
   fromManifest: false,
 });

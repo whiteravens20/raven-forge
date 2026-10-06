@@ -109,9 +109,8 @@ export function mrpackToManifest(pack: MrpackContents): ModManifest {
         version: pack.version,
         source: 'url',
         fileName: path.basename(file.path),
-        // `optional` in a pack means the player may turn it off, not that the
-        // launcher may skip it — the pack ships it either way.
-        required: file.env?.client !== 'optional',
+        // A file the pack calls `optional` is installed like any other: the
+        // word means the player may turn it off, and they may turn off any mod.
         side: 'client',
       });
     } else if (file.path.startsWith(RESOURCE_PACKS_DIR)) {
@@ -228,8 +227,6 @@ function bundledMods(pack: MrpackContents): InstalledMod[] {
         version: pack.version,
         source: 'local' as const,
         fileName,
-        required: false,
-        side: 'client' as const,
         enabled: true,
         fromManifest: false,
       },
