@@ -632,7 +632,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   // Never awaited: finding Discord's socket takes as long as it takes, and the
   // game is already running. A failure in here cannot reach the launch path.
   if (settings.discordRichPresence) {
-    void setGamePresence({
+    void setGamePresence(profile.id, {
       profileName: profile.name,
       minecraftVersion: profile.minecraftVersion,
       loader: loaderLabel(profile.modLoader),
@@ -697,7 +697,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   child.on('exit', (code, signal) => {
     void (async () => {
       runningProcesses.delete(profile.id);
-      clearGamePresence();
+      void clearGamePresence(profile.id);
       const playTimeMinutes = Math.round((Date.now() - startTime) / 60000);
       const failed = endedInFailure(code, signal, stopRequested.has(child));
 
@@ -764,7 +764,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   child.on('error', (err) => {
     void (async () => {
       runningProcesses.delete(profile.id);
-      clearGamePresence();
+      void clearGamePresence(profile.id);
       log.error(`Game process error for ${profile.name}:`, err);
       const logTail = getLogTail(profile.id, 100);
       const exitInfo: GameExitInfo = {

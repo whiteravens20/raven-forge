@@ -103,7 +103,7 @@ vi.mock('../src/core/mods/mod-sync', () => ({ syncManifest: async () => {} }));
 
 vi.mock('../src/core/discord/rich-presence', () => ({
   setGamePresence: async () => {},
-  clearGamePresence: () => {},
+  clearGamePresence: async () => {},
 }));
 
 vi.mock('../src/core/minecraft/version-manifest', async (importOriginal) => ({
