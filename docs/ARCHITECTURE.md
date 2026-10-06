@@ -226,6 +226,32 @@ each of its files and makes again the ones that are wrong. That takes seconds
 when nothing is, and a launch goes ahead without it when the installer cannot be
 reached.
 
+**Only builds that can be installed and started are offered.** What a loader
+lists for a Minecraft version and what works on it are not the same list, and a
+build that is chosen and then refused, or installed and then dead in the loader,
+is worse than one that was never there:
+
+- _Forge_ lists builds back to Minecraft 1.1. Nothing is offered below 1.7.10,
+  and of that version's 163 builds only the 38 from `10.13.3.1388` on, whose
+  installer carries a profile that can be used (`installableForgeBuilds`).
+- _NeoForge_ lists the builds it made for the snapshots and pre-releases of a
+  version under the release's own number, marked only by what follows a `+`;
+  those are left out, as is the one build of its 1.20.1 line that was published
+  without an installer.
+- _Fabric and Quilt_ list every build they have for every Minecraft version,
+  and serve a profile for any pair (`loader-fit.ts`). Three things take a build
+  off the list: its ASM cannot read the class files of the Java that Minecraft
+  version is compiled for, which both services publish enough to work out; its
+  profile sends for a library over plain http, which the launcher does not
+  fetch; or it is older than the oldest build that was found to start that
+  version by starting it — a short table, because nothing published says where
+  those floors are. For 26.3 that leaves 18 of Fabric's 253 builds and 16 of
+  Quilt's 307.
+
+A build that is not offered can still be named by a pack. It is installed as the
+pack asks; where that cannot be done the launch says so, and where the loader
+then gives up, the crash report carries the loader's own words.
+
 **A build has more than one name.** Forge's list spells some builds with a
 branch after the number — `10.13.4.1614-1.7.10` — while its own recommendation
 feed, and every pack on Modrinth, give the number alone. The recommendation is
