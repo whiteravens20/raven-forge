@@ -388,6 +388,11 @@ export const pl: Translations = {
   'profileForm.ramOver':
     '{value} to więcej, niż ten komputer ma ({total}). Minecraft się z tym nie uruchomi.',
   'profileForm.ramUseRecommended': 'Ustaw {recommended}',
+  'profileForm.ramRange': 'Od {min} do {max} MB.',
+  'profileForm.manifestUrlInvalid': 'To nie jest adres. Musi zaczynać się od https://',
+  'profileForm.serverPortRange': 'Port to liczba całkowita od 1 do 65535.',
+  'profileForm.saveRefused': 'Profil nie został zapisany.',
+  'profileForm.saveFailed': 'Launcher nie podał powodu.',
   'profileForm.manifestUrl': 'Manifest URL (opcjonalnie)',
   'profileForm.serverIp': 'Serwer IP',
   'profileForm.serverPort': 'Port',

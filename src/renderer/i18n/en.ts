@@ -363,6 +363,11 @@ export const en = {
   'profileForm.ramOver':
     '{value} is more than this machine has ({total}). Minecraft will not start with it.',
   'profileForm.ramUseRecommended': 'Use {recommended}',
+  'profileForm.ramRange': 'Between {min} and {max} MB.',
+  'profileForm.manifestUrlInvalid': 'That is not an address. It has to start with https://',
+  'profileForm.serverPortRange': 'A port is a whole number from 1 to 65535.',
+  'profileForm.saveRefused': 'The profile was not saved.',
+  'profileForm.saveFailed': 'The launcher gave no reason.',
   'profileForm.manifestUrl': 'Manifest URL (optional)',
   'profileForm.serverIp': 'Server IP',
   'profileForm.serverPort': 'Port',

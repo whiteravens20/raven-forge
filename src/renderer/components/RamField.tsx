@@ -3,6 +3,7 @@
 import { useId } from 'react';
 import { MAX_RAM_MB, MIN_RAM_MB, RAM_STEP_MB } from '@shared/constants';
 import { formatRamGb, ramAdvice, recommendedRamMb } from '@shared/memory';
+import { isAllocatableRam } from '@shared/profile-draft';
 import { useT } from '@renderer/i18n';
 
 interface RamFieldProps {
@@ -49,8 +50,14 @@ export function RamField({ valueMb, onChange, totalMb }: RamFieldProps) {
   const sliderMax = Math.min(MAX_RAM_MB, Math.max(machineMax, valueMb, MIN_RAM_MB + RAM_STEP_MB));
   const sliderValue = Math.min(Math.max(valueMb || MIN_RAM_MB, MIN_RAM_MB), sliderMax);
 
-  const message =
-    advice === 'over'
+  // Typed straight into the box, a number can be anything: the slider cannot
+  // leave its range, the box can. The main process refuses a profile outside
+  // it, so this is said first and in place of the advice.
+  const outOfRange = !isAllocatableRam(valueMb);
+
+  const message = outOfRange
+    ? t('profileForm.ramRange', { min: MIN_RAM_MB, max: MAX_RAM_MB })
+    : advice === 'over'
       ? t('profileForm.ramOver', { value: formatRamGb(valueMb), total: formatRamGb(totalMb ?? 0) })
       : advice === 'tight'
         ? t('profileForm.ramTight', {
@@ -65,7 +72,7 @@ export function RamField({ valueMb, onChange, totalMb }: RamFieldProps) {
             });
 
   const tone =
-    advice === 'over'
+    outOfRange || advice === 'over'
       ? 'text-rf-danger'
       : advice === 'tight'
         ? 'text-rf-warning'
@@ -109,7 +116,7 @@ export function RamField({ valueMb, onChange, totalMb }: RamFieldProps) {
         <span
           id={`${id}-note`}
           className={`text-xs ${tone}`}
-          role={advice === 'ok' ? undefined : 'alert'}
+          role={advice === 'ok' && !outOfRange ? undefined : 'alert'}
         >
           {message}
         </span>

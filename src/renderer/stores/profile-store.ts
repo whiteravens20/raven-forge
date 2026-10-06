@@ -12,8 +12,13 @@ interface ProfileStore {
 
   load: () => Promise<void>;
   select: (profileId: string | null) => void;
-  create: (data: Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Profile | null>;
-  update: (profileId: string, updates: Partial<Profile>) => Promise<void>;
+  /**
+   * Both answer with what the main process said. It refuses a profile the
+   * schema does not accept, and a caller that could not hear that closed its
+   * form over a profile that had not been saved.
+   */
+  create: (data: Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>) => Promise<IpcResult<Profile>>;
+  update: (profileId: string, updates: Partial<Profile>) => Promise<IpcResult<Profile>>;
   /** `deleteFiles: false` unlists the profile but leaves its directory intact. */
   remove: (profileId: string, deleteFiles: boolean) => Promise<void>;
   /**
@@ -55,14 +60,14 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     if (result.success && result.data) {
       await get().load();
       set({ selectedProfileId: result.data.id });
-      return result.data;
     }
-    return null;
+    return result;
   },
 
   update: async (profileId, updates) => {
-    await api.profiles.update(profileId, updates);
+    const result = await api.profiles.update(profileId, updates);
     await get().load();
+    return result;
   },
 
   remove: async (profileId, deleteFiles) => {

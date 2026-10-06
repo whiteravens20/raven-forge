@@ -31,6 +31,7 @@ import { GameFailureNotice } from '@components/GameFailureNotice';
 import { WorldBackupCard } from '@components/WorldBackupCard';
 import { VersionChangeDialog } from '@components/VersionChangeDialog';
 import { RamField } from '@components/RamField';
+import { isAllocatableRam, isManifestUrl, isServerPort } from '@shared/profile-draft';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useMachineMemoryMb } from '@hooks/use-machine-memory';
@@ -126,7 +127,6 @@ function windowSizeProblem(draft: DraftProfile): 'incomplete' | 'range' | null {
   return null;
 }
 
-function profileToDraft(p: Profile): DraftProfile {
 /**
  * The part of a profile the form edits.
  *
@@ -136,6 +136,7 @@ function profileToDraft(p: Profile): DraftProfile {
  * moment ago in this same form went back to the old one, and a game that ended
  * while the form was open lost that session's hours.
  */
+function profileToDraft(p: Profile): DraftProfile {
   const {
     id: _id,
     createdAt: _ca,
@@ -207,6 +208,8 @@ export function ProfilesPage() {
     await refreshOrphans();
   };
   const [syncing, setSyncing] = useState(false);
+  /** Why the main process would not save what is in the form. */
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
 
@@ -253,12 +256,14 @@ export function ProfilesPage() {
   const startFromScratch = () => {
     setChoosingSource(false);
     setDraft(emptyDraft(machineMemoryMb));
+    setSaveError(null);
     setMode('create');
   };
 
   const startEdit = () => {
     if (!selectedProfile) return;
     setDraft(profileToDraft(selectedProfile));
+    setSaveError(null);
     setMode('edit');
   };
 
@@ -287,19 +292,28 @@ export function ProfilesPage() {
 
   /** Write the draft out. Split from `save` so the dialog can call it too. */
   const commit = async (backupFirst = false) => {
-    if (mode === 'create') {
-      await createProfile(draft);
-    } else if (mode === 'edit' && selectedProfile) {
-      if (backupFirst) {
-        // Before the profile moves, not after: a failed copy must leave the
-        // profile exactly as it was rather than half-changed.
-        const backup = await api.profiles.backupWorlds(selectedProfile.id, 'version-change');
-        if (!backup.success) {
-          setActionError(backup.error ?? t('versionChange.backupFailed'));
-          return;
-        }
+    setSaveError(null);
+    if (mode === 'edit' && selectedProfile && backupFirst) {
+      // Before the profile moves, not after: a failed copy must leave the
+      // profile exactly as it was rather than half-changed.
+      const backup = await api.profiles.backupWorlds(selectedProfile.id, 'version-change');
+      if (!backup.success) {
+        setActionError(backup.error ?? t('versionChange.backupFailed'));
+        return;
       }
-      await updateProfile(selectedProfile.id, draft);
+    }
+
+    const saved =
+      mode === 'create'
+        ? await createProfile(draft)
+        : mode === 'edit' && selectedProfile
+          ? await updateProfile(selectedProfile.id, draft)
+          : undefined;
+    // The form stays open over what was typed. It used to close either way,
+    // and a profile the main process had refused was simply not there.
+    if (saved && !saved.success) {
+      setSaveError(saved.error ?? t('profileForm.saveFailed'));
+      return;
     }
     setMode('view');
   };
@@ -501,6 +515,7 @@ export function ProfilesPage() {
             onChange={setDraft}
             onCancel={cancel}
             onSave={save}
+            saveError={saveError}
             isCreate={mode === 'create'}
             profile={mode === 'edit' ? selectedProfile : undefined}
             machineMemoryMb={machineMemoryMb}
@@ -890,6 +905,8 @@ interface FormProps {
   onChange: (next: DraftProfile) => void;
   onCancel: () => void;
   onSave: () => void;
+  /** Why the last Save was refused, in the main process's words. */
+  saveError: string | null;
   isCreate: boolean;
   /** The saved profile being edited; absent while creating a new one. */
   profile?: Profile;
@@ -902,6 +919,7 @@ function ProfileForm({
   onChange,
   onCancel,
   onSave,
+  saveError,
   isCreate,
   profile,
   machineMemoryMb,
@@ -1049,6 +1067,12 @@ function ProfileForm({
           })
         : undefined;
   const heightAtFault = sizeProblem === 'incomplete' && draft.windowHeight === undefined;
+
+  // The other three things the main process refuses a profile over. Said beside
+  // the field, and Save waits for them, rather than found out from a refusal.
+  const urlProblem = draft.manifestUrl !== undefined && !isManifestUrl(draft.manifestUrl);
+  const portProblem = draft.serverPort !== undefined && !isServerPort(draft.serverPort);
+  const ramProblem = !isAllocatableRam(draft.allocatedRamMb);
 
   // Same rule as the version list: whatever the profile is already set to is
   // always one of the options, so the control cannot show a runtime other than
@@ -1201,8 +1225,9 @@ function ProfileForm({
         <Input
           label={t('profileForm.manifestUrl')}
           value={draft.manifestUrl ?? ''}
-          onChange={(e) => set('manifestUrl', e.target.value || undefined)}
+          onChange={(e) => set('manifestUrl', e.target.value.trim() || undefined)}
           placeholder="https://server.com/manifest.json"
+          error={urlProblem ? t('profileForm.manifestUrlInvalid') : undefined}
         />
         <Input
           label={t('profileForm.serverIp')}
@@ -1218,6 +1243,7 @@ function ProfileForm({
           placeholder="25565"
           min={1}
           max={65535}
+          error={portProblem ? t('profileForm.serverPortRange') : undefined}
         />
         <Input
           label={t('profileForm.javaArgs')}
@@ -1322,11 +1348,19 @@ function ProfileForm({
         />
       </div>
 
+      {saveError && (
+        <Banner type="urgent">
+          {t('profileForm.saveRefused')} {saveError}
+        </Banner>
+      )}
+
       <div className="flex gap-2 pt-2">
         <Button
           onClick={onSave}
           icon={<Save size={14} />}
-          disabled={!draft.name.trim() || sizeProblem !== null}
+          disabled={
+            !draft.name.trim() || sizeProblem !== null || urlProblem || portProblem || ramProblem
+          }
         >
           {t('common.save')}
         </Button>
