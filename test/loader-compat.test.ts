@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
   forgeInstallsOn,
   forgeVersionsFor,
+  installableForgeBuilds,
   neoForgePrefix,
   neoForgeVersionsFor,
   isNeoForgeStable,
@@ -62,6 +63,36 @@ describe('forgeInstallsOn', () => {
     for (const version of ['1.8', '1.8.9', '1.12.2', '1.16.5', '1.21.11', '26.1', '26.3']) {
       expect(forgeInstallsOn(version)).toBe(true);
     }
+  });
+});
+
+describe('installableForgeBuilds', () => {
+  it('leaves out the builds of 1.7.10 whose profile stands alone', () => {
+    // As Forge lists them: 1388 is the first whose profile extends the game's,
+    // and it is written with a branch after it that the earlier ones lack.
+    const builds = [
+      '10.13.4.1614-1.7.10',
+      '10.13.3.1388-1.7.10',
+      '10.13.3.1387-1.7.10',
+      '10.13.2.1291',
+      '10.13.0.1150',
+    ];
+
+    expect(installableForgeBuilds(builds, '1.7.10')).toEqual([
+      '10.13.4.1614-1.7.10',
+      '10.13.3.1388-1.7.10',
+    ]);
+  });
+
+  it('keeps every build of a version that has none of the older kind', () => {
+    const builds = ['11.15.1.2318-1.8.9', '11.15.0.1656'];
+
+    expect(installableForgeBuilds(builds, '1.8.9')).toEqual(builds);
+    expect(installableForgeBuilds(['47.4.10', '47.0.0'], '1.20.1')).toEqual(['47.4.10', '47.0.0']);
+  });
+
+  it('has nothing for a Minecraft version from before 1.7.10', () => {
+    expect(installableForgeBuilds(['9.11.1.1345'], '1.6.4')).toEqual([]);
   });
 });
 

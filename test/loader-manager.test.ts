@@ -173,6 +173,19 @@ describe('getLoaderVersions', () => {
     ]);
   });
 
+  it('offers only the Forge builds of 1.7.10 that can be installed', async () => {
+    serveForge(
+      ['1.7.10-10.13.4.1614-1.7.10', '1.7.10-10.13.3.1388-1.7.10', '1.7.10-10.13.2.1291'],
+      { '1.7.10-recommended': '10.13.4.1614' },
+    );
+
+    const versions = await mod.getLoaderVersions('forge', '1.7.10');
+
+    // 1291 is on Forge's list and was recommended for years. Its installer
+    // carries a profile this launcher refuses, so it is not there to be chosen.
+    expect(versions.map((v) => v.version)).toEqual(['10.13.4.1614-1.7.10', '10.13.3.1388-1.7.10']);
+  });
+
   it('offers no Forge build for a Minecraft version from before Forge could be installed like this', async () => {
     // Forge lists 72 builds for 1.6.4 and 133 for 1.3.2. None of them is
     // something this launcher installs, so none is offered — and nobody is asked.
