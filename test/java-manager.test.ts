@@ -368,6 +368,34 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
     expect((await fs.stat(result.path)).isFile()).toBe(true);
   });
 
+  it('installs a runtime once when two launches ask for it together', async () => {
+    // Two profiles on one Java, Play pressed on both. The second used to find
+    // the runtime missing while the first was unpacking it, fetch the archive
+    // again and replace the directory under the first.
+    const { ensureJavaVersion } = await loadModule();
+
+    const [one, two] = await Promise.all([ensureJavaVersion(21), ensureJavaVersion(21)]);
+
+    expect(archiveHits).toHaveLength(1);
+    expect(one.path).toBe(two.path);
+  });
+
+  it('leaves the runtime that was there when the new one cannot be unpacked', async () => {
+    // Unpacked beside it and swapped in: deleting first left `bin/java` with
+    // half a runtime behind it whenever the unpacking was cut short.
+    const { ensureJavaVersion } = await loadModule();
+    await fs.mkdir(path.dirname(managedJava()), { recursive: true });
+    await fs.writeFile(managedJava(), 'not a program', { mode: 0o755 });
+    const notAnArchive = Buffer.from('this is not a tar archive');
+    archiveBytes = notAnArchive;
+    adoptium = () => assetsFor(archiveUrl, sha256(notAnArchive));
+
+    await expect(ensureJavaVersion(21)).rejects.toThrow();
+
+    expect(await fs.readFile(managedJava(), 'utf-8')).toBe('not a program');
+    await expect(fs.access(path.join(root, 'java', 'jre-21.new'))).rejects.toThrow();
+  });
+
   it('fails when Adoptium cannot be reached', async () => {
     const { ensureJavaVersion } = await loadModule();
     adoptium = () => new Response('nope', { status: 503 });

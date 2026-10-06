@@ -8,12 +8,12 @@ import { promisify } from 'node:util';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { ADOPTIUM_API } from '../../shared/constants';
-import { verifyDownload } from '../mods/integrity';
 import { parseJavaVersion } from '../minecraft/java-requirement';
 import { LaunchRefusedError } from '../minecraft/launch-errors';
 import { emitProgress } from '../util/progress';
 import { downloadToFile } from '../net/download';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
+import { serializeByKey } from '../util/serialize';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
 
 const execFileAsync = promisify(execFile);
@@ -302,6 +302,9 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
     // held to https as well; the resolver's URL already is, and loopback stays
     // allowed for a mirror served locally.
     secure: true,
+    // The resolver guarantees a checksum, so the archive is never on disk under
+    // its name unless it is the one Adoptium published.
+    verify: { hashes: { sha256 }, label: `JRE ${majorVersion}` },
     onProgress: (bytes, declared) => {
       received = bytes;
       total = declared;
@@ -320,11 +323,6 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
     },
   });
 
-  // Deletes the archive and throws on mismatch. Everything inside it is about
-  // to be extracted and then run as the JVM for every launch, and the resolver
-  // guarantees a checksum, so this always runs.
-  await verifyDownload(tmpFile, { sha256 }, `JRE ${majorVersion}`);
-
   emitJavaProgress({
     operationId: `java-${majorVersion}`,
     progress: 1,
@@ -337,37 +335,52 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
   return tmpFile;
 }
 
+/**
+ * Unpack a runtime archive into `destDir`, replacing what is there.
+ *
+ * Unpacked beside the destination and swapped in once it is whole. It used to
+ * begin by deleting the destination and unpack into it, so a launcher closed
+ * mid-way left `bin/java` in place with half the runtime missing.
+ */
 async function extractArchive(
   archivePath: string,
   destDir: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  await fs.rm(destDir, { recursive: true, force: true });
-  await fs.mkdir(destDir, { recursive: true });
+  const staging = `${destDir}.new`;
+  await fs.rm(staging, { recursive: true, force: true });
+  await fs.mkdir(staging, { recursive: true });
 
-  // `tar` handles the zip too: Windows 10 1803 and later ship bsdtar, which
-  // reads zip archives. The `else` is not decoration — without it an extension
-  // this does not recognise made the whole function a silent no-op, and the
-  // failure surfaced several steps later as "installed JRE but failed to
-  // verify", which points at the wrong thing entirely.
-  if (archivePath.endsWith('.tar.gz')) {
-    await execFileAsync('tar', ['-xzf', archivePath, '-C', destDir, '--strip-components=1'], {
-      signal,
-    });
-  } else if (archivePath.endsWith('.zip')) {
-    await execFileAsync('tar', ['-xf', archivePath, '-C', destDir, '--strip-components=1'], {
-      signal,
-    });
-  } else {
-    throw new Error(`Cannot extract ${path.basename(archivePath)}: unrecognised archive type`);
-  }
-
-  // Ensure bin/java is executable
-  const javaExec = path.join(destDir, 'bin', getJavaExecutable());
   try {
-    await fs.chmod(javaExec, 0o755);
-  } catch {
-    /* Windows doesn't need chmod */
+    // `tar` handles the zip too: Windows 10 1803 and later ship bsdtar, which
+    // reads zip archives. The `else` is not decoration — without it an extension
+    // this does not recognise made the whole function a silent no-op, and the
+    // failure surfaced several steps later as "installed JRE but failed to
+    // verify", which points at the wrong thing entirely.
+    const unpack = archivePath.endsWith('.tar.gz')
+      ? '-xzf'
+      : archivePath.endsWith('.zip')
+        ? '-xf'
+        : null;
+    if (!unpack) {
+      throw new Error(`Cannot extract ${path.basename(archivePath)}: unrecognised archive type`);
+    }
+    await execFileAsync('tar', [unpack, archivePath, '-C', staging, '--strip-components=1'], {
+      signal,
+    });
+
+    // Ensure bin/java is executable
+    try {
+      await fs.chmod(path.join(staging, 'bin', getJavaExecutable()), 0o755);
+    } catch {
+      /* Windows doesn't need chmod */
+    }
+
+    await fs.rm(destDir, { recursive: true, force: true });
+    await fs.rename(staging, destDir);
+  } catch (err) {
+    await fs.rm(staging, { recursive: true, force: true });
+    throw err;
   }
 
   // Clean up archive
@@ -378,22 +391,22 @@ async function extractArchive(
 // ── Public API ─────────────────────────────────────────────
 
 /**
- * Ensure a specific Java major version is available.
- * Downloads from Adoptium if not already installed.
- * Returns the installation info.
- */
-/**
  * Ensure a specific Java major version is available, downloading it from
  * Adoptium when it is not.
  *
  * "Already installed" used to mean nothing more than `bin/java` being present
  * and executable, and the `-version` check ran only on the freshly-extracted
- * path. But `extractArchive` starts by deleting the destination, so an
- * interrupted extraction can leave exactly that: the launcher binary in place
- * and half the runtime missing. Every later launch then took the short path,
- * said "already installed", and died inside the JVM with an error naming none of
- * this. Proving the runtime actually starts costs one short subprocess per
- * launch and is the only way to tell the two states apart.
+ * path. An interrupted extraction could leave exactly that: the launcher binary
+ * in place and half the runtime missing. Every later launch then took the short
+ * path, said "already installed", and died inside the JVM with an error naming
+ * none of this. Proving the runtime actually starts costs one short subprocess
+ * per launch and is the only way to tell the two states apart.
+ *
+ * One install per version at a time. Two profiles that need the same missing
+ * runtime are got ready at once whenever the player presses Play on both, and
+ * the second used to find it missing while the first was still unpacking,
+ * download the same archive over it and replace the directory — which by then
+ * the first profile's game could be running from.
  */
 export async function ensureJavaVersion(
   majorVersion: number,
@@ -408,20 +421,23 @@ export async function ensureJavaVersion(
     managed: true,
   };
 
-  if (await runtimeWorks(javaPath)) {
-    log.info(`Java ${majorVersion} already installed at ${javaPath}`);
+  return serializeByKey(`java:${dir}`, async () => {
+    // Asked here, inside the turn: whoever held it before may have installed it.
+    if (await runtimeWorks(javaPath)) {
+      log.info(`Java ${majorVersion} already installed at ${javaPath}`);
+      return installation;
+    }
+
+    throwIfCancelled(signal, 'Java install');
+    const archivePath = await downloadAdoptium(majorVersion, signal);
+    throwIfCancelled(signal, 'Java install');
+    await extractArchive(archivePath, dir, signal);
+
+    if (!(await runtimeWorks(javaPath))) {
+      throw new Error(`Installed JRE ${majorVersion} but it does not run`);
+    }
     return installation;
-  }
-
-  throwIfCancelled(signal, 'Java install');
-  const archivePath = await downloadAdoptium(majorVersion, signal);
-  throwIfCancelled(signal, 'Java install');
-  await extractArchive(archivePath, dir, signal);
-
-  if (!(await runtimeWorks(javaPath))) {
-    throw new Error(`Installed JRE ${majorVersion} but it does not run`);
-  }
-  return installation;
+  });
 }
 
 /** Does this path start a JVM? The one question that separates a usable runtime
