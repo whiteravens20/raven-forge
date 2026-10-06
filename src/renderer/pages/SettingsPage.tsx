@@ -160,6 +160,15 @@ export function SettingsPage() {
           onCommit={(v) => update({ proxyUrl: v || undefined })}
         />
         <p className="text-xs text-rf-text-muted">{t('settings.proxyHint')}</p>
+
+        {/* Here, with the other things that decide what is fetched and run —
+            it has nothing to do with the manifest keys it used to sit among. */}
+        <CheckboxRow
+          checked={settings.allowUnverifiedLoaderInstaller}
+          onChange={(v) => update({ allowUnverifiedLoaderInstaller: v })}
+          label={t('settings.allowUnverifiedInstaller')}
+        />
+        <p className="text-xs text-rf-text-muted">{t('settings.allowUnverifiedInstallerHint')}</p>
       </Section>
 
       <Section title={t('settings.section.sources')}>
@@ -245,13 +254,6 @@ export function SettingsPage() {
             </p>
           )}
         </div>
-
-        <CheckboxRow
-          checked={settings.allowUnverifiedLoaderInstaller}
-          onChange={(v) => update({ allowUnverifiedLoaderInstaller: v })}
-          label={t('settings.allowUnverifiedInstaller')}
-        />
-        <p className="text-xs text-rf-text-muted">{t('settings.allowUnverifiedInstallerHint')}</p>
 
         <div className="grid grid-cols-2 gap-2 rounded-lg border border-rf-border bg-rf-surface p-3">
           <Input
