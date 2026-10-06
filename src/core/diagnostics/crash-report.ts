@@ -37,6 +37,26 @@ function escapeRegExp(value: string): string {
 }
 
 /**
+ * Every way a known value is written.
+ *
+ * An account's UUID comes from Minecraft Services without dashes and is printed
+ * by the game, and by most mods, with them. Matching only the spelling the
+ * launcher holds left the other one in the report.
+ */
+function spellings(secret: string): string[] {
+  const bare = secret.replace(/-/g, '');
+  if (!/^[0-9a-f]{32}$/i.test(bare)) return [secret];
+  const dashed = [
+    bare.slice(0, 8),
+    bare.slice(8, 12),
+    bare.slice(12, 16),
+    bare.slice(16, 20),
+    bare.slice(20),
+  ].join('-');
+  return [bare, dashed];
+}
+
+/**
  * Strip credentials and personal details out of anything before it is written.
  *
  * `secrets` are the values this launch is known to have used — the access
@@ -48,20 +68,27 @@ function escapeRegExp(value: string): string {
  * would otherwise redact a substring of every other word in the log and leave
  * behind something nobody can read.
  */
-export function redactSecrets(text: string, secrets: string[] = []): string {
+export function redactSecrets(
+  text: string,
+  secrets: string[] = [],
+  home: string = os.homedir(),
+): string {
   let out = text.replace(JWT_PATTERN, '<redacted>').replace(CREDENTIAL_ARG_PATTERN, '$1<redacted>');
 
-  for (const secret of secrets) {
+  for (const secret of secrets.flatMap(spellings)) {
     if (secret.length < 3) continue;
     out = out.replace(new RegExp(escapeRegExp(secret), 'gi'), '<redacted>');
   }
 
   // Windows puts the account name in every absolute path — `C:\Users\Jan
   // Kowalski\AppData\…` — and so does a Linux home directory. The paths still
-  // have to be readable to be useful, so only the home prefix goes.
-  const home = os.homedir();
+  // have to be readable to be useful, so only the home prefix goes. Java writes
+  // the same Windows path with forward slashes wherever it makes a URL of it,
+  // so that spelling goes too.
   if (home.length >= 3) {
-    out = out.replace(new RegExp(escapeRegExp(home), 'gi'), '~');
+    for (const prefix of new Set([home, home.replaceAll('\\', '/')])) {
+      out = out.replace(new RegExp(escapeRegExp(prefix), 'gi'), '~');
+    }
   }
 
   return out;

@@ -54,6 +54,27 @@ describe('redactSecrets', () => {
     expect(out).toContain('~/.config/Raven Forge Launcher');
   });
 
+  it('removes an account UUID in the spelling the launcher does not hold', () => {
+    // A Microsoft account's comes without dashes; the game prints it with them.
+    const bare = '069a79f444e94726a5befca90e38aaf5';
+    const dashed = '069a79f4-44e9-4726-a5be-fca90e38aaf5';
+    expect(redactSecrets(`Setting user: Raven (${dashed})`, [bare])).not.toContain(dashed);
+    expect(redactSecrets(`--uuid=${bare}`, [dashed])).not.toContain(bare);
+  });
+
+  it('removes a Windows home directory written with either kind of slash', () => {
+    const home = 'C:\\Users\\Jan Kowalski';
+    const text =
+      'gameDir C:\\Users\\Jan Kowalski\\AppData\\Roaming\\raven-forge-launcher\n' +
+      'jar file:/C:/Users/Jan Kowalski/AppData/Roaming/raven-forge-launcher/cache/a.jar';
+
+    const out = redactSecrets(text, [], home);
+
+    expect(out).not.toContain('Jan Kowalski');
+    expect(out).toContain('~\\AppData\\Roaming');
+    expect(out).toContain('file:/~/AppData/Roaming');
+  });
+
   it('ignores secrets too short to redact without shredding the text', () => {
     // `0` is the access token an offline launch uses. Redacting it would blank
     // out every version number, port and timestamp in the file.
