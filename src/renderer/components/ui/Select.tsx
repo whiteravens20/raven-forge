@@ -1,6 +1,7 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import type { SelectHTMLAttributes } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
@@ -20,23 +21,33 @@ export function Select({ label, options, error, className = '', id, ...props }: 
           {label}
         </label>
       )}
-      <select
-        id={selectId}
-        className={`rounded-lg border bg-rf-surface px-3 py-2 text-sm text-rf-text outline-none transition-colors appearance-none disabled:opacity-50 disabled:cursor-not-allowed ${
-          error
-            ? 'border-rf-danger focus:border-rf-danger'
-            : 'border-rf-border focus:border-rf-accent-text'
-        } ${className}`}
-        aria-invalid={error ? 'true' : undefined}
-        aria-describedby={error ? errorId : undefined}
-        {...props}
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      {/* The native arrow is switched off so the control matches the fields
+          around it, and one is drawn in its place: without it this was a text
+          field to look at, and nothing said it opens. */}
+      <div className="relative">
+        <select
+          id={selectId}
+          className={`w-full rounded-lg border bg-rf-surface py-2 pl-3 pr-9 text-sm text-rf-text outline-none transition-colors appearance-none disabled:opacity-50 disabled:cursor-not-allowed ${
+            error
+              ? 'border-rf-danger focus:border-rf-danger'
+              : 'border-rf-border focus:border-rf-accent-text'
+          } ${className}`}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={error ? errorId : undefined}
+          {...props}
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={15}
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-rf-text-muted"
+        />
+      </div>
       {error && (
         <span id={errorId} className="text-xs text-rf-danger" role="alert">
           {error}
