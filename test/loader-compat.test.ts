@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
   forgeInstallsOn,
   forgeVersionsFor,
-  installableForgeBuilds,
+  workingForgeBuilds,
   neoForgePrefix,
   neoForgeVersionsFor,
   isNeoForgeStable,
@@ -66,7 +66,7 @@ describe('forgeInstallsOn', () => {
   });
 });
 
-describe('installableForgeBuilds', () => {
+describe('workingForgeBuilds', () => {
   it('leaves out the builds of 1.7.10 whose profile stands alone', () => {
     // As Forge lists them: 1388 is the first whose profile extends the game's,
     // and it is written with a branch after it that the earlier ones lack.
@@ -78,21 +78,50 @@ describe('installableForgeBuilds', () => {
       '10.13.0.1150',
     ];
 
-    expect(installableForgeBuilds(builds, '1.7.10')).toEqual([
+    expect(workingForgeBuilds(builds, '1.7.10')).toEqual([
       '10.13.4.1614-1.7.10',
       '10.13.3.1388-1.7.10',
     ]);
   });
 
-  it('keeps every build of a version that has none of the older kind', () => {
+  it('leaves out the builds that do not start on the Java 8 of today', () => {
+    // 36.2.26 is where Forge stopped calling a constructor Java 8u321 removed.
+    expect(workingForgeBuilds(['36.2.42', '36.2.26', '36.2.25', '36.0.0'], '1.16.5')).toEqual([
+      '36.2.42',
+      '36.2.26',
+    ]);
+    // 1.16.4 was never given that fix.
+    expect(workingForgeBuilds(['35.1.37', '35.0.0'], '1.16.4')).toEqual([]);
+  });
+
+  it('leaves out the first builds of a line that never started', () => {
+    expect(workingForgeBuilds(['14.21.1.2443', '14.21.0.2322', '14.21.0.2321'], '1.12')).toEqual([
+      '14.21.1.2443',
+      '14.21.0.2322',
+    ]);
+    expect(workingForgeBuilds(['37.1.1', '37.0.29', '37.0.28', '37.0.0'], '1.17.1')).toEqual([
+      '37.1.1',
+      '37.0.29',
+    ]);
+  });
+
+  it('keeps every build of a version whose first one starts', () => {
     const builds = ['11.15.1.2318-1.8.9', '11.15.0.1656'];
 
-    expect(installableForgeBuilds(builds, '1.8.9')).toEqual(builds);
-    expect(installableForgeBuilds(['47.4.10', '47.0.0'], '1.20.1')).toEqual(['47.4.10', '47.0.0']);
+    expect(workingForgeBuilds(builds, '1.8.9')).toEqual(builds);
+    expect(workingForgeBuilds(['14.23.5.2859', '14.23.0.2486'], '1.12.2')).toEqual([
+      '14.23.5.2859',
+      '14.23.0.2486',
+    ]);
+    expect(workingForgeBuilds(['47.4.10', '47.0.0'], '1.20.1')).toEqual(['47.4.10', '47.0.0']);
   });
 
   it('has nothing for a Minecraft version from before 1.7.10', () => {
-    expect(installableForgeBuilds(['9.11.1.1345'], '1.6.4')).toEqual([]);
+    expect(workingForgeBuilds(['9.11.1.1345'], '1.6.4')).toEqual([]);
+  });
+
+  it('is not led astray by a version id that names something every object has', () => {
+    expect(workingForgeBuilds(['1.0.0'], 'constructor')).toEqual(['1.0.0']);
   });
 });
 
@@ -150,6 +179,13 @@ describe('neoForgeVersionsFor', () => {
     const listed = ['26.1.0.0-alpha.15+pre-3', '26.1.0.0-alpha.1+snapshot-1', '26.1.0.1-beta'];
 
     expect(neoForgeVersionsFor(listed, '26.1')).toEqual(['26.1.0.1-beta']);
+  });
+
+  it('leaves out the one first build whose installer does not run', () => {
+    expect(neoForgeVersionsFor(['20.4.0-beta', '20.4.1-beta', '20.4.251'], '1.20.4')).toEqual([
+      '20.4.1-beta',
+      '20.4.251',
+    ]);
   });
 
   it('returns nothing for Minecraft versions NeoForge never supported', () => {

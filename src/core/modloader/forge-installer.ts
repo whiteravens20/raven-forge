@@ -115,7 +115,10 @@ export function neoForgeVersionsFor(all: string[], mcVersion: string): string[] 
   // is NeoForge for the third pre-release of 26.1, and its installer says so.
   // It has the release's prefix all the same, and was offered for 26.1 — where
   // installing it sets up the pre-release under the release's name.
-  return all.filter((v) => v.startsWith(prefix) && !v.includes('+'));
+  const made = all.filter((v) => v.startsWith(prefix) && !v.includes('+'));
+  // Whole, not by number: what follows a hyphen in a NeoForge version is a
+  // prerelease tag, and `20.4.1-beta` is a different build from `20.4.1`.
+  return fromFirstWorking(made, FIRST_WORKING_NEOFORGE.get(mcVersion), (build) => build);
 }
 
 /** NeoForge marks unfinished builds in the version string itself. */
@@ -152,7 +155,7 @@ async function forgeRecommended(mcVersion: string): Promise<string | undefined> 
  * game's libraries as well as Forge's, the way the launcher of 2013 wanted them
  * named. A profile that says which version it extends and adds only what is
  * Forge's — the form everything here reads — first appears part of the way
- * through 1.7.10; see {@link installableForgeBuilds} for where.
+ * through 1.7.10; see {@link workingForgeBuilds} for where.
  *
  * Its builds for the older versions are still on the list Forge serves — 133
  * of them for 1.3.2. Offered here, each was a profile that could be made and
@@ -164,28 +167,72 @@ export function forgeInstallsOn(mcVersion: string): boolean {
 }
 
 /**
- * The first build of a Minecraft version that can be installed here, for the
- * one version where that is not simply the first build there is.
+ * The first build of a Minecraft version that installs and starts here, for
+ * the versions where that is not simply the first build there is — and null
+ * for one where no build does.
  *
- * Read out of the installers themselves: of the 163 builds Forge lists for
- * 1.7.10, the 125 before `10.13.3.1388` carry the stand-alone profile, and
- * every one from that build on extends the game's. No other version from
- * 1.7.10 up has a build of the older kind, and all 4,090 of them have an
- * installer.
+ * Found by doing it. Every one of the 4,090 builds Forge lists from 1.7.10 up
+ * has an installer; the installers for 1.7.10 were read for the kind of profile
+ * they carry; and on each of the 56 releases the oldest build offered was
+ * installed and started, with the first one that works searched for wherever
+ * it was not that one. What that turned up, and why:
+ *
+ * - `1.7.10` — the 125 builds before 10.13.3.1388 carry the stand-alone
+ *   profile described above; every one from that build on extends the game's.
+ * - `1.10.2`, `1.12`, `1.14.2`, `1.14.4` — the first build or two of the line
+ *   do not start: one dies on a null, two name a library that is on no server
+ *   they point to, three look for one of the game's own libraries under a name
+ *   it no longer has.
+ * - `1.16.4`, and `1.16.5` before 36.2.26 — these call a constructor that Java
+ *   took away in 8u321. Mojang's launcher still runs them on a Java from 2015;
+ *   the one fetched here is the current Java 8, and none of 1.16.4's 55 builds
+ *   was ever fixed.
+ * - `1.17.1` before 37.0.29 — these leave out of the game every library whose
+ *   *path* contains one of a list of words. `forge-` is on the list, and this
+ *   launcher's own folder is called `raven-forge-launcher`.
+ *
+ * Nothing older than a floor was tried above it, so nothing older is offered.
  */
-const FIRST_INSTALLABLE_FORGE: Record<string, string> = { '1.7.10': '10.13.3.1388' };
+const FIRST_WORKING_FORGE: ReadonlyMap<string, string | null> = new Map([
+  ['1.7.10', '10.13.3.1388'],
+  ['1.10.2', '12.18.0.2002'],
+  ['1.12', '14.21.0.2322'],
+  ['1.14.2', '26.0.2'],
+  ['1.14.4', '28.0.3'],
+  ['1.16.4', null],
+  ['1.16.5', '36.2.26'],
+  ['1.17.1', '37.0.29'],
+]);
 
 /**
- * The builds of a Minecraft version that this launcher can install: what is
- * offered to choose from, so that nothing chosen is then refused.
+ * The same for NeoForge, whose 23 releases were gone through the same way: the
+ * installer of the very first build for 1.20.4 fails on its own arguments.
  */
-export function installableForgeBuilds(builds: string[], mcVersion: string): string[] {
+const FIRST_WORKING_NEOFORGE: ReadonlyMap<string, string | null> = new Map([
+  ['1.20.4', '20.4.1-beta'],
+]);
+
+/** The builds from a version's first working one on, in the order given. */
+function fromFirstWorking(
+  builds: string[],
+  first: string | null | undefined,
+  numberOf: (build: string) => string,
+): string[] {
+  if (first === undefined) return builds;
+  if (first === null) return [];
+  return builds.filter((build) => compareLoaderVersionsDesc(numberOf(build), first) <= 0);
+}
+
+/**
+ * The builds of a Minecraft version that this launcher can install and start:
+ * what is offered to choose from, so that nothing chosen is then refused or
+ * found dead on arrival.
+ */
+export function workingForgeBuilds(builds: string[], mcVersion: string): string[] {
   if (!forgeInstallsOn(mcVersion)) return [];
-  const first = FIRST_INSTALLABLE_FORGE[mcVersion];
-  if (!first) return builds;
-  // By number: the list writes this very build as `10.13.3.1388-1.7.10`, which
-  // compared whole sorts as a prerelease of the bare one, and so before it.
-  return builds.filter((build) => compareLoaderVersionsDesc(forgeBuildNumber(build), first) <= 0);
+  // By number: the list writes a floor like 1388 as `10.13.3.1388-1.7.10`,
+  // which compared whole sorts as a prerelease of the bare one, and so before it.
+  return fromFirstWorking(builds, FIRST_WORKING_FORGE.get(mcVersion), forgeBuildNumber);
 }
 
 export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion[]> {
@@ -195,7 +242,7 @@ export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion
   }
 
   const xml = await fetchText(`${FORGE_MAVEN_ROOT}/maven-metadata.xml`, 'Forge Maven');
-  const versions = installableForgeBuilds(
+  const versions = workingForgeBuilds(
     forgeVersionsFor(parseMavenVersions(xml), mcVersion),
     mcVersion,
   );
