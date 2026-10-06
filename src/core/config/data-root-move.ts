@@ -132,10 +132,6 @@ async function inventory(root: string, entries: string[]): Promise<Item[]> {
 
 const totalSize = (items: Item[]): number => items.reduce((sum, item) => sum + item.size, 0);
 
-export async function movableSize(root: string): Promise<number> {
-  return totalSize(await inventory(root, await movableEntries(root)));
-}
-
 /** `true` when `child` is `parent` or sits inside it. */
 function isInside(child: string, parent: string): boolean {
   const rel = path.relative(path.resolve(parent), path.resolve(child));
@@ -303,17 +299,34 @@ export function pathConcerns(dir: string): { hasSpaces: boolean; hasNonAscii: bo
  * meant the whole of whatever folder that was.
  */
 export async function planDataRootChange(chosen: string): Promise<DataRootPlan> {
+  return (await survey(chosen)).plan;
+}
+
+/** A plan, and the list of what it would carry — read off the disk once for both. */
+interface Survey {
+  plan: DataRootPlan;
+  /** The launcher's entries at the top of the data folder; empty unless moving. */
+  entries: string[];
+  /** Everything under them. */
+  items: Item[];
+}
+
+async function survey(chosen: string): Promise<Survey> {
   const source = dataRoot();
   const picked = path.resolve(chosen);
 
-  const refuse = (problem: DataRootProblem, target = picked): DataRootPlan => ({
-    target,
-    action: 'move',
-    bytesToMove: 0,
-    sameVolume: false,
-    hasSpaces: false,
-    hasNonAscii: false,
-    problem,
+  const refuse = (problem: DataRootProblem, target = picked): Survey => ({
+    plan: {
+      target,
+      action: 'move',
+      bytesToMove: 0,
+      sameVolume: false,
+      hasSpaces: false,
+      hasNonAscii: false,
+      problem,
+    },
+    entries: [],
+    items: [],
   });
 
   if (dataRootSource() === 'env') return refuse('envLocked');
@@ -336,7 +349,11 @@ export async function planDataRootChange(chosen: string): Promise<DataRootPlan> 
 
   const action = found === 'launcher-data' ? 'adopt' : 'move';
   const onSameVolume = await sameVolume(source, target);
-  const bytesToMove = action === 'move' ? await movableSize(source) : 0;
+  // Walked here and handed to the move, which used to walk it all again: twice
+  // over every file of every profile before the first of them was touched.
+  const entries = action === 'move' ? await movableEntries(source) : [];
+  const items = await inventory(source, entries);
+  const bytesToMove = totalSize(items);
   const freeBytes = await freeSpace(target);
 
   // Only when the bytes actually have to be written again. A rename within one
@@ -350,18 +367,22 @@ export async function planDataRootChange(chosen: string): Promise<DataRootPlan> 
       : undefined;
 
   return {
-    target,
-    action,
-    bytesToMove,
-    freeBytes,
-    sameVolume: onSameVolume,
-    replacesDebris: found === 'debris',
-    // Leaving the home for the first time leaves the home behind, with the
-    // pointer and the browser's files in it. Leaving any other folder leaves
-    // nothing, and the folder itself is removed.
-    leavesHome: path.resolve(source) === path.resolve(defaultDataRoot()),
-    ...pathConcerns(target),
-    problem,
+    plan: {
+      target,
+      action,
+      bytesToMove,
+      freeBytes,
+      sameVolume: onSameVolume,
+      replacesDebris: found === 'debris',
+      // Leaving the home for the first time leaves the home behind, with the
+      // pointer and the browser's files in it. Leaving any other folder leaves
+      // nothing, and the folder itself is removed.
+      leavesHome: path.resolve(source) === path.resolve(defaultDataRoot()),
+      ...pathConcerns(target),
+      problem,
+    },
+    entries,
+    items,
   };
 }
 
@@ -408,19 +429,23 @@ export async function applyDataRoot(
   chosen: string,
   onProgress?: Progress,
 ): Promise<DataRootMoveResult> {
-  const plan = await planDataRootChange(chosen);
+  const surveyed = await survey(chosen);
+  const { plan } = surveyed;
   if (plan.problem) throw new Error(`Cannot use ${plan.target}: ${plan.problem}`);
   if (moving) throw new Error('The data directory is already being moved');
 
   moving = true;
   try {
-    return await move(plan, onProgress);
+    return await move(surveyed, onProgress);
   } finally {
     moving = false;
   }
 }
 
-async function move(plan: DataRootPlan, onProgress?: Progress): Promise<DataRootMoveResult> {
+async function move(
+  { plan, entries, items }: Survey,
+  onProgress?: Progress,
+): Promise<DataRootMoveResult> {
   const source = dataRoot();
   const target = plan.target;
 
@@ -430,8 +455,6 @@ async function move(plan: DataRootPlan, onProgress?: Progress): Promise<DataRoot
     return { target, leftovers: [] };
   }
 
-  const entries = await movableEntries(source);
-  const items = await inventory(source, entries);
   const total = totalSize(items);
   let done = 0;
   let lastReport = 0;

@@ -90,7 +90,7 @@ const {
   decodePointer,
   DATA_DIR_ENV,
 } = await import('../src/core/config/data-root');
-const { planDataRootChange, applyDataRoot, movableSize, recoverInterruptedMove, pathConcerns } =
+const { planDataRootChange, applyDataRoot, recoverInterruptedMove, pathConcerns } =
   await import('../src/core/config/data-root-move');
 const { paths } = await import('../src/core/config/paths');
 
@@ -111,6 +111,9 @@ async function seedLauncherData(root: string) {
   await realFs.writeFile(path.join(root, 'logs', 'main.log'), 'log');
   await realFs.mkdir(path.join(root, 'crash-reports'), { recursive: true });
 }
+
+/** What `seedLauncherData` writes, in bytes: the three state files, a jar, a runtime, a log. */
+const MOVABLE_BYTES = 13 + 16 + 15 + 64 + 32 + 3;
 
 /** What the home keeps for itself: the embedded browser's files. */
 async function seedBrowserState(root: string) {
@@ -306,8 +309,8 @@ describe('planning a change', () => {
     expect(plan.problem).toBeUndefined();
     expect(plan.action).toBe('move');
     expect(plan.target).toBe(path.join(tmp, 'games'));
-    expect(plan.bytesToMove).toBe(await movableSize(userData));
-    expect(plan.bytesToMove).toBeGreaterThan(64 + 32);
+    // Every file the launcher keeps there, and nothing of the browser's.
+    expect(plan.bytesToMove).toBe(MOVABLE_BYTES);
     // Leaving the home for the first time: the home stays, and the plan says so.
     expect(plan.leavesHome).toBe(true);
   });
