@@ -71,7 +71,7 @@ raven-forge/
     │   ├── updater/              # electron-updater wiring, manifest signature verification
     │   ├── profiles/             # profile CRUD, import/export, world backups
     │   ├── news/                 # news + announcement fetcher; a feed that cannot be read is said so, never filled in
-    │   ├── util/                 # atomic writes, cancellation, path containment, machine memory
+    │   ├── util/                 # atomic writes, cancellation, path containment, zip reading, refusals the page can say, machine memory
     │   └── config/               # paths.ts, app-home.ts, data-root.ts, data-root-move.ts, storage-map.ts, settings-manager.ts, defaults.ts
     └── shared/                   # types + validators consumed by both processes
         ├── ipc-types.ts          # InvokeChannels, EventChannels, RavenForgeAPI
@@ -158,6 +158,35 @@ onwards the file never matched the manifest again, and every sync handed the
 player's FOV, volume and keybinds back to the pack's defaults. Comparing what the
 pack says now against what the pack said last time separates the author's update
 from the player's edit, and only the author's update is delivered.
+
+### A file the player already has
+
+Not everything is on Modrinth, so a mod, a shader pack and a resource pack can
+each be added from a file (`core/mods/local-mod.ts`, `addContentFromFile` in
+`core/mods/content-manager.ts`). Three things hold for all of them:
+
+- **The page never names the path.** The channel takes a profile and nothing
+  else; the main process opens the file dialog itself. A channel that took a
+  path would copy any file on the disk into a profile — for a mod, onto the
+  game's class path — for whoever could send it a message.
+- **The file is checked to be what it is added as** before anything is copied: a
+  resource pack by a `pack.mcmeta` at the top of the archive, a shader pack by a
+  `shaders/` folder there, a mod by the file its loader reads (`fabric.mod.json`,
+  `quilt.mod.json`, `META-INF/mods.toml`, `META-INF/neoforge.mods.toml`,
+  `mcmod.info`). A pack zipped one folder too high is the usual case and is
+  named as that. A mod for a loader the profile does not run is refused; a jar
+  that says nothing about loaders is let through. These refusals travel as
+  `errorMessage` keys, so they are read in the player's language.
+- **It is copied beside its name and renamed onto it**, never over a file a
+  manifest put there, and a file already lying in the folder is listed where it
+  lies — which is how something dropped there by hand gets onto the list.
+
+A mod is also asked about: its SHA-512 goes to Modrinth, and when Modrinth
+publishes that very build the entry is recorded as that project and version —
+so its updates are found, what it requires is installed with it, and a mod that
+depends on it later sees that it is there. A file Modrinth does not know, or
+cannot be asked about, is listed as a local file and works the same in every
+way that does not need a project id.
 
 ## Microsoft auth chain
 
