@@ -1,7 +1,7 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { app } from 'electron';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import readline from 'node:readline';
@@ -745,6 +745,25 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
 const KILL_GRACE_MS = 10_000;
 
 /**
+ * Ask the game to close, in the way the platform has for asking.
+ *
+ * Elsewhere that is SIGTERM, which the JVM turns into an orderly shutdown. On
+ * Windows there is no such signal: `kill()` there is `TerminateProcess`, at
+ * once and whatever was passed, so Stop used to end the game in the middle of
+ * whatever it was writing. `taskkill` without `/F` asks the game's window to
+ * close, which is the same request as the X in its corner.
+ */
+function requestStop(child: ChildProcess): void {
+  if (process.platform !== 'win32' || child.pid === undefined) {
+    child.kill('SIGTERM');
+    return;
+  }
+  execFile('taskkill', ['/PID', String(child.pid)], { windowsHide: true }, (err) => {
+    if (err) child.kill();
+  });
+}
+
+/**
  * Stop the game, and do not report success until it has actually stopped.
  *
  * This used to drop the process from the map the instant `SIGTERM` was sent. A
@@ -759,13 +778,12 @@ export async function killGame(profileId: string): Promise<void> {
 
   const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
   stopRequested.add(child);
-  child.kill('SIGTERM');
+  requestStop(child);
 
+  // Cleared below the moment the process exits, so firing means it has not.
   const timer = setTimeout(() => {
-    if (!child.killed || runningProcesses.has(profileId)) {
-      log.warn(`Game for ${profileId} ignored SIGTERM after ${KILL_GRACE_MS}ms — sending SIGKILL`);
-      child.kill('SIGKILL');
-    }
+    log.warn(`Game for ${profileId} was still running ${KILL_GRACE_MS}ms after Stop — killing it`);
+    child.kill('SIGKILL');
   }, KILL_GRACE_MS);
 
   try {
