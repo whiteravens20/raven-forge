@@ -4,7 +4,11 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { applyProfileOptions, buildResourcePacksValue } from '../src/core/minecraft/options-file';
+import {
+  applyProfileOptions,
+  buildResourcePacksValue,
+  languageCodeFor,
+} from '../src/core/minecraft/options-file';
 
 /**
  * The one thing here that can be wrong quietly: the direction.
@@ -246,5 +250,27 @@ describe('the file as the game leaves it', () => {
 
     expect((await fs.stat(optionsFile())).isDirectory()).toBe(true);
     expect(await fs.readdir(dir)).toEqual(['options.txt']);
+  });
+});
+
+describe('the spelling of a language code', () => {
+  it('is all lower case from 1.11 on', () => {
+    expect(languageCodeFor('1.11', 'pl_pl')).toBe('pl_pl');
+    expect(languageCodeFor('1.21.4', 'pl_pl')).toBe('pl_pl');
+    expect(languageCodeFor('26.3', 'pl_PL')).toBe('pl_pl');
+  });
+
+  it('has the country in capitals before that, which is the only spelling those versions know', () => {
+    expect(languageCodeFor('1.10.2', 'pl_pl')).toBe('pl_PL');
+    expect(languageCodeFor('1.8.9', 'de_de')).toBe('de_DE');
+    expect(languageCodeFor('1.5.2', 'en_gb')).toBe('en_GB');
+  });
+
+  it('is left as it is when it has no country to spell', () => {
+    expect(languageCodeFor('1.8.9', 'lol')).toBe('lol');
+  });
+
+  it('is the modern one for anything that is not a release number', () => {
+    expect(languageCodeFor('25w14a', 'pl_pl')).toBe('pl_pl');
   });
 });

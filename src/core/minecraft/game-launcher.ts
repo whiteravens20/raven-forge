@@ -50,7 +50,7 @@ import {
 } from './launch-args';
 import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
-import { applyProfileOptions } from './options-file';
+import { applyProfileOptions, languageCodeFor } from './options-file';
 import { LaunchRefusedError } from './launch-errors';
 
 // Track running processes by profileId
@@ -589,7 +589,8 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   try {
     await applyProfileOptions(gameDir, {
       fullscreen: profile.fullscreen,
-      language: profile.gameLanguage,
+      language:
+        profile.gameLanguage && languageCodeFor(profile.minecraftVersion, profile.gameLanguage),
     });
   } catch (err) {
     // The game can still be started; it starts with what the file already says.

@@ -199,6 +199,21 @@ export async function applyResourcePackOrder(
   );
 }
 
+/**
+ * A language code the way this Minecraft version spells it.
+ *
+ * The profile holds the modern spelling, `pl_pl`. Until 1.11 the game wrote the
+ * country in capitals — `pl_PL` — and matched it exactly, so the modern one
+ * named no language it had: 1.8.9 stayed in English, and 1.5.2 printed a stack
+ * trace on its way there.
+ */
+export function languageCodeFor(minecraftVersion: string, code: string): string {
+  const [major, minor] = minecraftVersion.split('.').map((part) => parseInt(part, 10));
+  const [language, country] = code.toLowerCase().split('_');
+  if (major !== 1 || !(minor <= 10) || !country) return code.toLowerCase();
+  return `${language}_${country.toUpperCase()}`;
+}
+
 /** What a profile says about the game's own settings. Unset means "leave it". */
 export interface ProfileOptions {
   fullscreen?: boolean;
