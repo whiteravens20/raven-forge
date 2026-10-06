@@ -42,6 +42,14 @@ async function getMetaLoaderVersions(
   const res = await fetch(`${api}/versions/loader/${mcVersion}`, {
     signal: AbortSignal.timeout(10000),
   });
+  // Neither answers a Minecraft version it has nothing for with an empty list:
+  // Fabric says 400 and Quilt 404. That is an answer, not a failure, and it is
+  // the one every release before 1.14 gets — reported as a failure, the editor
+  // said the list could not be loaded and offered a box to type a build into.
+  if (res.status === 400 || res.status === 404) {
+    log.info(`${label} has no builds for Minecraft ${mcVersion}`);
+    return [];
+  }
   if (!res.ok) throw new Error(`${label} API error: ${res.status}`);
 
   const data = (await res.json()) as Array<{ loader: { version: string; stable?: boolean } }>;

@@ -155,6 +155,32 @@ describe('getLoaderVersions', () => {
     expect(versions.filter((v) => v.recommended).map((v) => v.version)).toEqual(['47.4.10']);
     expect(defaultLoaderVersion(versions)).toBe('47.4.10');
   });
+
+  it.each([
+    // What each service really sends for Minecraft 1.12.2.
+    ['fabric', 400, '[]'],
+    ['quilt', 404, '{"code":"not_found","message":"File with such name does not exist."}'],
+  ] as const)(
+    'reads the answer %s gives for a Minecraft version it has nothing for as no builds',
+    async (loader, status, body) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(body, { status })),
+      );
+
+      expect(await mod.getLoaderVersions(loader, '1.12.2')).toEqual([]);
+      expect(await mod.resolveDefaultLoaderVersion(loader, '1.12.2')).toBeUndefined();
+    },
+  );
+
+  it('still reports a list that could not be fetched as a failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('unavailable', { status: 503 })),
+    );
+
+    await expect(mod.getLoaderVersions('quilt', '1.21.4')).rejects.toThrow('Quilt API error: 503');
+  });
 });
 
 describe('isLoaderInstalled', () => {
