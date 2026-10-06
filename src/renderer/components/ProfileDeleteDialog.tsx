@@ -6,6 +6,7 @@ import { Button } from '@components/ui/Button';
 import { formatBytes } from '@renderer/format';
 import { useT } from '@renderer/i18n';
 import type { ProfileFileSummary } from '@shared/ipc-types';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 const api = window.ravenforge;
 
@@ -27,6 +28,7 @@ interface Props {
  */
 export function ProfileDeleteDialog({ profileId, profileName, onCancel, onConfirm }: Props) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const [deleteFiles, setDeleteFiles] = useState(true);
   const [summary, setSummary] = useState<ProfileFileSummary | null>(null);
   /** The count could not be taken, so nothing is known about what is in there. */
@@ -82,7 +84,9 @@ export function ProfileDeleteDialog({ profileId, profileName, onCancel, onConfir
       role="presentation"
     >
       <div
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-profile-title"

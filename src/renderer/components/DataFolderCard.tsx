@@ -11,6 +11,7 @@ import type {
   DataRootPlan,
   ProgressEvent,
 } from '@shared/ipc-types';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 const api = window.ravenforge;
 
@@ -146,6 +147,7 @@ function DataRootDialog({
   onClose: () => void;
 }) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [moved, setMoved] = useState<DataRootMoveResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +222,9 @@ function DataRootDialog({
       role="presentation"
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="data-root-title"

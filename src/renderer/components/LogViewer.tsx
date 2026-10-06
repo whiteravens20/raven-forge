@@ -5,6 +5,7 @@ import { ClipboardCheck, Copy, FileText, FolderOpen, RefreshCw, X } from 'lucide
 import { Button } from '@components/ui/Button';
 import { useT } from '@renderer/i18n';
 import { openPath } from '@renderer/open';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 const api = window.ravenforge;
 
@@ -61,6 +62,7 @@ interface LogViewerProps {
 
 export function LogViewer({ onClose }: LogViewerProps) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const [lines, setLines] = useState<ParsedLine[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,8 +162,10 @@ export function LogViewer({ onClose }: LogViewerProps) {
       role="presentation"
     >
       <div
-        className="flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={t('logs.title')}

@@ -6,6 +6,7 @@ import { Button } from '@components/ui/Button';
 import { useT, type TFunction } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import type { CompatibilityIssue, InstallPlan } from '@shared/ipc-types';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 interface Props {
   plan: InstallPlan;
@@ -47,6 +48,7 @@ function describe(t: TFunction, issue: CompatibilityIssue): string {
  */
 export function CompatibilityDialog({ plan, busy, onCancel, onInstall }: Props) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const installable = Boolean(plan.versionId);
 
   useEffect(() => {
@@ -63,7 +65,9 @@ export function CompatibilityDialog({ plan, busy, onCancel, onInstall }: Props) 
       role="presentation"
     >
       <div
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="compat-title"

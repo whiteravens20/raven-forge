@@ -10,6 +10,7 @@ import { formatBytes } from '@renderer/format';
 import { localized, useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import type { CataloguePack, IpcResult, PackInstall, Profile } from '@shared/ipc-types';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 const api = window.ravenforge;
 
@@ -40,6 +41,7 @@ type Route = 'choose' | 'white-ravens' | 'modrinth' | 'import';
  */
 export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const locale = useLocale();
   const [route, setRoute] = useState<Route>('choose');
   const [packs, setPacks] = useState<CataloguePack[] | null>(null);
@@ -143,7 +145,9 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
       role="presentation"
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="source-title"

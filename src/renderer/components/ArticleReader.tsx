@@ -5,6 +5,7 @@ import { X, ExternalLink } from 'lucide-react';
 import { parseArticle, type Block, type Span } from '@shared/article';
 import { useT } from '@renderer/i18n';
 import { openLink } from '@renderer/open';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 export interface Article {
   title: string;
@@ -26,6 +27,7 @@ export interface Article {
  */
 export function ArticleReader({ article, onClose }: { article: Article; onClose: () => void }) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
 
   // Escape closes it. A modal that can only be dismissed by hitting a specific
   // 16px target is a modal a keyboard user is stuck in.
@@ -48,8 +50,10 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
       role="presentation"
     >
       <div
-        className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={article.title}
