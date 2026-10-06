@@ -9,6 +9,7 @@ import { downloadToFile } from '../net/download';
 import { assertSecureAnswer, readJsonCapped } from '../net/json';
 import { createProfile, deleteProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
+import { mutateLockFile } from '../mods/lock-file';
 import { getModVersions, primaryFile } from '../mods/modrinth-api';
 import { loaderLabel } from '../../shared/labels';
 import { readMrpack, applyOverrides, type MrpackContents, type MrpackFile } from './mrpack';
@@ -16,7 +17,7 @@ import { assertSecureContentUrl } from '../../shared/validators';
 import { formatRamGb, recommendedRamMb, safeMaxRamMb } from '../../shared/memory';
 import { machineMemoryMb } from '../util/machine-memory';
 import type { ModManifest } from '../../shared/manifest-schema';
-import type { PackInstall, Profile } from '../../shared/ipc-types';
+import type { InstalledMod, PackInstall, Profile } from '../../shared/ipc-types';
 
 /**
  * Turning a pack into a profile.
@@ -206,6 +207,36 @@ async function firstSync(profile: Profile, supplied?: ModManifest): Promise<Pack
   }
 }
 
+/**
+ * The mods a pack ships as files inside itself rather than as links.
+ *
+ * They are unpacked with the rest of `overrides/`, and until they were also
+ * written down here they were jars the launcher did not know it had: not on the
+ * mods page, so not something to switch off or remove, and left out when the
+ * profile was exported again. A file the pack's index also names is the index's
+ * — that copy is the one the sync writes and keeps.
+ */
+function bundledMods(pack: MrpackContents): InstalledMod[] {
+  const indexed = new Set(pack.files.map((file) => file.path.toLowerCase()));
+  return pack.overrides.flatMap((override) => {
+    const fileName = /^mods\/([^/]+\.jar)$/i.exec(override.path)?.[1];
+    if (!fileName || indexed.has(override.path.toLowerCase())) return [];
+    return [
+      {
+        id: `bundled-${fileName}`,
+        name: fileName.replace(/\.jar$/i, ''),
+        version: pack.version,
+        source: 'local' as const,
+        fileName,
+        required: false,
+        side: 'client' as const,
+        enabled: true,
+        fromManifest: false,
+      },
+    ];
+  });
+}
+
 /** Import a `.mrpack` as a new profile. */
 export async function importMrpack(
   filePath: string,
@@ -230,6 +261,8 @@ export async function importMrpack(
       pack.overrides,
     );
     if (written > 0) log.info(`Applied ${written} override file(s) for ${pack.name}`);
+    const bundled = bundledMods(pack);
+    if (bundled.length > 0) await mutateLockFile(profile.id, (mods) => void mods.push(...bundled));
   } catch (err) {
     // The one failure after the profile exists that cannot be picked up again:
     // the pack is only kept once the sync below has it, so a profile left here

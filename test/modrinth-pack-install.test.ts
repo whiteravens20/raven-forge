@@ -32,6 +32,9 @@ vi.mock('../src/core/net/download', () => ({
   downloadToFile: (url: string, dest: string, opts: unknown) => downloadToFile(url, dest, opts),
 }));
 
+/** What the pack carries as files inside itself, set by a test that cares. */
+let overrides: Array<{ path: string; entry: string; size: number }> = [];
+let indexed: Array<{ path: string; hashes: { sha512: string }; downloads: string[] }> = [];
 const readMrpack = vi.fn(async (_file: string) => ({
   name: 'Fabulously Optimized',
   version: '6.4.0',
@@ -39,13 +42,14 @@ const readMrpack = vi.fn(async (_file: string) => ({
   minecraftVersion: '1.21.1',
   modLoader: 'fabric' as const,
   modLoaderVersion: '0.16.14',
-  files: [],
-  overrides: new Map<string, Buffer>(),
+  files: indexed,
+  overrides,
 }));
-const applyOverrides = vi.fn(async (_gameDir: string, _overrides: unknown) => 0);
+const applyOverrides = vi.fn(async (_gameDir: string, _packFile: string, _overrides: unknown) => 0);
 vi.mock('../src/core/packs/mrpack', () => ({
   readMrpack: (file: string) => readMrpack(file),
-  applyOverrides: (gameDir: string, overrides: unknown) => applyOverrides(gameDir, overrides),
+  applyOverrides: (gameDir: string, packFile: string, wanted: unknown) =>
+    applyOverrides(gameDir, packFile, wanted),
 }));
 
 const createProfile = vi.fn(async (data: Partial<Profile>) => ({ ...data, id: 'new' }) as Profile);
@@ -97,6 +101,8 @@ beforeEach(async () => {
     mock.mockClear();
   }
   getModVersions.mockResolvedValue([packVersion]);
+  overrides = [];
+  indexed = [];
 });
 
 afterEach(async () => {
@@ -192,5 +198,48 @@ describe('an install that fails after the profile was made', () => {
 
     expect(deleteProfile).toHaveBeenCalledWith('new');
     expect(syncManifest).not.toHaveBeenCalled();
+  });
+});
+
+describe('a mod the pack carries as a file', () => {
+  const override = (file: string) => ({ path: file, entry: `overrides/${file}`, size: 1 });
+  const lock = async () =>
+    JSON.parse(await fs.readFile(path.join(root, 'profiles', 'new', 'installed.lock'), 'utf-8'));
+
+  it('is written down, so the mods page can switch it off or remove it', async () => {
+    // Unpacked with the rest of the overrides and, until this, known to nothing:
+    // a jar in `mods/` that no list named.
+    overrides = [
+      override('mods/private-build.jar'),
+      override('config/private-build.toml'),
+      override('mods/nested/library.jar'),
+    ];
+
+    await installer.installModrinthPack(pack);
+
+    expect(await lock()).toEqual([
+      expect.objectContaining({
+        name: 'private-build',
+        fileName: 'private-build.jar',
+        source: 'local',
+        enabled: true,
+        fromManifest: false,
+      }),
+    ]);
+  });
+
+  it('is left to the index when the index names the same file', async () => {
+    overrides = [override('mods/sodium.jar')];
+    indexed = [
+      {
+        path: 'mods/sodium.jar',
+        hashes: { sha512: 'b'.repeat(128) },
+        downloads: ['https://cdn.modrinth.com/data/AANobbMI/versions/v1/sodium.jar'],
+      },
+    ];
+
+    await installer.installModrinthPack(pack);
+
+    await expect(lock()).rejects.toThrow();
   });
 });
