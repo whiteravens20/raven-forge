@@ -42,11 +42,11 @@ function initials(name: string): string {
 
 interface ProfileAvatarProps {
   profile: Profile;
-  size?: number;
-  className?: string;
+  /** The side of the square, in pixels. */
+  size: number;
 }
 
-export function ProfileAvatar({ profile, size = 40, className = '' }: ProfileAvatarProps) {
+export function ProfileAvatar({ profile, size }: ProfileAvatarProps) {
   const key = cacheKey(profile);
   const [icon, setIcon] = useState<string | null>(() => cache.get(key) ?? null);
 
@@ -89,7 +89,7 @@ export function ProfileAvatar({ profile, size = 40, className = '' }: ProfileAva
         src={src}
         alt=""
         style={dimensions}
-        className={`shrink-0 rounded-lg border border-rf-border object-cover ${className}`}
+        className="shrink-0 rounded-lg border border-rf-border object-cover"
       />
     );
   }
@@ -97,7 +97,7 @@ export function ProfileAvatar({ profile, size = 40, className = '' }: ProfileAva
   return (
     <div
       style={{ ...dimensions, fontSize: Math.round(size * 0.36) }}
-      className={`flex shrink-0 items-center justify-center rounded-lg border border-rf-border font-display font-semibold ${tintFor(profile.id)} ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-lg border border-rf-border font-display font-semibold ${tintFor(profile.id)}`}
       aria-hidden="true"
     >
       {initials(profile.name)}

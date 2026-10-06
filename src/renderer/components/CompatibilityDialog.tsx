@@ -10,7 +10,6 @@ import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 interface Props {
   plan: InstallPlan;
-  busy: boolean;
   onCancel: () => void;
   onInstall: () => void;
 }
@@ -46,18 +45,18 @@ function describe(t: TFunction, issue: CompatibilityIssue): string {
  * The one case with no way through is a project publishing nothing at all: there
  * is no file, so there is no decision, and offering the button would be a lie.
  */
-export function CompatibilityDialog({ plan, busy, onCancel, onInstall }: Props) {
+export function CompatibilityDialog({ plan, onCancel, onInstall }: Props) {
   const t = useT();
   const dialogRef = useDialogFocus<HTMLDivElement>();
   const installable = Boolean(plan.versionId);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onCancel();
+      if (e.key === 'Escape') onCancel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel, busy]);
+  }, [onCancel]);
 
   return (
     <div
@@ -79,9 +78,8 @@ export function CompatibilityDialog({ plan, busy, onCancel, onInstall }: Props) 
           </h2>
           <button
             onClick={onCancel}
-            disabled={busy}
             aria-label={t('common.close')}
-            className="text-rf-text-muted hover:text-rf-text disabled:opacity-40"
+            className="text-rf-text-muted hover:text-rf-text"
           >
             <X size={16} />
           </button>
@@ -127,11 +125,11 @@ export function CompatibilityDialog({ plan, busy, onCancel, onInstall }: Props) 
         </div>
 
         <footer className="flex justify-end gap-2 border-t border-rf-border px-5 py-3">
-          <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             {installable ? t('common.cancel') : t('common.close')}
           </Button>
           {installable && (
-            <Button variant="secondary" size="sm" loading={busy} onClick={onInstall}>
+            <Button variant="secondary" size="sm" onClick={onInstall}>
               {t('compat.installAnyway')}
             </Button>
           )}

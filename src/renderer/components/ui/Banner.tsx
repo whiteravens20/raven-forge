@@ -4,7 +4,7 @@ import { AlertTriangle, Info, AlertCircle, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useT } from '@renderer/i18n';
 
-type BadgeType = 'info' | 'warning' | 'urgent' | 'success';
+type BadgeType = 'info' | 'warning' | 'urgent';
 
 interface BadgeProps {
   type: BadgeType;
@@ -17,14 +17,12 @@ const styles: Record<BadgeType, string> = {
   info: 'bg-rf-accent/10 border-rf-accent/30 text-rf-accent-text',
   warning: 'bg-rf-warning/10 border-rf-warning/30 text-rf-warning',
   urgent: 'bg-rf-danger/10 border-rf-danger/30 text-rf-danger',
-  success: 'bg-rf-success/10 border-rf-success/30 text-rf-success',
 };
 
 const icons: Record<BadgeType, typeof Info> = {
   info: Info,
   warning: AlertTriangle,
   urgent: AlertCircle,
-  success: Info,
 };
 
 export function Banner({ type, children, dismissible, onDismiss }: BadgeProps) {

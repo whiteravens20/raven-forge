@@ -389,7 +389,6 @@ export function ModsPage() {
       {plan && (
         <CompatibilityDialog
           plan={plan.plan}
-          busy={busy.has(plan.mod.id)}
           onCancel={() => setPlan(null)}
           onInstall={() => {
             const pending = plan;

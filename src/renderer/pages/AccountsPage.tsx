@@ -37,7 +37,9 @@ const MC_ACCOUNT_URL = 'https://www.minecraft.net/msaprofile/mygames/editprofile
  * avatar, keeps the player's UUID from being handed to a third party for a
  * picture we already have the pixels for.
  */
-function SkinHead({ url, size = 40 }: { url: string; size?: number }) {
+function SkinHead({ url }: { url: string }) {
+  /** The side of the square, in pixels: one skin pixel is drawn five across. */
+  const size = 40;
   const layer: CSSProperties = {
     position: 'absolute',
     inset: 0,

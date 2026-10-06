@@ -355,7 +355,6 @@ export function ContentPage() {
       {plan && (
         <CompatibilityDialog
           plan={plan.plan}
-          busy={busyId === plan.item.id}
           onCancel={() => setPlan(null)}
           onInstall={() => {
             const pending = plan;
