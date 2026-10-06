@@ -129,30 +129,6 @@ export const FORGE_PROMOTIONS_URL =
 // ── Adoptium JRE ──────────────────────────────────────────
 export const ADOPTIUM_API = 'https://api.adoptium.net/v3';
 
-// ── Java version mapping ──────────────────────────────────
-export const JAVA_VERSION_MAP: Record<string, number> = {
-  // Versions ≤ 1.16.5 need Java 8
-  '1.7': 8,
-  '1.8': 8,
-  '1.9': 8,
-  '1.10': 8,
-  '1.11': 8,
-  '1.12': 8,
-  '1.13': 8,
-  '1.14': 8,
-  '1.15': 8,
-  '1.16': 8,
-  // 1.17 – 1.20.4 need Java 17
-  '1.17': 17,
-  '1.18': 17,
-  '1.19': 17,
-  '1.20': 17,
-  // 1.21+ needs Java 21
-  '1.21': 21,
-  '1.22': 21,
-  '1.23': 21,
-};
-
 // ── Launcher window ───────────────────────────────────────
 // The launcher's own window, not the game's — see the block below for that.
 export const DEFAULT_WINDOW_WIDTH = 1280;

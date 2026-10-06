@@ -23,16 +23,30 @@ describe('requiredJavaFor', () => {
     ).toBe(21);
   });
 
-  it('falls back to the table for versions that state nothing', () => {
-    // Pre-1.17 metas have no javaVersion at all, and 1.8 on Java 21 fails in
-    // ways that look like anything but a Java version problem.
-    expect(requiredJavaFor('1.8.9')).toBe(8);
-    expect(requiredJavaFor('1.16.5')).toBe(8);
-    expect(requiredJavaFor('1.17.1')).toBe(17);
+  it.each([
+    // What Mojang's own metadata states for each of these.
+    ['1.2.5', 8],
+    ['1.6.4', 8],
+    ['1.8.9', 8],
+    ['1.16.5', 8],
+    ['1.17', 16],
+    ['1.17.1', 16],
+    ['1.18', 17],
+    ['1.20.4', 17],
+    ['1.20.5', 21],
+    ['1.21', 21],
+    ['1.21.11', 21],
+    ['26.1', 25],
+    ['26.3', 25],
+  ])('knows by rule that %s needs Java %i when no metadata says', (version, java) => {
+    expect(requiredJavaFor(version)).toBe(java);
   });
 
-  it('falls back for a version it has never heard of', () => {
-    expect(requiredJavaFor('99.99')).toBe(21);
+  it('answers with the newest for something that is not a release number', () => {
+    // A snapshot. Its metadata is what a launch reads; this is only what the
+    // profile editor says before that has ever been fetched.
+    expect(requiredJavaFor('26.4-snapshot-2')).toBe(25);
+    expect(requiredJavaFor('25w14a')).toBe(25);
   });
 
   it.each([
@@ -48,10 +62,9 @@ describe('requiredJavaFor', () => {
     ['a negative', -21],
     ['zero', 0],
     ['an implausible major', 4096],
-  ])('ignores %s in the version meta and uses the table', (_label, majorVersion) => {
+  ])('ignores %s in the version meta and goes by the version', (_label, majorVersion) => {
     const meta = { javaVersion: { component: 'java-runtime', majorVersion } } as never;
-    // 1.8.9 is in the table, so a rejected value is visible as the table's answer
-    // rather than as the generic default.
+    // 1.8.9 needs Java 8 and nothing here says 8, so a rejected value shows.
     expect(requiredJavaFor('1.8.9', meta)).toBe(8);
   });
 

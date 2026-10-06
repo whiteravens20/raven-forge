@@ -99,6 +99,11 @@ async function readMetaFile(versionId: string): Promise<{ raw: string; meta: Ver
   }
 }
 
+/** The version meta already on disk, without asking anyone. Undefined when there is none. */
+export async function getCachedVersionMeta(versionId: string): Promise<VersionMeta | undefined> {
+  return (await readMetaFile(versionId))?.meta;
+}
+
 /**
  * Fetch full version meta JSON for a specific version.
  *

@@ -83,7 +83,7 @@ import {
   isGameRunning,
   getLogLines,
 } from '../core/minecraft/game-launcher';
-import { getVersionManifest } from '../core/minecraft/version-manifest';
+import { getCachedVersionMeta, getVersionManifest } from '../core/minecraft/version-manifest';
 import { cancelJob, isCancellation } from '../core/util/cancellation';
 import { machineMemoryMb } from '../core/util/machine-memory';
 import {
@@ -982,13 +982,13 @@ export function registerAllIpcHandlers(): void {
   });
   handle('java:probe', async (_event, binPath: string, minecraftVersion: string) => {
     try {
-      // The requirement without a version meta: the table in `requiredJavaFor`
-      // is enough to say "too old" in the editor, and fetching Mojang's meta
-      // for a field somebody is still typing in would be a network round trip
-      // per keystroke.
+      // The requirement as Mojang states it when this version's metadata is
+      // already on disk, and by rule when it is not: fetching it for a field
+      // somebody is still typing in would be a network round trip per keystroke.
+      const meta = await getCachedVersionMeta(minecraftVersion);
       return ok({
         version: await probeJava(binPath),
-        requiredVersion: requiredJavaFor(minecraftVersion),
+        requiredVersion: requiredJavaFor(minecraftVersion, meta),
       });
     } catch (err) {
       return fail(`Failed to check ${binPath}: ${reason(err)}`);

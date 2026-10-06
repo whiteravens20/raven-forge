@@ -132,6 +132,18 @@ describe('the description of a version', () => {
     await expect(mod.getVersionMeta('1.21.4')).rejects.toThrow(/not the file Mojang/);
     await expect(fs.access(cacheFile('1.21.4.json'))).rejects.toThrow();
   });
+
+  it('can be read from disk without asking anyone, for the profile editor', async () => {
+    expect(await mod.getCachedVersionMeta('1.21.4')).toBeUndefined();
+
+    const meta = metaText('net.minecraft.client.main.Main');
+    mojang = { [MANIFEST_URL]: manifestFor(meta), [META_URL]: meta };
+    await mod.getVersionMeta('1.21.4');
+    asked.length = 0;
+
+    expect((await mod.getCachedVersionMeta('1.21.4'))?.id).toBe('1.21.4');
+    expect(asked).toEqual([]);
+  });
 });
 
 describe('the list of versions', () => {

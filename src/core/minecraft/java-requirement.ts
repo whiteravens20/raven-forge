@@ -1,6 +1,5 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { JAVA_VERSION_MAP } from '../../shared/constants';
 import type { VersionMeta } from './types';
 
 /**
@@ -24,11 +23,33 @@ export function parseJavaVersion(stderr: string): number | null {
 }
 
 /**
+ * The Java a Minecraft version needs, read off its number alone.
+ *
+ * What Mojang's own metadata says for each release, as a rule instead of a list
+ * of them. The list this replaces began at 1.7 and ended at 1.21, and answered
+ * 21 for everything outside it — so 1.6.4 was started on Java 21, and the
+ * profile editor accepted a Java 21 for a 26.x version that the launch, which
+ * reads the metadata, then refused.
+ *
+ * Anything that is not a release number — a snapshot's `25w14a` — is answered
+ * with the newest, which is what a snapshot is far more likely to need.
+ */
+function javaForRelease(mcVersion: string): number {
+  const [major, minor = 0, patch = 0] = mcVersion.split('.').map((part) => parseInt(part, 10));
+  if (major !== 1) return 25;
+  if (minor <= 16) return 8;
+  if (minor === 17) return 16;
+  if (minor <= 19 || (minor === 20 && patch <= 4)) return 17;
+  return 21;
+}
+
+/**
  * The Java major version a Minecraft version needs.
  *
- * Mojang states this in the version meta from 1.17 onward, and that is always
- * the authority. The table is the fallback for older versions, which say
- * nothing — and for the case that matters most, since running 1.8 on Java 21
+ * Mojang states this in the metadata of nearly every release, and that is always
+ * the authority. The rule above is for the few that say nothing — 1.6.x — and for
+ * when the metadata is not at hand: the profile editor asks about a version
+ * that may never have been fetched. It matters, since running 1.8 on Java 21
  * fails in ways that look like anything but a Java version problem.
  *
  * The Forge and NeoForge installers need this too: they are modern Java
@@ -54,8 +75,7 @@ export function requiredJavaFor(
     return stated;
   }
 
-  const parts = mcVersion.split('.');
-  return JAVA_VERSION_MAP[`${parts[0]}.${parts[1]}`] ?? 21;
+  return javaForRelease(mcVersion);
 }
 
 /** Minecraft has never asked for anything older; 1.8 wants exactly this. */
