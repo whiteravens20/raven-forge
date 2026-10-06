@@ -54,6 +54,30 @@ function headerLabel(t: ReturnType<typeof useT>, header: string): string {
   }
 }
 
+interface Option {
+  value: string;
+  label: string;
+}
+
+/**
+ * The options of a filter, always including the one that is in force.
+ *
+ * A filter can hold a value its list does not: the profile's Minecraft version
+ * when that is a snapshot, or any value at all while the lists could not be
+ * fetched. A `<select>` then has nothing to show for it and shows its first
+ * option — "Any" — over a search that is being narrowed all the same, and
+ * picking "Any" does nothing, being what the control already says.
+ */
+function optionsWith(
+  current: string,
+  any: Option,
+  values: string[],
+  labelOf: (value: string) => string = (value) => value,
+): Option[] {
+  const all = !current || values.includes(current) ? values : [current, ...values];
+  return [any, ...all.map((value) => ({ value, label: labelOf(value) }))];
+}
+
 interface Props {
   facets: FacetGroups;
   value: SearchFilterState;
@@ -82,17 +106,20 @@ export function SearchFilters({ facets, value, onChange, loaderLabel, showLoader
       <div className="min-w-36 flex-1">
         <Select
           label={t('search.gameVersion')}
-          options={[any, ...facets.gameVersions.map((v) => ({ value: v, label: v }))]}
+          options={optionsWith(value.gameVersion, any, facets.gameVersions)}
           value={value.gameVersion}
           onChange={(e) => onChange({ ...value, gameVersion: e.target.value })}
         />
       </div>
 
-      {showLoader && facets.loaders.length > 0 && (
+      {/* Drawn whenever a loader is in force, list or no list: without the
+          control there is nothing to see the filter by, and nothing to lift it
+          with. */}
+      {showLoader && (facets.loaders.length > 0 || value.loader) && (
         <div className="min-w-36 flex-1">
           <Select
             label={loaderLabel}
-            options={[any, ...facets.loaders.map((l) => ({ value: l, label: tagLabel(l) }))]}
+            options={optionsWith(value.loader, any, facets.loaders, tagLabel)}
             value={value.loader}
             onChange={(e) => onChange({ ...value, loader: e.target.value })}
           />
@@ -106,7 +133,7 @@ export function SearchFilters({ facets, value, onChange, loaderLabel, showLoader
         <div key={group.header} className="min-w-36 flex-1">
           <Select
             label={headerLabel(t, group.header)}
-            options={[any, ...group.names.map((n) => ({ value: n, label: tagLabel(n) }))]}
+            options={optionsWith(value.categories[group.header] ?? '', any, group.names, tagLabel)}
             value={value.categories[group.header] ?? ''}
             onChange={(e) =>
               onChange({
