@@ -778,6 +778,15 @@ export function registerAllIpcHandlers(): void {
   });
 
   // ── Mods ─────────────────────────────────────────────────
+  /**
+   * Said by everything below that changes a profile's mods, shaders or resource
+   * packs. The pages switch those controls off while the game is up, but a
+   * request already on its way is not stopped by a button going grey — and the
+   * game has those files open, or is about to read them.
+   */
+  const GAME_IS_UP =
+    'Close the game first — its files cannot be changed while it is running or being started.';
+
   handle('mods:get-installed', async (_event, profileId: string) => {
     try {
       return ok(await getInstalledMods(profileId));
@@ -787,6 +796,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('mods:sync-manifest', async (_event, profileId: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       await syncManifest(profileId);
       return ok(undefined);
     } catch (err) {
@@ -798,6 +808,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('mods:install-from-search', async (_event, profileId, mod, version) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       return ok(await installModFromSearch(profileId, mod, version));
     } catch (err) {
       return fail(`Failed to install mod: ${reason(err)}`);
@@ -814,6 +825,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('mods:uninstall', async (_event, profileId: string, modId: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       await uninstallMod(profileId, modId);
       return ok(undefined);
     } catch (err) {
@@ -824,6 +836,7 @@ export function registerAllIpcHandlers(): void {
     'mods:toggle-enabled',
     async (_event, profileId: string, modId: string, enabled: boolean) => {
       try {
+        if (isGameBusy(profileId)) return fail(GAME_IS_UP);
         await toggleModEnabled(profileId, modId, enabled);
         return ok(undefined);
       } catch (err) {
@@ -840,6 +853,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('mods:update', async (_event, profileId: string, modIds: string[]) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       return ok(await updateMods(profileId, modIds));
     } catch (err) {
       return fail(`Failed to update mods: ${reason(err)}`);
@@ -889,6 +903,7 @@ export function registerAllIpcHandlers(): void {
     'content:install-shader',
     async (_event, profileId: string, source: string, version?: string) => {
       try {
+        if (isGameBusy(profileId)) return fail(GAME_IS_UP);
         await installContent('shaders', profileId, source, version);
         return ok(undefined);
       } catch (err) {
@@ -916,6 +931,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('content:install-shader-loader', async (_event, profileId: string, projectId: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       const profile = await getProfile(profileId);
       if (!profile) return fail(`Profile ${profileId} not found`);
       return ok(
@@ -937,6 +953,7 @@ export function registerAllIpcHandlers(): void {
     'content:install-resourcepack',
     async (_event, profileId: string, source: string, version?: string) => {
       try {
+        if (isGameBusy(profileId)) return fail(GAME_IS_UP);
         await installContent('resourcepacks', profileId, source, version);
         return ok(undefined);
       } catch (err) {
@@ -946,6 +963,7 @@ export function registerAllIpcHandlers(): void {
   );
   handle('content:remove-shader', async (_event, profileId: string, id: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       await removeContent('shaders', profileId, id);
       return ok(undefined);
     } catch (err) {
@@ -954,6 +972,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('content:remove-resourcepack', async (_event, profileId: string, id: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       await removeContent('resourcepacks', profileId, id);
       return ok(undefined);
     } catch (err) {
@@ -964,6 +983,7 @@ export function registerAllIpcHandlers(): void {
     'content:reorder-resourcepacks',
     async (_event, profileId: string, orderedIds: string[]) => {
       try {
+        if (isGameBusy(profileId)) return fail(GAME_IS_UP);
         await reorderResourcePacks(profileId, orderedIds);
         return ok(undefined);
       } catch (err) {

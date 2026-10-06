@@ -52,6 +52,7 @@ vi.mock('../src/main/logger', () => ({
 vi.mock('../src/core/minecraft/game-launcher', async (original) => ({
   ...(await original<typeof import('../src/core/minecraft/game-launcher')>()),
   isGameRunning: (profileId: string) => running.has(profileId),
+  isGameBusy: (profileId: string) => running.has(profileId),
 }));
 
 // The sender guard wants a window whose main frame the call came from.
@@ -107,6 +108,73 @@ describe('game:get-running', () => {
 
     running.add(a.id);
     expect((await call<string[]>('game:get-running')).data).toEqual([a.id, b.id]);
+  });
+});
+
+/**
+ * A profile's mods, shaders and resource packs while its game is up.
+ *
+ * The pages switch these controls off, which stops a click and not a request
+ * that was already on its way. The game has the files open or is about to read
+ * them, so the answer is given here as well.
+ */
+describe('changing a profile’s files under its running game', () => {
+  const modsDir = (id: string) => path.join(root, 'data', 'profiles', id, '.minecraft', 'mods');
+  const lockFile = (id: string) => path.join(root, 'data', 'profiles', id, 'installed.lock');
+
+  async function profileWithMod(): Promise<string> {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Modded'))).data!;
+    await fs.mkdir(modsDir(id), { recursive: true });
+    await fs.writeFile(path.join(modsDir(id), 'sodium.jar'), 'jar');
+    await fs.writeFile(
+      lockFile(id),
+      JSON.stringify([
+        {
+          id: 'sodium',
+          name: 'Sodium',
+          version: '0.6.0',
+          source: 'modrinth',
+          fileName: 'sodium.jar',
+          required: false,
+          side: 'client',
+          enabled: true,
+          fromManifest: false,
+        },
+      ]),
+    );
+    return id;
+  }
+
+  it.each([
+    ['mods:sync-manifest', []],
+    ['mods:install-from-search', [{ id: 'lithium' }]],
+    ['mods:uninstall', ['sodium']],
+    ['mods:toggle-enabled', ['sodium', false]],
+    ['mods:update', [['sodium']]],
+    ['content:install-shader', ['modrinth:complementary']],
+    ['content:install-resourcepack', ['modrinth:faithful']],
+    ['content:remove-shader', ['x']],
+    ['content:remove-resourcepack', ['x']],
+    ['content:reorder-resourcepacks', [[]]],
+    ['content:install-shader-loader', ['iris']],
+  ])('%s is refused, and says why', async (channel, args) => {
+    const id = await profileWithMod();
+    running.add(id);
+
+    const result = await call(channel, id, ...args);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Close the game first/);
+    // Nothing was touched on the way to saying so.
+    expect(await fs.readFile(path.join(modsDir(id), 'sodium.jar'), 'utf-8')).toBe('jar');
+    expect(JSON.parse(await fs.readFile(lockFile(id), 'utf-8'))).toHaveLength(1);
+  });
+
+  it('goes through once the game is down', async () => {
+    const id = await profileWithMod();
+
+    expect((await call('mods:uninstall', id, 'sodium')).success).toBe(true);
+    await expect(fs.access(path.join(modsDir(id), 'sodium.jar'))).rejects.toThrow();
   });
 });
 
