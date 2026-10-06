@@ -149,7 +149,15 @@ export function HomePage() {
   // One banner at a time, in feed order — the publisher decides what is most
   // urgent, and a stack of them pushes the launch button off the fold. Dismiss
   // it and the next one takes its place.
-  const announcement = announcements.find((a) => !dismissedIds.has(a.id));
+  //
+  // One that cannot be dismissed never leaves the head of that queue, and so
+  // used to hide everything behind it for as long as it stayed in the feed. It
+  // keeps its place, and the first one that can be dismissed is shown under it.
+  const waiting = announcements.filter((a) => !dismissedIds.has(a.id));
+  const shown =
+    waiting[0] && !waiting[0].dismissible
+      ? [waiting[0], ...waiting.filter((a) => a.dismissible).slice(0, 1)]
+      : waiting.slice(0, 1);
 
   return (
     // `isolate` is load-bearing: without it this container is no stacking
@@ -162,12 +170,12 @@ export function HomePage() {
       {/* The announcement. Only one with something more to say is clickable —
           a banner that opens a dialog repeating its own single sentence teaches
           people the click is not worth making. */}
-      {announcement && (
+      {shown.map((announcement) => (
         // Everywhere else a banner sits on a page background; here it sits on
         // the backdrop, and its own `/10` tint is far too thin to be a surface
         // — over the Nether scene the text came out at 1.7:1. The wrapper is
         // the surface, so the tint has something known to be a tint *of*.
-        <div className="rounded-lg bg-rf-bg">
+        <div key={announcement.id} className="rounded-lg bg-rf-bg">
           <Banner
             type={announcement.type}
             dismissible={announcement.dismissible}
@@ -193,7 +201,7 @@ export function HomePage() {
             )}
           </Banner>
         </div>
-      )}
+      ))}
 
       {reading && <ArticleReader article={reading} onClose={() => setReading(null)} />}
 
