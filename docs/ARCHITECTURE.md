@@ -232,12 +232,18 @@ build that is chosen and then refused, or installed and then dead in the loader,
 is worse than one that was never there:
 
 - _Forge_ lists builds back to Minecraft 1.1. Nothing is offered below 1.7.10,
-  and of that version's 163 builds only the 38 from `10.13.3.1388` on, whose
-  installer carries a profile that can be used (`installableForgeBuilds`).
+  and a short table says where a version's working builds begin when that is
+  not at its first (`workingForgeBuilds`): 1.7.10 from `10.13.3.1388`, the first
+  whose installer carries a profile that can be used; the first build or two of
+  four lines that never started; 1.16.5 from `36.2.26` and 1.16.4 not at all,
+  because the builds before that call a constructor Java 8u321 removed, and the
+  Java fetched here is the current one; 1.17.1 from `37.0.29`, because the
+  earlier builds drop every library whose path has `forge-` in it, and the
+  launcher's folder does.
 - _NeoForge_ lists the builds it made for the snapshots and pre-releases of a
   version under the release's own number, marked only by what follows a `+`;
-  those are left out, as is the one build of its 1.20.1 line that was published
-  without an installer.
+  those are left out, as are one build of its 1.20.1 line that was published
+  without an installer and one of 1.20.4 whose installer does not run.
 - _Fabric and Quilt_ list every build they have for every Minecraft version,
   and serve a profile for any pair (`loader-fit.ts`). Three things take a build
   off the list: its ASM cannot read the class files of the Java that Minecraft
@@ -247,6 +253,14 @@ is worse than one that was never there:
   version by starting it — a short table, because nothing published says where
   those floors are. For 26.3 that leaves 18 of Fabric's 253 builds and 16 of
   Quilt's 307.
+
+Every floor in those tables came from starting the game: the oldest build still
+offered was installed and started on every release each loader has builds for —
+48 for Fabric, 44 for Quilt, 56 for Forge, 23 for NeoForge — and where it did
+not start, the first one that does was searched for. For Fabric and Quilt a
+Minecraft version newer than the table keeps its newest floor; a Forge or
+NeoForge build is made for one version, so a new version starts out with every
+build offered.
 
 A build that is not offered can still be named by a pack. It is installed as the
 pack asks; where that cannot be done the launch says so, and where the loader
