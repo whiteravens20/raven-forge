@@ -69,9 +69,6 @@ let assertProxyUsable: Proxy['assertProxyUsable'];
 let proxyCredentialsFor: Proxy['proxyCredentialsFor'];
 
 beforeEach(async () => {
-  setProxy.mockClear();
-  closeAllConnections.mockClear();
-  setGlobalDispatcher.mockClear();
   logged.length = 0;
   made.length = 0;
   vi.resetModules();

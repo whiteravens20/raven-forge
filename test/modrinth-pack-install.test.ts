@@ -90,16 +90,6 @@ beforeEach(async () => {
   const { reloadDataRoot } = await import('../src/core/config/data-root');
   reloadDataRoot();
   installer = await import('../src/core/packs/pack-installer');
-  for (const mock of [
-    getModVersions,
-    downloadToFile,
-    applyOverrides,
-    createProfile,
-    deleteProfile,
-    syncManifest,
-  ]) {
-    mock.mockClear();
-  }
   getModVersions.mockResolvedValue([packVersion]);
   overrides = [];
   indexed = [];
@@ -132,7 +122,6 @@ describe('installModrinthPack', () => {
   });
 
   it('does not open a pack file that fails the check, and leaves nothing behind', async () => {
-    readMrpack.mockClear();
     downloadToFile.mockRejectedValueOnce(new Error('sha512 mismatch for fo.mrpack'));
 
     await expect(installer.installModrinthPack(pack)).rejects.toThrow(/sha512 mismatch/);
