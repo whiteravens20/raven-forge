@@ -202,10 +202,11 @@ export async function installContent(
   await mutateIndex(kind, profileId, async (items) => {
     const idx = items.findIndex((m) => m.id === installed.id);
     if (idx >= 0) {
-      try {
+      // The build this one replaces, unless it goes by the same file name — in
+      // which case that name is the file that has just arrived, and deleting
+      // "the old one" used to delete it.
+      if (items[idx].fileName !== installed.fileName) {
         await fs.rm(path.join(dir, items[idx].fileName), { force: true });
-      } catch {
-        /* ok */
       }
       items[idx] = installed;
     } else {
@@ -328,11 +329,7 @@ export async function syncContentFromManifest(
   // Drop manifest-managed items the manifest dropped.
   const keptIds = new Set(fromManifest.map((item) => item.id));
   for (const stale of existing.filter((i) => i.fromManifest && !keptIds.has(i.id))) {
-    try {
-      await fs.rm(path.join(dir, stale.fileName), { force: true });
-    } catch {
-      /* ok */
-    }
+    await fs.rm(path.join(dir, stale.fileName), { force: true });
     log.info(`Removed orphaned ${kind.slice(0, -1)} ${stale.name} from profile ${profileId}`);
   }
 
@@ -359,11 +356,10 @@ export async function removeContent(
     if (idx < 0) throw new Error(`${kind.slice(0, -1)} ${id} not found`);
     const item = items[idx];
 
-    try {
-      await fs.rm(path.join(dir, item.fileName), { force: true });
-    } catch {
-      /* ok */
-    }
+    // Before the entry, and not past a failure: a file that would not go —
+    // held open by a running game on Windows — used to leave the list saying it
+    // had gone, with nothing left in the launcher to remove it by.
+    await fs.rm(path.join(dir, item.fileName), { force: true });
     items.splice(idx, 1);
     return item.name;
   });

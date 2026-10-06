@@ -171,6 +171,22 @@ describe('removeContent', () => {
     expect(await fs.readFile(optionsFile(), 'utf-8')).not.toContain('Fancy.zip');
   });
 
+  it('keeps the entry when the file would not go', async () => {
+    // A folder under the pack's name is the portable way to make the delete
+    // fail. The entry used to be dropped anyway, leaving a file the launcher
+    // no longer listed and so could no longer remove.
+    const installed = await content.installContent(
+      'resourcepacks',
+      PROFILE,
+      await localZip('Fancy.zip'),
+    );
+    await fs.rm(path.join(packsDir(), 'Fancy.zip'));
+    await fs.mkdir(path.join(packsDir(), 'Fancy.zip'));
+
+    await expect(content.removeContent('resourcepacks', PROFILE, installed.id)).rejects.toThrow();
+    expect(await content.listContent('resourcepacks', PROFILE)).toHaveLength(1);
+  });
+
   it('says so when there is nothing by that id', async () => {
     await expect(content.removeContent('shaders', PROFILE, 'nope')).rejects.toThrow(/not found/);
   });
