@@ -173,6 +173,16 @@ describe('getLoaderVersions', () => {
     ]);
   });
 
+  it('offers no Forge build for a Minecraft version from before Forge could be installed like this', async () => {
+    // Forge lists 72 builds for 1.6.4 and 133 for 1.3.2. None of them is
+    // something this launcher installs, so none is offered — and nobody is asked.
+    serveForge(['1.6.4-9.11.1.1345', '1.3.2-4.3.5.318'], {});
+
+    expect(await mod.getLoaderVersions('forge', '1.6.4')).toEqual([]);
+    expect(await mod.getLoaderVersions('forge', '1.3.2')).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each([
     // What each service really sends for Minecraft 1.12.2.
     ['fabric', 400, '[]'],

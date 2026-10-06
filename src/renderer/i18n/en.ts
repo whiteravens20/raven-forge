@@ -405,7 +405,7 @@ export const en = {
   'profileForm.versionsLoading': 'Loading versions…',
   'profileForm.versionsFailed': 'Could not load the version list — type it manually',
   'profileForm.noLoaderBuilds':
-    '{loader} has no builds for Minecraft {mcVersion} — pick another version or loader',
+    '{loader} has no builds for Minecraft {mcVersion} that this launcher can install — pick another version or loader',
   'profileForm.loaderUnstable': 'prerelease',
   'profileForm.loaderRecommended': 'recommended',
   'profileForm.loaderVersion': 'Loader version',

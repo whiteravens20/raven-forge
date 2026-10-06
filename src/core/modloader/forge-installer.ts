@@ -133,7 +133,33 @@ async function forgeRecommended(mcVersion: string): Promise<string | undefined> 
   }
 }
 
+/**
+ * Whether what Forge publishes for this Minecraft version is something this
+ * launcher can install.
+ *
+ * Forge is older than its installer. Up to Minecraft 1.5.1 it was a zip to be
+ * merged into the game's own jar by hand. What it published for 1.5.2 to 1.7.2
+ * is an installer whose version profile stands alone: it lists the game's
+ * libraries as well as Forge's, the way the launcher of 2013 wanted them named.
+ * From 1.7.10 the profile says which version it extends and adds only what is
+ * Forge's, which is the form everything here reads.
+ *
+ * Its builds for the older versions are still on the list Forge serves — 133
+ * of them for 1.3.2. Offered here, each was a profile that could be made and
+ * never started.
+ */
+export function forgeInstallsOn(mcVersion: string): boolean {
+  const [major, minor = 0, patch = 0] = mcVersion.split('.').map((part) => parseInt(part, 10));
+  if (major !== 1) return true;
+  return minor > 7 || (minor === 7 && patch >= 10);
+}
+
 export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion[]> {
+  if (!forgeInstallsOn(mcVersion)) {
+    log.info(`Forge for Minecraft ${mcVersion} is older than what this launcher installs`);
+    return [];
+  }
+
   const xml = await fetchText(`${FORGE_MAVEN_ROOT}/maven-metadata.xml`, 'Forge Maven');
   const versions = forgeVersionsFor(parseMavenVersions(xml), mcVersion);
   if (versions.length === 0) {

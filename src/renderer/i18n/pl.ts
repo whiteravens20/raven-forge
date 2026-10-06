@@ -434,7 +434,7 @@ export const pl: Translations = {
   'profileForm.versionsLoading': 'Wczytywanie wersji…',
   'profileForm.versionsFailed': 'Nie udało się pobrać listy wersji — wpisz ręcznie',
   'profileForm.noLoaderBuilds':
-    '{loader} nie ma wydań dla Minecraft {mcVersion} — wybierz inną wersję lub loader',
+    '{loader} nie ma dla Minecraft {mcVersion} wydań, które ten launcher potrafi zainstalować — wybierz inną wersję lub loader',
   'profileForm.loaderUnstable': 'wersja testowa',
   'profileForm.loaderRecommended': 'zalecana',
   'profileForm.loaderVersion': 'Wersja loadera',

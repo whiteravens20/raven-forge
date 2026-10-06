@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  forgeInstallsOn,
   forgeVersionsFor,
   neoForgePrefix,
   neoForgeVersionsFor,
@@ -43,6 +44,24 @@ describe('forgeVersionsFor', () => {
 
   it('returns nothing for a version Forge does not build for', () => {
     expect(forgeVersionsFor(all, '1.21.9')).toEqual([]);
+  });
+});
+
+describe('forgeInstallsOn', () => {
+  it('starts at 1.7.10, where a Forge profile first extends the game’s own', () => {
+    expect(forgeInstallsOn('1.7.10')).toBe(true);
+    // The version before it, whose number sorts after it as text.
+    expect(forgeInstallsOn('1.7.2')).toBe(false);
+    expect(forgeInstallsOn('1.6.4')).toBe(false);
+    // And the ones Forge was never an installer for at all.
+    expect(forgeInstallsOn('1.5.1')).toBe(false);
+    expect(forgeInstallsOn('1.2.5')).toBe(false);
+  });
+
+  it('covers everything since, under either way of numbering Minecraft', () => {
+    for (const version of ['1.8', '1.8.9', '1.12.2', '1.16.5', '1.21.11', '26.1', '26.3']) {
+      expect(forgeInstallsOn(version)).toBe(true);
+    }
   });
 });
 
