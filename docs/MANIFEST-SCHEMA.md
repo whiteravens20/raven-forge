@@ -53,9 +53,6 @@ makes large packs cheap to build. `sha1` is the floor, and exists because a
 accepted **without verification** — the launcher does not invent a hash to check
 against.
 
-`installed.lock` always records `sha256` locally, whichever algorithm the
-manifest used.
-
 ### Resolution and the `url` fast path
 
 An entry carrying `url` is fetched directly — no Modrinth lookup, for any
@@ -65,7 +62,10 @@ Setting `source: "modrinth"` alongside `url` is still worthwhile: it preserves
 provenance for the UI.
 
 Without `url`, a `modrinth` entry resolves `projectId` through the API and
-matches `version` against `version_number` first, then the opaque version `id`.
+matches `version` against a build's `version_number` or its opaque version `id`.
+A `version` that names neither is an error: the sync stops and says which entry,
+rather than installing some other build in its place. `installed.lock` records
+the label as the manifest wrote it, which is what a later sync compares.
 
 **There is no `curseforge` source.** CurseForge's API key is issued per
 developer after a manual application and its terms make the key

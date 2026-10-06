@@ -301,8 +301,8 @@ re-read on every sync; a `.mrpack` is unpacked once, exactly like the file route
 `.mrpack` is the only open, cross-launcher pack format the launcher reads; Prism,
 ATLauncher, MultiMC and the Modrinth app produce and consume the same files. An
 import is converted into a manifest and installed through the ordinary sync path,
-so it gets the same hash verification, orphan handling and resource-pack ordering
-as a server pack. CurseForge's pack zip is not read, for the reason above: its
+so it gets the same hash verification, removal of dropped mods and resource-pack
+ordering as a server pack. CurseForge's pack zip is not read, for the reason above: its
 files cannot be fetched without a key.
 
 Paths inside a pack are checked before anything is written. An entry that tries
