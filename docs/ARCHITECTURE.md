@@ -33,7 +33,7 @@ raven-forge/
 ├── tsconfig.json                 # base of tsconfig.test.json, and an editor's map from a file to its project
 ├── tsconfig.main.json            # main + preload + core + shared (Node ESM)
 ├── tsconfig.renderer.json        # renderer (DOM)
-├── vite.config.ts                # renderer build + path aliases
+├── vite.config.mts               # renderer build + path aliases
 ├── .github/workflows/
 │   ├── build.yml                 # PR / push CI — lint, typecheck, test, build
 │   ├── codeql.yml                # CodeQL analysis

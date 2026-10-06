@@ -5,7 +5,7 @@
  *
  * Modules under `src/core/` reach Electron only through `paths.ts` and
  * `logger.ts`, both of which want `app.getPath('userData')` at import time.
- * Aliasing the module (see vitest.config.ts) means a pure function does not
+ * Aliasing the module (see vitest.config.mts) means a pure function does not
  * have to be pulled out of its file just to become testable.
  *
  * It is deliberately incomplete: a test that reaches further than this hits an
