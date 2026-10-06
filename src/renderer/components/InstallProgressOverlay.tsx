@@ -47,7 +47,11 @@ export function InstallProgressOverlay() {
   const overall = items.reduce((acc, e) => acc + e.progress, 0) / items.length;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border border-rf-border bg-rf-bg-secondary/95 p-3 shadow-lg backdrop-blur animate-fade-in">
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border border-rf-border bg-rf-bg-secondary/95 p-3 shadow-lg backdrop-blur animate-fade-in"
+    >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-display font-semibold uppercase tracking-wider text-rf-text-secondary">
           {/* Named for what is happening. This box is on screen at every launch,

@@ -302,6 +302,7 @@ export function ContentPage() {
           {(['installed', 'browse'] as const).map((value) => (
             <button
               key={value}
+              aria-pressed={tab === value}
               onClick={() => {
                 setTab(value);
                 if (value === 'installed') void loadInstalled();

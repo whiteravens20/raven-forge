@@ -187,6 +187,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
             {(['all', 'warn', 'error'] as const).map((level) => (
               <button
                 key={level}
+                aria-pressed={filter === level}
                 onClick={() => setFilter(level)}
                 className={`rounded px-2 py-1 text-[11px] transition-colors ${
                   filter === level

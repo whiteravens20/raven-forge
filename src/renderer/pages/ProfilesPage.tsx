@@ -459,6 +459,7 @@ export function ProfilesPage() {
           {profiles.map((profile) => (
             <button
               key={profile.id}
+              aria-current={profile.id === selectedId ? 'true' : undefined}
               onClick={() => {
                 select(profile.id);
                 setMode('view');
@@ -1451,10 +1452,11 @@ function ProfileForm({
       </details>
 
       <div className="space-y-2">
-        <label className="text-xs font-medium text-rf-text-secondary">
+        <label htmlFor="profile-notes" className="text-xs font-medium text-rf-text-secondary">
           {t('profileForm.notes')}
         </label>
         <textarea
+          id="profile-notes"
           value={draft.notes ?? ''}
           onChange={(e) => set('notes', e.target.value || undefined)}
           rows={3}

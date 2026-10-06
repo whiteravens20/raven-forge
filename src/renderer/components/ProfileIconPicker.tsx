@@ -6,7 +6,7 @@ import { Button } from '@components/ui/Button';
 import { ProfileAvatar, invalidateAvatarCache } from '@components/ProfileAvatar';
 import { PROFILE_PRESETS, PROFILE_PRESET_IDS } from '@components/profile-presets';
 import { useProfileStore } from '@stores/profile-store';
-import { useT } from '@renderer/i18n';
+import { useT, type TranslationKey } from '@renderer/i18n';
 import type { Profile } from '@shared/ipc-types';
 
 const api = window.ravenforge;
@@ -115,7 +115,13 @@ export function ProfileIconPicker({ profile }: { profile: Profile }) {
                   : 'border-transparent hover:border-rf-border'
               }`}
             >
-              <img src={PROFILE_PRESETS[id]} alt={id} width={36} height={36} className="rounded" />
+              <img
+                src={PROFILE_PRESETS[id]}
+                alt={t(`profileIcon.preset.${id}` as TranslationKey)}
+                width={36}
+                height={36}
+                className="rounded"
+              />
             </button>
           ))}
         </div>

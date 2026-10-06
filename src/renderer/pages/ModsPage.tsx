@@ -316,6 +316,7 @@ export function ModsPage() {
           )}
           <div className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5">
             <button
+              aria-pressed={tab === 'installed'}
               onClick={() => {
                 setTab('installed');
                 loadInstalled();
@@ -329,6 +330,7 @@ export function ModsPage() {
               {t('mods.tabInstalled')}
             </button>
             <button
+              aria-pressed={tab === 'browse'}
               onClick={() => setTab('browse')}
               className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
                 tab === 'browse'

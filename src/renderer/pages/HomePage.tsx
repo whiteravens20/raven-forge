@@ -238,6 +238,7 @@ export function HomePage() {
           <div className="flex items-center gap-3">
             {selectedProfile && <ProfileAvatar profile={selectedProfile} size={40} />}
             <select
+              aria-label={t('home.profile')}
               value={selectedId ?? ''}
               onChange={(e) => selectProfile(e.target.value)}
               className="rounded-lg border border-rf-border bg-rf-surface px-4 py-2 text-sm text-rf-text outline-none focus:border-rf-accent-text min-w-[200px]"
