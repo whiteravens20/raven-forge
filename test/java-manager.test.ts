@@ -150,7 +150,7 @@ beforeEach(async () => {
     // Only Adoptium's index is invented. The archive comes down the real
     // downloader, over a real socket, into a real file.
     const url = String(input);
-    if (url.startsWith('https://api.adoptium.net')) return Promise.resolve(adoptium(url));
+    if (new URL(url).origin === 'https://api.adoptium.net') return Promise.resolve(adoptium(url));
     return realFetch(input, init);
   });
 });
