@@ -9,7 +9,7 @@ import { resolveDefaultLoaderVersion } from '../modloader/loader-manager';
 import { hashFile } from '../mods/integrity';
 import { readLockFile } from '../mods/lock-file';
 import { listContent } from '../mods/content-manager';
-import { versionsByHash, primaryFile, type ModrinthVersion } from '../mods/modrinth-api';
+import { versionsByHash, primaryFile, type ModrinthFile } from '../mods/modrinth-api';
 import { ZipWriter } from './zip-writer';
 import type { InstalledMod, ModLoaderType, MrpackExport } from '../../shared/ipc-types';
 
@@ -100,12 +100,18 @@ async function collect(profileId: string): Promise<{ items: Candidate[]; disable
 /**
  * Ask Modrinth which of these files it can serve, keyed by candidate index.
  *
+ * The answer for each is the very file that was asked about. A version can hold
+ * several — a Fabric build and a Forge one, a jar and its sources — and Modrinth
+ * answers a hash with the version, so taking that version's primary file named
+ * a different jar from the one installed whenever the installed one was not the
+ * primary.
+ *
  * A failure here is not a failure of the export: with no answer at all every
  * file is bundled instead, which is a much larger pack that still installs. An
  * export that refused to run because Modrinth was down would be strictly worse
  * than one that got big.
  */
-async function resolveDownloads(items: Candidate[]): Promise<Map<number, ModrinthVersion>> {
+async function resolveDownloads(items: Candidate[]): Promise<Map<number, ModrinthFile>> {
   const hashes = new Map<string, number[]>();
   for (const [index, candidate] of items.entries()) {
     try {
@@ -117,11 +123,12 @@ async function resolveDownloads(items: Candidate[]): Promise<Map<number, Modrint
     }
   }
 
-  const resolved = new Map<number, ModrinthVersion>();
+  const resolved = new Map<number, ModrinthFile>();
   try {
     const found = await versionsByHash([...hashes.keys()]);
     for (const [hash, version] of found) {
-      for (const index of hashes.get(hash) ?? []) resolved.set(index, version);
+      const file = version.files.find((f) => f.hashes.sha512 === hash) ?? primaryFile(version);
+      for (const index of hashes.get(hash) ?? []) resolved.set(index, file);
     }
   } catch (err) {
     log.warn(`Could not reach Modrinth while exporting; bundling every file instead: ${err}`);
@@ -204,8 +211,8 @@ export async function exportProfileAsMrpack(
   let bundledBytes = 0;
 
   for (const [index, candidate] of items.entries()) {
-    const version = resolved.get(index);
-    if (!version) {
+    const file = resolved.get(index);
+    if (!file) {
       // Nothing to point at, so the bytes travel with the pack. A file that has
       // gone missing from disk was already dropped during resolution and would
       // fail here, so its absence is checked rather than assumed.
@@ -218,7 +225,6 @@ export async function exportProfileAsMrpack(
       continue;
     }
 
-    const file = primaryFile(version);
     files.push({
       path: `${candidate.packDir}/${file.filename}`,
       hashes: { sha1: file.hashes.sha1, sha512: file.hashes.sha512 },

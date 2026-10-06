@@ -255,6 +255,30 @@ describe('exportProfileAsMrpack', () => {
     expect(pack.files.every((f) => f.env?.server === 'unsupported')).toBe(true);
   });
 
+  it('names the file that is installed, not another one of the same version', async () => {
+    // One Modrinth version, two jars in it. The installed one is not the
+    // primary — and the pack used to point at the primary all the same.
+    await write('mods/listed-fabric.jar', 'the fabric build');
+    await lock([mod({ id: 'listed', fileName: 'listed-fabric.jar' })]);
+    const hash = await hashOf('mods/listed-fabric.jar');
+    const version = build('listed-forge.jar', 'https://cdn/forge.jar');
+    version.files.push({
+      filename: 'listed-fabric.jar',
+      url: 'https://cdn/fabric.jar',
+      size: 16,
+      primary: false,
+      hashes: { sha1: 'c'.repeat(40), sha512: hash },
+    });
+    known.set(hash, version);
+
+    await exportProfileAsMrpack('p1', dest());
+
+    const pack = await readMrpack(dest());
+    expect(pack.files.map((f) => [f.path, f.downloads[0]])).toEqual([
+      ['mods/listed-fabric.jar', 'https://cdn/fabric.jar'],
+    ]);
+  });
+
   it('leaves out content that is switched off', async () => {
     await write('mods/on.jar', 'on');
     await write('mods/off.jar.disabled', 'off');
