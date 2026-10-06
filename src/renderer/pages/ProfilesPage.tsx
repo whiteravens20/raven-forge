@@ -89,11 +89,18 @@ const DROPPED_FIELD_LABELS: Partial<Record<string, TranslationKey>> = {
   manifestUrl: 'profiles.manifestUrl',
 };
 
+/**
+ * What a new profile is on until Mojang's list has been read — and for good
+ * when it cannot be. With the list in hand the form moves it to the newest
+ * release; a constant alone meant every new profile started two years back.
+ */
+const FALLBACK_MINECRAFT_VERSION = '1.21.4';
+
 /** `totalMb` is the machine's memory, or undefined when it could not be read. */
 function emptyDraft(totalMb: number | undefined): DraftProfile {
   return {
     name: '',
-    minecraftVersion: '1.21.4',
+    minecraftVersion: FALLBACK_MINECRAFT_VERSION,
     modLoader: 'fabric',
     modLoaderVersion: undefined,
     manifestUrl: undefined,
@@ -1074,6 +1081,17 @@ function ProfileForm({
         return;
       }
       setMcVersions(r.data);
+      // A new profile that nobody has chosen a version for yet starts on the
+      // newest release, which heads the list.
+      const now = latest.current;
+      if (
+        isCreate &&
+        !showSnapshots &&
+        now.draft.minecraftVersion === FALLBACK_MINECRAFT_VERSION &&
+        r.data[0] !== FALLBACK_MINECRAFT_VERSION
+      ) {
+        now.onChange({ ...now.draft, minecraftVersion: r.data[0], modLoaderVersion: undefined });
+      }
       // A profile already pinned to a snapshot opens with the toggle off, and
       // its own version is then not among the options — which a <select>
       // renders as whatever happens to be first. Turning the toggle on is the
@@ -1093,7 +1111,7 @@ function ProfileForm({
     return () => {
       cancelled = true;
     };
-  }, [showSnapshots]);
+  }, [showSnapshots, isCreate]);
 
   useEffect(() => {
     let cancelled = false;
