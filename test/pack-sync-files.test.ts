@@ -417,6 +417,9 @@ describe('a pack that names a Modrinth build by its id', () => {
 
     expect(await jars()).toEqual(['sodium-0.6.5.jar']);
     expect((await lock())[0].version).toBe('pinnedId');
+    // And which project the pack's `sodium` is, for whatever asks later whether
+    // the profile already has it.
+    expect((await lock())[0]).toMatchObject({ id: 'sodium', projectId: 'AANobbMI' });
     expect(pendingChanges(manifest.mods, await lock())).toBe(0);
   });
 });

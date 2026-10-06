@@ -281,7 +281,13 @@ export async function syncContentFromManifest(
 
     // Skip the download when the file on disk already matches the manifest.
     if (previous && (await fileMatches(dest, entry))) {
-      fromManifest.push({ ...previous, fileName, version, fromManifest: true });
+      fromManifest.push({
+        ...previous,
+        projectId: entry.projectId,
+        fileName,
+        version,
+        fromManifest: true,
+      });
       continue;
     }
 
@@ -295,6 +301,7 @@ export async function syncContentFromManifest(
 
     fromManifest.push({
       id: entry.id,
+      projectId: entry.projectId,
       name: entry.name,
       version,
       source: entry.source === 'modrinth' ? 'modrinth' : 'url',

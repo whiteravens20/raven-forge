@@ -817,6 +817,7 @@ async function runSync(profileId: string, supplied?: ModManifest): Promise<void>
 
         synced.push({
           id: entry.id,
+          projectId: entry.projectId,
           name: entry.name,
           // The manifest's own label, whichever of a build's two names it is.
           // It is what the update check compares, so recording Modrinth's

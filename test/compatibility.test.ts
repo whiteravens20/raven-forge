@@ -313,4 +313,32 @@ describe('requiredDependencies', () => {
     });
     expect(requiredDependencies(version, [])).toEqual([{ projectId: 'p2', versionId: 'v9' }]);
   });
+
+  it('sees a mod a pack ships under its own name as the project it is', () => {
+    // A manifest calls it `fabric-api` and says which project that is beside
+    // it; Modrinth names the dependency by project id. Only the entry's own id
+    // used to be compared, so a pack profile got a second Fabric API installed
+    // beside the pack's.
+    const version = build({
+      dependencies: [{ version_id: null, project_id: 'P7dR8mSH', dependency_type: 'required' }],
+    });
+    expect(requiredDependencies(version, [{ id: 'fabric-api', projectId: 'P7dR8mSH' }])).toEqual(
+      [],
+    );
+    // And one under a name of its own with no project beside it is still asked for.
+    expect(requiredDependencies(version, [{ id: 'fabric-api' }])).toEqual([
+      { projectId: 'P7dR8mSH', versionId: null },
+    ]);
+  });
+
+  it('sees a jar dropped in by hand once an update check has said what it is', () => {
+    const version = build({
+      dependencies: [{ version_id: null, project_id: 'P7dR8mSH', dependency_type: 'required' }],
+    });
+    const byHand = {
+      id: 'local-1',
+      updateAvailable: { versionId: 'v2', versionNumber: '2', projectId: 'P7dR8mSH' },
+    };
+    expect(requiredDependencies(version, [byHand])).toEqual([]);
+  });
 });

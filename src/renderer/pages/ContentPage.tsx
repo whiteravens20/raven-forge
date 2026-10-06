@@ -12,6 +12,7 @@ import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
 import { useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
+import { isProject } from '@shared/mod-identity';
 import {
   SearchFilters,
   EMPTY_FILTERS,
@@ -77,9 +78,10 @@ export function ContentPage() {
   // when a pack manifest did — and a search result carries both. Switching kind
   // reloads the list, so shaders are never matched against resource packs.
   const details = useProjectDetails(installed);
-  const installedIds = new Set(installed.map((item) => item.id));
+  // By any of the names an entry can go by — a pack's own id for a mod is not
+  // the one the search speaks.
   const isInstalled = (item: ModSearchResult) =>
-    installedIds.has(item.id) || installedIds.has(item.slug);
+    installed.some((entry) => isProject(entry, item.id) || entry.id === item.slug);
 
   const loadInstalled = useCallback(async () => {
     if (!selectedId) return;

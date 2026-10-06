@@ -1,6 +1,7 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { acceptedLoaders } from '../../shared/constants';
+import { isProject, type InstalledIdentity } from '../../shared/mod-identity';
 import { getModVersions, getProjectTitle, type ModrinthVersion } from './modrinth-api';
 import type {
   CompatibilityIssue,
@@ -48,11 +49,11 @@ const SUPPORTED_VERSIONS_SHOWN = 3;
  */
 export function requiredDependencies(
   version: ModrinthVersion,
-  installed: Array<{ id: string }>,
+  installed: InstalledIdentity[],
 ): Array<{ projectId: string; versionId: string | null }> {
   return version.dependencies
     .filter((d) => d.dependency_type === 'required' && d.project_id)
-    .filter((d) => !installed.some((m) => m.id === d.project_id))
+    .filter((d) => !installed.some((m) => isProject(m, d.project_id as string)))
     .map((d) => ({ projectId: d.project_id as string, versionId: d.version_id }));
 }
 
@@ -69,7 +70,7 @@ function conflictingWith(version: ModrinthVersion, installed: InstalledMod[]): s
   return (
     version.dependencies
       .filter((d) => d.dependency_type === 'incompatible' && d.project_id)
-      .map((d) => installed.find((m) => m.id === d.project_id))
+      .map((d) => installed.find((m) => isProject(m, d.project_id as string)))
       .filter((m): m is InstalledMod => Boolean(m))
       // The installed name is already on hand and is what the player sees in
       // their own list — no reason to ask Modrinth what it calls that project.

@@ -10,6 +10,12 @@ export type ModSide = 'client' | 'server' | 'both';
 
 export interface InstalledMod {
   id: string;
+  /**
+   * The Modrinth project this is, where a pack's manifest says so. A manifest
+   * names its entries as it likes, and this is the name the rest of Modrinth
+   * knows the mod by — see `isProject`.
+   */
+  projectId?: string;
   name: string;
   version: string;
   source: ModSource;

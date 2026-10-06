@@ -8,13 +8,14 @@ const api = window.ravenforge;
 /**
  * The name Modrinth would know an installed entry by.
  *
- * Usually its id, which is a project id when the launcher installed it and a
- * slug when a pack manifest did. A jar dropped in by hand has neither — but an
+ * The project a pack's manifest names, where it names one. Otherwise its id,
+ * which is a project id when the launcher installed it and whatever the pack
+ * called it when a manifest did. A jar dropped in by hand has neither — but an
  * update check recognises it by its contents and writes down the project it
  * turned out to be, and that is the better name where there is one.
  */
 export function projectKey(entry: InstalledMod): string {
-  return entry.updateAvailable?.projectId ?? entry.id;
+  return entry.projectId ?? entry.updateAvailable?.projectId ?? entry.id;
 }
 
 /**

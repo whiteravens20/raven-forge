@@ -22,6 +22,7 @@ import { CompatibilityBadge } from '@components/CompatibilityBadge';
 import { CompatibilityDialog } from '@components/CompatibilityDialog';
 import { InstalledMark } from '@components/InstalledMark';
 import { isClientModLoader } from '@shared/constants';
+import { isProject } from '@shared/mod-identity';
 import type {
   FacetGroups,
   InstallPlan,
@@ -66,9 +67,10 @@ export function ModsPage() {
   // whatever named them: a project id when the launcher installed them, a slug
   // when a pack manifest did. A search result carries both, so both are asked —
   // checking the id alone leaves half a pack's mods offered a second time.
-  const installedIds = new Set(installed.map((mod) => mod.id));
+  // By any of the names an entry can go by — a pack's own id for a mod is not
+  // the one the search speaks.
   const isInstalled = (mod: ModSearchResult) =>
-    installedIds.has(mod.id) || installedIds.has(mod.slug);
+    installed.some((entry) => isProject(entry, mod.id) || entry.id === mod.slug);
 
   // The badge is on the entry, put there by the last check, so this needs no
   // second source of truth and no request of its own.
