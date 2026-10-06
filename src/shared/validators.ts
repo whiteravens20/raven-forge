@@ -93,8 +93,9 @@ export const globalSettingsSchema = z.object({
   launcherBehaviorOnLaunch: z.enum(['close', 'minimize', 'keep-open']),
   // Validated rather than free text: an unparseable URL used to be accepted and
   // then silently ignored. Every scheme listed here has a dispatcher behind it —
-  // http/https through undici's ProxyAgent, socks through a connect hook — so
-  // nothing that saves cleanly can fail to take effect.
+  // http/https through undici's ProxyAgent, socks through a connect hook. That
+  // an address of one of these schemes can actually be used is asked where it
+  // is saved, by building the dispatcher: see `assertProxyUsable`.
   proxyUrl: z
     .string()
     .optional()

@@ -8,7 +8,7 @@ import { log, LOG_FILE } from './logger';
 import { getMainWindow } from './window';
 import { assertTrustedSender } from './security';
 import { getSettings, updateSettings, resetSettings } from '../core/config/settings-manager';
-import { applyProxySettings } from '../core/net/proxy';
+import { applyProxySettings, assertProxyUsable } from '../core/net/proxy';
 import { paths } from '../core/config/paths';
 import {
   dataRootSource,
@@ -320,6 +320,9 @@ export function registerAllIpcHandlers(): void {
   });
   handle('settings:update', async (_event, updates: Partial<GlobalSettings>) => {
     try {
+      // Before it is written down, not after: an address that cannot be used
+      // must not be what the next start reads.
+      if ('proxyUrl' in updates) await assertProxyUsable(updates.proxyUrl);
       const settings = await updateSettings(updates);
       await applyProxySettings(settings);
       return ok(settings);

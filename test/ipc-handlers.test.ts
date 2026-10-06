@@ -178,6 +178,20 @@ describe('changing a profile’s files under its running game', () => {
   });
 });
 
+describe('settings:update', () => {
+  it('does not write down a proxy address that could never be used', async () => {
+    // A URL as far as the schema can tell, and not one a proxy can be made
+    // from. It used to be saved and then found out: the change was reported as
+    // failed while the file kept the address for every later start to trip on.
+    const result = await call('settings:update', {
+      proxyUrl: 'http://user:50%off@proxy.example.net:8080',
+    });
+
+    expect(result.success).toBe(false);
+    expect((await call<GlobalSettings>('settings:get')).data?.proxyUrl ?? '').toBe('');
+  });
+});
+
 describe('settings:add-trusted-key', () => {
   const key = (publicKey: string, name = 'Raven SMP') => ({
     name,
