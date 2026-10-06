@@ -268,7 +268,7 @@ export async function importMrpack(
     // The one failure after the profile exists that cannot be picked up again:
     // the pack is only kept once the sync below has it, so a profile left here
     // would have nothing to finish its install from.
-    await deleteProfile(profile.id);
+    await deleteProfile(profile.id, true);
     throw err;
   }
 

@@ -53,10 +53,10 @@ vi.mock('../src/core/packs/mrpack', () => ({
 }));
 
 const createProfile = vi.fn(async (data: Partial<Profile>) => ({ ...data, id: 'new' }) as Profile);
-const deleteProfile = vi.fn(async (_profileId: string) => {});
+const deleteProfile = vi.fn(async (_profileId: string, _deleteFiles: boolean) => {});
 vi.mock('../src/core/profiles/profile-manager', () => ({
   createProfile: (data: Partial<Profile>) => createProfile(data),
-  deleteProfile: (profileId: string) => deleteProfile(profileId),
+  deleteProfile: (profileId: string, deleteFiles: boolean) => deleteProfile(profileId, deleteFiles),
 }));
 
 const syncManifest = vi.fn(async (_profileId: string, _manifest?: unknown) => {});
@@ -196,7 +196,8 @@ describe('an install that fails after the profile was made', () => {
 
     await expect(installer.installModrinthPack(pack)).rejects.toThrow(/ENOSPC/);
 
-    expect(deleteProfile).toHaveBeenCalledWith('new');
+    // With its files: a profile whose pack never arrived has nothing to keep.
+    expect(deleteProfile).toHaveBeenCalledWith('new', true);
     expect(syncManifest).not.toHaveBeenCalled();
   });
 });

@@ -283,7 +283,7 @@ describe('deleteProfile', () => {
   });
 
   it('says so when there is no such profile', async () => {
-    await expect(mgr.deleteProfile('nope')).rejects.toThrow(/not found/);
+    await expect(mgr.deleteProfile('nope', true)).rejects.toThrow(/not found/);
   });
 
   it.skipIf(asRoot)('says so when a file would not go, and lists what is left', async () => {

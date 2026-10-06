@@ -244,7 +244,7 @@ export async function summarizeProfileFiles(profileId: string): Promise<ProfileF
  * `profiles/<id>/` — unreachable from the UI, but recoverable by hand, which is
  * the entire point of offering the choice.
  */
-export async function deleteProfile(profileId: string, deleteFiles = true): Promise<void> {
+export async function deleteProfile(profileId: string, deleteFiles: boolean): Promise<void> {
   const removed = await mutateProfiles((profiles) => {
     const idx = profiles.findIndex((p) => p.id === profileId);
     if (idx < 0) throw new Error(`Profile ${profileId} not found`);
@@ -437,7 +437,7 @@ export async function duplicateProfile(profileId: string, name?: string): Promis
   } catch (err) {
     // A copy that stopped part-way is a profile that looks whole and is
     // missing whichever mods had not been reached. Better none than that one.
-    await deleteProfile(copy.id).catch(() => undefined);
+    await deleteProfile(copy.id, true).catch(() => undefined);
     throw err;
   }
 }
