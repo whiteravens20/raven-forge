@@ -1,7 +1,11 @@
 # ── Code Owners ───────────────────────────────────────────────────────────────
-# GitHub enforces that at least one owner approves any PR touching these paths.
-# Configure branch protection (Settings → Branches → main → Require review from
-# Code Owners) to make this mandatory.
+# Auto-requests review from the listed owner on any PR touching these paths, and
+# documents where the blast radius is largest.
+#
+# Do NOT turn on "Require review from Code Owners" in branch protection here.
+# This is a one-maintainer repository and nobody can approve their own PR, so
+# that setting would leave every PR unmergeable. The merge gate is CI — the
+# required status checks on main and dev.
 #
 # Paths are checked most-specific to least-specific; last matching rule wins.
 
@@ -32,6 +36,8 @@
 /src/preload/ @pavlojs
 /src/main/window.ts @pavlojs
 /src/main/ipc-handlers.ts @pavlojs
+# The Content-Security-Policy, the permission policy and where a link may go.
+/src/main/security.ts @pavlojs
 
 # ── Content integrity ─────────────────────────────────────────────────────────
 # Manifest signature verification and file hashing — the two things standing
@@ -48,6 +54,10 @@
 # Builds the argv the JVM is spawned with, and unpacks archives to disk.
 /src/core/minecraft/game-launcher.ts @pavlojs
 /src/core/minecraft/asset-downloader.ts @pavlojs
+/src/core/util/zip-read.ts @pavlojs
+/src/core/packs/mrpack.ts @pavlojs
+# Puts a file the player picked on the game's class path.
+/src/core/mods/local-mod.ts @pavlojs
 
 # ── Egress ────────────────────────────────────────────────────────────────────
 # Sets the global undici dispatcher and the Chromium session proxy, so it
