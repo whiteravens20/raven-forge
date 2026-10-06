@@ -196,6 +196,21 @@ async function resolveDownloads(items: Candidate[]): Promise<Map<number, Modrint
 }
 
 /**
+ * A file's contents, or null when it is larger than `limit`.
+ *
+ * Asked and read through the one handle: sized by name and then read by name,
+ * the file read is whatever is at that name by then.
+ */
+async function readUpTo(file: string, limit: number): Promise<Buffer | null> {
+  const handle = await fs.open(file, 'r');
+  try {
+    return (await handle.stat()).size > limit ? null : await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
  * The player's `options.txt` as it may leave the machine: every setting but the
  * one that says where they play. `lastServer` is the address of the server they
  * last joined, written there by the game, and a pack handed to somebody else is
@@ -349,13 +364,21 @@ export async function exportProfileAsMrpack(
       const source = path.join(gameDir, relative);
       // A mod that keeps a database under `config/` should not turn a 20 KB pack
       // into a 300 MB one. Configuration is text and is never this big.
-      if ((await fs.stat(source)).size > MAX_CONFIG_FILE_BYTES) {
+      const tooLarge = () =>
         log.warn(`Leaving ${relative} out of the pack: too large to be configuration`);
-        continue;
-      }
+
       if (relative === 'options.txt') {
-        await zip.addBuffer('overrides/options.txt', shareableOptions(await fs.readFile(source)));
+        const settings = await readUpTo(source, MAX_CONFIG_FILE_BYTES);
+        if (!settings) {
+          tooLarge();
+          continue;
+        }
+        await zip.addBuffer('overrides/options.txt', shareableOptions(settings));
       } else {
+        if ((await fs.stat(source)).size > MAX_CONFIG_FILE_BYTES) {
+          tooLarge();
+          continue;
+        }
         await zip.addFile(`overrides/${relative}`, source);
       }
       written++;
