@@ -240,7 +240,7 @@ State in the PR description what you actually ran. "Typechecks" is not a test re
 ### Credentials and tokens
 
 - **Never commit secrets** — no tokens, no client ids, no private keys, not even in a test fixture.
-- Tokens belong in the OS keychain (`src/core/auth/secret-store.ts`), never in a plaintext config file, and never in a log line. `--accessToken` must not reach `launcher.log`.
+- Tokens belong in the OS keychain (`src/core/auth/secret-store.ts`), never in a plaintext config file, and never in a log line. `--accessToken` must not reach `logs/main.log`.
 - If you commit a secret by accident, treat it as compromised, rotate it, and report it privately.
 
 ### Integrity

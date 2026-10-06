@@ -35,10 +35,13 @@ notes is offered for every valid report unless you prefer otherwise.
 
 ### Redact your logs before sharing them
 
-`launcher.log` and crash reports can contain a **live Minecraft access token**
-(passed to the game as `--accessToken`), your username and UUID, and local file
-paths. Strip those before attaching a log to an issue or a report. If you have
-already posted one publicly, sign out and back in — that invalidates the session.
+`logs/main.log` holds your username, your UUID and local file paths, and it
+keeps the game's own output, into which a mod can print anything. The launcher
+takes the **Minecraft session token** (passed to the game as `--accessToken`)
+out of every line before it is logged, and a crash report is written with the
+username, UUID and home directory removed as well — but read either through
+before attaching it to an issue or a report. If you have posted a token
+publicly, sign out and back in — that invalidates the session.
 
 ---
 
