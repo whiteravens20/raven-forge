@@ -25,17 +25,27 @@ import path from 'node:path';
 export async function resolveWithin(baseDir: string, relative: string): Promise<string> {
   const dest = path.resolve(baseDir, relative);
   const rel = path.relative(baseDir, dest);
-  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+  if (rel === '' || leavesTheTree(rel)) {
     throw new Error(`Refusing to write outside the target directory: ${relative}`);
   }
 
   const parent = path.dirname(dest);
   await fs.mkdir(parent, { recursive: true });
   const [realParent, realBase] = await Promise.all([fs.realpath(parent), fs.realpath(baseDir)]);
-  const relReal = path.relative(realBase, realParent);
-  if (relReal.startsWith('..') || path.isAbsolute(relReal)) {
+  if (leavesTheTree(path.relative(realBase, realParent))) {
     throw new Error(`Refusing to follow a symlink out of the target directory: ${relative}`);
   }
 
   return dest;
+}
+
+/**
+ * Whether a relative path climbs out of where it starts.
+ *
+ * By its first component, not by its first two characters: `..cache/x.json` is
+ * a folder with an odd name inside the tree, and a pack that ships one is
+ * entitled to have it written.
+ */
+function leavesTheTree(rel: string): boolean {
+  return rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
 }

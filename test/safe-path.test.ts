@@ -43,6 +43,14 @@ describe('resolveWithin', () => {
     await expect(fs.stat(path.join(base, 'deeply', 'nested'))).resolves.toBeTruthy();
   });
 
+  it('allows a name that only begins with two dots', async () => {
+    // Not a way out: a folder called `..cache` is inside the tree.
+    expect(await resolveWithin(base, '..cache/state.json')).toBe(
+      path.join(base, '..cache', 'state.json'),
+    );
+    expect(await resolveWithin(base, '...')).toBe(path.join(base, '...'));
+  });
+
   it('refuses a name that climbs out with ..', async () => {
     await expect(resolveWithin(base, '../outside/evil.txt')).rejects.toThrow(/outside/i);
   });
