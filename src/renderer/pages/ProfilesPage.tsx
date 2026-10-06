@@ -1361,13 +1361,16 @@ function ProfileForm({
           max={65535}
           error={portProblem ? t('profileForm.serverPortRange') : undefined}
         />
-        <Input
-          label={t('profileForm.javaArgs')}
-          value={draft.javaArgs ?? ''}
-          onChange={(e) => set('javaArgs', e.target.value || undefined)}
-          placeholder="-XX:+UseG1GC"
-          className="col-span-2"
-        />
+        {/* The span goes on a wrapper: given to `Input` it lands on the field
+            inside, where there is no grid for it to span. */}
+        <div className="col-span-2">
+          <Input
+            label={t('profileForm.javaArgs')}
+            value={draft.javaArgs ?? ''}
+            onChange={(e) => set('javaArgs', e.target.value || undefined)}
+            placeholder="-XX:+UseG1GC"
+          />
+        </div>
       </div>
 
       {/* Folded away rather than absent: none of it is needed to make a profile
