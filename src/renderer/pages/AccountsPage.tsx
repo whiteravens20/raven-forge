@@ -161,7 +161,11 @@ export function AccountsPage() {
               autoFocus
             />
           </div>
-          <Button type="submit">{t('common.add')}</Button>
+          {/* Off until there is a name: pressed on an empty field it did
+              nothing, and did not say that it had done nothing. */}
+          <Button type="submit" disabled={!offlineUsername.trim()}>
+            {t('common.add')}
+          </Button>
         </form>
       )}
 
