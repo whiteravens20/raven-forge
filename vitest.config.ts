@@ -16,5 +16,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/**/*.test.ts'],
+    // Every file runs in a worker of its own, and that is a choice rather than
+    // a default left alone: the files replace modules with `vi.mock`, and the
+    // code under test keeps state at module level (the data root, the stores),
+    // so no file may be handed a module another one has already loaded.
+    isolate: true,
   },
 });
