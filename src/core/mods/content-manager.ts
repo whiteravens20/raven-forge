@@ -89,6 +89,7 @@ async function syncResourcePackSelection(profileId: string): Promise<void> {
   await applyResourcePackOrder(
     paths.profileGameDir(profileId),
     items.filter((p) => p.enabled !== false).map((p) => p.fileName),
+    items.map((p) => p.fileName),
   );
 }
 

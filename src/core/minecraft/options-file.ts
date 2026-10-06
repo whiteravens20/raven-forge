@@ -40,18 +40,18 @@ function packEntry(fileName: string): string {
  * which is the launcher's territory to decide about.
  *
  * The folder is created and filled by the launcher, and the content page is how
- * packs get in and out of it, so its list is the source of truth for what is
- * selected from there. Anything else in the line — `vanilla`, `mod_resources`,
- * a namespaced pack a mod contributes — belongs to the game or a mod and is
+ * packs get in and out of it, so its list is the source of truth for the packs
+ * it put there. Anything else in the line — `vanilla`, `mod_resources`, a
+ * namespaced pack a mod contributes — belongs to the game or a mod and is
  * copied through untouched.
- *
- * The cost of that rule is a zip copied into the folder by hand: it stays
- * installed, but the next launcher-side change unselects it. The alternative is
- * worse — a pack removed in the launcher would stay listed forever, still
- * winning over the packs below it until the player noticed.
  */
 function isFolderPack(entry: string): boolean {
   return entry.startsWith('file/') || entry.toLowerCase().endsWith('.zip');
+}
+
+/** The file a folder entry names: `file/Faithful.zip` and `Faithful.zip` alike. */
+function folderPackName(entry: string): string {
+  return entry.startsWith('file/') ? entry.slice('file/'.length) : entry;
 }
 
 /**
@@ -71,12 +71,23 @@ function isFolderPack(entry: string): boolean {
  * ones. Dropping them would silently unselect a modpack's own resources. See
  * {@link isFolderPack} for where that line is drawn.
  *
+ * So is a pack in the folder that the launcher did not put there: a zip the
+ * player dropped in and switched on in the game, or one a `.mrpack` carried in
+ * its overrides and selected in the `options.txt` it shipped. This runs at the
+ * end of every sync, which for a pack profile is every launch, and it used to
+ * take every folder entry it did not know out of the line — so such a pack was
+ * switched off again each time the game started. `handPlaced` names the ones
+ * that are really in the folder; an entry for a file that is gone still goes,
+ * which is what keeps a pack removed in the launcher from staying listed.
+ *
  * @param existing the current value, e.g. `["vanilla","mod_resources"]`, or null
  * @param orderedFileNames pack file names, highest priority first
+ * @param handPlaced files in the folder that are not in the launcher's list
  */
 export function buildResourcePacksValue(
   existing: string | null,
   orderedFileNames: string[],
+  handPlaced: ReadonlySet<string> = new Set(),
 ): string {
   let foreign: string[] = [];
   if (existing) {
@@ -85,7 +96,7 @@ export function buildResourcePacksValue(
       if (Array.isArray(parsed)) {
         foreign = parsed
           .filter((e): e is string => typeof e === 'string')
-          .filter((e) => !isFolderPack(e));
+          .filter((e) => !isFolderPack(e) || handPlaced.has(folderPackName(e)));
       }
     } catch {
       // A line we cannot parse is a line we must not silently discard the
@@ -152,16 +163,24 @@ async function editOptions(gameDir: string, edit: (body: string) => string): Pro
  * Point the profile's `options.txt` at these packs, in this order.
  *
  * @param orderedFileNames pack file names, highest priority first
+ * @param managedFileNames every pack the launcher's list holds, switched on or
+ *        not — whatever else is in `resourcepacks/` is the player's own, and
+ *        its place in the line is left as the game wrote it
  */
 export async function applyResourcePackOrder(
   gameDir: string,
   orderedFileNames: string[],
+  managedFileNames: string[] = orderedFileNames,
 ): Promise<void> {
+  const managed = new Set(managedFileNames);
+  const inFolder = await fs.readdir(path.join(gameDir, 'resourcepacks')).catch(() => []);
+  const handPlaced = new Set(inFolder.filter((name) => !managed.has(name)));
+
   await editOptions(gameDir, (body) =>
     writeOption(
       body,
       RESOURCE_PACKS_KEY,
-      buildResourcePacksValue(readOption(body, RESOURCE_PACKS_KEY), orderedFileNames),
+      buildResourcePacksValue(readOption(body, RESOURCE_PACKS_KEY), orderedFileNames, handPlaced),
     ),
   );
 }

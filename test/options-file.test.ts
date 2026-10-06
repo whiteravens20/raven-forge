@@ -63,6 +63,36 @@ describe('buildResourcePacksValue', () => {
     expect(JSON.parse(value)).toEqual(['vanilla', 'file/old.zip']);
   });
 
+  it('keeps a pack the player put in the folder and switched on in the game', () => {
+    // This runs before every launch of a pack profile. It used to take every
+    // folder entry it did not know out of the line, so a pack dropped into
+    // `resourcepacks/` by hand was switched off again each time the game started.
+    const value = buildResourcePacksValue(
+      '["vanilla","mod_resources","file/MyOwnPack.zip","file/pack-shipped.zip"]',
+      ['pack-shipped.zip'],
+      new Set(['MyOwnPack.zip']),
+    );
+    expect(JSON.parse(value)).toEqual([
+      'vanilla',
+      'mod_resources',
+      'file/MyOwnPack.zip',
+      'file/pack-shipped.zip',
+    ]);
+  });
+
+  it('still drops an entry for a file that is no longer in the folder', () => {
+    // Which is what a pack removed in the launcher is.
+    const value = buildResourcePacksValue('["vanilla","file/removed.zip"]', [], new Set());
+    expect(JSON.parse(value)).toEqual(['vanilla']);
+  });
+
+  it('does not keep a pack the launcher holds switched off', () => {
+    // It is in the folder, and it is not the player's: the launcher's list is
+    // what says whether it is on, so it is never passed as hand-placed.
+    const value = buildResourcePacksValue('["vanilla","file/off.zip"]', [], new Set());
+    expect(JSON.parse(value)).toEqual(['vanilla']);
+  });
+
   it('drops every managed pack when the list is emptied', () => {
     const value = buildResourcePacksValue('["vanilla","file/gone.zip","mod_resources"]', []);
     expect(JSON.parse(value)).toEqual(['vanilla', 'mod_resources']);
