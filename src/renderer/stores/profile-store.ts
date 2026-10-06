@@ -2,11 +2,21 @@
 
 import { create } from 'zustand';
 import type { IpcResult, Profile } from '@shared/ipc-types';
+import { t } from '../i18n';
+import { useNoticeStore } from './notice-store';
 
 const api = window.ravenforge;
 
 interface ProfileStore {
   profiles: Profile[];
+  /**
+   * False until the list has been asked for and answered once.
+   *
+   * An empty list before that is not "no profiles". The main process holds
+   * every answer until it has found its data, and on a slow disk that is long
+   * enough to read "You have no profiles yet" about a folder full of them.
+   */
+  loaded: boolean;
   selectedProfileId: string | null;
 
   load: () => Promise<void>;
@@ -58,23 +68,29 @@ function rememberSelection(profileId: string): void {
 
 export const useProfileStore = create<ProfileStore>((set, get) => ({
   profiles: [],
+  loaded: false,
   selectedProfileId: null,
   duplicating: new Set(),
   removing: new Set(),
 
   load: async () => {
     const result = await api.profiles.getAll();
-    if (result.success && result.data) {
-      const profiles = result.data;
-      set({ profiles });
-      // The one that was selected last time, when it is still there; the first
-      // otherwise. The launcher used to open on the first profile whatever had
-      // been played the night before.
-      if (!get().selectedProfileId && profiles.length > 0) {
-        const remembered = recallSelection();
-        const selected = profiles.find((p) => p.id === remembered) ?? profiles[0];
-        set({ selectedProfileId: selected.id });
-      }
+    if (!result.success || !result.data) {
+      // Said, and the list left as it was: profiles that could not be read are
+      // not profiles that are gone.
+      set({ loaded: true });
+      useNoticeStore.getState().show(result.error ?? t('profiles.loadFailed'));
+      return;
+    }
+    const profiles = result.data;
+    set({ profiles, loaded: true });
+    // The one that was selected last time, when it is still there; the first
+    // otherwise. The launcher used to open on the first profile whatever had
+    // been played the night before.
+    if (!get().selectedProfileId && profiles.length > 0) {
+      const remembered = recallSelection();
+      const selected = profiles.find((p) => p.id === remembered) ?? profiles[0];
+      set({ selectedProfileId: selected.id });
     }
   },
 

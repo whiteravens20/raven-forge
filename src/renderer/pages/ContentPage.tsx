@@ -51,6 +51,7 @@ type Kind = 'shaders' | 'resourcepacks';
  */
 export function ContentPage() {
   const profiles = useProfileStore((s) => s.profiles);
+  const profilesLoaded = useProfileStore((s) => s.loaded);
   const selectedId = useProfileStore((s) => s.selectedProfileId);
 
   const t = useT();
@@ -284,7 +285,7 @@ export function ContentPage() {
   if (!selectedProfile) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-rf-text-muted">
-        {t('content.pickProfile')}
+        {t(profilesLoaded ? 'content.pickProfile' : 'profiles.loading')}
       </div>
     );
   }

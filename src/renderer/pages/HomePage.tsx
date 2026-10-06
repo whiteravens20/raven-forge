@@ -35,11 +35,13 @@ function formatTime(timestamp: number, locale: string): string {
 
 export function HomePage() {
   const profiles = useProfileStore((s) => s.profiles);
+  const profilesLoaded = useProfileStore((s) => s.loaded);
   const selectedId = useProfileStore((s) => s.selectedProfileId);
   const selectProfile = useProfileStore((s) => s.select);
 
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
   const accounts = useAuthStore((s) => s.accounts);
+  const accountsLoaded = useAuthStore((s) => s.loaded);
 
   const news = useNewsStore((s) => s.news);
   const announcements = useNewsStore((s) => s.announcements);
@@ -237,7 +239,10 @@ export function HomePage() {
               </span>
             </p>
           ) : (
-            <p className="text-sm text-rf-warning">{t('home.notSignedIn')}</p>
+            // Only once the accounts have been read. Until then nobody knows,
+            // and a warning about an answer still on its way is a false alarm
+            // at every start.
+            accountsLoaded && <p className="text-sm text-rf-warning">{t('home.notSignedIn')}</p>
           )}
         </div>
 
@@ -259,7 +264,11 @@ export function HomePage() {
             </select>
           </div>
         ) : (
-          <p className="text-sm text-rf-text-muted">{t('home.noProfiles')}</p>
+          // Not said until the list has been read: "no profiles" about a list
+          // that is still on its way is the wrong thing to open on.
+          <p className="text-sm text-rf-text-muted">
+            {t(profilesLoaded ? 'home.noProfiles' : 'profiles.loading')}
+          </p>
         )}
 
         {/* Crash reporter */}

@@ -201,6 +201,8 @@ export const pl: Translations = {
     'Kopia ma te same mody, konfiguracje, shadery, paczki zasobów i światy co oryginał. Kopie zapasowe światów zostały przy oryginale.',
   'profiles.duplicateFailed': 'Nie udało się zduplikować profilu.',
   'profiles.deleteFailed': 'Nie udało się usunąć profilu.',
+  'profiles.loading': 'Wczytywanie profili…',
+  'profiles.loadFailed': 'Nie udało się odczytać listy profili.',
   'profiles.cancelSyncFailed':
     'Nic nie zostało zatrzymane. Synchronizacja mogła się właśnie kończyć.',
   'profiles.openFolder': 'Otwórz folder profilu',
@@ -548,6 +550,8 @@ export const pl: Translations = {
   'accounts.privacyLink': 'Co Raven Forge robi z moimi danymi?',
   'accounts.playerName': 'Nazwa gracza',
   'accounts.empty': 'Brak kont — zaloguj się powyżej',
+  'accounts.loading': 'Wczytywanie kont…',
+  'accounts.loadFailed': 'Nie udało się odczytać kont.',
   'accounts.active': '• aktywne',
   'accounts.setActive': 'Ustaw aktywne',
   'accounts.manage': 'Ustawienia konta',

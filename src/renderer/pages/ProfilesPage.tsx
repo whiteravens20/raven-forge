@@ -162,6 +162,7 @@ function profileToDraft(p: Profile): DraftProfile {
 
 export function ProfilesPage() {
   const profiles = useProfileStore((s) => s.profiles);
+  const profilesLoaded = useProfileStore((s) => s.loaded);
   const selectedId = useProfileStore((s) => s.selectedProfileId);
   const select = useProfileStore((s) => s.select);
   const createProfile = useProfileStore((s) => s.create);
@@ -554,7 +555,10 @@ export function ProfilesPage() {
               </span>
             </button>
           ))}
-          {profiles.length === 0 && orphans.length === 0 && (
+          {!profilesLoaded && (
+            <p className="p-4 text-sm text-rf-text-muted">{t('profiles.loading')}</p>
+          )}
+          {profilesLoaded && profiles.length === 0 && orphans.length === 0 && (
             <EmptyState
               kind="profiles"
               title={t('profiles.empty')}

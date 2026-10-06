@@ -61,6 +61,7 @@ function SkinHead({ url }: { url: string }) {
 
 export function AccountsPage() {
   const accounts = useAuthStore((s) => s.accounts);
+  const accountsLoaded = useAuthStore((s) => s.loaded);
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
   const isAuthenticating = useAuthStore((s) => s.isAuthenticating);
   const loginMicrosoft = useAuthStore((s) => s.loginMicrosoft);
@@ -174,7 +175,9 @@ export function AccountsPage() {
       {/* Account list */}
       <div className="space-y-2">
         {accounts.length === 0 ? (
-          <p className="py-8 text-center text-sm text-rf-text-muted">{t('accounts.empty')}</p>
+          <p className="py-8 text-center text-sm text-rf-text-muted">
+            {t(accountsLoaded ? 'accounts.empty' : 'accounts.loading')}
+          </p>
         ) : (
           accounts.map((account) => (
             <div

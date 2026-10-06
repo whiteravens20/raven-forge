@@ -87,3 +87,35 @@ describe('the selected profile', () => {
     expect(store.getState().selectedProfileId).toBe('b');
   });
 });
+
+describe('the profile list before it has been read', () => {
+  it('is not taken for an empty one', async () => {
+    // The main process holds its answers until it has found its data. Until
+    // then there is no list, which is not the same as a list of none.
+    let answer: (result: { success: true; data: unknown[] }) => void = () => {};
+    api
+      .call('profiles', 'getAll')
+      .mockReturnValue(new Promise((resolve) => (answer = resolve)) as never);
+    const store = await loadStore();
+
+    const loading = store.getState().load();
+    expect(store.getState().loaded).toBe(false);
+
+    answer({ success: true, data: [] });
+    await loading;
+    expect(store.getState().loaded).toBe(true);
+    expect(store.getState().profiles).toEqual([]);
+  });
+
+  it('keeps the profiles it has, and says so, when they cannot be read again', async () => {
+    const store = await loadStore();
+    await store.getState().load();
+    api.call('profiles', 'getAll').mockResolvedValue({ success: false, error: 'EIO: i/o error' });
+
+    await store.getState().load();
+
+    expect(store.getState().profiles).toHaveLength(3);
+    const { useNoticeStore } = await import('../src/renderer/stores/notice-store');
+    expect(useNoticeStore.getState().message).toBe('EIO: i/o error');
+  });
+});

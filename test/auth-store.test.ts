@@ -90,3 +90,40 @@ describe('signing out', () => {
     expect(store.getState().accounts).toHaveLength(2);
   });
 });
+
+describe('the accounts before they have been read', () => {
+  it('are not taken for nobody being signed in', async () => {
+    let answer: (result: unknown) => void = () => {};
+    api
+      .call('auth', 'getState')
+      .mockReturnValue(new Promise((resolve) => (answer = resolve)) as never);
+    const store = await loadStore();
+
+    const loading = store.getState().load();
+    expect(store.getState().loaded).toBe(false);
+
+    answer({ success: true, data: { accounts: [], activeAccountId: null } });
+    await loading;
+    expect(store.getState().loaded).toBe(true);
+  });
+
+  it('count as read once the main process has announced them itself', async () => {
+    // The silent refresh at launch tells the page who is signed in before the
+    // page has asked.
+    const store = await loadStore();
+    api.emit('auth:state-changed', { accounts: [{ id: 'a' }], activeAccountId: 'a' });
+    expect(store.getState().loaded).toBe(true);
+  });
+
+  it('keeps the accounts it has, and says so, when they cannot be read again', async () => {
+    const store = await loadStore();
+    await store.getState().load();
+    api.call('auth', 'getState').mockResolvedValue({ success: false, error: 'keyring is locked' });
+
+    await store.getState().load();
+
+    expect(store.getState().accounts).toHaveLength(2);
+    const { useNoticeStore } = await import('../src/renderer/stores/notice-store');
+    expect(useNoticeStore.getState().message).toBe('keyring is locked');
+  });
+});

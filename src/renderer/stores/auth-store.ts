@@ -2,6 +2,8 @@
 
 import { create } from 'zustand';
 import type { AuthState } from '@shared/ipc-types';
+import { t } from '../i18n';
+import { useNoticeStore } from './notice-store';
 
 const api = window.ravenforge;
 
@@ -14,6 +16,12 @@ const api = window.ravenforge;
 type AuthResult = Promise<string | null>;
 
 interface AuthStore extends AuthState {
+  /**
+   * False until the accounts have been asked for and answered once. Before
+   * that there is no telling whether anyone is signed in, and "not signed in"
+   * is the wrong thing to say about an answer that has not arrived.
+   */
+  loaded: boolean;
   /** A sign-in started from this window has not come back yet. */
   isAuthenticating: boolean;
   load: () => Promise<void>;
@@ -26,18 +34,25 @@ interface AuthStore extends AuthState {
 export const useAuthStore = create<AuthStore>((set, get) => ({
   accounts: [],
   activeAccountId: null,
+  loaded: false,
   isAuthenticating: false,
 
   load: async () => {
     const result = await api.auth.getState();
-    if (result.success && result.data) {
-      set({
-        accounts: result.data.accounts,
-        activeAccountId: result.data.activeAccountId,
-        credentialsInPlaintext: result.data.credentialsInPlaintext,
-        credentialsFile: result.data.credentialsFile,
-      });
+    if (!result.success || !result.data) {
+      // Said, and the list left as it was: accounts that could not be read are
+      // not accounts that were signed out.
+      set({ loaded: true });
+      useNoticeStore.getState().show(result.error ?? t('accounts.loadFailed'));
+      return;
     }
+    set({
+      accounts: result.data.accounts,
+      activeAccountId: result.data.activeAccountId,
+      credentialsInPlaintext: result.data.credentialsInPlaintext,
+      credentialsFile: result.data.credentialsFile,
+      loaded: true,
+    });
   },
 
   loginMicrosoft: async () => {
@@ -92,5 +107,6 @@ api.on('auth:state-changed', (state) => {
   useAuthStore.setState({
     accounts: state.accounts,
     activeAccountId: state.activeAccountId,
+    loaded: true,
   });
 });
