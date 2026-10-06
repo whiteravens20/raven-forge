@@ -9,6 +9,7 @@ import { paths } from '../config/paths';
 import { MOJANG_VERSION_MANIFEST } from '../../shared/constants';
 import { writeFileAtomic } from '../util/atomic-file';
 import type { VersionManifest, VersionMeta, VersionEntry } from './types';
+import { errorText } from '../util/error-text';
 
 const MANIFEST_CACHE_FILE = 'version_manifest_v2.json';
 const MANIFEST_MAX_AGE_MS = 10 * 60 * 1000; // 10 min
@@ -70,7 +71,7 @@ export async function getVersionManifest(): Promise<VersionManifest> {
   } catch (err) {
     const stale = onDisk?.manifest ?? cachedManifest;
     if (!stale) throw err;
-    log.warn(`Could not refresh the version manifest, using the copy on disk: ${String(err)}`);
+    log.warn(`Could not refresh the version manifest, using the copy on disk: ${errorText(err)}`);
     cachedManifest = stale;
     // Not for the full ten minutes: the network may be back long before then.
     cachedUntil = Date.now() + MANIFEST_RETRY_MS;
@@ -152,7 +153,7 @@ export async function getVersionMeta(versionId: string): Promise<VersionMeta> {
   } catch (err) {
     if (!cached) throw err;
     log.warn(
-      `Could not refresh the version meta for ${versionId}, using the copy on disk: ${String(err)}`,
+      `Could not refresh the version meta for ${versionId}, using the copy on disk: ${errorText(err)}`,
     );
     return cached.meta;
   }

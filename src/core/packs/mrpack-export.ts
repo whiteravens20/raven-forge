@@ -17,6 +17,7 @@ import type {
   MrpackExport,
   MrpackExportOptions,
 } from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 /**
  * Writing a profile out as a Modrinth modpack.
@@ -186,7 +187,9 @@ async function resolveDownloads(items: Candidate[]): Promise<Map<number, Modrint
       for (const index of hashes.get(hash) ?? []) resolved.set(index, file);
     }
   } catch (err) {
-    log.warn(`Could not reach Modrinth while exporting; bundling every file instead: ${err}`);
+    log.warn(
+      `Could not reach Modrinth while exporting; bundling every file instead: ${errorText(err)}`,
+    );
   }
 
   return resolved;

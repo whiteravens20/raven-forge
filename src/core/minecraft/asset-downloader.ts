@@ -18,6 +18,7 @@ import { emitProgress } from '../util/progress';
 import { getMojangOsName, rulesAllow } from './launch-args';
 import type { AssetIndex, DownloadInfo, Library, VersionMeta } from './types';
 import type { ProgressEvent, ProgressMessage } from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 // ── Hash verification ──────────────────────────────────────
 
@@ -109,7 +110,7 @@ async function downloadFile(
         throw new Error(`Failed to download ${url} after ${DOWNLOAD_ATTEMPTS} attempts: ${err}`, {
           cause: err,
         });
-      log.warn(`Download attempt ${attempt} failed for ${url}: ${err}`);
+      log.warn(`Download attempt ${attempt} failed for ${url}: ${errorText(err)}`);
     }
   }
 }

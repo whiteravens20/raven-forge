@@ -85,6 +85,7 @@ import {
 } from '../core/minecraft/game-launcher';
 import { getCachedVersionMeta, getVersionManifest } from '../core/minecraft/version-manifest';
 import { cancelJob, isCancellation } from '../core/util/cancellation';
+import { errorText } from '../core/util/error-text';
 import { machineMemoryMb } from '../core/util/machine-memory';
 import {
   loginMicrosoft,
@@ -133,9 +134,12 @@ function fail<T>(error: string, code?: IpcErrorCode, errorMessage?: ErrorMessage
  * an Error prepends. These strings are shown to the user verbatim, and
  * "Login failed: Error: Microsoft login is not configured" reads like a bug.
  */
-function reason(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+/**
+ * What a handler says went wrong: the error, and what was underneath it. A
+ * failed request is "fetch failed" whatever the reason, and the reason is the
+ * part somebody can act on.
+ */
+const reason = errorText;
 
 /**
  * `ipcMain.handle`, with the caller checked first.

@@ -48,6 +48,7 @@ import type {
   ProgressMessage,
   TrustedKey,
 } from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -243,7 +244,7 @@ export async function checkForPackUpdates(profileId: string): Promise<void> {
     // A check the player never asked for must not turn a working profile red.
     // Pressing Sync reports a real failure properly; this one only ever had
     // permission to deliver good news or none.
-    log.warn(`Update check failed for ${profile.name}: ${err}`);
+    log.warn(`Update check failed for ${profile.name}: ${errorText(err)}`);
   }
 }
 

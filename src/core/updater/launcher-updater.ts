@@ -6,6 +6,7 @@ import { log } from '../../main/logger';
 import { getMainWindow } from '../../main/window';
 import { abandonProgress, emitProgress } from '../util/progress';
 import type { UpdateCheck, UpdateInfo, UpdateUnsupportedReason } from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 /** The one bar the update download draws. */
 const UPDATE_OPERATION = 'launcher-update';
@@ -61,7 +62,7 @@ export function initUpdater(): void {
   });
 
   autoUpdater.on('error', (err) => {
-    log.warn(`Updater error: ${err.message}`);
+    log.warn(`Updater error: ${errorText(err)}`);
     // A download that died half-way reports nothing further, and its bar
     // would stay at whatever it had reached.
     abandonProgress(UPDATE_OPERATION);
@@ -122,7 +123,7 @@ export async function checkForUpdates(): Promise<UpdateCheck> {
     }
     return { status: 'available', currentVersion, update: pendingUpdate };
   } catch (err) {
-    log.warn(`Update check failed: ${err}`);
+    log.warn(`Update check failed: ${errorText(err)}`);
     return {
       status: 'failed',
       currentVersion,

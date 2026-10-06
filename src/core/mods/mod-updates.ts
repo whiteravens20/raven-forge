@@ -10,6 +10,7 @@ import { readLockFile, mutateLockFile, modFilePath } from './lock-file';
 import { getProjectTitle, getVersion, latestVersionsByHash, primaryFile } from './modrinth-api';
 import { downloadFor, installResolvedMod, installRequiredDependencies } from './mod-sync';
 import type { InstalledMod, ModUpdateResult, ModUpdateSummary } from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 /**
  * Keeping hand-installed mods current.
@@ -165,7 +166,7 @@ export async function updateMods(profileId: string, modIds: string[]): Promise<M
       log.info(`Updated ${name} to ${update.versionNumber} in profile ${profileId}`);
     } catch (err) {
       failed.push({ name: mod.name, error: err instanceof Error ? err.message : String(err) });
-      log.warn(`Failed to update ${mod.name} in profile ${profileId}: ${err}`);
+      log.warn(`Failed to update ${mod.name} in profile ${profileId}: ${errorText(err)}`);
     }
   }
 

@@ -8,6 +8,7 @@ import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
 import { getProjects } from './modrinth-api';
 import type { ProjectDetails } from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 /**
  * What a mod is, for the list of the ones a profile has.
@@ -113,7 +114,7 @@ export async function getProjectDetails(keys: string[]): Promise<Record<string, 
       // each other to the same file.
       await serializeByKey(CACHE_FILE, () => writeJsonAtomic(cacheFile(), known));
     } catch (err) {
-      log.warn(`Could not look up ${missing.length} project(s) on Modrinth: ${String(err)}`);
+      log.warn(`Could not look up ${missing.length} project(s) on Modrinth: ${errorText(err)}`);
     }
   }
 

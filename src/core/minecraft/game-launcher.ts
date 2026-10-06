@@ -52,6 +52,7 @@ import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
 import { applyProfileOptions, languageCodeFor } from './options-file';
 import { LaunchRefusedError } from './launch-errors';
+import { errorText } from '../util/error-text';
 
 // Track running processes by profileId
 const runningProcesses = new Map<string, ChildProcess>();
@@ -378,7 +379,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
       // Anything else means the sync did not finish — the pack unreachable with
       // nothing cached, a file that failed its hash. Starting with what is
       // installed beats refusing to start, and the log says why.
-      log.warn(`Could not sync ${stored.name} before launch: ${err}`);
+      log.warn(`Could not sync ${stored.name} before launch: ${errorText(err)}`);
     }
   }
 

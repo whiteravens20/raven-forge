@@ -4,6 +4,7 @@ import log from 'electron-log';
 import path from 'node:path';
 import { app } from 'electron';
 import { paths } from '../core/config/paths';
+import { withCauses } from '../core/util/error-text';
 
 /** The launcher's own log, inside `paths.logsDir`. */
 export const LOG_FILE = 'main.log';
@@ -22,6 +23,13 @@ export function initLogger(): void {
   log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
 
   log.transports.console.format = '[{h}:{i}:{s}] [{level}] {text}';
+
+  // An error is written as its stack, and a stack stops short of the cause —
+  // which for a failed request is the only part that says why.
+  log.hooks.push((message) => {
+    message.data = withCauses(message.data);
+    return message;
+  });
 
   // Replace global console with electron-log in production
   if (!app.isPackaged) {
