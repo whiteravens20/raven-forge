@@ -4,11 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  applyFullscreen,
-  applyLanguage,
-  buildResourcePacksValue,
-} from '../src/core/minecraft/options-file';
+import { applyProfileOptions, buildResourcePacksValue } from '../src/core/minecraft/options-file';
 
 /**
  * The one thing here that can be wrong quietly: the direction.
@@ -115,7 +111,7 @@ describe('buildResourcePacksValue', () => {
  * in the file the game reads is what makes the choice work in both directions,
  * and these cases are the ones where getting it wrong is silent.
  */
-describe('applyFullscreen', () => {
+describe('the full-screen choice of a profile', () => {
   let dir: string;
 
   beforeEach(async () => {
@@ -129,7 +125,7 @@ describe('applyFullscreen', () => {
   const read = () => fs.readFile(optionsFile(), 'utf-8');
 
   it('writes a one-line file for a profile that has never launched', async () => {
-    await applyFullscreen(dir, true);
+    await applyProfileOptions(dir, { fullscreen: true });
     expect(await read()).toBe('fullscreen:true\n');
   });
 
@@ -137,14 +133,14 @@ describe('applyFullscreen', () => {
     // F11 during play, then quit: the game leaves `fullscreen:true` behind. A
     // profile that says windowed has to be able to mean it a second time.
     await fs.writeFile(optionsFile(), 'version:3465\nfullscreen:true\nfov:0.0\n');
-    await applyFullscreen(dir, false);
+    await applyProfileOptions(dir, { fullscreen: false });
     expect(await read()).toBe('version:3465\nfullscreen:false\nfov:0.0\n');
   });
 
   it('leaves every other setting exactly as the player left it', async () => {
     const body = 'lang:pl_pl\nresourcePacks:["vanilla"]\nkey_key.attack:key.mouse.left\n';
     await fs.writeFile(optionsFile(), body);
-    await applyFullscreen(dir, true);
+    await applyProfileOptions(dir, { fullscreen: true });
     expect(await read()).toBe(body + 'fullscreen:true\n');
   });
 
@@ -152,7 +148,7 @@ describe('applyFullscreen', () => {
     await fs.writeFile(optionsFile(), 'fullscreen:true\n');
     const before = (await fs.stat(optionsFile())).mtimeMs;
     await new Promise((resolve) => setTimeout(resolve, 10));
-    await applyFullscreen(dir, true);
+    await applyProfileOptions(dir, { fullscreen: true });
     expect((await fs.stat(optionsFile())).mtimeMs).toBe(before);
   });
 });
@@ -163,7 +159,7 @@ describe('applyFullscreen', () => {
  * There is no launch argument for it, so a profile that names a language has
  * exactly one way to make the game use it.
  */
-describe('applyLanguage', () => {
+describe('the language of a profile', () => {
   let dir: string;
 
   beforeEach(async () => {
@@ -177,20 +173,78 @@ describe('applyLanguage', () => {
   const read = () => fs.readFile(optionsFile(), 'utf-8');
 
   it('gives a profile that has never launched its language from the first start', async () => {
-    await applyLanguage(dir, 'pl_pl');
+    await applyProfileOptions(dir, { language: 'pl_pl' });
     expect(await read()).toBe('lang:pl_pl\n');
   });
 
   it('replaces the language the last session left, and nothing else', async () => {
     await fs.writeFile(optionsFile(), 'version:3465\nlang:en_us\nfov:0.0\n');
-    await applyLanguage(dir, 'de_de');
+    await applyProfileOptions(dir, { language: 'de_de' });
     expect(await read()).toBe('version:3465\nlang:de_de\nfov:0.0\n');
   });
 
   it('does not rewrite a file that already says the same thing', async () => {
     await fs.writeFile(optionsFile(), 'lang:pl_pl\n');
     const before = (await fs.stat(optionsFile())).mtimeMs;
-    await applyLanguage(dir, 'pl_pl');
+    await applyProfileOptions(dir, { language: 'pl_pl' });
     expect((await fs.stat(optionsFile())).mtimeMs).toBe(before);
+  });
+});
+
+/**
+ * The file is the player's, written by the game, and on Windows it looks
+ * different from what the launcher would write by itself.
+ */
+describe('the file as the game leaves it', () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-options-file-'));
+  });
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  const optionsFile = () => path.join(dir, 'options.txt');
+  const read = () => fs.readFile(optionsFile(), 'utf-8');
+
+  it('is not rewritten when it has Windows line endings and already says so', async () => {
+    await fs.writeFile(optionsFile(), 'version:3465\r\nfullscreen:true\r\nlang:pl_pl\r\n');
+    const before = (await fs.stat(optionsFile())).mtimeMs;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await applyProfileOptions(dir, { fullscreen: true, language: 'pl_pl' });
+
+    expect((await fs.stat(optionsFile())).mtimeMs).toBe(before);
+  });
+
+  it('keeps its Windows line endings on every line when a value changes', async () => {
+    await fs.writeFile(optionsFile(), 'version:3465\r\nfullscreen:true\r\nfov:0.0\r\n');
+
+    await applyProfileOptions(dir, { fullscreen: false, language: 'pl_pl' });
+
+    expect(await read()).toBe('version:3465\r\nfullscreen:false\r\nfov:0.0\r\nlang:pl_pl\r\n');
+  });
+
+  it('gets both choices in one write', async () => {
+    await applyProfileOptions(dir, { fullscreen: true, language: 'pl_pl' });
+    expect(await read()).toBe('fullscreen:true\nlang:pl_pl\n');
+  });
+
+  it('is left alone by a profile that chooses nothing', async () => {
+    await applyProfileOptions(dir, {});
+    await expect(fs.access(optionsFile())).rejects.toThrow();
+  });
+
+  it('is not replaced when it could not be read', async () => {
+    // A folder where the file belongs is the portable way to make the read
+    // fail with something other than "not there". What used to follow was a
+    // one-line file renamed over the player's settings.
+    await fs.mkdir(optionsFile());
+
+    await expect(applyProfileOptions(dir, { fullscreen: true })).rejects.toThrow();
+
+    expect((await fs.stat(optionsFile())).isDirectory()).toBe(true);
+    expect(await fs.readdir(dir)).toEqual(['options.txt']);
   });
 });

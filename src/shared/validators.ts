@@ -199,9 +199,9 @@ export const profileSchema = z.object({
     .max(MAX_GAME_DIMENSION)
     .optional()
     .catch(undefined),
-  /** Unset means "whatever the game last did" — see `applyFullscreen`. */
+  /** Unset means "whatever the game last did" — see `applyProfileOptions`. */
   fullscreen: z.boolean().optional().catch(undefined),
-  /** Unset means "whatever the game is set to" — see `applyLanguage`. */
+  /** Unset means "whatever the game is set to" — see `applyProfileOptions`. */
   gameLanguage: z.string().regex(GAME_LANGUAGE_PATTERN).optional().catch(undefined),
   notes: z.string().optional(),
   lastPlayed: z.string().optional(),

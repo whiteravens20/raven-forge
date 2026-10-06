@@ -2,6 +2,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { writeFileAtomic } from '../util/atomic-file';
 
 /**
  * The three lines of `options.txt` this launcher writes.
@@ -111,9 +112,19 @@ export function buildResourcePacksValue(
   return JSON.stringify([...foreign, ...ours]);
 }
 
+/**
+ * The line ending the file already has. Minecraft on Windows writes CRLF, and a
+ * file read as if it were LF kept a `\r` on every value: a setting that had not
+ * changed never compared equal, so the file was rewritten at every launch, and
+ * the rewritten line lost its `\r` while the others kept theirs.
+ */
+function lineEnding(body: string): string {
+  return body.includes('\r\n') ? '\r\n' : '\n';
+}
+
 /** Extract the raw value of `key` from an options.txt body, or null. */
 function readOption(body: string, key: string): string | null {
-  for (const line of body.split('\n')) {
+  for (const line of body.split(/\r?\n/)) {
     if (line.startsWith(`${key}:`)) return line.slice(key.length + 1).trimEnd();
   }
   return null;
@@ -121,14 +132,15 @@ function readOption(body: string, key: string): string | null {
 
 /** Replace `key`'s line, or append it when the file does not have one yet. */
 function writeOption(body: string, key: string, value: string): string {
-  const lines = body.split('\n');
+  const eol = lineEnding(body);
+  const lines = body.split(/\r?\n/);
   const index = lines.findIndex((line) => line.startsWith(`${key}:`));
   if (index >= 0) {
     lines[index] = `${key}:${value}`;
-    return lines.join('\n');
+    return lines.join(eol);
   }
-  const trimmed = body.endsWith('\n') ? body.slice(0, -1) : body;
-  return trimmed === '' ? `${key}:${value}\n` : `${trimmed}\n${key}:${value}\n`;
+  const trimmed = body.endsWith(eol) ? body.slice(0, -eol.length) : body;
+  return trimmed === '' ? `${key}:${value}${eol}` : `${trimmed}${eol}${key}:${value}${eol}`;
 }
 
 /**
@@ -138,7 +150,12 @@ function writeOption(body: string, key: string, value: string): string {
  * copied through untouched, and the write goes to a temporary file first so a
  * crash mid-write cannot leave them with a truncated settings file. A profile
  * that has never been launched has no `options.txt` yet — one is created with
- * just the line being set, and Minecraft fills in the rest at its first save.
+ * just the lines being set, and Minecraft fills in the rest at its first save.
+ *
+ * Only a file that is not there counts as an empty one. Any failure to read
+ * used to: a file that was locked or unreadable for a moment was taken for a
+ * profile that had never been launched, and a one-line file was then renamed
+ * over every setting the player had.
  */
 async function editOptions(gameDir: string, edit: (body: string) => string): Promise<void> {
   const file = path.join(gameDir, 'options.txt');
@@ -146,17 +163,14 @@ async function editOptions(gameDir: string, edit: (body: string) => string): Pro
   let body = '';
   try {
     body = await fs.readFile(file, 'utf-8');
-  } catch {
-    /* never launched — a one-line file is a valid options.txt */
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
   }
 
   const next = edit(body);
   if (next === body) return;
 
-  await fs.mkdir(gameDir, { recursive: true });
-  const tmp = `${file}.tmp`;
-  await fs.writeFile(tmp, next, 'utf-8');
-  await fs.rename(tmp, file);
+  await writeFileAtomic(file, next);
 }
 
 /**
@@ -185,28 +199,37 @@ export async function applyResourcePackOrder(
   );
 }
 
+/** What a profile says about the game's own settings. Unset means "leave it". */
+export interface ProfileOptions {
+  fullscreen?: boolean;
+  /** A language code as the game spells it, `pl_pl`. */
+  language?: string;
+}
+
 /**
- * State the profile's full-screen choice in the file the game reads it from.
+ * State the profile's choices in the file the game reads them from.
  *
  * Called on every launch, so the profile's answer wins over whatever the last
  * session left behind — which is the whole point: F11 during play writes
  * `fullscreen:true` here on exit, and a profile that says "windowed" has to be
- * able to mean it a second time. A profile that says nothing is left alone, so
- * the game's own memory of what the player last did survives.
- */
-export async function applyFullscreen(gameDir: string, fullscreen: boolean): Promise<void> {
-  await editOptions(gameDir, (body) => writeOption(body, FULLSCREEN_KEY, String(fullscreen)));
-}
-
-/**
- * State the profile's language in the file the game reads it from.
+ * able to mean it a second time. The language has no other way in at all; there
+ * is no launch argument for it.
  *
- * The same contract as {@link applyFullscreen}: called on every launch for a
- * profile that names a language, so the profile's answer wins over a change
- * made in the game's own menu, and never called for one that names none, so
- * that change is then the player's to keep. A code the installed Minecraft
+ * A choice the profile does not make is left alone, so the game's own memory of
+ * what the player last did survives. A language code the installed Minecraft
  * version does not ship is not an error; the game falls back to English.
+ *
+ * Both in one pass over the file: they used to be two, each reading and writing
+ * the whole of it.
  */
-export async function applyLanguage(gameDir: string, code: string): Promise<void> {
-  await editOptions(gameDir, (body) => writeOption(body, LANGUAGE_KEY, code));
+export async function applyProfileOptions(gameDir: string, options: ProfileOptions): Promise<void> {
+  const { fullscreen, language } = options;
+  if (fullscreen === undefined && !language) return;
+
+  await editOptions(gameDir, (body) => {
+    let next = body;
+    if (fullscreen !== undefined) next = writeOption(next, FULLSCREEN_KEY, String(fullscreen));
+    if (language) next = writeOption(next, LANGUAGE_KEY, language);
+    return next;
+  });
 }

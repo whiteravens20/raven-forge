@@ -50,7 +50,7 @@ import {
 } from './launch-args';
 import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
-import { applyFullscreen, applyLanguage } from './options-file';
+import { applyProfileOptions } from './options-file';
 import { LaunchRefusedError } from './launch-errors';
 
 // Track running processes by profileId
@@ -578,12 +578,15 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   const finalArgs = [...jvmArgs, ...gameArgs];
 
   // Stated in options.txt rather than passed as `--fullscreen`, because that
-  // argument has no opposite. See `applyFullscreen`.
-  if (profile.fullscreen !== undefined) {
-    await applyFullscreen(gameDir, profile.fullscreen);
-  }
-  if (profile.gameLanguage) {
-    await applyLanguage(gameDir, profile.gameLanguage);
+  // argument has no opposite. See `applyProfileOptions`.
+  try {
+    await applyProfileOptions(gameDir, {
+      fullscreen: profile.fullscreen,
+      language: profile.gameLanguage,
+    });
+  } catch (err) {
+    // The game can still be started; it starts with what the file already says.
+    log.warn(`Could not write the game options of ${profile.name}: ${String(err)}`);
   }
 
   const javaBinary = await windowlessJava(java.path);
