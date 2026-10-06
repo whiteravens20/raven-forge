@@ -156,6 +156,32 @@ describe('listBackups', () => {
       '2026-01-01T00-00-01-000',
     ]);
   });
+  it('reads a copy’s size from its record instead of measuring the copy again', async () => {
+    // A copy does not change, and measuring one is a `stat` of every region
+    // file in it — which used to happen for every copy at every look.
+    await world('Home', 'home data');
+    const taken = await backupWorlds('p1', 'manual');
+    expect(taken.bytes).toBe('home data'.length);
+
+    // Whatever the folder holds now, the record is what is quoted.
+    await fs.writeFile(
+      path.join(root, 'backups', taken.id, 'saves', 'Home', 'extra'),
+      'x'.repeat(50),
+    );
+    expect((await listBackups('p1'))[0].bytes).toBe('home data'.length);
+  });
+
+  it('measures a copy made before sizes were recorded, once, and writes it down', async () => {
+    const id = '2026-01-01T00-00-01-000';
+    await existingBackup(id, 'manual');
+
+    expect((await listBackups('p1'))[0].bytes).toBe('old'.length);
+
+    const record = JSON.parse(
+      await fs.readFile(path.join(root, 'backups', id, 'backup.json'), 'utf-8'),
+    ) as { bytes?: number; reason: string };
+    expect(record).toMatchObject({ bytes: 3, reason: 'manual' });
+  });
 });
 
 describe('restoreBackup', () => {

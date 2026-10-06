@@ -70,6 +70,21 @@ async function worldsIn(savesDir: string): Promise<string[]> {
   }
 }
 
+/**
+ * What `backup.json` says about the copy it sits beside.
+ *
+ * The size is in it because the copy does not change, and finding it out means
+ * a `stat` of every region file of every world in it. It used to be found out
+ * again each time the list was shown — once per backup, on every visit to the
+ * profile, and once more whenever an old copy was to be pruned.
+ */
+interface BackupRecord {
+  createdAt: string;
+  reason: WorldBackupReason;
+  worlds: string[];
+  bytes?: number;
+}
+
 /** What this profile has that would be worth keeping. */
 export async function listWorlds(profileId: string): Promise<string[]> {
   return worldsIn(await savesDirFor(profileId));
@@ -92,12 +107,15 @@ export async function listBackups(profileId: string): Promise<WorldBackup[]> {
       .map(async (entry): Promise<WorldBackup | null> => {
         const dir = path.join(root, entry.name);
         try {
-          const meta = JSON.parse(await fs.readFile(path.join(dir, 'backup.json'), 'utf-8')) as {
-            createdAt: string;
-            reason: WorldBackupReason;
-            worlds: string[];
-          };
-          return { id: entry.name, ...meta, bytes: await directorySize(dir) };
+          const record = path.join(dir, 'backup.json');
+          const meta = JSON.parse(await fs.readFile(record, 'utf-8')) as BackupRecord;
+          if (typeof meta.bytes === 'number') return { id: entry.name, ...meta, bytes: meta.bytes };
+
+          // A backup from before the size was written down. Measured this once
+          // and noted, so that it is not measured again at every look.
+          const bytes = await directorySize(path.join(dir, 'saves'));
+          await writeJsonAtomic(record, { ...meta, bytes }).catch(() => undefined);
+          return { id: entry.name, ...meta, bytes };
         } catch {
           // A directory with no readable record is a half-written backup from a
           // crash. Listing it would offer a restore that cannot work.
@@ -178,16 +196,15 @@ async function copyWorldsAside(profileId: string, reason: WorldBackupReason): Pr
   await fs.mkdir(path.dirname(dir), { recursive: true });
   await fs.mkdir(dir);
 
+  let bytes: number;
   try {
     // Symlinks are copied as symlinks, not followed. A link in `saves/` points
     // outside the profile as often as not, and a backup that silently swallowed
     // whatever it aimed at would be a surprise in both directions.
     await fs.cp(savesDir, path.join(dir, 'saves'), { recursive: true });
-    await writeJsonAtomic(path.join(dir, 'backup.json'), {
-      createdAt: createdAt.toISOString(),
-      reason,
-      worlds,
-    });
+    bytes = await directorySize(path.join(dir, 'saves'));
+    const record: BackupRecord = { createdAt: createdAt.toISOString(), reason, worlds, bytes };
+    await writeJsonAtomic(path.join(dir, 'backup.json'), record);
   } catch (err) {
     // A partial copy that lists as a backup is the one outcome worth avoiding
     // entirely — it would be offered as a restore.
@@ -201,7 +218,7 @@ async function copyWorldsAside(profileId: string, reason: WorldBackupReason): Pr
     createdAt: createdAt.toISOString(),
     reason,
     worlds,
-    bytes: await directorySize(dir),
+    bytes,
   };
 }
 
