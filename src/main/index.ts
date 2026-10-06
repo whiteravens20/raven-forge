@@ -5,7 +5,7 @@ import { initLogger, log } from './logger';
 import { establishAppHome } from './home';
 import type { AppHome } from '../core/config/app-home';
 import { createMainWindow, getMainWindow } from './window';
-import { installContentSecurityPolicy } from './security';
+import { installContentSecurityPolicy, installPermissionPolicy } from './security';
 import { holdHandlersUntil, registerAllIpcHandlers } from './ipc-handlers';
 import { loadSettings } from '../core/config/settings-manager';
 import { ensureDataDirectories } from './init';
@@ -130,6 +130,7 @@ function registerAppLifecycle(home: AppHome): void {
     // CSP first regardless: it has to be installed before the very first
     // document, and handlers have to exist before the renderer can invoke one.
     installContentSecurityPolicy();
+    installPermissionPolicy();
     registerAllIpcHandlers();
 
     // Before anything fetches. The handlers wait for this, so the page's first

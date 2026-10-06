@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { session, type IpcMainInvokeEvent } from 'electron';
+import { session, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { log } from './logger';
 import { getMainWindow } from './window';
 
@@ -70,6 +70,28 @@ export function installContentSecurityPolicy(): void {
       },
     });
   });
+}
+
+/**
+ * Refuse every permission a page can ask the browser for, bar the one in use.
+ *
+ * Electron grants whatever is asked when nobody answers: camera, microphone,
+ * location, notifications. The launcher's own page asks for one thing, to put
+ * the log on the clipboard, and the Microsoft sign-in window — which loads
+ * pages that are not ours, in this same session — has no business with any.
+ */
+export function installPermissionPolicy(): void {
+  const granted = (contents: WebContents | null, permission: string): boolean =>
+    permission === 'clipboard-sanitized-write' &&
+    contents !== null &&
+    contents === getMainWindow()?.webContents;
+
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
+    callback(granted(contents, permission));
+  });
+  session.defaultSession.setPermissionCheckHandler((contents, permission) =>
+    granted(contents, permission),
+  );
 }
 
 /**
