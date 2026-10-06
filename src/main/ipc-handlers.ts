@@ -1,7 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { app, ipcMain, dialog, shell, type IpcMainInvokeEvent } from 'electron';
-import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { log, LOG_FILE } from './logger';
@@ -204,10 +203,7 @@ export function registerAllIpcHandlers(): void {
   handle('system:get-info', async () => {
     const info: SystemInfo = {
       launcherVersion: app.getVersion(),
-      platform: process.platform as SystemInfo['platform'],
-      arch: process.arch,
       totalMemoryMb: machineMemoryMb(),
-      freeMemoryMb: Math.round(os.freemem() / 1024 / 1024),
       dataDirectory: paths.root,
       crashReportsDirectory: paths.crashReportsDir,
     };

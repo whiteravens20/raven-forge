@@ -9,10 +9,7 @@ export interface SystemInfo {
    * read from the one place it is written, package.json.
    */
   launcherVersion: string;
-  platform: 'win32' | 'linux' | 'darwin';
-  arch: string;
   totalMemoryMb: number;
-  freeMemoryMb: number;
   dataDirectory: string;
   /** Where the crash reports land, so Settings can offer to open it. */
   crashReportsDirectory: string;
