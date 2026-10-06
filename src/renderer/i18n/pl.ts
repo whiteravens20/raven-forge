@@ -613,6 +613,7 @@ export const pl: Translations = {
   'settings.feedPlaceholder': 'https://twoj-serwer.com/api/{feed}.json',
   'settings.newsFeed': 'Adres kanału aktualności',
   'settings.feedInvalid': 'To nie jest poprawny adres URL. Zostaw puste, aby wyłączyć kanał.',
+  'settings.feedUnreadable': 'Przy ostatniej próbie nie udało się nic odczytać spod tego adresu.',
   'settings.announcementFeed': 'Adres kanału ogłoszeń',
   'settings.trustedKeysHint':
     'Klucz White Ravens jest wbudowany w launcher, dlatego paczki White Ravens są weryfikowane od pierwszego uruchomienia. Dopóki nie dodasz własnego klucza, launcher pokazuje wynik weryfikacji, ale niczego nie blokuje. Dodanie klucza włącza wymuszanie: instalowane będą wyłącznie podpisane manifesty, które da się zweryfikować.',

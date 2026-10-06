@@ -11,14 +11,14 @@ interface NewsStore {
   dismissedIds: Set<string>;
   loading: boolean;
   /**
-   * Set when the last attempt at either feed failed.
+   * Set when the last attempt at that feed failed.
    *
-   * One flag for both because one button refreshes both, and that button is
-   * where the page reports it. Whichever half failed, something the user asked
-   * for did not happen, and saying nothing is how a dead feed URL used to pass
-   * for a slow news week.
+   * Saying nothing is how a dead feed address used to pass for a slow news
+   * week. One flag each, because the two addresses are typed into two fields
+   * and the one that is wrong is the one to be told about.
    */
-  feedError: boolean;
+  newsFailed: boolean;
+  announcementsFailed: boolean;
   /**
    * How the last press of the refresh button ended, or null before the first.
    *
@@ -46,7 +46,8 @@ export const useNewsStore = create<NewsStore>((set, get) => ({
     JSON.parse(localStorage.getItem('rf-dismissed-announcements') ?? '[]') as string[],
   ),
   loading: false,
-  feedError: false,
+  newsFailed: false,
+  announcementsFailed: false,
   lastRefresh: null,
 
   load: async () => {
@@ -55,7 +56,8 @@ export const useNewsStore = create<NewsStore>((set, get) => ({
     set({
       news: newsRes.data?.items ?? [],
       announcements: annRes.data?.items ?? [],
-      feedError: failed(newsRes) || failed(annRes),
+      newsFailed: failed(newsRes),
+      announcementsFailed: failed(annRes),
       loading: false,
     });
   },
@@ -91,25 +93,24 @@ async function runRefresh(
   set: (partial: Partial<NewsStore>) => void,
   get: () => NewsStore,
 ): Promise<void> {
-  {
-    set({ loading: true });
-    // The two feeds number their entries independently, so an id only means
-    // something together with the feed it came from.
-    const knownNews = new Set(get().news.map((item) => item.id));
-    const knownAnnouncements = new Set(get().announcements.map((item) => item.id));
-    const [newsRes, annRes] = await Promise.all([api.news.refresh(), api.announcements.refresh()]);
-    const added =
-      (newsRes.data?.items ?? []).filter((item) => !knownNews.has(item.id)).length +
-      (annRes.data?.items ?? []).filter((item) => !knownAnnouncements.has(item.id)).length;
-    set({
-      // A failed fetch still carries the last good items, so this assigns rather
-      // than preserves. The guard is for the call itself failing, which carries
-      // nothing at all — and then what is on screen is the best we have.
-      ...(newsRes.data ? { news: newsRes.data.items } : {}),
-      ...(annRes.data ? { announcements: annRes.data.items } : {}),
-      feedError: failed(newsRes) || failed(annRes),
-      lastRefresh: { at: Date.now(), added },
-      loading: false,
-    });
-  }
+  set({ loading: true });
+  // The two feeds number their entries independently, so an id only means
+  // something together with the feed it came from.
+  const knownNews = new Set(get().news.map((item) => item.id));
+  const knownAnnouncements = new Set(get().announcements.map((item) => item.id));
+  const [newsRes, annRes] = await Promise.all([api.news.refresh(), api.announcements.refresh()]);
+  const added =
+    (newsRes.data?.items ?? []).filter((item) => !knownNews.has(item.id)).length +
+    (annRes.data?.items ?? []).filter((item) => !knownAnnouncements.has(item.id)).length;
+  set({
+    // A failed fetch still carries the last good items, so this assigns rather
+    // than preserves. The guard is for the call itself failing, which carries
+    // nothing at all — and then what is on screen is the best we have.
+    ...(newsRes.data ? { news: newsRes.data.items } : {}),
+    ...(annRes.data ? { announcements: annRes.data.items } : {}),
+    newsFailed: failed(newsRes),
+    announcementsFailed: failed(annRes),
+    lastRefresh: { at: Date.now(), added },
+    loading: false,
+  });
 }

@@ -580,6 +580,7 @@ export const en = {
   'settings.feedPlaceholder': 'https://your-server.com/api/{feed}.json',
   'settings.newsFeed': 'News feed URL',
   'settings.feedInvalid': 'Not a valid URL. Leave it empty to turn the feed off.',
+  'settings.feedUnreadable': 'Nothing could be read from this address the last time it was tried.',
   'settings.announcementFeed': 'Announcement feed URL',
   'settings.trustedKeysHint':
     'The White Ravens key is built into the launcher, which is why White Ravens packs verify on a fresh install. Until you add a key of your own the launcher reports what it verified but blocks nothing. Adding one switches enforcement on: only a signed manifest that verifies is installed.',

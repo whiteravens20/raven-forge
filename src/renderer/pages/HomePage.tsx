@@ -46,7 +46,7 @@ export function HomePage() {
   const dismissedIds = useNewsStore((s) => s.dismissedIds);
   const dismiss = useNewsStore((s) => s.dismiss);
   const refreshNews = useNewsStore((s) => s.refresh);
-  const feedError = useNewsStore((s) => s.feedError);
+  const feedError = useNewsStore((s) => s.newsFailed || s.announcementsFailed);
   const newsLoading = useNewsStore((s) => s.loading);
   const lastRefresh = useNewsStore((s) => s.lastRefresh);
 

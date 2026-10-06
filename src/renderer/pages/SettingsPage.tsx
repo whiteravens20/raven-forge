@@ -59,6 +59,8 @@ export function SettingsPage() {
   const addTrustedKey = useSettingsStore((s) => s.addTrustedKey);
   const removeTrustedKey = useSettingsStore((s) => s.removeTrustedKey);
   const refreshFeeds = useNewsStore((s) => s.refresh);
+  const newsFailed = useNewsStore((s) => s.newsFailed);
+  const announcementsFailed = useNewsStore((s) => s.announcementsFailed);
 
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyValue, setNewKeyValue] = useState('');
@@ -191,6 +193,9 @@ export function SettingsPage() {
           value={settings.newsFeedUrl ?? ''}
           placeholder={t('settings.feedPlaceholder', { feed: 'news' })}
           invalidMessage={t('settings.feedInvalid')}
+          // An address can be a perfectly good one and still lead nowhere. That
+          // was only ever said on the Home page, a screen away from the field.
+          warning={newsFailed && settings.newsFeedUrl ? t('settings.feedUnreadable') : undefined}
           onCommit={async (v) => {
             const saved = await save({ newsFeedUrl: v });
             if (saved) await refreshFeeds();
@@ -202,6 +207,11 @@ export function SettingsPage() {
           value={settings.announcementFeedUrl ?? ''}
           placeholder={t('settings.feedPlaceholder', { feed: 'announcements' })}
           invalidMessage={t('settings.feedInvalid')}
+          warning={
+            announcementsFailed && settings.announcementFeedUrl
+              ? t('settings.feedUnreadable')
+              : undefined
+          }
           onCommit={async (v) => {
             const saved = await save({ announcementFeedUrl: v });
             if (saved) await refreshFeeds();
@@ -368,6 +378,7 @@ function TextSetting({
   label,
   value,
   invalidMessage,
+  warning,
   onCommit,
   ...inputProps
 }: {
@@ -375,6 +386,8 @@ function TextSetting({
   value: string;
   /** Shown when the main process refuses the value. */
   invalidMessage: string;
+  /** Something about the stored value worth knowing, which is not a refusal. */
+  warning?: string;
   /** `false` if the value was rejected. */
   onCommit: (value: string) => Promise<boolean>;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
@@ -400,19 +413,23 @@ function TextSetting({
   };
 
   return (
-    <Input
-      label={label}
-      value={draft}
-      error={error ?? undefined}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => void commit()}
-      // Enter is how people finish typing into a single field; without this it
-      // does nothing at all and the value looks unsaved.
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-      }}
-      {...inputProps}
-    />
+    <div className="space-y-1">
+      <Input
+        label={label}
+        value={draft}
+        error={error ?? undefined}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void commit()}
+        // Enter is how people finish typing into a single field; without this
+        // it does nothing at all and the value looks unsaved.
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
+        {...inputProps}
+      />
+      {/* About what is stored, so not while the field holds something else. */}
+      {warning && !error && draft === value && <p className="text-xs text-rf-warning">{warning}</p>}
+    </div>
   );
 }
 
