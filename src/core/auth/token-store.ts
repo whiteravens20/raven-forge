@@ -82,6 +82,17 @@ function warnFallback(): void {
  * inside its turn. Two readers finding the file broken at once would both move
  * it aside, and the second would move whatever a save had put there since.
  */
+/**
+ * An account as it is kept: these fields, and nothing else the file may hold.
+ *
+ * The file used to date each sign-in as well. Nothing ever read that, so it is
+ * no longer written — and taking only what is named here is what makes the next
+ * write leave it out of a file that still has it.
+ */
+function asKept({ id, uuid, username, type, skinUrl }: MinecraftAccount): MinecraftAccount {
+  return { id, uuid, username, type, ...(skinUrl === undefined ? {} : { skinUrl }) };
+}
+
 function readRaw(): Promise<AuthStoreData> {
   const file = getAuthPath();
   return serializeByKey(`${file}:read`, async () => {
@@ -109,7 +120,7 @@ function readRaw(): Promise<AuthStoreData> {
 
     const stored = parsed as Partial<AuthStoreData>;
     return {
-      accounts: stored.accounts ?? [],
+      accounts: (stored.accounts ?? []).map(asKept),
       activeAccountId: stored.activeAccountId ?? null,
       refreshTokens: stored.refreshTokens ?? {},
       mcSessions: stored.mcSessions,

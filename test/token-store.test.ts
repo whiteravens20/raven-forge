@@ -205,6 +205,24 @@ describe('the account list', () => {
     expect((await store.getAuthState()).activeAccountId).toBe('a1');
   });
 
+  it('stops keeping the date of the last sign-in, which an older file still has', async () => {
+    // Nothing ever read it. The privacy policy lists what this file holds, and
+    // a file that goes on holding more than that makes the list wrong.
+    await fs.writeFile(
+      authFile(),
+      JSON.stringify({
+        accounts: [{ ...account('a1'), lastAuthenticated: '2026-08-01T10:00:00.000Z' }],
+        activeAccountId: 'a1',
+        refreshTokens: {},
+      }),
+    );
+    const store = await loadModule();
+
+    expect((await store.getAuthState()).accounts).toEqual([account('a1')]);
+    await store.saveAccount(account('a2'));
+    expect(JSON.stringify(await readAuth())).not.toContain('lastAuthenticated');
+  });
+
   it('updates an account in place rather than adding it twice', async () => {
     const store = await loadModule();
     await store.saveAccount(account('a1', 'Old'));
