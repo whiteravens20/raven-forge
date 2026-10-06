@@ -4,10 +4,15 @@ import { describe, it, expect } from 'vitest';
 import {
   getMojangOsName,
   ruleMatches,
+  rulesAllow,
   resolveConditionalArgs,
   substituteVars,
+  type RuleHost,
 } from '../src/core/minecraft/launch-args';
 import type { ConditionalArg } from '../src/core/minecraft/types';
+
+const linux: RuleHost = { osName: 'linux', arch: 'x64' };
+const osx: RuleHost = { osName: 'osx', arch: 'arm64' };
 
 describe('getMojangOsName', () => {
   it('maps Node platform names to Mojang ones', () => {
@@ -23,12 +28,12 @@ describe('getMojangOsName', () => {
 
 describe('ruleMatches', () => {
   it('matches a rule with no conditions', () => {
-    expect(ruleMatches({ action: 'allow' }, {}, 'linux')).toBe(true);
+    expect(ruleMatches({ action: 'allow' }, {}, linux)).toBe(true);
   });
 
   it('matches on os name', () => {
-    expect(ruleMatches({ action: 'allow', os: { name: 'osx' } }, {}, 'osx')).toBe(true);
-    expect(ruleMatches({ action: 'allow', os: { name: 'osx' } }, {}, 'linux')).toBe(false);
+    expect(ruleMatches({ action: 'allow', os: { name: 'osx' } }, {}, osx)).toBe(true);
+    expect(ruleMatches({ action: 'allow', os: { name: 'osx' } }, {}, linux)).toBe(false);
   });
 
   it('requires every feature condition to hold', () => {
@@ -36,10 +41,10 @@ describe('ruleMatches', () => {
       action: 'allow' as const,
       features: { has_custom_resolution: true, is_demo_user: false },
     };
-    expect(ruleMatches(rule, { has_custom_resolution: true, is_demo_user: false }, 'linux')).toBe(
+    expect(ruleMatches(rule, { has_custom_resolution: true, is_demo_user: false }, linux)).toBe(
       true,
     );
-    expect(ruleMatches(rule, { has_custom_resolution: false, is_demo_user: false }, 'linux')).toBe(
+    expect(ruleMatches(rule, { has_custom_resolution: false, is_demo_user: false }, linux)).toBe(
       false,
     );
   });
@@ -48,16 +53,40 @@ describe('ruleMatches', () => {
     // Mojang adds feature flags over time. An unknown one defaulting to "true"
     // would switch on arguments for a mode the launcher does not implement.
     const requiresUnknown = { action: 'allow' as const, features: { is_quick_play_realms: true } };
-    expect(ruleMatches(requiresUnknown, {}, 'linux')).toBe(false);
+    expect(ruleMatches(requiresUnknown, {}, linux)).toBe(false);
 
     const forbidsUnknown = { action: 'allow' as const, features: { is_quick_play_realms: false } };
-    expect(ruleMatches(forbidsUnknown, {}, 'linux')).toBe(true);
+    expect(ruleMatches(forbidsUnknown, {}, linux)).toBe(true);
+  });
+});
+
+describe('rulesAllow', () => {
+  it('reads a processor condition instead of taking it as "any"', () => {
+    // The one Mojang ships: a thread stack size for 32-bit Windows, which used
+    // to land on every command line.
+    const only32bit = [{ action: 'allow' as const, os: { arch: 'x86' } }];
+    expect(rulesAllow(only32bit, {}, linux)).toBe(false);
+    expect(rulesAllow(only32bit, {}, { osName: 'windows', arch: 'x86' })).toBe(true);
+  });
+
+  it('lets a later rule veto an earlier one, as a library list does', () => {
+    // 1.16.5 names LWJGL this way: for everything, then not for macOS.
+    const rules = [
+      { action: 'allow' as const },
+      { action: 'disallow' as const, os: { name: 'osx' } },
+    ];
+    expect(rulesAllow(rules, {}, linux)).toBe(true);
+    expect(rulesAllow(rules, {}, osx)).toBe(false);
+  });
+
+  it('allows nothing when no rule matches', () => {
+    expect(rulesAllow([{ action: 'allow', os: { name: 'osx' } }], {}, linux)).toBe(false);
   });
 });
 
 describe('resolveConditionalArgs', () => {
   it('passes plain strings through untouched', () => {
-    expect(resolveConditionalArgs(['--username', '${auth_player_name}'], {}, 'linux')).toEqual([
+    expect(resolveConditionalArgs(['--username', '${auth_player_name}'], {}, linux)).toEqual([
       '--username',
       '${auth_player_name}',
     ]);
@@ -68,8 +97,8 @@ describe('resolveConditionalArgs', () => {
       rules: [{ action: 'allow', os: { name: 'osx' } }],
       value: '-XstartOnFirstThread',
     };
-    expect(resolveConditionalArgs([arg], {}, 'linux')).toEqual([]);
-    expect(resolveConditionalArgs([arg], {}, 'osx')).toEqual(['-XstartOnFirstThread']);
+    expect(resolveConditionalArgs([arg], {}, linux)).toEqual([]);
+    expect(resolveConditionalArgs([arg], {}, osx)).toEqual(['-XstartOnFirstThread']);
   });
 
   it('flattens an array value', () => {
@@ -77,7 +106,7 @@ describe('resolveConditionalArgs', () => {
       rules: [{ action: 'allow', features: { has_custom_resolution: true } }],
       value: ['--width', '${resolution_width}', '--height', '${resolution_height}'],
     };
-    expect(resolveConditionalArgs([arg], { has_custom_resolution: true }, 'linux')).toEqual([
+    expect(resolveConditionalArgs([arg], { has_custom_resolution: true }, linux)).toEqual([
       '--width',
       '${resolution_width}',
       '--height',
@@ -91,8 +120,8 @@ describe('resolveConditionalArgs', () => {
       rules: [{ action: 'allow' }, { action: 'disallow', os: { name: 'osx' } }],
       value: '-Dfoo=bar',
     };
-    expect(resolveConditionalArgs([arg], {}, 'linux')).toEqual(['-Dfoo=bar']);
-    expect(resolveConditionalArgs([arg], {}, 'osx')).toEqual([]);
+    expect(resolveConditionalArgs([arg], {}, linux)).toEqual(['-Dfoo=bar']);
+    expect(resolveConditionalArgs([arg], {}, osx)).toEqual([]);
   });
 
   it('ignores a non-matching disallow rather than treating it as an allow', () => {
@@ -100,7 +129,7 @@ describe('resolveConditionalArgs', () => {
       rules: [{ action: 'disallow', os: { name: 'windows' } }],
       value: '-Dfoo=bar',
     };
-    expect(resolveConditionalArgs([arg], {}, 'linux')).toEqual([]);
+    expect(resolveConditionalArgs([arg], {}, linux)).toEqual([]);
   });
 });
 

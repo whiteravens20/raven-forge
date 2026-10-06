@@ -13,7 +13,7 @@ import { MOJANG_RESOURCES } from '../../shared/constants';
 import { hashFile } from '../mods/integrity';
 import { getSettings } from '../config/settings-manager';
 import { emitProgress } from '../util/progress';
-import { getMojangOsName } from './launch-args';
+import { getMojangOsName, rulesAllow } from './launch-args';
 import type { AssetIndex, DownloadInfo, Library, VersionMeta } from './types';
 import type { ProgressEvent, ProgressMessage } from '../../shared/ipc-types';
 
@@ -242,15 +242,9 @@ export async function ensureClientJar(
 
 // ── Download libraries ─────────────────────────────────────
 
+/** A library with no rules is for everyone; with rules, they decide. */
 function shouldIncludeLibrary(lib: Library): boolean {
-  if (!lib.rules) return true;
-  let allowed = false;
-  for (const rule of lib.rules) {
-    const osMatch = !rule.os || rule.os.name === getMojangOsName();
-    if (rule.action === 'allow' && osMatch) allowed = true;
-    if (rule.action === 'disallow' && osMatch) allowed = false;
-  }
-  return allowed;
+  return !lib.rules || rulesAllow(lib.rules);
 }
 
 function emitAssetProgress(event: ProgressEvent): void {

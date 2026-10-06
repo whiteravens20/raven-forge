@@ -56,23 +56,64 @@ export function getMojangOsName(platform: NodeJS.Platform = process.platform): s
   }
 }
 
-/** Every condition on a rule must hold; an unknown feature is off, not ignored. */
+/** Mojang's names for the processor, as its rules spell them. */
+function mojangArch(arch: string = process.arch): string {
+  return arch === 'ia32' ? 'x86' : arch;
+}
+
+/** The machine a rule is asked about. The default is this one. */
+export interface RuleHost {
+  osName: string;
+  arch: string;
+}
+
+const thisHost = (): RuleHost => ({ osName: getMojangOsName(), arch: mojangArch() });
+
+/**
+ * Every condition on a rule must hold; an unknown feature is off, not ignored.
+ *
+ * `os.version` is the one condition not evaluated. Mojang has used two patterns
+ * for it: `^10\.` on Windows, which holds on every Windows this launcher runs
+ * on, and one for OS X 10.5. Evaluating it would mean compiling a pattern that
+ * arrives as JSON off the network, for an answer that cannot differ.
+ */
 export function ruleMatches(
   rule: Rule,
   features: Record<string, boolean>,
-  osName: string = getMojangOsName(),
+  host: RuleHost = thisHost(),
 ): boolean {
-  if (rule.os?.name && rule.os.name !== osName) return false;
+  if (rule.os?.name && rule.os.name !== host.osName) return false;
+  // Read as "any processor" before this, so the `-Xss1M` meant for 32-bit
+  // Windows went onto every command line.
+  if (rule.os?.arch && rule.os.arch !== host.arch) return false;
   for (const [name, required] of Object.entries(rule.features ?? {})) {
     if ((features[name] ?? false) !== required) return false;
   }
   return true;
 }
 
+/**
+ * Whether a list of rules lets something through: an argument, or a library.
+ *
+ * Later matching rules override earlier ones, so a disallow can veto; nothing
+ * matching at all means no.
+ */
+export function rulesAllow(
+  rules: Rule[],
+  features: Record<string, boolean> = {},
+  host: RuleHost = thisHost(),
+): boolean {
+  let allowed = false;
+  for (const rule of rules) {
+    if (ruleMatches(rule, features, host)) allowed = rule.action === 'allow';
+  }
+  return allowed;
+}
+
 export function resolveConditionalArgs(
   args: Array<string | ConditionalArg>,
   features: Record<string, boolean>,
-  osName: string = getMojangOsName(),
+  host: RuleHost = thisHost(),
 ): string[] {
   const result: string[] = [];
   for (const arg of args) {
@@ -80,12 +121,7 @@ export function resolveConditionalArgs(
       result.push(arg);
       continue;
     }
-    // Later matching rules override earlier ones, so a disallow can veto.
-    let allowed = false;
-    for (const rule of arg.rules) {
-      if (ruleMatches(rule, features, osName)) allowed = rule.action === 'allow';
-    }
-    if (allowed) {
+    if (rulesAllow(arg.rules, features, host)) {
       if (Array.isArray(arg.value)) result.push(...arg.value);
       else result.push(arg.value);
     }
