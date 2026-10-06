@@ -19,8 +19,20 @@ import type { ProgressEvent, ProgressMessage } from '../../shared/ipc-types';
 
 // ── Hash verification ──────────────────────────────────────
 
-async function sha1File(filePath: string): Promise<string> {
-  return hashFile(filePath, 'sha1');
+/** How the files a launch needs are checked, and whether the check can be called off. */
+export interface GameFileOptions {
+  signal?: AbortSignal;
+  /**
+   * Hash every file, instead of taking one of the right size as the right file.
+   *
+   * Off for an ordinary launch. Nothing reaches its final name here except by a
+   * rename after its hash was checked, so a file of the declared size is the
+   * file that was verified when it arrived — and reading all of it again came
+   * to 400 MB of SHA-1 over four thousand assets on every Play, seconds on a
+   * warm disk and far longer on a cold one. What size cannot see is a file that
+   * rotted in place, so the launch that follows a crash asks for this.
+   */
+  thorough?: boolean;
 }
 
 /**
@@ -29,23 +41,24 @@ async function sha1File(filePath: string): Promise<string> {
  * With no published sha1 or size — which is the case for a library named only
  * by Maven coordinates — this can do no better than "a file exists". That is
  * sound only because `downloadFile` never puts a partial file at this path: it
- * receives into a `.part` beside it and renames on success, so anything sitting
- * here arrived complete. Before that, a download killed halfway left a truncated
- * jar which this then accepted for good, and the profile went on failing to
- * launch with a corrupt loader library that nothing would replace.
+ * is received beside it and renamed on success, so anything sitting here arrived
+ * complete. Before that, a download killed halfway left a truncated jar which
+ * this then accepted for good, and the profile went on failing to launch with a
+ * corrupt loader library that nothing would replace.
  */
 async function fileExistsAndValid(
   filePath: string,
-  expectedSha1?: string,
-  expectedSize?: number,
+  expectedSha1: string | undefined,
+  expectedSize: number | undefined,
+  thorough: boolean,
 ): Promise<boolean> {
   try {
     const stat = await fs.stat(filePath);
-    if (expectedSize !== undefined && stat.size !== expectedSize) return false;
-    if (expectedSha1) {
-      const hash = await sha1File(filePath);
-      return hash === expectedSha1;
+    if (expectedSize !== undefined) {
+      if (stat.size !== expectedSize) return false;
+      if (!thorough) return true;
     }
+    if (expectedSha1) return (await hashFile(filePath, 'sha1')) === expectedSha1;
     return true;
   } catch {
     return false;
@@ -54,57 +67,44 @@ async function fileExistsAndValid(
 
 // ── Download with retry ────────────────────────────────────
 
+const DOWNLOAD_ATTEMPTS = 3;
+
 /**
  * Fetch one game file, retrying, and never leave a partial one behind.
  *
  * The transfer itself is `downloadToFile`, which is the launcher's one download
  * policy: a stall timeout that resets on every chunk, backpressure by awaiting
- * each write, and the destination removed on any failure at all. This used to be
- * a second implementation with an absolute `AbortSignal.timeout(60_000)`, and
- * that is the mistake `download.ts` already documents at length — the signal
- * governs the body stream, so the 26 MB client jar was simply unfetchable below
- * about 3.5 Mbit/s, three identical times in a row.
- *
- * The cleanup matters as much. The old final attempt threw without deleting, so
- * a truncated file stayed on disk; the next launch saw a library with no
- * published sha1 or size, found *a* file there, and called it installed for
- * good.
+ * each write, the body received beside the destination and hashed as it is
+ * written, and the destination given its name only once that hash is right.
+ * This used to be a second implementation with an absolute
+ * `AbortSignal.timeout(60_000)`, and that is the mistake `download.ts` already
+ * documents at length — the signal governs the body stream, so the 26 MB client
+ * jar was simply unfetchable below about 3.5 Mbit/s, three identical times in a
+ * row.
  */
 async function downloadFile(
   url: string,
   dest: string,
-  sha1?: string,
-  retries = 3,
-  signal?: AbortSignal,
+  sha1: string | undefined,
+  signal: AbortSignal | undefined,
 ): Promise<void> {
-  // Received beside the target and renamed onto it, so the destination only ever
-  // exists complete. `rename` within a directory is atomic, and a process killed
-  // mid-transfer leaves a `.part` that the next run overwrites rather than a
-  // short file that `fileExistsAndValid` would accept as installed.
-  const part = `${dest}.part`;
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt++) {
     throwIfCancelled(signal, 'Download');
     try {
       // Libraries and natives are loaded straight into the JVM, so the bytes
-      // come down https; the published sha1 (when there is one) is checked next.
-      await downloadToFile(url, part, { signal, secure: true });
-
-      if (sha1) {
-        const hash = await sha1File(part);
-        if (hash !== sha1) throw new Error(`SHA1 mismatch: expected ${sha1}, got ${hash}`);
-      }
-
-      await fs.rename(part, dest);
-      return; // success
+      // come down https and are held to the published sha1 when there is one.
+      await downloadToFile(url, dest, {
+        signal,
+        secure: true,
+        verify: sha1 ? { hashes: { sha1 }, label: path.basename(dest) } : undefined,
+      });
+      return;
     } catch (err) {
-      // Whatever went wrong, nothing half-written survives this function.
-      await fs.rm(part, { force: true });
       // A cancelled job must not be retried — that would keep downloading for
       // another three rounds after the user asked us to stop.
       if (signal?.aborted || isCancellation(err)) throw new CancelledError('Download');
-      if (attempt === retries)
-        throw new Error(`Failed to download ${url} after ${retries} attempts: ${err}`, {
+      if (attempt === DOWNLOAD_ATTEMPTS)
+        throw new Error(`Failed to download ${url} after ${DOWNLOAD_ATTEMPTS} attempts: ${err}`, {
           cause: err,
         });
       log.warn(`Download attempt ${attempt} failed for ${url}: ${err}`);
@@ -150,28 +150,25 @@ function uniqueByDestination(tasks: DownloadTask[]): DownloadTask[] {
  * run at the download concurrency now rather than one file at a time.
  *
  * Both passes report, and each says what it is. Checking is the *whole* of a
- * launch with nothing to fetch — several seconds of SHA-1 over every asset —
- * and it used to run behind a bar frozen at zero, under the words "Downloading
- * game assets", which was the one thing that was certainly not happening. The
- * same correction the pack sync already got.
+ * launch with nothing to fetch, and it used to run behind a bar frozen at zero,
+ * under the words "Downloading game assets", which was the one thing that was
+ * certainly not happening. The same correction the pack sync already got.
  */
 async function downloadBatch(
   listed: DownloadTask[],
   concurrency: number,
-  opts?: {
+  opts: GameFileOptions & {
     operationId: string;
     /** Said while the files already on disk are being checked. */
-    checkLabel?: ProgressMessage;
+    checkLabel: ProgressMessage;
     /** Said while the ones that failed that check are being fetched. */
-    downloadLabel?: ProgressMessage;
-    signal?: AbortSignal;
+    downloadLabel: ProgressMessage;
   },
 ): Promise<void> {
   const tasks = uniqueByDestination(listed);
   const total = tasks.length;
 
   const emit = (progress: number, message: ProgressMessage, done: number, installing = false) => {
-    if (!opts) return;
     emitAssetProgress({
       operationId: opts.operationId,
       progress,
@@ -182,8 +179,7 @@ async function downloadBatch(
     });
   };
 
-  const checkLabel: ProgressMessage = opts?.checkLabel ?? { key: 'progress.msg.checkingFiles' };
-  const downloadLabel: ProgressMessage = opts?.downloadLabel ?? { key: 'progress.msg.downloading' };
+  const { checkLabel, downloadLabel, signal, thorough = false } = opts;
 
   // ── Pass one: which of these are already here and correct ──
 
@@ -193,7 +189,7 @@ async function downloadBatch(
 
   const pending: DownloadTask[] = [];
   await forEachConcurrently(tasks, concurrency, async (task) => {
-    throwIfCancelled(opts?.signal, 'Download');
+    throwIfCancelled(signal, 'Download');
     // Counted on entry rather than on completion, so this pass can never report
     // a full bar: the renderer clears an operation that says it has finished,
     // and the downloads this pass exists to find are still to come.
@@ -208,7 +204,7 @@ async function downloadBatch(
       emit(total > 0 ? checked / total : 0, checkLabel, checked);
     }
     checked++;
-    if (!(await fileExistsAndValid(task.dest, task.sha1, task.size))) pending.push(task);
+    if (!(await fileExistsAndValid(task.dest, task.sha1, task.size, thorough))) pending.push(task);
   });
 
   // ── Pass two: fetch what pass one turned down ──
@@ -223,7 +219,7 @@ async function downloadBatch(
   if (pending.length > 0) reportDownload();
 
   await forEachConcurrently(pending, concurrency, async (task) => {
-    await downloadFile(task.url, task.dest, task.sha1, 3, opts?.signal);
+    await downloadFile(task.url, task.dest, task.sha1, signal);
     completed++;
     reportDownload();
   });
@@ -244,15 +240,15 @@ export async function ensureClientJar(
   versionsDir: string,
   versionId: string,
   clientDl: DownloadInfo,
-  signal?: AbortSignal,
+  { signal, thorough = false }: GameFileOptions = {},
 ): Promise<string> {
   const jarPath = path.join(versionsDir, versionId, `${versionId}.jar`);
-  if (await fileExistsAndValid(jarPath, clientDl.sha1, clientDl.size)) {
+  if (await fileExistsAndValid(jarPath, clientDl.sha1, clientDl.size, thorough)) {
     return jarPath;
   }
 
   log.info(`Downloading client jar for ${versionId}...`);
-  await downloadFile(clientDl.url, jarPath, clientDl.sha1, 3, signal);
+  await downloadFile(clientDl.url, jarPath, clientDl.sha1, signal);
   return jarPath;
 }
 
@@ -379,7 +375,7 @@ export async function ensureLibraries(
   librariesDir: string,
   meta: VersionMeta,
   nativesDir?: string,
-  signal?: AbortSignal,
+  options: GameFileOptions = {},
 ): Promise<string[]> {
   const settings = await getSettings();
   const concurrency = settings.downloadConcurrency;
@@ -429,10 +425,10 @@ export async function ensureLibraries(
 
   log.info(`Ensuring ${tasks.length} libraries...`);
   await downloadBatch(tasks, concurrency, {
+    ...options,
     operationId: `libraries-${meta.id}`,
     checkLabel: { key: 'progress.msg.checkingLibraries', vars: { version: meta.id } },
     downloadLabel: { key: 'progress.msg.libraries', vars: { version: meta.id } },
-    signal,
   });
 
   if (nativesDir && nativeJars.length > 0) {
@@ -455,7 +451,7 @@ export async function ensureLibraries(
 export async function ensureAssets(
   assetsDir: string,
   meta: VersionMeta,
-  signal?: AbortSignal,
+  options: GameFileOptions = {},
 ): Promise<void> {
   const settings = await getSettings();
   const indexDir = path.join(assetsDir, 'indexes');
@@ -465,8 +461,10 @@ export async function ensureAssets(
   const indexFile = path.join(indexDir, `${meta.assetIndex.id}.json`);
 
   // Download asset index
-  if (!(await fileExistsAndValid(indexFile, meta.assetIndex.sha1))) {
-    await downloadFile(meta.assetIndex.url, indexFile, meta.assetIndex.sha1, 3, signal);
+  // Always by hash: it is one small file, and it decides what every other
+  // asset is supposed to be.
+  if (!(await fileExistsAndValid(indexFile, meta.assetIndex.sha1, undefined, true))) {
+    await downloadFile(meta.assetIndex.url, indexFile, meta.assetIndex.sha1, options.signal);
   }
 
   const indexRaw = await fs.readFile(indexFile, 'utf-8');
@@ -482,9 +480,9 @@ export async function ensureAssets(
 
   log.info(`Ensuring ${tasks.length} assets...`);
   await downloadBatch(tasks, settings.downloadConcurrency, {
+    ...options,
     operationId: `assets-${meta.id}`,
     checkLabel: { key: 'progress.msg.checkingAssets' },
     downloadLabel: { key: 'progress.msg.assets' },
-    signal,
   });
 }

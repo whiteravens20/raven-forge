@@ -134,3 +134,41 @@ describe('files a version lists more than once', () => {
     expect(fetched).toHaveLength(1);
   });
 });
+
+describe('a file that is already there', () => {
+  it('is taken at its size on an ordinary launch, and read back on a thorough one', async () => {
+    const lib = library('guava', 'the real bytes');
+    await fs.mkdir(path.dirname(lib.file), { recursive: true });
+    // What rot looks like: the length the version declares, other content.
+    await fs.writeFile(lib.file, 'THE REAL BYTES');
+
+    await ensureLibraries(libs(), metaOf([lib]));
+    expect(hits).toEqual([]);
+
+    await ensureLibraries(libs(), metaOf([lib]), undefined, { thorough: true });
+    expect(hits).toHaveLength(1);
+    expect(await fs.readFile(lib.file, 'utf-8')).toBe('the real bytes');
+  });
+
+  it('is fetched again when its size is wrong, thorough or not', async () => {
+    const lib = library('guava', 'the real bytes');
+    await fs.mkdir(path.dirname(lib.file), { recursive: true });
+    await fs.writeFile(lib.file, 'short');
+
+    await ensureLibraries(libs(), metaOf([lib]));
+
+    expect(await fs.readFile(lib.file, 'utf-8')).toBe('the real bytes');
+  });
+
+  it('is not replaced by a download that turns out wrong', async () => {
+    const lib = library('guava', 'the real bytes');
+    await fs.mkdir(path.dirname(lib.file), { recursive: true });
+    await fs.writeFile(lib.file, 'short');
+    served[`/${lib.downloads!.artifact!.path}`] = Buffer.from('not what was asked');
+
+    await expect(ensureLibraries(libs(), metaOf([lib]))).rejects.toThrow(/Failed to download/);
+
+    expect(await fs.readFile(lib.file, 'utf-8')).toBe('short');
+    expect(await fs.readdir(path.dirname(lib.file))).toEqual([path.basename(lib.file)]);
+  });
+});

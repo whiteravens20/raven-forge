@@ -368,6 +368,43 @@ describe.skipIf(!posix)('a launch', () => {
   });
 });
 
+describe.skipIf(!posix)('the launch after a crash', () => {
+  const marker = () => path.join(root, 'data', 'profiles', 'p1', '.recheck-game-files');
+
+  it('reads every game file back, once', async () => {
+    // A file that went bad on disk still has its size, which is all an
+    // ordinary launch looks at.
+    const jar = path.join(cacheDir(), 'versions', '1.21.4', '1.21.4.jar');
+    await launch('exit 1');
+    await exitInfo();
+    await expect(fs.access(marker())).resolves.toBeUndefined();
+
+    await fs.writeFile(jar, 'THE CLIENT JAR');
+    state.sent.length = 0;
+    // Same size, different bytes, and nowhere to fetch the real one from: only a
+    // launch that reads the file notices, and it fails on the download.
+    await expect(launcher.launchGame({ profileId: 'p1' })).rejects.toThrow(/Failed to download/);
+  });
+
+  it('goes back to checking sizes once that launch has got through', async () => {
+    await launch('exit 1');
+    await exitInfo();
+    state.sent.length = 0;
+
+    await launch('exit 0');
+    await exitInfo();
+
+    await expect(fs.access(marker())).rejects.toThrow();
+  });
+
+  it('is not asked for by a game that simply closed', async () => {
+    await launch('exit 0');
+    await exitInfo();
+
+    await expect(fs.access(marker())).rejects.toThrow();
+  });
+});
+
 /**
  * Log4Shell. Minecraft 1.7.2 to 1.18 resolve `${jndi:…}` in anything they log,
  * chat included, unless they are started with a configuration that stops it.

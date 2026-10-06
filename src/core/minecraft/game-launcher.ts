@@ -23,7 +23,12 @@ import {
 } from '../modloader/loader-manager';
 import { resolveLaunchMeta } from '../modloader/loader-profile';
 import { getVersionMeta } from './version-manifest';
-import { ensureClientJar, ensureLibraries, ensureAssets } from './asset-downloader';
+import {
+  ensureClientJar,
+  ensureLibraries,
+  ensureAssets,
+  type GameFileOptions,
+} from './asset-downloader';
 import { beginJob, endJob, isCancellation, throwIfCancelled } from '../util/cancellation';
 import { withProgress } from '../util/progress';
 import { machineMemoryMb } from '../util/machine-memory';
@@ -252,6 +257,23 @@ export function afterGameWhenClosed(state: {
   return state.windowVisible || state.othersRunning ? 'stay' : 'quit';
 }
 
+/**
+ * Left in a profile's folder when its game crashed, and taken away by the next
+ * launch once it has read every game file back — see `GameFileOptions.thorough`.
+ */
+function recheckMarker(profileId: string): string {
+  return path.join(paths.profileDir(profileId), '.recheck-game-files');
+}
+
+async function exists(file: string): Promise<boolean> {
+  try {
+    await fs.access(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The cancellable job a launch registered, once it has: `launchGame` ends it. */
 interface LaunchJob {
   signal?: AbortSignal;
@@ -348,22 +370,29 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     ? await resolveChosenJava(profile.customJavaPath, javaVersion)
     : await ensureJavaVersion(javaVersion, signal);
 
-  // Download game files
+  // Download game files. Read back by hash rather than by size when the last
+  // run of this profile crashed: a file that went bad on disk is one of the
+  // things that crash can have been.
+  const recheck = recheckMarker(profile.id);
+  const files: GameFileOptions = { signal, thorough: await exists(recheck) };
+  if (files.thorough) log.info(`${profile.name} crashed last time — checking every game file`);
+
   log.info('Ensuring client jar...');
   const clientJar = await ensureClientJar(
     versionsDir,
     profile.minecraftVersion,
     meta.downloads.client,
-    signal,
+    files,
   );
 
   log.info('Ensuring libraries...');
-  const libClasspath = await ensureLibraries(librariesDir, meta, nativesDir, signal);
+  const libClasspath = await ensureLibraries(librariesDir, meta, nativesDir, files);
 
   log.info('Ensuring assets...');
-  await ensureAssets(assetsDir, meta, signal);
+  await ensureAssets(assetsDir, meta, files);
 
   throwIfCancelled(signal, 'Launch');
+  if (files.thorough) await fs.rm(recheck, { force: true });
 
   // Build classpath
   const cpSep = process.platform === 'win32' ? ';' : ':';
@@ -618,6 +647,10 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
       const minecraftCrash = failed ? await readMinecraftCrash(gameDir, startTime) : undefined;
       const hungOnExit = isShutdownWatchdogCrash(minecraftCrash);
       const crashed = failed && !hungOnExit;
+
+      // A crash that a bad file caused is found by reading the files back, and
+      // that is too slow to do at every launch — so it is asked for here.
+      if (crashed) await fs.writeFile(recheckMarker(profile.id), '').catch(() => undefined);
 
       const logTail = crashed ? getLogTail(profile.id, 100) : undefined;
       const exitInfo: GameExitInfo = {
