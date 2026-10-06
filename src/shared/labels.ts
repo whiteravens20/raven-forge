@@ -28,8 +28,9 @@ const SPECIAL: Record<string, string> = {
  * the meaning, not a word break.
  */
 export function tagLabel(name: string): string {
-  const special = SPECIAL[name];
-  if (special) return special;
+  // Asked of the table itself: `constructor` is a word a tag may be, and read
+  // off any object it is a function.
+  if (Object.hasOwn(SPECIAL, name)) return SPECIAL[name];
 
   const spaced = name.replace(/(?<=\w)-(?=\w)/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);

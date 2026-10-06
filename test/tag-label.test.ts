@@ -46,6 +46,12 @@ describe('tagLabel', () => {
     expect(tagLabel('')).toBe('');
   });
 
+  it('treats a tag named like something every object has as a tag', () => {
+    // Looked up in a plain object, `constructor` came back as a function.
+    expect(tagLabel('constructor')).toBe('Constructor');
+    expect(tagLabel('toString')).toBe('ToString');
+  });
+
   it('passes through a tag Modrinth adds tomorrow', () => {
     // The point of the mechanical rule: an unknown tag reads sensibly rather
     // than vanishing or arriving as a raw key.
