@@ -43,6 +43,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ isAuthenticating: true });
     try {
       const result = await api.auth.loginMicrosoft();
+      // Closing the sign-in window is not a failure to report.
+      if (result.code === 'CANCELLED') return null;
       if (!result.success) return result.error ?? '';
       await get().load();
       return null;

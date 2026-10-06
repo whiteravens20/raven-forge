@@ -25,8 +25,11 @@ export interface IpcResult<T> {
  * `AUTH_UNREACHABLE` — Microsoft's or Mojang's auth endpoints could not be
  * reached, as opposed to rejecting us. The distinction matters: unreachable is
  * recoverable by launching offline, rejected is not.
+ *
+ * `CANCELLED` — the player called it off themselves, by closing the window it
+ * was happening in. Nothing went wrong and nothing is to be reported.
  */
-export type IpcErrorCode = 'AUTH_UNREACHABLE';
+export type IpcErrorCode = 'AUTH_UNREACHABLE' | 'CANCELLED';
 
 /**
  * Failure messages the main process may name for the renderer to say.

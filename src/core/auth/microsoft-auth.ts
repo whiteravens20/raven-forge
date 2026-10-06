@@ -24,6 +24,7 @@ import {
   getMcSession,
   getAuthState as getStoredAuthState,
 } from './token-store';
+import { CancelledError } from '../util/cancellation';
 
 // ── Azure AD App Registration ──────────────────────────────
 // To use real Microsoft auth, register your own app and set RAVENFORGE_CLIENT_ID
@@ -149,7 +150,9 @@ async function getMsAuthCode(): Promise<{ code: string; verifier: string }> {
     authWindow.webContents.on('will-navigate', onNavigate);
 
     authWindow.on('closed', () => {
-      reject(new Error('Authentication window was closed'));
+      // The player's own doing, and said as that: it used to come back as a
+      // failed login, in red, for somebody who had only changed their mind.
+      reject(new CancelledError('Sign-in'));
     });
   });
 }

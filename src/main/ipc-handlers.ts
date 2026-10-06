@@ -504,6 +504,8 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await loginMicrosoft());
     } catch (err) {
+      // Closing the sign-in window is an answer, not an error.
+      if (isCancellation(err)) return fail('Sign-in was called off', 'CANCELLED');
       log.error('Microsoft login failed:', err);
       return fail(`Login failed: ${reason(err)}`);
     }
