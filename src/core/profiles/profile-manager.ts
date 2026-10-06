@@ -557,11 +557,28 @@ export async function importProfile(json: string): Promise<ProfileImport> {
  */
 const MAX_PROFILE_FILE_BYTES = 1024 * 1024;
 
-/** {@link importProfile}, from a file on disk. */
+/**
+ * {@link importProfile}, from a file on disk.
+ *
+ * Opened once and read up to one byte past the limit, rather than measured by
+ * name and then read by name: between those two the file can be swapped for
+ * another, and the one read need not be the one that was measured.
+ */
 export async function importProfileFile(filePath: string): Promise<ProfileImport> {
-  const { size } = await fs.stat(filePath);
-  if (size > MAX_PROFILE_FILE_BYTES) {
-    throw new Error('That file is too large to be a profile');
+  const handle = await fs.open(filePath, 'r');
+  try {
+    const buffer = Buffer.alloc(MAX_PROFILE_FILE_BYTES + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > MAX_PROFILE_FILE_BYTES) {
+      throw new Error('That file is too large to be a profile');
+    }
+    return await importProfile(buffer.subarray(0, length).toString('utf-8'));
+  } finally {
+    await handle.close();
   }
-  return importProfile(await fs.readFile(filePath, 'utf-8'));
 }
