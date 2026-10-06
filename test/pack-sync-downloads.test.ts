@@ -22,6 +22,12 @@ let server: http.Server;
 let base: string;
 /** What each path answers with. A number is a status, and no body worth having. */
 const served = new Map<string, string | number>();
+/** How long the server sits on each request before answering. */
+let delayMs = 0;
+/** The most requests it has been answering at once. */
+let peak = 0;
+/** The "concurrent downloads" setting. */
+let downloadConcurrency = 4;
 
 const profile: Profile = {
   id: 'p1',
@@ -40,7 +46,7 @@ vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 vi.mock('../src/core/config/settings-manager', () => ({
-  getSettings: async () => ({ trustedPublicKeys: [] }),
+  getSettings: async () => ({ trustedPublicKeys: [], downloadConcurrency }),
 }));
 vi.mock('../src/core/profiles/profile-manager', () => ({ getProfile: async () => profile }));
 vi.mock('../src/core/mods/content-manager', () => ({ syncContentFromManifest: async () => {} }));
@@ -55,6 +61,7 @@ vi.mock('../src/core/config/paths', () => ({
 }));
 
 const { syncManifest } = await import('../src/core/mods/mod-sync');
+const { readLockFile } = await import('../src/core/mods/lock-file');
 
 const sha256 = (body: string) => crypto.createHash('sha256').update(body).digest('hex');
 
@@ -106,15 +113,23 @@ beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-sync-downloads-'));
   await fs.mkdir(modsDir(), { recursive: true });
   served.clear();
+  delayMs = 0;
+  peak = 0;
+  downloadConcurrency = 4;
 
+  let answering = 0;
   server = http.createServer((req, res) => {
-    const answer = served.get(req.url ?? '');
-    if (typeof answer !== 'string') {
-      res.statusCode = answer ?? 404;
-      res.end('no');
-      return;
-    }
-    res.end(answer);
+    peak = Math.max(peak, ++answering);
+    setTimeout(() => {
+      answering--;
+      const answer = served.get(req.url ?? '');
+      if (typeof answer !== 'string') {
+        res.statusCode = answer ?? 404;
+        res.end('no');
+        return;
+      }
+      res.end(answer);
+    }, delayMs);
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
@@ -125,6 +140,48 @@ beforeEach(async () => {
 afterEach(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await fs.rm(root, { recursive: true, force: true });
+});
+
+describe('a pack with many mods', () => {
+  const ids = ['ae2', 'create', 'jei', 'mekanism', 'sodium', 'waystones'];
+
+  it('fetches them several at a time, as the downloads setting says', async () => {
+    downloadConcurrency = 3;
+    delayMs = 40;
+
+    await syncManifest('p1', pack({ mods: ids.map((id) => mod(id)) }));
+
+    // One after another, whatever the setting, is how it used to go.
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(3);
+    expect((await fs.readdir(modsDir())).sort()).toEqual(ids.map((id) => `${id}.jar`));
+    // Recorded in the pack's order, not in the order the files happened to land.
+    expect((await readLockFile('p1')).map((m) => m.id)).toEqual(ids);
+  });
+
+  it('fetches one at a time when that is what was asked for', async () => {
+    downloadConcurrency = 1;
+    delayMs = 5;
+
+    await syncManifest('p1', pack({ mods: ids.map((id) => mod(id)) }));
+
+    expect(peak).toBe(1);
+  });
+
+  it('keeps what arrived when one of them fails, and stops there', async () => {
+    downloadConcurrency = 2;
+    const mods = ids.map((id) => mod(id));
+    served.set('/mods/create.jar', 503);
+
+    await expect(syncManifest('p1', pack({ mods }))).rejects.toThrow(/503/);
+
+    // Nothing is recorded by a sync that failed; the files that landed are
+    // found again by their hashes, and only the rest is fetched.
+    expect(await readLockFile('p1')).toEqual([]);
+    const landed = await fs.readdir(modsDir());
+    expect(landed).not.toContain('create.jar');
+    expect(landed.every((name) => name.endsWith('.jar'))).toBe(true);
+  });
 });
 
 describe('a file that fails to arrive', () => {

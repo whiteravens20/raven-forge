@@ -26,6 +26,7 @@ import { acceptedLoaders } from '../../shared/constants';
 import { downloadToFile } from '../net/download';
 import { readJsonCapped } from '../net/json';
 import { writeJsonAtomic } from '../util/atomic-file';
+import { forEachConcurrently } from '../util/concurrency';
 import { syncContentFromManifest } from './content-manager';
 import { fileMatches, verifyDownload, expectedHash, type HashedEntry } from './integrity';
 import { configVersion, shouldApplyConfigOverride } from './config-overrides';
@@ -604,9 +605,9 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
 
     // Neither pass may report 1: the renderer clears an operation that says it
     // has finished, and the download pass may still be to come. Both counters
-    // are emitted before the item they announce, so the last value of each is
-    // one short — the single completion event at the end of the sync is the
-    // only thing that reports the whole job done.
+    // are emitted before the item they announce, so the last value of each
+    // falls short of the whole — the single completion event at the end of the
+    // sync is the only thing that reports the whole job done.
     const reportCheck = () =>
       emitProgress('progress:mod-sync', {
         operationId: profileId,
@@ -703,10 +704,13 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         installing: true,
       });
 
-    for (const planned of plannedMods) {
-      const { entry, resolved, destPath, previous, enabled } = planned;
-
-      if (!planned.present) {
+    // As many at a time as the downloads setting says. That setting was only
+    // ever read for the game's own libraries and assets, so a pack of two
+    // hundred mods came down one file after another whatever it was set to.
+    await forEachConcurrently(
+      plannedMods.filter((p) => !p.present),
+      settings.downloadConcurrency,
+      async ({ entry, resolved, destPath, previous, enabled }) => {
         throwIfCancelled(signal, 'Sync');
         reportDownload({ key: 'progress.msg.downloadingFile', vars: { name: entry.name } });
 
@@ -719,8 +723,11 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
           await fs.rm(modFilePath(modsDir, previous.fileName, enabled), { force: true });
         }
         fetched++;
-      }
+      },
+    );
 
+    // In the manifest's order, whatever order the files arrived in.
+    for (const { entry, resolved, enabled } of plannedMods) {
       synced.push({
         id: entry.id,
         name: entry.name,

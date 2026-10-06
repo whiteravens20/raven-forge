@@ -41,7 +41,7 @@ vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 vi.mock('../src/core/config/settings-manager', () => ({
-  getSettings: async () => ({ trustedPublicKeys: [] }),
+  getSettings: async () => ({ trustedPublicKeys: [], downloadConcurrency: 1 }),
 }));
 vi.mock('../src/core/profiles/profile-manager', () => ({
   getProfile: async () => profile,

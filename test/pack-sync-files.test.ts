@@ -35,7 +35,7 @@ vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 vi.mock('../src/core/config/settings-manager', () => ({
-  getSettings: async () => ({ trustedPublicKeys: [] }),
+  getSettings: async () => ({ trustedPublicKeys: [], downloadConcurrency: 1 }),
 }));
 const updateProfile = vi.fn(async (_id: string, updates: Partial<Profile>) => {
   profile = { ...profile, ...updates };
