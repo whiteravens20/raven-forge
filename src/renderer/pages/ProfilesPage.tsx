@@ -127,7 +127,26 @@ function windowSizeProblem(draft: DraftProfile): 'incomplete' | 'range' | null {
 }
 
 function profileToDraft(p: Profile): DraftProfile {
-  const { id: _id, createdAt: _ca, updatedAt: _ua, ...draft } = p;
+/**
+ * The part of a profile the form edits.
+ *
+ * Not the pictures and not the play statistics. Save sends the whole draft, and
+ * the main process merges it over the profile — so a draft that carried them
+ * wrote back whatever they had been when Edit was pressed: the avatar picked a
+ * moment ago in this same form went back to the old one, and a game that ended
+ * while the form was open lost that session's hours.
+ */
+  const {
+    id: _id,
+    createdAt: _ca,
+    updatedAt: _ua,
+    iconPath: _iconPath,
+    iconUrl: _iconUrl,
+    iconPreset: _iconPreset,
+    lastPlayed: _lastPlayed,
+    totalPlayTimeMinutes: _playTime,
+    ...draft
+  } = p;
   return draft;
 }
 
