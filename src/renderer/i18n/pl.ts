@@ -97,7 +97,6 @@ export const pl: Translations = {
   'common.remove': 'Usuń',
   'common.delete': 'Usuń',
   'common.edit': 'Edytuj',
-  'common.import': 'Importuj',
   'common.back': 'Wstecz',
   'common.close': 'Zamknij',
   'common.dismiss': 'Ukryj',
@@ -114,8 +113,6 @@ export const pl: Translations = {
   'common.installed': 'Zainstalowano',
   'common.enable': 'Włącz',
   'common.disable': 'Wyłącz',
-  'common.show': 'Pokaż',
-  'common.hide': 'Ukryj',
 
   // ── Home ─────────────────────────────────────────────────
   'home.signedInAs': 'Zalogowano jako',

@@ -109,7 +109,6 @@ export const en = {
   'common.remove': 'Remove',
   'common.delete': 'Delete',
   'common.edit': 'Edit',
-  'common.import': 'Import',
   'common.back': 'Back',
   'common.close': 'Close',
   'common.dismiss': 'Dismiss',
@@ -126,8 +125,6 @@ export const en = {
   'common.installed': 'Installed',
   'common.enable': 'Enable',
   'common.disable': 'Disable',
-  'common.show': 'Show',
-  'common.hide': 'Hide',
 
   // ── Home ─────────────────────────────────────────────────
   'home.signedInAs': 'Signed in as',
