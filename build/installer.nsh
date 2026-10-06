@@ -94,6 +94,12 @@
 ; the old-named folder, written as UTF-8 by a build that knew no better; it is
 ; read the old way, which is right for every path that old way ever got right.
 ;
+; This only works in an installer compiled on Windows, which is where the
+; packaging and release jobs compile it. The Linux makensis that comes with
+; electron-builder's NSIS (3.0.4.1) compiles `FileReadUTF16LE` into something
+; the installer does not run: the read comes back empty, no error is raised,
+; and the uninstaller behaves as though the data had never moved.
+;
 ; Registers: $R3-$R9 only. $R0-$R2 are left alone because the stock uninstall
 ; section uses them either side of where this macro is inserted, and the
 ; trailing newline is stripped by hand rather than with `${TrimNewLines}` —
@@ -138,6 +144,18 @@
   ${If} $R4 < 4
     StrCpy $R9 ""
   ${ElseIfNot} ${FileExists} "$R9\*.*"
+    StrCpy $R9 ""
+  ${EndIf}
+
+  ; And what is there has to be the launcher's data, by the same three signs
+  ; the launcher itself goes by (`usable` in src/core/config/data-root.ts). The
+  ; deleting below is by name, and `cache`, `logs` and `profiles` are names
+  ; other programs use too: a pointer that had come to name some other folder
+  ; must not have them taken out of it.
+  ${If} $R9 != ""
+  ${AndIfNot} ${FileExists} "$R9\settings.json"
+  ${AndIfNot} ${FileExists} "$R9\profiles.json"
+  ${AndIfNot} ${FileExists} "$R9\profiles\*.*"
     StrCpy $R9 ""
   ${EndIf}
 !macroend
