@@ -188,6 +188,56 @@ depends on it later sees that it is there. A file Modrinth does not know, or
 cannot be asked about, is listed as a local file and works the same in every
 way that does not need a project id.
 
+## Installing a mod loader
+
+Four loaders, and three quite different things called installing
+(`core/modloader/`). Whatever the kind, the result is the same one file — a
+version profile under `loaders/<loader>/<minecraft>-<build>/` — which a launch
+merges over Mojang's own metadata to get the main class, the extra libraries and
+the arguments the loader adds.
+
+- **Fabric and Quilt** publish that profile ready-made. It is fetched from the
+  loader's metadata service and written down. Fabric starts at Minecraft 1.14
+  and Quilt at 1.14.4; asked about an older version the two services answer with
+  an error status rather than an empty list, and that is read as "no builds".
+- **Forge from 1.12.2's last builds on, and NeoForge**, ship an installer that
+  has to be run: it downloads libraries and patches the game's jar on the
+  player's machine. It is fetched, held to the checksum the repository publishes
+  beside it, and run with `--installClient` against the launcher's cache, so
+  what it writes lands where a launch already looks. One at a time, on the Java
+  the game itself needs.
+- **Forge for 1.7.10 up to 1.12.2's earlier builds** has an installer with
+  nothing to run. Its work is copying the Forge jar into the libraries folder
+  and writing a profile that names it, so that is done here directly: the game
+  patches itself as it starts. Such a profile names its libraries by Maven
+  coordinates alone — Mojang's library host unless it says otherwise, and a list
+  of checksums of which any one may be the file's.
+- **Forge for anything older than 1.7.10** is not offered. Up to 1.5.1 Forge had
+  no installer at all, and the ones for 1.5.2 to 1.7.2 carry a profile that
+  stands alone instead of extending the game's.
+
+**What counts as installed** is the profile _and_ every library it lists with a
+hash and no address — which is how a profile says "the installer made this".
+Those cannot be downloaded, so a launch that finds one missing installs the
+loader again instead of trying. Most of what a Forge or NeoForge installer makes
+is listed nowhere, though, and only the installer can vouch for it: on the
+launch after a crash it is run again over the existing install, where it checks
+each of its files and makes again the ones that are wrong. That takes seconds
+when nothing is, and a launch goes ahead without it when the installer cannot be
+reached.
+
+**A build has more than one name.** Forge's list spells some builds with a
+branch after the number — `10.13.4.1614-1.7.10` — while its own recommendation
+feed, and every pack on Modrinth, give the number alone. The recommendation is
+matched by number; a profile holding the short name has it looked up on the
+list when the installer is not found under it, and the editor shows the list's
+spelling rather than treating the build as unknown.
+
+**Quilt runs Fabric's mods**, and most of them are tagged for Fabric alone, so
+everything that asks Modrinth on a Quilt profile's behalf — search, install,
+dependencies, updates — asks for either (`acceptedLoaders` in
+`shared/constants.ts`). NeoForge is not given Forge's: that holds on 1.20.1 only.
+
 ## Microsoft auth chain
 
 ```mermaid

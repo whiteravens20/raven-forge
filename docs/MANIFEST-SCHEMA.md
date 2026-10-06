@@ -20,6 +20,13 @@ Server admins publish a JSON manifest at a stable HTTPS URL — plain HTTP is ta
 }
 ```
 
+`modLoaderVersion` is the loader's own build — `0.19.3` for Fabric, `47.4.10`
+for Forge, `21.1.248` for NeoForge — and never carries the Minecraft version in
+front of it. For the few Minecraft versions where Forge publishes a build with a
+branch after its number (`10.13.4.1614-1.7.10`), the number alone is enough: the
+launcher finds the build by it. Which Minecraft versions each loader can be
+installed for is in the [architecture notes](ARCHITECTURE.md#installing-a-mod-loader).
+
 `recommendedRamMb` is optional and bounded to 512–65536. It is applied **only
 when the profile is created**, so a later sync never overwrites a figure the
 player has since chosen; a manifest without one leaves the launcher's own
