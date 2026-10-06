@@ -2,6 +2,15 @@
   <img src="assets/brand/logo.svg" alt="Raven Forge — Minecraft: Java Edition launcher" width="640">
 </p>
 
+<p align="center">
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/build.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/build.yml/badge.svg?branch=dev" alt="CI"></a>
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/package.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/package.yml/badge.svg" alt="Packaging"></a>
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/release.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/codeql.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/security.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/security.yml/badge.svg" alt="Security scan"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/whiteravens20/raven-forge"><img src="https://api.securityscorecards.dev/projects/github.com/whiteravens20/raven-forge/badge" alt="OpenSSF Scorecard"></a>
+</p>
+
 > **🧪 TESTING & DEVELOPMENT — Raven Forge is usable today, but it is still in testing and active development. Some features are still landing, a few edges are rough, and details may change between releases. Bug reports, feedback and contributions are very welcome!**
 
 Custom Minecraft: Java Edition launcher with mod management, auto-sync from server manifests, and server profiles.
