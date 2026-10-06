@@ -129,6 +129,23 @@ export function detectLogLevel(line: string): GameLogLine['level'] {
   return 'info';
 }
 
+/**
+ * A line of game output without the colour codes some loaders write into it.
+ *
+ * Forge 28 on Minecraft 1.14.4 colours its console whether or not it is one, so
+ * every line arrives as `ESC[32m[12:00:00] [main/INFO] …`. Nothing that reads
+ * the output here is a terminal: the console, the launcher's log and the crash
+ * report all showed the codes as text.
+ *
+ * Built from the character code because a control character written into a
+ * pattern is what the linter is there to catch.
+ */
+const COLOUR_CODE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
+
+export function withoutColourCodes(line: string): string {
+  return line.replace(COLOUR_CODE, '');
+}
+
 /** How long lines are gathered before the console is sent them. */
 const LOG_FLUSH_MS = 100;
 
@@ -693,7 +710,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     readline.createInterface({ input: stream, crlfDelay: Infinity }).on('line', (raw) => {
       // Before anything holds on to it: the log, the ring buffer the console
       // and the exit card read, and the renderer all get the line from here.
-      const line = redactTokens(raw, accessToken);
+      const line = redactTokens(withoutColourCodes(raw), accessToken);
       if (!line) return;
       record(`[MC:${profile.name}] ${line}`);
       emitLogLine(profile.id, line);
