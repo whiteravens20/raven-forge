@@ -3,6 +3,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { constants as fsConstants } from 'node:fs';
+import type { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import yauzl from 'yauzl';
 import { z } from 'zod';
 import { log } from '../../main/logger';
@@ -27,23 +29,27 @@ const O_NOFOLLOW = fsConstants.O_NOFOLLOW ?? 0;
  * somewheres is checked before use.
  */
 
-/** Nothing in this format is large. A pack index past this is not one. */
+/** The index is a list of references. One past this is not an index. */
 const MAX_INDEX_BYTES = 8 * 1024 * 1024;
 
 /**
- * Ceilings on what a `.mrpack` may decompress to, held in memory as it is read.
+ * Ceilings on what a pack's `overrides/` may unpack to.
  *
- * The archive is references, not jars — an override is a config file, a script,
- * at most a small bundled resource pack — so these are anti-bomb ceilings, not
- * a quota any real pack approaches. Without them a 20 KB zip whose entries
- * inflate to gigabytes (a classic deflate bomb) is read whole into the map
- * below and takes the main process down with it. The per-entry cap stops one
- * enormous file; the total stops a thousand merely large ones.
+ * They bound the disk a pack can take, not the memory: an override is written
+ * straight from the archive to its place and never held whole. That is what
+ * lets them be this high, and they have to be — packs bundle what Modrinth does
+ * not host, resource packs and private builds among it, and of the hundred most
+ * downloaded ones several run to hundreds of megabytes. The ceilings these
+ * replace, 128 MB a file and 512 MB in all, sized for an archive read into
+ * memory, turned those away as "larger than any real modpack".
+ *
+ * What is left is a stop for the zip that unpacks to more than any pack does:
+ * twenty kilobytes of deflate can stand for gigabytes.
  */
-const MAX_ENTRY_BYTES = 128 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 512 * 1024 * 1024;
+const MAX_ENTRY_BYTES = 1024 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 4 * 1024 * 1024 * 1024;
 
-/** How much a `.mrpack` may decompress to. Overridable so a test can use bytes. */
+/** How much a `.mrpack` may unpack to. Overridable so a test can use bytes. */
 export interface MrpackLimits {
   maxEntryBytes: number;
   maxTotalBytes: number;
@@ -89,6 +95,15 @@ const mrpackIndexSchema = z.object({
 
 export type MrpackFile = z.infer<typeof mrpackFileSchema>;
 
+/** One file under `overrides/`: where it goes, and where in the archive it is. */
+export interface MrpackOverride {
+  /** Relative to the game directory, already checked to stay inside it. */
+  path: string;
+  /** The archive entry the bytes are in. */
+  entry: string;
+  size: number;
+}
+
 /** A pack, read and understood, before anything has been downloaded. */
 export interface MrpackContents {
   name: string;
@@ -99,9 +114,8 @@ export interface MrpackContents {
   modLoaderVersion?: string;
   /** Files this client needs, `unsupported` ones already dropped. */
   files: MrpackFile[];
-  /** `overrides/` entries: game-dir-relative path → bytes. */
-  overrides: Map<string, Buffer>;
-  totalBytes: number;
+  /** What `overrides/` holds. The bytes stay in the archive until {@link applyOverrides}. */
+  overrides: MrpackOverride[];
 }
 
 /**
@@ -133,77 +147,123 @@ function safeRelativePath(entry: string): string | null {
   return normalised;
 }
 
-/** Read every entry of a zip into memory, keyed by name, under a size ceiling. */
-async function readZipEntries(file: string, limits: MrpackLimits): Promise<Map<string, Buffer>> {
-  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
+function openZip(file: string): Promise<yauzl.ZipFile> {
+  return new Promise((resolve, reject) => {
     yauzl.open(file, { lazyEntries: true }, (err, opened) => {
       if (err || !opened) reject(err ?? new Error(`Could not open ${file}`));
       else resolve(opened);
     });
   });
+}
 
-  const entries = new Map<string, Buffer>();
-  let total = 0;
-  await new Promise<void>((resolve, reject) => {
-    // Once a cap is hit the read is over: stop the loop, close the archive so it
-    // is not left reading gigabytes into a promise that already rejected, and
-    // let the first failure be the one reported.
-    let bailed = false;
-    const fail = (err: Error) => {
-      if (bailed) return;
-      bailed = true;
-      zip.close();
-      reject(err);
-    };
+function openEntry(zip: yauzl.ZipFile, entry: yauzl.Entry): Promise<Readable> {
+  return new Promise((resolve, reject) => {
+    zip.openReadStream(entry, (err, stream) => {
+      if (err || !stream) reject(err ?? new Error(`Could not read ${entry.fileName}`));
+      else resolve(stream);
+    });
+  });
+}
 
-    zip.on('entry', (entry: yauzl.Entry) => {
-      if (bailed) return;
-      if (entry.fileName.endsWith('/')) {
-        zip.readEntry();
-        return;
-      }
-      // The zip's own table declares the inflated size. It can lie, so it is not
-      // trusted alone — but a declared size over the cap is refused before a byte
-      // is read, and the running count below catches an entry that under-declares.
-      if (entry.uncompressedSize > limits.maxEntryBytes) {
-        fail(new Error(`The pack contains an implausibly large file: ${entry.fileName}`));
-        return;
-      }
-      zip.openReadStream(entry, (err, stream) => {
-        if (err || !stream) {
-          fail(err ?? new Error(`Could not read ${entry.fileName}`));
-          return;
-        }
-        const chunks: Buffer[] = [];
-        let entryBytes = 0;
-        stream.on('data', (chunk: Buffer) => {
-          entryBytes += chunk.length;
-          total += chunk.length;
-          if (entryBytes > limits.maxEntryBytes || total > limits.maxTotalBytes) {
-            stream.destroy();
-            fail(
-              new Error('The pack is far larger decompressed than any real modpack — refusing it'),
-            );
-            return;
-          }
-          chunks.push(chunk);
-        });
-        stream.on('error', fail);
-        stream.on('end', () => {
-          if (bailed) return;
-          entries.set(entry.fileName, Buffer.concat(chunks));
-          zip.readEntry();
-        });
+/**
+ * Go through an archive's files one at a time, in order.
+ *
+ * `visit` decides what to do with each; the next entry is not read until it has
+ * finished. The archive is closed whichever way this ends.
+ */
+async function eachEntry(
+  file: string,
+  visit: (zip: yauzl.ZipFile, entry: yauzl.Entry) => Promise<void>,
+): Promise<void> {
+  const zip = await openZip(file);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      zip.on('entry', (entry: yauzl.Entry) => {
+        if (entry.fileName.endsWith('/')) zip.readEntry();
+        else visit(zip, entry).then(() => zip.readEntry(), reject);
       });
+      zip.on('end', resolve);
+      zip.on('error', reject);
+      zip.readEntry();
     });
-    zip.on('end', () => {
-      if (!bailed) resolve();
+  } finally {
+    zip.close();
+  }
+}
+
+/** Where an archive entry goes in the game directory, or null when it is not an override. */
+function overrideTarget(entryName: string): { relative: string; client: boolean } | null {
+  for (const [prefix, client] of [
+    ['client-overrides/', true],
+    ['overrides/', false],
+  ] as const) {
+    if (entryName.startsWith(prefix) && entryName.length > prefix.length) {
+      return { relative: entryName.slice(prefix.length), client };
+    }
+  }
+  return null;
+}
+
+/**
+ * The index, and a list of what `overrides/` holds — without unpacking it.
+ *
+ * Sizes are the ones the archive declares. yauzl holds every entry to its
+ * declared size as it is read, so a file that says 1 KB and unpacks to more is
+ * an error when {@link applyOverrides} gets to it, not a surprise on disk.
+ */
+async function scanPack(
+  file: string,
+  limits: MrpackLimits,
+): Promise<{ index: Buffer | null; overrides: MrpackOverride[] }> {
+  let index: Buffer | null = null;
+  // By destination: a pack may carry a file under both prefixes, and then
+  // `client-overrides/` is the one a client takes — that is what it is for.
+  const overrides = new Map<string, MrpackOverride & { client: boolean }>();
+  let total = 0;
+
+  await eachEntry(file, async (zip, entry) => {
+    if (entry.fileName === 'modrinth.index.json') {
+      if (entry.uncompressedSize > MAX_INDEX_BYTES) {
+        throw new Error('The pack index is implausibly large — refusing to parse it');
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of await openEntry(zip, entry)) chunks.push(chunk as Buffer);
+      index = Buffer.concat(chunks);
+      return;
+    }
+
+    const target = overrideTarget(entry.fileName);
+    if (!target) return;
+    const safe = safeRelativePath(target.relative);
+    if (!safe) {
+      throw new Error(`The pack tries to write outside the game directory: ${entry.fileName}`);
+    }
+    if (entry.uncompressedSize > limits.maxEntryBytes) {
+      throw new Error(`The pack contains an implausibly large file: ${entry.fileName}`);
+    }
+
+    const known = overrides.get(safe);
+    if (known && (known.client || !target.client)) return;
+    total += entry.uncompressedSize - (known?.size ?? 0);
+    if (total > limits.maxTotalBytes) {
+      throw new Error('The pack is far larger unpacked than any real modpack — refusing it');
+    }
+    overrides.set(safe, {
+      path: safe,
+      entry: entry.fileName,
+      size: entry.uncompressedSize,
+      client: target.client,
     });
-    zip.on('error', fail);
-    zip.readEntry();
   });
 
-  return entries;
+  return {
+    index,
+    overrides: [...overrides.values()].map(({ path: to, entry, size }) => ({
+      path: to,
+      entry,
+      size,
+    })),
+  };
 }
 
 /** Which loader, and which build of it, a pack's dependencies name. */
@@ -230,14 +290,9 @@ export async function readMrpack(
   file: string,
   limits: MrpackLimits = DEFAULT_LIMITS,
 ): Promise<MrpackContents> {
-  const entries = await readZipEntries(file, limits);
-
-  const indexRaw = entries.get('modrinth.index.json');
+  const { index: indexRaw, overrides } = await scanPack(file, limits);
   if (!indexRaw) {
     throw new Error('Not a Modrinth pack: modrinth.index.json is missing');
-  }
-  if (indexRaw.length > MAX_INDEX_BYTES) {
-    throw new Error('The pack index is implausibly large — refusing to parse it');
   }
 
   const parsed = mrpackIndexSchema.safeParse(JSON.parse(indexRaw.toString('utf-8')));
@@ -265,24 +320,8 @@ export async function readMrpack(
     files.push({ ...entry, path: safe });
   }
 
-  const overrides = new Map<string, Buffer>();
-  for (const [name, data] of entries) {
-    // `client-overrides/` wins over `overrides/` where a pack ships both — that
-    // is what the prefix is for.
-    const relative = name.startsWith('client-overrides/')
-      ? name.slice('client-overrides/'.length)
-      : name.startsWith('overrides/')
-        ? name.slice('overrides/'.length)
-        : null;
-    if (relative === null || relative === '') continue;
-
-    const safe = safeRelativePath(relative);
-    if (!safe) throw new Error(`The pack tries to write outside the game directory: ${name}`);
-    if (name.startsWith('client-overrides/') || !overrides.has(safe)) overrides.set(safe, data);
-  }
-
   log.info(
-    `Read pack ${index.name} ${index.versionId}: ${files.length} files, ${overrides.size} overrides`,
+    `Read pack ${index.name} ${index.versionId}: ${files.length} files, ${overrides.length} overrides`,
   );
 
   return {
@@ -293,30 +332,48 @@ export async function readMrpack(
     ...readLoader(index.dependencies),
     files,
     overrides,
-    totalBytes: files.reduce((sum, f) => sum + (f.fileSize ?? 0), 0),
   };
 }
 
-/** Write a pack's `overrides/` into a profile's game directory. */
+/**
+ * Write a pack's `overrides/` into a profile's game directory, straight from
+ * the archive.
+ *
+ * @param packFile the `.mrpack` that `overrides` was read from
+ * @returns how many files were written
+ */
 export async function applyOverrides(
   gameDir: string,
-  overrides: Map<string, Buffer>,
+  packFile: string,
+  overrides: MrpackOverride[],
 ): Promise<number> {
-  for (const [relative, data] of overrides) {
+  const wanted = new Map(overrides.map((override) => [override.entry, override]));
+  let written = 0;
+
+  await eachEntry(packFile, async (zip, entry) => {
+    const override = wanted.get(entry.fileName);
+    if (!override) return;
+
     // Confirms the parent stays inside the game dir even through a symlink; the
     // `O_NOFOLLOW` open below then refuses a symlink sitting where the file
     // itself goes. `fs.writeFile(dest)` followed either, so a link left in the
     // game dir by a previous pack could redirect a write out of the tree.
-    const dest = await resolveWithin(gameDir, relative);
+    const dest = await resolveWithin(gameDir, override.path);
     const handle = await fs.open(
       dest,
       fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC | O_NOFOLLOW,
     );
     try {
-      await handle.writeFile(data);
+      await pipeline(await openEntry(zip, entry), handle.createWriteStream());
+    } catch (err) {
+      // Half an override is worse than none: it would be read as the file.
+      await fs.rm(dest, { force: true });
+      throw err;
     } finally {
-      await handle.close();
+      await handle.close().catch(() => undefined);
     }
-  }
-  return overrides.size;
+    written++;
+  });
+
+  return written;
 }

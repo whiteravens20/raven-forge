@@ -68,7 +68,23 @@ vi.mock('../src/core/mods/modrinth-api', () => ({
 }));
 
 const { exportProfileAsMrpack } = await import('../src/core/packs/mrpack-export');
-const { readMrpack } = await import('../src/core/packs/mrpack');
+const { readMrpack, applyOverrides } = await import('../src/core/packs/mrpack');
+
+/** What a pack would put in a game directory: each override's path and what it holds. */
+async function overridesOf(packFile: string): Promise<Record<string, string>> {
+  const pack = await readMrpack(packFile);
+  const into = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-export-read-'));
+  try {
+    await applyOverrides(into, packFile, pack.overrides);
+    const found: Record<string, string> = {};
+    for (const override of pack.overrides) {
+      found[override.path] = await fs.readFile(path.join(into, override.path), 'utf-8');
+    }
+    return found;
+  } finally {
+    await fs.rm(into, { recursive: true, force: true });
+  }
+}
 
 const run = promisify(execFile);
 
@@ -193,7 +209,7 @@ describe('exportProfileAsMrpack', () => {
 
     const pack = await readMrpack(dest());
     expect(pack.files).toHaveLength(0);
-    expect(pack.overrides.get('mods/private.jar')?.toString()).toBe('a jar nobody publishes');
+    expect(await overridesOf(dest())).toEqual({ 'mods/private.jar': 'a jar nobody publishes' });
   });
 
   it('carries config and options.txt so the pack is reproducible', async () => {
@@ -205,15 +221,15 @@ describe('exportProfileAsMrpack', () => {
     const summary = await exportProfileAsMrpack('p1', dest());
     expect(summary.overrides).toBe(3);
 
-    const pack = await readMrpack(dest());
-    expect([...pack.overrides.keys()].sort()).toEqual([
+    const carried = Object.keys(await overridesOf(dest()));
+    expect(carried.sort()).toEqual([
       'config/nested/deep.toml',
       'config/sodium-options.json',
       'options.txt',
     ]);
     // A world is not configuration, and a pack handed to a friend must not
     // carry the author's saves.
-    expect([...pack.overrides.keys()].some((k) => k.startsWith('saves/'))).toBe(false);
+    expect(carried.some((k) => k.startsWith('saves/'))).toBe(false);
   });
 
   it('files shaders and resource packs where the game keeps them', async () => {
@@ -252,7 +268,7 @@ describe('exportProfileAsMrpack', () => {
     expect(summary.skippedDisabled).toBe(1);
     expect(summary.bundled).toBe(1);
     const pack = await readMrpack(dest());
-    expect([...pack.overrides.keys()]).toEqual(['mods/on.jar']);
+    expect(pack.overrides.map((override) => override.path)).toEqual(['mods/on.jar']);
   });
 
   it('names the loader build when the profile never pinned one', async () => {

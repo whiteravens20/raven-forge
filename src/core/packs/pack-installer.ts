@@ -30,12 +30,16 @@ import type { PackInstall, Profile } from '../../shared/ipc-types';
  */
 
 /**
- * The initial pack download is a `.mrpack` (references, not jars) or a manifest
- * (a few kilobytes) — both small by construction. This cap is the ceiling on a
- * URL the launcher does not control, so a hostile or mistaken multi-gigabyte
- * response is refused before it fills the disk, well clear of any real pack.
+ * The ceiling on a pack file fetched from a URL the launcher does not control,
+ * so that a hostile or mistaken response is refused before it fills the disk.
+ *
+ * A `.mrpack` is mostly references, but not only: what Modrinth does not host
+ * travels inside it, and real packs run to hundreds of megabytes that way —
+ * Prominence II is 405 MB. The 256 MB this used to be refused five of the
+ * hundred most downloaded packs on Modrinth. It is received to disk and read
+ * from there, so the size costs no memory.
  */
-const MAX_PACK_DOWNLOAD_BYTES = 256 * 1024 * 1024;
+const MAX_PACK_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
 /** Where a file inside a pack lands decides which part of a manifest it becomes. */
 const MODS_DIR = 'mods/';
@@ -220,7 +224,11 @@ export async function importMrpack(
   // the first time the game reads it — and so a manifest-supplied file of the
   // same path wins, which is the order the format intends.
   try {
-    const written = await applyOverrides(paths.profileGameDir(profile.id), pack.overrides);
+    const written = await applyOverrides(
+      paths.profileGameDir(profile.id),
+      filePath,
+      pack.overrides,
+    );
     if (written > 0) log.info(`Applied ${written} override file(s) for ${pack.name}`);
   } catch (err) {
     // The one failure after the profile exists that cannot be picked up again:
@@ -294,9 +302,9 @@ const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
  * ends its URLs in `.mrpack` but a signed or proxied link need not, and it is
  * the bytes that decide what a thing is.
  *
- * That is why this downloads first and sniffs after. Both kinds are small — a
- * pack file is metadata plus config, never the jars — so the cost of being
- * right is one short download.
+ * That is why this downloads first and sniffs after. A manifest is a few
+ * kilobytes and most pack files are little more, so the cost of being right is
+ * as a rule one short download.
  */
 export async function createProfileFromUrl(url: string): Promise<PackInstall> {
   assertSecureContentUrl(url);

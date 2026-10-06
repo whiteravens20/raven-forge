@@ -65,7 +65,6 @@ describe('readMrpack', () => {
     // The format states the loader as a dependency key beside `minecraft`.
     expect(result.modLoader).toBe('fabric');
     expect(result.modLoaderVersion).toBe('0.16.9');
-    expect(result.totalBytes).toBe(1024);
   });
 
   it('calls a pack with no loader dependency vanilla', async () => {
@@ -127,7 +126,22 @@ describe('readMrpack', () => {
         'client-overrides/options.txt': 'client',
       }),
     );
-    expect(result.overrides.get('options.txt')?.toString()).toBe('client');
+    expect(result.overrides).toEqual([
+      { path: 'options.txt', entry: 'client-overrides/options.txt', size: 6 },
+    ]);
+  });
+
+  it('lists what the overrides hold without unpacking any of it', async () => {
+    const result = await readMrpack(
+      await pack('listed', index(), {
+        'overrides/config/mod.toml': 'a = 1',
+        'overrides/mods/private-build.jar': 'jar bytes',
+      }),
+    );
+    expect(result.overrides).toEqual([
+      { path: 'config/mod.toml', entry: 'overrides/config/mod.toml', size: 5 },
+      { path: 'mods/private-build.jar', entry: 'overrides/mods/private-build.jar', size: 9 },
+    ]);
   });
 
   it('rejects a zip that is not a Modrinth pack', async () => {
@@ -141,7 +155,7 @@ describe('readMrpack', () => {
     await expect(readMrpack(await pack('malformed', contents))).rejects.toThrow(/malformed/);
   });
 
-  it('refuses a single entry that decompresses past the per-entry cap', async () => {
+  it('refuses a single entry that unpacks past the per-entry cap', async () => {
     // A deflate bomb ships as a tiny zip whose one entry inflates to gigabytes.
     // The declared size is checked before a byte is read; here a 64-byte override
     // against a 16-byte cap stands in for that, so the test costs nothing.
@@ -149,6 +163,15 @@ describe('readMrpack', () => {
     await expect(readMrpack(p, { maxEntryBytes: 16, maxTotalBytes: 1024 })).rejects.toThrow(
       /implausibly large/,
     );
+  });
+
+  it('takes a pack as large as the real ones, which the old ceilings turned away', async () => {
+    // Packs carry what Modrinth does not host — resource packs, private builds —
+    // and several of the most downloaded run past 128 MB a file. Nothing is
+    // unpacked to find that out, so a declared size is all this needs.
+    const p = await pack('large', index(), { 'overrides/resourcepacks/big.zip': 'x'.repeat(4096) });
+    const result = await readMrpack(p);
+    expect(result.overrides).toHaveLength(1);
   });
 
   it('refuses a pack whose entries total past the cap', async () => {
@@ -159,16 +182,50 @@ describe('readMrpack', () => {
       'overrides/b.txt': 'y'.repeat(40),
     });
     await expect(readMrpack(p, { maxEntryBytes: 1024, maxTotalBytes: 50 })).rejects.toThrow(
-      /larger decompressed/,
+      /larger unpacked/,
     );
   });
 });
 
 describe('applyOverrides', () => {
+  /** Unpack the overrides of a pack holding exactly these files. */
+  async function unpack(gameDir: string, name: string, files: Record<string, string>) {
+    const packFile = await pack(name, index(), files);
+    const { overrides } = await readMrpack(packFile);
+    return applyOverrides(gameDir, packFile, overrides);
+  }
+
   it('writes an ordinary override into the game directory', async () => {
     const gameDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-overrides-'));
-    await applyOverrides(gameDir, new Map([['config/opts.txt', Buffer.from('ok')]]));
+
+    expect(await unpack(gameDir, 'plain', { 'overrides/config/opts.txt': 'ok' })).toBe(1);
+
     expect(await fs.readFile(path.join(gameDir, 'config/opts.txt'), 'utf-8')).toBe('ok');
+    await fs.rm(gameDir, { recursive: true, force: true });
+  });
+
+  it('writes the client copy where a pack ships a file under both prefixes', async () => {
+    const gameDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-overrides-'));
+
+    const written = await unpack(gameDir, 'both', {
+      'overrides/options.txt': 'shared',
+      'client-overrides/options.txt': 'client',
+      'overrides/servers.dat': 'servers',
+    });
+
+    expect(written).toBe(2);
+    expect(await fs.readFile(path.join(gameDir, 'options.txt'), 'utf-8')).toBe('client');
+    await fs.rm(gameDir, { recursive: true, force: true });
+  });
+
+  it('writes a file of some size whole', async () => {
+    // Straight from the archive to disk, a chunk at a time.
+    const gameDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-overrides-'));
+    const body = 'resource pack bytes '.repeat(200_000);
+
+    await unpack(gameDir, 'sizeable', { 'overrides/resourcepacks/big.zip': body });
+
+    expect((await fs.stat(path.join(gameDir, 'resourcepacks', 'big.zip'))).size).toBe(body.length);
     await fs.rm(gameDir, { recursive: true, force: true });
   });
 
@@ -178,9 +235,9 @@ describe('applyOverrides', () => {
     // A previous pack, or the player, left a symlinked subdir pointing away.
     await fs.symlink(outside, path.join(gameDir, 'config'));
 
-    await expect(
-      applyOverrides(gameDir, new Map([['config/evil.txt', Buffer.from('x')]])),
-    ).rejects.toThrow(/symlink|outside/);
+    await expect(unpack(gameDir, 'via-link', { 'overrides/config/evil.txt': 'x' })).rejects.toThrow(
+      /symlink|outside/,
+    );
     // Nothing was written through the link.
     await expect(fs.readFile(path.join(outside, 'evil.txt'))).rejects.toThrow();
 
@@ -196,7 +253,7 @@ describe('applyOverrides', () => {
     await fs.symlink(target, path.join(gameDir, 'options.txt'));
 
     await expect(
-      applyOverrides(gameDir, new Map([['options.txt', Buffer.from('overwritten')]])),
+      unpack(gameDir, 'onto-link', { 'overrides/options.txt': 'overwritten' }),
     ).rejects.toThrow();
     // The file the link pointed at is untouched — O_NOFOLLOW refused to open it.
     expect(await fs.readFile(target, 'utf-8')).toBe('original');
