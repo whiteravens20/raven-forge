@@ -281,6 +281,7 @@ export async function deleteProfile(profileId: string, deleteFiles = true): Prom
     // id, so without this the folder is an opaque UUID full of jars that nothing
     // — not the launcher, not the person who kept them — can identify later.
     await writeJsonAtomic(orphanRecordPath(profileId), removed);
+    keptFiles.delete(profileId);
     log.info(`Kept the files of profile ${name} at ${paths.profileDir(profileId)}`);
   }
 
@@ -291,6 +292,9 @@ export async function deleteProfile(profileId: string, deleteFiles = true): Prom
 function orphanRecordPath(profileId: string): string {
   return path.join(paths.profileDir(profileId), 'profile.json');
 }
+
+/** What each kept-behind profile holds, by id, for as long as it stays kept. */
+const keptFiles = new Map<string, ProfileFileSummary>();
 
 /**
  * Profile data left on disk that no profile in the index points at.
@@ -311,7 +315,12 @@ export async function listOrphanedProfiles(): Promise<OrphanedProfile[]> {
     try {
       const raw = await fs.readFile(orphanRecordPath(entry.name), 'utf-8');
       const profile = profileSchema.parse(JSON.parse(raw));
-      orphans.push({ profile, files: await summarizeProfileFiles(entry.name) });
+      // Counted once. Nothing runs from these files any more, and counting them
+      // is a walk over every world they hold — which this used to do for each
+      // kept profile every time the profiles page was opened.
+      const files = keptFiles.get(entry.name) ?? (await summarizeProfileFiles(entry.name));
+      keptFiles.set(entry.name, files);
+      orphans.push({ profile, files });
     } catch {
       // No record, or an unreadable one. A directory the launcher cannot
       // identify is not something to offer restoring — leave it alone rather
@@ -344,6 +353,7 @@ export async function adoptOrphanedProfile(profileId: string): Promise<Profile> 
     profiles.push(restored);
   });
   await fs.rm(orphanRecordPath(profileId), { force: true });
+  keptFiles.delete(profileId);
   log.info(`Restored profile ${restored.name} (${profileId}) from kept files`);
   return restored;
 }
@@ -355,6 +365,7 @@ export async function discardOrphanedProfile(profileId: string): Promise<void> {
     throw new Error(`${profileId} belongs to a live profile, not to kept files`);
   }
   await fs.rm(paths.profileDir(profileId), { recursive: true, force: true });
+  keptFiles.delete(profileId);
   log.info(`Discarded kept files for ${profileId}`);
 }
 
