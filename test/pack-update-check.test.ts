@@ -138,6 +138,28 @@ afterEach(async () => {
 });
 
 describe('checkForPackUpdates', () => {
+  it('does not read a manifest that a redirect brought back over plain http', async () => {
+    // The address asked for is https; the one that answered is not, and that
+    // hop is where the document could have been swapped.
+    await givenSyncedProfile([{ id: 'jei', version: '30.16' }]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        const res = new Response(JSON.stringify(manifest([{ id: 'jei', version: '99' }])), {
+          headers: { etag: '"v2"' },
+        });
+        Object.defineProperty(res, 'url', { value: 'http://mirror.example.test/manifest.json' });
+        return res;
+      }),
+    );
+
+    await checkForPackUpdates('p1');
+
+    // Nothing of that manifest was taken: the profile is not told it is behind.
+    expect((await readState()).pendingUpdates).toBe(0);
+    expect((await readState()).manifestEtag).toBe('"v1"');
+  });
+
   it('turns a stale profile amber without installing anything', async () => {
     await givenSyncedProfile([{ id: 'jei', version: '30.16' }]);
     serving(

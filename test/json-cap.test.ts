@@ -1,7 +1,7 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { describe, it, expect } from 'vitest';
-import { readJsonCapped } from '../src/core/net/json';
+import { assertSecureAnswer, readJsonCapped } from '../src/core/net/json';
 
 /**
  * Reading JSON from a host that is not obliged to be reasonable.
@@ -58,5 +58,38 @@ describe('readJsonCapped', () => {
     // read as a manifest with no mods in it — which is a pack that uninstalls
     // itself.
     await expect(readJsonCapped(response('{ not json'), 'manifest')).rejects.toThrow(SyntaxError);
+  });
+});
+
+/**
+ * The address that answered, as against the one that was asked.
+ *
+ * `fetch` follows a redirect on its own, so an https manifest address that
+ * redirects to plain http hands back a document nothing had checked the
+ * transport of.
+ */
+describe('assertSecureAnswer', () => {
+  const answeredFrom = (url: string) => ({ url }) as Response;
+
+  it('takes an answer that came over https, redirected or not', () => {
+    expect(() =>
+      assertSecureAnswer(answeredFrom('https://cdn.example.net/manifest.json')),
+    ).not.toThrow();
+  });
+
+  it('takes one from this machine, where a pack is tried out', () => {
+    expect(() =>
+      assertSecureAnswer(answeredFrom('http://127.0.0.1:8080/manifest.json')),
+    ).not.toThrow();
+  });
+
+  it('refuses one that ended up on plain http', () => {
+    expect(() => assertSecureAnswer(answeredFrom('http://cdn.example.net/manifest.json'))).toThrow(
+      /must be https/,
+    );
+  });
+
+  it('says nothing about a response that was never received', () => {
+    expect(() => assertSecureAnswer(new Response('{}'))).not.toThrow();
   });
 });

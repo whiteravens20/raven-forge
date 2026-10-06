@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { downloadToFile } from '../net/download';
+import { assertSecureAnswer } from '../net/json';
 import { createProfile, deleteProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
 import { getModVersions, primaryFile } from '../mods/modrinth-api';
@@ -336,6 +337,7 @@ export async function createProfileFromManifest(url: string): Promise<PackInstal
 
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`Could not fetch the manifest: ${res.status} ${res.statusText}`);
+  assertSecureAnswer(res);
 
   // Read enough to name the profile and pin its Minecraft version. The sync
   // fetches and validates it properly a moment later; this is only so the

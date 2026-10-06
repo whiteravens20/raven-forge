@@ -24,7 +24,7 @@ import { readLockFile, mutateLockFile, modFilePath, isSameModFile } from './lock
 import { requiredDependencies } from './compatibility';
 import { acceptedLoaders } from '../../shared/constants';
 import { downloadToFile } from '../net/download';
-import { readJsonCapped } from '../net/json';
+import { assertSecureAnswer, readJsonCapped } from '../net/json';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { forEachConcurrently } from '../util/concurrency';
 import { emitProgress, withProgress } from '../util/progress';
@@ -484,6 +484,7 @@ async function obtainManifest(
   }
 
   if (!res.ok) throw new Error(`Failed to fetch manifest: ${res.status} ${res.statusText}`);
+  assertSecureAnswer(res);
 
   const raw = await readJsonCapped(res, 'The manifest');
   const loaded: LoadedManifest = { raw, manifest: parseManifest(raw, profileName) };

@@ -1,5 +1,7 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
+import { assertSecureContentUrl } from '../../shared/validators';
+
 /**
  * Reading JSON from somewhere that is not obliged to be reasonable.
  *
@@ -10,6 +12,21 @@
  * main process's heap. `mrpack.ts` has capped its index since it was written;
  * this is the same idea for the routes that had not.
  */
+
+/**
+ * Refuse an answer that came from somewhere a request would not have been sent.
+ *
+ * The address asked for is checked before the request, and `fetch` follows a
+ * redirect by itself — so the address that finally answered had not been
+ * checked at all. A manifest asked for over https and served, one redirect
+ * later, over plain http was read as if nothing had happened, on the one hop
+ * where it could be swapped. `downloadToFile` has always looked at where it
+ * ended up; this is the same look for the documents.
+ */
+export function assertSecureAnswer(res: Response): void {
+  // Empty on a response built by hand rather than received; a real one has it.
+  if (res.url) assertSecureContentUrl(res.url);
+}
 
 /** Short lists of references. None of these documents is a large file. */
 const MAX_REMOTE_JSON_BYTES = 8 * 1024 * 1024;
