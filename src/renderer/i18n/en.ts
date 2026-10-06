@@ -526,6 +526,7 @@ export const en = {
   // ── Settings ─────────────────────────────────────────────
   'settings.title': 'Settings',
   'settings.loading': 'Loading settings…',
+  'settings.saveFailed': 'That setting could not be saved, so it is back as it was.',
   'settings.section.appearance': 'Appearance',
   'settings.section.behavior': 'Behaviour',
   'settings.section.network': 'Network and downloads',

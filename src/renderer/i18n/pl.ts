@@ -557,6 +557,8 @@ export const pl: Translations = {
   // ── Settings ─────────────────────────────────────────────
   'settings.title': 'Ustawienia',
   'settings.loading': 'Ładowanie ustawień…',
+  'settings.saveFailed':
+    'Tego ustawienia nie udało się zapisać, więc wróciło do poprzedniej wartości.',
   'settings.section.appearance': 'Wygląd',
   'settings.section.behavior': 'Zachowanie',
   'settings.section.network': 'Sieć i pobieranie',

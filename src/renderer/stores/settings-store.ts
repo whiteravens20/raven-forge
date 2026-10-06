@@ -22,7 +22,8 @@ interface SettingsStore {
    * settings, so a controlled input silently snaps back to them otherwise.
    */
   update: (updates: Partial<GlobalSettings>) => Promise<boolean>;
-  reset: () => Promise<void>;
+  /** `false` if the main process refused. */
+  reset: () => Promise<boolean>;
   /**
    * The key list has channels of its own, which check what `update` cannot: that
    * a key is a key, and that it is not on the list already. Both answer with the
@@ -58,10 +59,10 @@ export const useSettingsStore = create<SettingsStore>((set, _get) => ({
 
   reset: async () => {
     const result = await api.settings.reset();
-    if (result.success && result.data) {
-      set({ settings: result.data });
-      document.documentElement.setAttribute('data-theme', result.data.theme);
-    }
+    if (!result.success || !result.data) return false;
+    set({ settings: result.data });
+    document.documentElement.setAttribute('data-theme', result.data.theme);
+    return true;
   },
 
   addTrustedKey: async (key) => {

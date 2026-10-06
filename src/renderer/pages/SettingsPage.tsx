@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { useSettingsStore } from '@stores/settings-store';
+import { useNoticeStore } from '@stores/notice-store';
 import { useNewsStore } from '@stores/news-store';
 import { useUpdaterStore } from '@stores/updater-store';
 import { Select } from '@components/ui/Select';
@@ -41,8 +42,20 @@ export function SettingsPage() {
     { value: 'close', label: t('settings.onLaunch.close') },
     { value: 'keep-open', label: t('settings.onLaunch.keepOpen') },
   ];
-  const update = useSettingsStore((s) => s.update);
-  const reset = useSettingsStore((s) => s.reset);
+  const save = useSettingsStore((s) => s.update);
+  const resetSettings = useSettingsStore((s) => s.reset);
+  const notify = useNoticeStore((s) => s.show);
+  /**
+   * For the switches, the dropdowns and Reset. One that is refused goes back to
+   * where it was, and without a word that reads as a control that does not
+   * work. Said in the window's own line, which shows wherever this page is
+   * scrolled to; the text fields say their refusals underneath themselves.
+   */
+  const reportRefusal = (saved: boolean) => {
+    if (!saved) notify(t('settings.saveFailed'));
+  };
+  const update = async (updates: Parameters<typeof save>[0]) => reportRefusal(await save(updates));
+  const reset = async () => reportRefusal(await resetSettings());
   const addTrustedKey = useSettingsStore((s) => s.addTrustedKey);
   const removeTrustedKey = useSettingsStore((s) => s.removeTrustedKey);
   const refreshFeeds = useNewsStore((s) => s.refresh);
@@ -151,14 +164,14 @@ export function SettingsPage() {
           max={8}
           value={String(settings.downloadConcurrency)}
           invalidMessage={t('settings.concurrencyInvalid')}
-          onCommit={(v) => update({ downloadConcurrency: Number(v) })}
+          onCommit={(v) => save({ downloadConcurrency: Number(v) })}
         />
         <TextSetting
           label={t('settings.proxy')}
           value={settings.proxyUrl ?? ''}
           placeholder={t('settings.proxyPlaceholder')}
           invalidMessage={t('settings.proxyInvalid')}
-          onCommit={(v) => update({ proxyUrl: v || undefined })}
+          onCommit={(v) => save({ proxyUrl: v || undefined })}
         />
         <p className="text-xs text-rf-text-muted">{t('settings.proxyHint')}</p>
 
@@ -179,7 +192,7 @@ export function SettingsPage() {
           placeholder={t('settings.feedPlaceholder', { feed: 'news' })}
           invalidMessage={t('settings.feedInvalid')}
           onCommit={async (v) => {
-            const saved = await update({ newsFeedUrl: v });
+            const saved = await save({ newsFeedUrl: v });
             if (saved) await refreshFeeds();
             return saved;
           }}
@@ -190,7 +203,7 @@ export function SettingsPage() {
           placeholder={t('settings.feedPlaceholder', { feed: 'announcements' })}
           invalidMessage={t('settings.feedInvalid')}
           onCommit={async (v) => {
-            const saved = await update({ announcementFeedUrl: v });
+            const saved = await save({ announcementFeedUrl: v });
             if (saved) await refreshFeeds();
             return saved;
           }}
