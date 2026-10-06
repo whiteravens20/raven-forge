@@ -310,17 +310,17 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 ## O czym decydujesz Ty
 
-| Co                     | Gdzie i co to daje                                                                                                                                                                                                    |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Logowanie              | **Ustawienia → Zachowanie → „Zawsze uruchamiaj offline”**: launcher nigdy nie łączy się z serwerami logowania Microsoftu, Xboxa i Mojang. Pliki gry i mody nadal są pobierane. Konto offline nie loguje się nigdzie.  |
-| Wiadomości             | **Ustawienia → Źródła treści**: wyczyść oba adresy, a żaden kanał nie będzie pobierany; wpisz własne, a pytane będą tylko one.                                                                                        |
-| Proxy                  | **Ustawienia → Sieć i pobieranie → Proxy URL**: każde połączenie launchera idzie przez nie. Gra, gdy już działa, łączy się sama i proxy launchera jej nie obejmuje.                                                   |
-| Discord                | **Ustawienia → Zachowanie → „Pokazuj grę na statusie Discorda”**, domyślnie wyłączone.                                                                                                                                |
-| Paczki                 | Profil, który trzyma się paczki, pyta o nią adres z pola **Manifest URL** — przy starcie launchera i przed każdym uruchomieniem gry. Usuń ten adres w edytorze profilu, a profil przestanie pytać i się aktualizować. |
-| Zawartość z Modrinth   | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz, nie otworzysz listy modów, shaderów albo paczek zasobów profilu, nie sprawdzisz aktualizacji ani nie wyeksportujesz paczki.                                   |
-| Aktualizacje launchera | Sprawdzane przy każdym starcie jednym zapytaniem do GitHuba. Tego na razie nie da się wyłączyć — patrz „Znane luki”.                                                                                                  |
-| Logi i raporty         | Nie opuszczają komputera, dopóki sam ich komuś nie wyślesz. „Zgłoś błąd” otwiera stronę zgłoszeń w przeglądarce; plik dołączasz ręcznie.                                                                              |
-| Gdzie to wszystko leży | **Ustawienia → Dane → Przenieś…** przenosi folder danych tam, gdzie wskażesz.                                                                                                                                         |
+| Co                     | Gdzie i co to daje                                                                                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Logowanie              | **Ustawienia → Zachowanie → „Zawsze uruchamiaj offline”**: launcher nigdy nie łączy się z serwerami logowania Microsoftu, Xboxa i Mojang. Pliki gry i mody nadal są pobierane. Konto offline nie loguje się nigdzie.     |
+| Wiadomości             | **Ustawienia → Źródła treści**: wyczyść oba adresy, a żaden kanał nie będzie pobierany; wpisz własne, a pytane będą tylko one.                                                                                           |
+| Proxy                  | **Ustawienia → Sieć i pobieranie → Adres proxy**: każde połączenie launchera idzie przez nie. Gra, gdy już działa, łączy się sama i proxy launchera jej nie obejmuje.                                                    |
+| Discord                | **Ustawienia → Zachowanie → „Pokazuj grę na statusie Discorda”**, domyślnie wyłączone.                                                                                                                                   |
+| Paczki                 | Profil, który trzyma się paczki, pyta o nią adres z pola **Adres manifestu** — przy starcie launchera i przed każdym uruchomieniem gry. Usuń ten adres w edytorze profilu, a profil przestanie pytać i się aktualizować. |
+| Zawartość z Modrinth   | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz, nie otworzysz listy modów, shaderów albo paczek zasobów profilu, nie sprawdzisz aktualizacji ani nie wyeksportujesz paczki.                                      |
+| Aktualizacje launchera | Sprawdzane przy każdym starcie jednym zapytaniem do GitHuba. Tego na razie nie da się wyłączyć — patrz „Znane luki”.                                                                                                     |
+| Logi i raporty         | Nie opuszczają komputera, dopóki sam ich komuś nie wyślesz. „Zgłoś błąd” otwiera stronę zgłoszeń w przeglądarce; plik dołączasz ręcznie.                                                                                 |
+| Gdzie to wszystko leży | **Ustawienia → Dane → Przenieś…** przenosi folder danych tam, gdzie wskażesz.                                                                                                                                            |
 
 ---
 
