@@ -49,6 +49,7 @@ const { state } = vi.hoisted(() => ({
     logged: [] as string[],
     settings: {} as Partial<GlobalSettings>,
     account: {} as MinecraftAccount,
+    noActiveAccount: false,
     profile: undefined as Profile | undefined,
     meta: undefined as VersionMeta | undefined,
     played: [] as Array<{ profileId: string; minutes: number }>,
@@ -84,7 +85,7 @@ vi.mock('../src/core/config/settings-manager', () => ({
 vi.mock('../src/core/auth/microsoft-auth', () => ({
   getAuthState: async () => ({
     accounts: [state.account],
-    activeAccountId: state.account.id,
+    activeAccountId: state.noActiveAccount ? null : state.account.id,
     isAuthenticating: false,
   }),
   getMinecraftAccessToken: async () => TOKEN,
@@ -198,6 +199,7 @@ beforeEach(async () => {
   state.sent.length = 0;
   state.logged.length = 0;
   state.played.length = 0;
+  state.noActiveAccount = false;
   state.settings = {
     downloadConcurrency: 4,
     offlineMode: false,
@@ -365,6 +367,18 @@ describe.skipIf(!posix)('a launch', () => {
     expect(args).toContain('-XX:+UseG1GC');
     // What used to happen: the second half went where the main class belongs.
     expect(args).not.toContain('Forge"');
+  });
+
+  it('asks for an account before it fetches anything', async () => {
+    const { launchRefusal } = await import('../src/core/minecraft/launch-errors');
+    state.noActiveAccount = true;
+    // The version itself cannot be read, so a launch that got as far as
+    // preparing files would fail on that instead.
+    state.meta = undefined;
+
+    const err = await launch('exit 0').catch((e: unknown) => e);
+
+    expect(launchRefusal(err)).toEqual({ key: 'launchError.noAccount' });
   });
 });
 

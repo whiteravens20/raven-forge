@@ -313,6 +313,17 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
 
   assertRamFits(stored);
 
+  // Asked first. It used to be found out after the loader, the Java runtime and
+  // every asset had been fetched — minutes of downloading to be told to sign in.
+  const authState = await getAuthState();
+  const account = authState.accounts.find((a) => a.id === authState.activeAccountId);
+  if (!account) {
+    throw new LaunchRefusedError(
+      { key: 'launchError.noAccount' },
+      'No active account — please log in first',
+    );
+  }
+
   log.info(`Launching game for profile: ${stored.name} (MC ${stored.minecraftVersion})`);
 
   // A profile that follows a pack is brought up to the pack before it starts.
@@ -417,13 +428,6 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   const cpSep = process.platform === 'win32' ? ';' : ':';
   const classpath = [...libClasspath, clientJar].join(cpSep);
 
-  // Get auth info
-  const authState = await getAuthState();
-  const account = authState.accounts.find((a) => a.id === authState.activeAccountId);
-  if (!account) {
-    throw new Error('No active account — please log in first');
-  }
-
   const { username, uuid } = account;
 
   // Offline is a per-launch decision with a global default. `undefined` means
@@ -459,7 +463,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     auth_access_token: accessToken,
     clientid: '',
     auth_xuid: '',
-    user_type: account?.type === 'microsoft' ? 'msa' : 'legacy',
+    user_type: account.type === 'microsoft' ? 'msa' : 'legacy',
     version_type: meta.type,
     natives_directory: nativesDir,
     launcher_name: 'raven-forge',

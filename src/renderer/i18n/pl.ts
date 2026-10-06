@@ -136,6 +136,8 @@ export const pl: Translations = {
   'home.launchFailed': 'Nie udało się uruchomić gry',
   'launchError.alreadyRunning': 'Ten profil już działa.',
   'launchError.alreadyPreparing': 'Ten profil jest już przygotowywany do uruchomienia.',
+  'launchError.noAccount':
+    'Nie wybrano konta. Dodaj je albo wybierz na stronie Konta i naciśnij Graj jeszcze raz.',
   'launchError.ramTooBig':
     'Ten profil ma przydzielone {allocated} RAM, a ten komputer ma {total}. Minecraft nie wystartuje z większą ilością pamięci, niż fizycznie jest — zmniejsz ją w edytorze profilu, gdzie {recommended} pasuje do tej maszyny.',
   'launchError.loaderVersionUnknown':
