@@ -5,16 +5,17 @@ import { AlertTriangle, X, FileText, FolderOpen, Bug } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { NEW_CRASH_ISSUE_URL } from '@shared/branding';
 import { useT } from '@renderer/i18n';
-import type { GameExitInfo } from '@shared/ipc-types';
+import type { GameExitInfo, Profile } from '@shared/ipc-types';
 import { openLink, openPath } from '@renderer/open';
+import { LoaderBuildHint } from '@components/LoaderBuildHint';
 
 interface CrashReporterProps {
   crashInfo: GameExitInfo;
-  profileName: string;
+  profile: Profile;
   onDismiss: () => void;
 }
 
-export function CrashReporter({ crashInfo, profileName, onDismiss }: CrashReporterProps) {
+export function CrashReporter({ crashInfo, profile, onDismiss }: CrashReporterProps) {
   const t = useT();
   const [showLogs, setShowLogs] = useState(false);
 
@@ -32,11 +33,11 @@ export function CrashReporter({ crashInfo, profileName, onDismiss }: CrashReport
             <p className="text-xs text-rf-text-secondary">
               {crashInfo.playTimeMinutes > 0
                 ? t('crash.bodyWithTime', {
-                    profile: profileName,
+                    profile: profile.name,
                     code: crashInfo.exitCode ?? '?',
                     minutes: crashInfo.playTimeMinutes,
                   })
-                : t('crash.body', { profile: profileName, code: crashInfo.exitCode ?? '?' })}
+                : t('crash.body', { profile: profile.name, code: crashInfo.exitCode ?? '?' })}
             </p>
           </div>
         </div>
@@ -48,6 +49,8 @@ export function CrashReporter({ crashInfo, profileName, onDismiss }: CrashReport
           <X size={14} />
         </button>
       </div>
+
+      <LoaderBuildHint profile={profile} className="block text-xs text-rf-text select-text" />
 
       {/* Says out loud that nothing left the machine, and that the file is the
           thing to attach — the log tail below is gone the moment this is closed. */}

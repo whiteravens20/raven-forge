@@ -273,6 +273,16 @@ export interface InvokeChannels {
     loader: ModLoaderType,
     mcVersion: string,
   ) => Promise<IpcResult<LoaderVersion[]>>;
+  /**
+   * Whether a build is one the list above would offer for that Minecraft
+   * version. Answered from what is on the machine: it is asked about a profile
+   * whose launch has just failed, and must not need the network to say why.
+   */
+  'loaders:build-starts': (
+    loader: ModLoaderType,
+    loaderVersion: string,
+    mcVersion: string,
+  ) => Promise<IpcResult<boolean>>;
 
   // -- Game Launch --
   'game:launch': (options: LaunchOptions) => Promise<IpcResult<void>>;
@@ -477,6 +487,7 @@ export interface RavenForgeAPI {
   };
   loaders: {
     getVersions: InvokeChannels['loaders:get-versions'];
+    buildStarts: InvokeChannels['loaders:build-starts'];
   };
   game: {
     launch: InvokeChannels['game:launch'];

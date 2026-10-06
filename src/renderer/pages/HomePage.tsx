@@ -276,7 +276,7 @@ export function HomePage() {
           <div className="w-full max-w-lg">
             <CrashReporter
               crashInfo={crashInfo}
-              profileName={selectedProfile.name}
+              profile={selectedProfile}
               onDismiss={() => clearCrash(selectedProfile.id)}
             />
           </div>

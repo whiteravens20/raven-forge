@@ -206,6 +206,11 @@ export const pl: Translations = {
   'crash.openReport': 'Otwórz raport',
   'crash.reportBug': 'Zgłoś błąd',
 
+  'loaderHint.notOffered':
+    '{loader} to wydanie, którego launcher nie oferuje dla Minecraft {mcVersion}: należy do tych, które najpewniej tej wersji nie uruchomią. To może być przyczyna — wybierz inne wydanie w edytorze profilu.',
+  'loaderHint.notOfferedPack':
+    '{loader} to wydanie, którego launcher nie oferuje dla Minecraft {mcVersion}: należy do tych, które najpewniej tej wersji nie uruchomią. To może być przyczyna — to wydanie wskazuje paczka, więc zmienić je może jej autor.',
+
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profile',
   'profiles.new': 'Nowy profil',

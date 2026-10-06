@@ -215,6 +215,13 @@ export const en = {
   'crash.openReport': 'Open report',
   'crash.reportBug': 'Report a bug',
 
+  // Under a crash or a failed launch, when the profile holds a loader build
+  // the editor's list would not have offered.
+  'loaderHint.notOffered':
+    '{loader} is not a build this launcher offers for Minecraft {mcVersion}: it is among those not expected to start it. That may be the reason — choose another build in the profile editor.',
+  'loaderHint.notOfferedPack':
+    "{loader} is not a build this launcher offers for Minecraft {mcVersion}: it is among those not expected to start it. That may be the reason — the pack names this build, so it is the pack's author who can change it.",
+
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profiles',
   'profiles.new': 'New profile',
