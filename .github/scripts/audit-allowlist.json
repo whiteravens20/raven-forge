@@ -42,6 +42,28 @@
         "stops depending on @electron/get 3 - whichever removes this entry first."
       ],
       "expires": "2026-11-04"
+    },
+    {
+      "ghsa": "GHSA-68fv-2mgg-jv7q",
+      "package": "source-map-js",
+      "severity": "high",
+      "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+      "reason": [
+        "Build tooling only. The package arrives through vite -> postcss and through",
+        "@tailwindcss/vite -> @tailwindcss/node, and nothing under `dependencies` reaches",
+        "it (`npm ls source-map-js --omit=dev` is empty), so it is not in the packaged",
+        "app.",
+        "",
+        "The advisory needs a crafted indexed source map to be parsed. The only source",
+        "maps this build reads are the ones its own stylesheets and its own installed",
+        "packages produce, at build time, on the machine doing the build.",
+        "",
+        "The fix is 1.2.2, published 2026-09-30. It becomes installable under this",
+        "repo's seven-day release-age rule on 2026-10-07; bump the lockfile then and",
+        "remove this entry. The expiry is set so that it cannot outlive that by more",
+        "than a few days."
+      ],
+      "expires": "2026-10-10"
     }
   ]
 }
