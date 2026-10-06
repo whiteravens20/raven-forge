@@ -449,6 +449,9 @@ export const en = {
   'mods.updateTo': 'new: {version}',
   'mods.updated': 'Updated: {names}',
   'mods.updateFailed': 'Could not update: {names}',
+  'mods.toggleFailed': 'Could not switch {name}.',
+  'mods.removeFailed': 'Could not remove {name}.',
+  'mods.gameBusy': 'Not while the game is running or starting — it is using these files.',
 
   // ── Compatibility ────────────────────────────────────────
   'compat.title': 'Does {name} fit this profile?',

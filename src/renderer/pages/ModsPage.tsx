@@ -6,6 +6,7 @@ import { usePagedSearch } from '@hooks/use-paged-search';
 import { InstalledEntryInfo, SearchPager, SearchResultRow } from '@components/SearchResults';
 import { projectKey, useProjectDetails } from '@hooks/use-project-details';
 import { useProfileStore } from '@stores/profile-store';
+import { useGameStore } from '@stores/game-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Switch } from '@components/ui/Switch';
@@ -48,7 +49,29 @@ export function ModsPage() {
   const [error, setError] = useState<string | null>(null);
   const [facets, setFacets] = useState<FacetGroups>(NO_FACETS);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * The mods something is being done to right now, by id: installed, updated,
+   * switched or removed.
+   *
+   * One set for all four. They were a single slot for installs and a second for
+   * updates, so pressing Install on another mod took the spinner off the first
+   * and left its button live — and a mod could be installed or updated twice at
+   * once, each run deleting the file the other had just written.
+   */
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const working = async (ids: string[], work: () => Promise<void>) => {
+    setBusy((now) => new Set([...now, ...ids]));
+    try {
+      await work();
+    } finally {
+      setBusy((now) => new Set([...now].filter((id) => !ids.includes(id))));
+    }
+  };
+  // The game has the mods folder open, and a launch being prepared is writing
+  // into it. Nothing here changes it underneath either.
+  const gameBusy = useGameStore((s) =>
+    selectedId ? s.running.has(selectedId) || s.preparing.has(selectedId) : false,
+  );
   /** Non-null while a compatibility warning is waiting on a decision. */
   const [plan, setPlan] = useState<{ mod: ModSearchResult; plan: InstallPlan } | null>(null);
   /** Something worth saying that is not a failure — dependencies that arrived. */
@@ -56,8 +79,6 @@ export function ModsPage() {
   /** The last update check's counts, or null before one has run this session. */
   const [updateCheck, setUpdateCheck] = useState<ModUpdateSummary | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
-  /** Ids being updated right now — a set, so "update all" lights every row. */
-  const [updating, setUpdating] = useState<Set<string>>(new Set());
 
   const details = useProjectDetails(installed);
   const selectedProfile = profiles.find((p) => p.id === selectedId);
@@ -113,11 +134,10 @@ export function ModsPage() {
    * returns names the exact build so installing cannot quietly pick another.
    */
   const handleInstall = async (mod: ModSearchResult) => {
-    if (!selectedId) return;
+    if (!selectedId || busy.has(mod.id)) return;
     setError(null);
     setNote(null);
-    setBusyId(mod.id);
-    try {
+    await working([mod.id], async () => {
       const check = await api.mods.checkInstall(selectedId, mod);
       if (!check.success || !check.data) {
         setError(check.error ?? t('mods.installFailed', { name: mod.name }));
@@ -130,9 +150,7 @@ export function ModsPage() {
         return;
       }
       await install(mod, check.data.versionId);
-    } finally {
-      setBusyId(null);
-    }
+    });
   };
 
   /** Download a build the profile has already agreed to. */
@@ -178,12 +196,14 @@ export function ModsPage() {
     }
   };
 
-  const handleUpdate = async (modIds: string[]) => {
+  const handleUpdate = async (wanted: string[]) => {
+    // Not the ones already on their way: "Update all" pressed after one row's
+    // "Update" used to send that mod a second time.
+    const modIds = wanted.filter((id) => !busy.has(id));
     if (!selectedId || modIds.length === 0) return;
     setError(null);
     setNote(null);
-    setUpdating(new Set(modIds));
-    try {
+    await working(modIds, async () => {
       const result = await api.mods.update(selectedId, modIds);
       if (!result.success || !result.data) {
         setError(result.error ?? t('mods.checkUpdatesFailed'));
@@ -201,21 +221,34 @@ export function ModsPage() {
       // them. The badges below come from the reloaded list, which is current.
       setUpdateCheck(null);
       await loadInstalled();
-    } finally {
-      setUpdating(new Set());
-    }
+    });
   };
 
-  const handleToggle = async (modId: string, enabled: boolean) => {
-    if (!selectedId) return;
-    await api.mods.toggleEnabled(selectedId, modId, enabled);
-    await loadInstalled();
+  // Both used to drop the answer. A switch that could not be flipped — the jar
+  // deleted by hand, or held open by the game on Windows — simply did nothing,
+  // and a mod that could not be removed left the list all the same.
+  const handleToggle = async (mod: InstalledMod, enabled: boolean) => {
+    if (!selectedId || busy.has(mod.id)) return;
+    setError(null);
+    await working([mod.id], async () => {
+      const result = await api.mods.toggleEnabled(selectedId, mod.id, enabled);
+      if (!result.success) {
+        setError(result.error ?? t('mods.toggleFailed', { name: mod.name }));
+      }
+      await loadInstalled();
+    });
   };
 
-  const handleUninstall = async (modId: string) => {
-    if (!selectedId) return;
-    await api.mods.uninstall(selectedId, modId);
-    await loadInstalled();
+  const handleUninstall = async (mod: InstalledMod) => {
+    if (!selectedId || busy.has(mod.id)) return;
+    setError(null);
+    await working([mod.id], async () => {
+      const result = await api.mods.uninstall(selectedId, mod.id);
+      if (!result.success) {
+        setError(result.error ?? t('mods.removeFailed', { name: mod.name }));
+      }
+      await loadInstalled();
+    });
   };
 
   useEffect(() => {
@@ -346,13 +379,12 @@ export function ModsPage() {
       {plan && (
         <CompatibilityDialog
           plan={plan.plan}
-          busy={busyId === plan.mod.id}
+          busy={busy.has(plan.mod.id)}
           onCancel={() => setPlan(null)}
           onInstall={() => {
             const pending = plan;
             setPlan(null);
-            setBusyId(pending.mod.id);
-            void install(pending.mod, pending.plan.versionId).finally(() => setBusyId(null));
+            void working([pending.mod.id], () => install(pending.mod, pending.plan.versionId));
           }}
         />
       )}
@@ -387,7 +419,8 @@ export function ModsPage() {
               {outdated.length > 1 && (
                 <Button
                   size="sm"
-                  loading={updating.size > 1}
+                  loading={outdated.every((mod) => busy.has(mod.id))}
+                  disabled={gameBusy}
                   onClick={() => void handleUpdate(outdated.map((mod) => mod.id))}
                 >
                   {t('mods.updateAll')}
@@ -423,7 +456,8 @@ export function ModsPage() {
                     <Button
                       size="sm"
                       icon={<ArrowUpCircle size={14} />}
-                      loading={updating.has(mod.id)}
+                      loading={busy.has(mod.id)}
+                      disabled={gameBusy}
                       onClick={() => void handleUpdate([mod.id])}
                     >
                       {t('mods.update')}
@@ -431,12 +465,24 @@ export function ModsPage() {
                   )}
                   <Switch
                     checked={mod.enabled}
-                    onChange={(next) => handleToggle(mod.id, next)}
+                    onChange={(next) => void handleToggle(mod, next)}
                     label={mod.name}
-                    title={mod.enabled ? t('common.disable') : t('common.enable')}
+                    title={
+                      gameBusy
+                        ? t('mods.gameBusy')
+                        : mod.enabled
+                          ? t('common.disable')
+                          : t('common.enable')
+                    }
+                    disabled={gameBusy || busy.has(mod.id)}
                   />
                   {!mod.fromManifest && (
-                    <Button variant="danger" size="sm" onClick={() => handleUninstall(mod.id)}>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={gameBusy || busy.has(mod.id)}
+                      onClick={() => void handleUninstall(mod)}
+                    >
                       {t('common.remove')}
                     </Button>
                   )}
@@ -468,7 +514,9 @@ export function ModsPage() {
                     variant="secondary"
                     size="sm"
                     icon={<Download size={14} />}
-                    loading={busyId === mod.id}
+                    loading={busy.has(mod.id)}
+                    disabled={gameBusy}
+                    title={gameBusy ? t('mods.gameBusy') : undefined}
                     onClick={() => void handleInstall(mod)}
                   >
                     {t('common.install')}

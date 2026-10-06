@@ -1105,12 +1105,10 @@ export async function uninstallMod(profileId: string, modId: string): Promise<vo
     if (idx < 0) throw new Error(`Mod ${modId} not found in profile ${profileId}`);
     const mod = mods[idx];
 
-    // Delete file
-    try {
-      await fs.rm(modFilePath(modsDir, mod.fileName, mod.enabled), { force: true });
-    } catch {
-      /* ok */
-    }
+    // A file that is already gone is fine; one that would not go is not. It
+    // used to be dropped from the list either way, and the jar the game went
+    // on loading was then in no list at all.
+    await fs.rm(modFilePath(modsDir, mod.fileName, mod.enabled), { force: true });
 
     mods.splice(idx, 1);
     return mod.name;
