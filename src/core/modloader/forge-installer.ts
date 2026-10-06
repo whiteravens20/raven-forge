@@ -114,21 +114,16 @@ export function isNeoForgeStable(version: string): boolean {
  * A failure here is not fatal — it costs the recommendation, not the list
  * itself, so a promotions outage must not stop someone installing Forge.
  */
-async function forgePromotions(
-  mcVersion: string,
-): Promise<{ recommended?: string; latest?: string }> {
+async function forgeRecommended(mcVersion: string): Promise<string | undefined> {
   try {
     const raw = await fetchText(FORGE_PROMOTIONS_URL, 'Forge promotions');
     const promos = (JSON.parse(raw) as { promos?: Record<string, string> }).promos ?? {};
-    return {
-      recommended: promos[`${mcVersion}-recommended`],
-      latest: promos[`${mcVersion}-latest`],
-    };
+    return promos[`${mcVersion}-recommended`];
   } catch (err) {
     log.warn(
       `Could not read Forge promotions — no build will be marked recommended: ${String(err)}`,
     );
-    return {};
+    return undefined;
   }
 }
 
@@ -140,7 +135,7 @@ export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion
     return [];
   }
 
-  const { recommended } = await forgePromotions(mcVersion);
+  const recommended = await forgeRecommended(mcVersion);
 
   // Sorted rather than reversed. Forge's metadata is in no one order: for most
   // Minecraft versions it lists the newest build first, for a few the oldest,
@@ -211,14 +206,6 @@ function installerUrl(loader: ForgeLikeLoader, loaderVersion: string, mcVersion:
     return `${NEOFORGE_LEGACY_MAVEN_ROOT}/${full}/forge-${full}-installer.jar`;
   }
   return `${NEOFORGE_MAVEN_ROOT}/${loaderVersion}/neoforge-${loaderVersion}-installer.jar`;
-}
-
-function loaderInstallDir(
-  loader: ForgeLikeLoader,
-  loaderVersion: string,
-  mcVersion: string,
-): string {
-  return loaderCacheDir(loader, mcVersion, loaderVersion);
 }
 
 /** Read one entry out of a zip into memory. Returns null when it is not there. */
@@ -396,7 +383,7 @@ export async function installForgeLike(
   signal?: AbortSignal,
 ): Promise<void> {
   const label = loader === 'forge' ? 'Forge' : 'NeoForge';
-  const destDir = loaderInstallDir(loader, loaderVersion, mcVersion);
+  const destDir = loaderCacheDir(loader, mcVersion, loaderVersion);
   // Installing into the launcher's own cache is what makes the libraries and
   // the patched client land where the launcher already looks for them.
   const installRoot = paths.cacheDir;
