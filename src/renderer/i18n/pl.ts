@@ -95,7 +95,6 @@ export const pl: Translations = {
   'common.remove': 'Usuń',
   'common.delete': 'Usuń',
   'common.edit': 'Edytuj',
-  'common.export': 'Eksportuj',
   'common.import': 'Importuj',
   'common.back': 'Wstecz',
   'common.close': 'Zamknij',
@@ -203,6 +202,7 @@ export const pl: Translations = {
   'profiles.deleteFailed': 'Nie udało się usunąć profilu.',
   'profiles.openFolder': 'Otwórz folder profilu',
   'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
+  'profiles.exportSettings': 'Eksportuj ustawienia profilu (.json) — bez modów',
   'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',
   'profiles.exportPackAsk': 'W paczce znajdą się mody, shadery i paczki zasobów tego profilu.',
   'profiles.exportPackSettings': 'Dołącz ustawienia gry i konfigurację modów',
@@ -237,7 +237,8 @@ export const pl: Translations = {
   'worlds.backupNow': 'Zrób kopię',
   'worlds.backedUp': 'Światy zostały skopiowane.',
   'worlds.backupFailed': 'Nie udało się zrobić kopii światów.',
-  'worlds.noBackups': 'Brak kopii. Jedna powstaje automatycznie przed zmianą wersji.',
+  'worlds.noBackups':
+    'Brak kopii. Przy zmianie wersji Minecrafta launcher proponuje zrobić ją najpierw.',
   'worlds.restore': 'Przywróć tę kopię',
   'worlds.confirmRestore': 'Zastąpić obecne światy?',
   'worlds.confirmRestoreYes': 'Zastąp',
@@ -304,7 +305,8 @@ export const pl: Translations = {
     'Ten profil ma {count} zapisanych światów. Później nie da się ich odzyskać.',
   'delete.worldsWarning.other':
     'Ten profil ma {count} zapisanego świata. Później nie da się go odzyskać.',
-  'delete.keptAt': 'Pliki zostaną w {path} — launcher po prostu przestanie je pokazywać.',
+  'delete.keptAt':
+    'Pliki zostaną w {path}. Będą na tej stronie w sekcji „Pozostawione pliki”, skąd można je przywrócić albo usunąć.',
   'delete.confirmWithFiles': 'Usuń z plikami',
   'delete.confirmKeepFiles': 'Usuń, zostaw pliki',
 
@@ -522,7 +524,7 @@ export const pl: Translations = {
   // ── Accounts ─────────────────────────────────────────────
   'accounts.title': 'Konta',
   'accounts.loginMicrosoft': 'Zaloguj przez Microsoft',
-  'accounts.offlineMode': 'Tryb offline',
+  'accounts.offlineMode': 'Dodaj konto offline',
   'accounts.privacyLink': 'Co Raven Forge robi z moimi danymi?',
   'accounts.playerName': 'Nazwa gracza',
   'accounts.empty': 'Brak kont — zaloguj się powyżej',
@@ -573,7 +575,7 @@ export const pl: Translations = {
   'settings.onLaunch.keepOpen': 'Zostaw otwarte',
   'settings.onLaunchCloseHint':
     'Okno launchera znika, gdy gra już działa, a launcher kończy pracę razem z grą. Jeśli gra ulegnie awarii, okno wraca, żeby raport z awarii nie przepadł.',
-  'settings.showConsole': 'Pokaż konsolę gry',
+  'settings.showConsole': 'Pokazuj na stronie głównej przycisk konsoli gry, gdy gra działa',
   'settings.offlineMode': 'Zawsze uruchamiaj offline',
   'settings.offlineModeHint':
     'Nigdy nie łączy się z serwerami logowania. Tylko singleplayer i LAN — serwery w trybie online odrzucą sesję offline.',

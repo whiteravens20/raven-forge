@@ -782,7 +782,7 @@ function ProfileDetail({
             size="sm"
             icon={<Download size={14} />}
             onClick={onExport}
-            title={t('common.export')}
+            title={t('profiles.exportSettings')}
           />
           <Button
             variant="ghost"

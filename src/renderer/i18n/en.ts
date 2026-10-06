@@ -106,7 +106,6 @@ export const en = {
   'common.remove': 'Remove',
   'common.delete': 'Delete',
   'common.edit': 'Edit',
-  'common.export': 'Export',
   'common.import': 'Import',
   'common.back': 'Back',
   'common.close': 'Close',
@@ -211,6 +210,7 @@ export const en = {
   'profiles.deleteFailed': 'Could not delete the profile.',
   'profiles.openFolder': 'Open profile folder',
   'profiles.exportPack': 'Export as a modpack (.mrpack)',
+  'profiles.exportSettings': 'Export the profile’s settings (.json) — not its mods',
   'profiles.exportPackFailed': 'Could not export that profile as a pack.',
   'profiles.exportPackAsk': 'The pack will hold this profile’s mods, shaders and resource packs.',
   'profiles.exportPackSettings': 'Include the game settings and the mods’ configuration',
@@ -232,7 +232,7 @@ export const en = {
   'worlds.backupNow': 'Back up',
   'worlds.backedUp': 'The worlds were copied aside.',
   'worlds.backupFailed': 'Could not back up the worlds.',
-  'worlds.noBackups': 'No copies yet. One is taken automatically before a version change.',
+  'worlds.noBackups': 'No copies yet. Changing the Minecraft version offers to take one first.',
   'worlds.restore': 'Restore this copy',
   'worlds.confirmRestore': 'Replace the current worlds?',
   'worlds.confirmRestoreYes': 'Replace',
@@ -280,7 +280,8 @@ export const en = {
   'delete.worldsWarning.one': 'This profile has a world save. It cannot be recovered afterwards.',
   'delete.worldsWarning.other':
     'This profile has {count} world saves. They cannot be recovered afterwards.',
-  'delete.keptAt': 'The files stay at {path} — the launcher will simply stop listing them.',
+  'delete.keptAt':
+    'The files stay at {path}. They are listed under “Leftover files” on this page, where they can be put back or deleted.',
   'delete.confirmWithFiles': 'Delete with files',
   'delete.confirmKeepFiles': 'Delete, keep files',
 
@@ -492,7 +493,7 @@ export const en = {
   // ── Accounts ─────────────────────────────────────────────
   'accounts.title': 'Accounts',
   'accounts.loginMicrosoft': 'Sign in with Microsoft',
-  'accounts.offlineMode': 'Offline mode',
+  'accounts.offlineMode': 'Add an offline account',
   'accounts.privacyLink': 'What does Raven Forge do with my data?',
   'accounts.playerName': 'Player name',
   'accounts.empty': 'No accounts — sign in above',
@@ -543,7 +544,7 @@ export const en = {
   'settings.onLaunch.keepOpen': 'Stay open',
   'settings.onLaunchCloseHint':
     'The launcher window goes away once the game is running, and the launcher quits when the game does. If the game crashes the window comes back instead, so the crash report is not missed.',
-  'settings.showConsole': 'Show the game console',
+  'settings.showConsole': 'Offer the game’s console on the home page while a game is running',
   'settings.offlineMode': 'Always launch offline',
   'settings.offlineModeHint':
     'Never contacts the sign-in servers. Singleplayer and LAN only — online-mode servers refuse an offline session.',
