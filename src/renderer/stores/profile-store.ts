@@ -19,8 +19,12 @@ interface ProfileStore {
    */
   create: (data: Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>) => Promise<IpcResult<Profile>>;
   update: (profileId: string, updates: Partial<Profile>) => Promise<IpcResult<Profile>>;
-  /** `deleteFiles: false` unlists the profile but leaves its directory intact. */
-  remove: (profileId: string, deleteFiles: boolean) => Promise<void>;
+  /**
+   * `deleteFiles: false` unlists the profile but leaves its directory intact.
+   * Answers with the main process's reply: a delete can be refused, and one
+   * that could not remove every file says so.
+   */
+  remove: (profileId: string, deleteFiles: boolean) => Promise<IpcResult<void>>;
   /**
    * Profiles being copied right now, by the id of the original.
    *
@@ -71,13 +75,15 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   },
 
   remove: async (profileId, deleteFiles) => {
-    await api.profiles.delete(profileId, deleteFiles);
-    const { profiles, selectedProfileId } = get();
-    if (selectedProfileId === profileId) {
-      const remaining = profiles.filter((p) => p.id !== profileId);
-      set({ selectedProfileId: remaining[0]?.id ?? null });
-    }
+    const result = await api.profiles.delete(profileId, deleteFiles);
+    // Reloaded whatever the answer: a delete that could not remove every file
+    // has still taken the profile off the list.
     await get().load();
+    const { profiles, selectedProfileId } = get();
+    if (selectedProfileId === profileId && !profiles.some((p) => p.id === profileId)) {
+      set({ selectedProfileId: profiles[0]?.id ?? null });
+    }
+    return result;
   },
 
   duplicate: async (profileId, name) => {

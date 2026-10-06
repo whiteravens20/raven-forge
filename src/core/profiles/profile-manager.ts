@@ -263,7 +263,18 @@ export async function deleteProfile(profileId: string, deleteFiles = true): Prom
     try {
       await fs.rm(paths.profileDir(profileId), { recursive: true, force: true });
     } catch (err) {
-      log.warn(`Failed to delete profile directory for ${profileId}: ${err}`);
+      // Something in there would not go — a file the game or an editor still
+      // has open, on Windows. This was logged and answered as done, leaving a
+      // folder named by an id, with the worlds in it, that no screen listed.
+      // What is left is recorded as kept files, so it shows where those do and
+      // can be deleted from there, and the caller is told the truth.
+      await writeJsonAtomic(orphanRecordPath(profileId), removed).catch(() => undefined);
+      throw new Error(
+        `${name} is off the list, but not all of its files could be deleted — ` +
+          `${err instanceof Error ? err.message : String(err)}. ` +
+          'What is left is listed as kept files, and can be deleted from there.',
+        { cause: err },
+      );
     }
   } else {
     // Leave the profile's own record beside its files. Directories are named by

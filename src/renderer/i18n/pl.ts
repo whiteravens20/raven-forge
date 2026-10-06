@@ -192,6 +192,7 @@ export const pl: Translations = {
   'profiles.duplicated':
     'Kopia ma te same mody, konfiguracje, shadery, paczki zasobów i światy co oryginał. Kopie zapasowe światów zostały przy oryginale.',
   'profiles.duplicateFailed': 'Nie udało się zduplikować profilu.',
+  'profiles.deleteFailed': 'Nie udało się usunąć profilu.',
   'profiles.openFolder': 'Otwórz folder profilu',
   'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
   'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',

@@ -200,6 +200,7 @@ export const en = {
   'profiles.duplicated':
     'The copy has the same mods, configs, shaders, resource packs and worlds as the original. The world backups stay with the original.',
   'profiles.duplicateFailed': 'Could not duplicate the profile.',
+  'profiles.deleteFailed': 'Could not delete the profile.',
   'profiles.openFolder': 'Open profile folder',
   'profiles.exportPack': 'Export as a modpack (.mrpack)',
   'profiles.exportPackFailed': 'Could not export that profile as a pack.',

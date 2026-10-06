@@ -720,6 +720,11 @@ export function isGameRunning(profileId: string): boolean {
   return runningProcesses.has(profileId);
 }
 
+/** Running, or between Play and the game existing — see `preparing`. */
+export function isGameBusy(profileId: string): boolean {
+  return runningProcesses.has(profileId) || preparing.has(profileId);
+}
+
 /**
  * Profiles between "launch pressed" and `spawn`.
  *

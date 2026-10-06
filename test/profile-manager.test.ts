@@ -283,6 +283,31 @@ describe('deleteProfile', () => {
   it('says so when there is no such profile', async () => {
     await expect(mgr.deleteProfile('nope')).rejects.toThrow(/not found/);
   });
+
+  it.skipIf(asRoot)('says so when a file would not go, and lists what is left', async () => {
+    // A world the game still has open, on Windows; here, a folder nothing may
+    // be removed from. This used to be logged and answered as deleted, leaving
+    // a folder named by an id, worlds and all, that no screen showed.
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    const saves = path.join(root, 'profiles', created.id, '.minecraft', 'saves', 'World');
+    await fs.mkdir(saves, { recursive: true });
+    await fs.writeFile(path.join(saves, 'level.dat'), 'world');
+    await fs.chmod(saves, 0o500);
+
+    try {
+      await expect(mgr.deleteProfile(created.id, true)).rejects.toThrow(/off the list/);
+    } finally {
+      await fs.chmod(saves, 0o700);
+    }
+
+    expect(await mgr.getProfile(created.id)).toBeNull();
+    const orphans = await mgr.listOrphanedProfiles();
+    expect(orphans.map((o) => o.profile.name)).toEqual(['Ravens']);
+    expect(orphans[0].files.worlds).toBe(1);
+    // And from there it can be deleted for good.
+    await mgr.discardOrphanedProfile(created.id);
+    await expect(fs.stat(path.join(root, 'profiles', created.id))).rejects.toThrow();
+  });
 });
 
 describe('orphaned profiles', () => {

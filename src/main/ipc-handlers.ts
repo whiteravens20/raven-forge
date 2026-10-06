@@ -76,7 +76,13 @@ import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater
 import { detectSystemJava, probeJava } from '../core/java/java-manager';
 import { requiredJavaFor } from '../core/minecraft/java-requirement';
 import { getLoaderVersions } from '../core/modloader/loader-manager';
-import { launchGame, killGame, isGameRunning, getLogTail } from '../core/minecraft/game-launcher';
+import {
+  launchGame,
+  killGame,
+  isGameBusy,
+  isGameRunning,
+  getLogTail,
+} from '../core/minecraft/game-launcher';
 import { getVersionManifest } from '../core/minecraft/version-manifest';
 import { cancelJob, isCancellation } from '../core/util/cancellation';
 import { machineMemoryMb } from '../core/util/machine-memory';
@@ -536,6 +542,14 @@ export function registerAllIpcHandlers(): void {
   });
   handle('profiles:delete', async (_event, profileId: string, deleteFiles: boolean) => {
     try {
+      // The game has the profile's files open, and a launch being prepared is
+      // still writing them: deleting underneath either removes what it can and
+      // leaves the rest, and the game carries on in a folder that is half gone.
+      if (isGameBusy(profileId)) {
+        return fail(
+          'Close the game first — a profile cannot be deleted while its game is running.',
+        );
+      }
       await deleteProfile(profileId, deleteFiles);
       return ok(undefined);
     } catch (err) {

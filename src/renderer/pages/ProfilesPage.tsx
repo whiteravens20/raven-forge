@@ -641,7 +641,12 @@ export function ProfilesPage() {
           onConfirm={(deleteFiles) => {
             const id = deleting.id;
             setDeleting(null);
-            void removeProfile(id, deleteFiles);
+            setActionError(null);
+            void removeProfile(id, deleteFiles).then((r) => {
+              if (!r.success) setActionError(r.error ?? t('profiles.deleteFailed'));
+              // Files that would not go are listed as kept; show them now.
+              void refreshOrphans();
+            });
           }}
         />
       )}
