@@ -67,6 +67,10 @@ jobs:
       - uses: actions/dependency-review-action@v5.0.0
         with:
           fail-on-severity: high
+          comment-summary-in-pr: always
+          # Any allowlisted ID goes here as `allow-ghsas:`, and its justification
+          # in .github/scripts/audit-allowlist.json. Keep the two in sync.
+          #
           # Deny licences that would conflict with redistributing the packaged
           # app. Raven Forge is AGPL-3.0-only, and these two are not compatible
           # with it, so a dependency under either cannot ship inside the installer.
