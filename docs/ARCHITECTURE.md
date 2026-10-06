@@ -238,8 +238,9 @@ is worse than one that was never there:
   four lines that never started; 1.16.5 from `36.2.26` and 1.16.4 not at all,
   because the builds before that call a constructor Java 8u321 removed, and the
   Java fetched here is the current one; 1.17.1 from `37.0.29`, because the
-  earlier builds drop every library whose path has `forge-` in it, and the
-  launcher's folder does.
+  earlier builds either tell the game's jar by the name Mojang's launcher gives
+  it, which is not its name here, or drop every library whose path has `forge-`
+  in it, which the launcher's own folder does.
 - _NeoForge_ lists the builds it made for the snapshots and pre-releases of a
   version under the release's own number, marked only by what follows a `+`;
   those are left out, as are one build of its 1.20.1 line that was published
@@ -249,18 +250,20 @@ is worse than one that was never there:
   off the list: its ASM cannot read the class files of the Java that Minecraft
   version is compiled for, which both services publish enough to work out; its
   profile sends for a library over plain http, which the launcher does not
-  fetch; or it is older than the oldest build that was found to start that
-  version by starting it — a short table, because nothing published says where
-  those floors are. For 26.3 that leaves 18 of Fabric's 253 builds and 16 of
-  Quilt's 307.
+  fetch; or it is older than the floor a short table gives for that version,
+  found by starting the game because nothing published says where it is. For
+  26.3 that leaves 18 of Fabric's 253 builds and 16 of Quilt's 307.
 
 Every floor in those tables came from starting the game: the oldest build still
 offered was installed and started on every release each loader has builds for —
 48 for Fabric, 44 for Quilt, 56 for Forge, 23 for NeoForge — and where it did
 not start, the first one that does was searched for. For Fabric and Quilt a
-Minecraft version newer than the table keeps its newest floor; a Forge or
-NeoForge build is made for one version, so a new version starts out with every
-build offered.
+floor found on one release is kept for the ones after it, until one of them
+needs a newer build still, and a Minecraft version newer than the table keeps
+its newest floor. That can keep an old build from a release it would have
+started; it never offers one older than a build that was seen to start. A Forge
+or NeoForge build is made for one version, so a new version starts out with
+every build offered.
 
 A build that is not offered can still be named by a pack. It is installed as the
 pack asks; where that cannot be done the launch says so, and where the loader

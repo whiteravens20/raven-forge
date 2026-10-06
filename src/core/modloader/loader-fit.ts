@@ -135,10 +135,13 @@ function namesPlainHttp(entry: LoaderEntry): boolean {
  *   unobfuscated — 26.1 and later — does not have.
  *
  * A row holds until the next row's release, and the last one for everything
- * after it. That is deliberate in both directions: nothing older has been
- * tried on a later release, so nothing older is offered for one; and a release
- * that comes out after this was written keeps the newest floor until somebody
- * has started it with less.
+ * after it — which is how the later releases were started: each with the floor
+ * it inherits. That can keep a build from a release it would have started:
+ * Fabric 0.14.0 starts 1.20.1, where the floor carried over from 1.19.1 is
+ * 0.14.8. It is the side to be wrong on. Such a build is older than the game
+ * it is kept from, and nothing is offered below a build that was seen to
+ * start. A release that comes out after this was written keeps the newest
+ * floor the same way, until somebody has started it with less.
  */
 const FIRST_STARTING: Record<MetaLoader, ReadonlyArray<readonly [from: string, build: string]>> = {
   fabric: [

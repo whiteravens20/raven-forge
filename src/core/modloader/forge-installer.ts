@@ -187,11 +187,16 @@ export function forgeInstallsOn(mcVersion: string): boolean {
  *   took away in 8u321. Mojang's launcher still runs them on a Java from 2015;
  *   the one fetched here is the current Java 8, and none of 1.16.4's 55 builds
  *   was ever fixed.
- * - `1.17.1` before 37.0.29 — these leave out of the game every library whose
- *   *path* contains one of a list of words. `forge-` is on the list, and this
- *   launcher's own folder is called `raven-forge-launcher`.
+ * - `1.17.1` before 37.0.29 — two things, and both come of how this launcher
+ *   is laid out. Up to 37.0.12 a build keeps the game's own jar off the module
+ *   path by the name it has in Mojang's launcher, which makes a copy for every
+ *   Forge version and calls it after that one; here there is a single jar,
+ *   called after the Minecraft version. From 37.0.13 a build leaves out every
+ *   library whose *path* contains one of a list of words. `forge-` is on the
+ *   list, and this launcher's own folder is called `raven-forge-launcher`.
  *
- * Nothing older than a floor was tried above it, so nothing older is offered.
+ * A line that starts was taken to go on starting: the builds before a floor
+ * were not each tried, and none of them is offered.
  */
 const FIRST_WORKING_FORGE: ReadonlyMap<string, string | null> = new Map([
   ['1.7.10', '10.13.3.1388'],
