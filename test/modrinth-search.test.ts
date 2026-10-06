@@ -75,6 +75,30 @@ describe('searchMods', () => {
     expect(facets()).toEqual([['project_type:mod'], ['versions:1.21.1'], ['categories:neoforge']]);
   });
 
+  it('asks for Fabric mods as well on Quilt, which runs them', async () => {
+    await searchMods({ query: 'sodium', loader: 'quilt', gameVersion: '1.21.1' });
+
+    // One group, so either tag will do. Sodium and Fabric API carry `fabric`
+    // alone, and a group of `quilt` only kept both out of the results.
+    expect(facets()).toEqual([
+      ['project_type:mod'],
+      ['versions:1.21.1'],
+      ['categories:quilt', 'categories:fabric'],
+    ]);
+  });
+
+  it('asks for no loader at all for vanilla, which runs no mods', async () => {
+    await searchMods({ query: 'x', loader: 'vanilla' });
+
+    expect(facets()).toEqual([['project_type:mod']]);
+  });
+
+  it('keeps a modpack search to the one loader the pack is built for', async () => {
+    await searchMods({ query: '', projectType: 'modpack', loader: 'quilt' });
+
+    expect(facets()).toEqual([['project_type:modpack'], ['categories:quilt']]);
+  });
+
   it('narrows a modpack search by loader too', async () => {
     await searchMods({ query: '', projectType: 'modpack', loader: 'fabric' });
 
