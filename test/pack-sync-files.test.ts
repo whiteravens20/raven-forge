@@ -57,6 +57,12 @@ vi.mock('../src/core/net/download', () => ({
     await afterDownload(dest);
   },
 }));
+/** What Modrinth lists for a project, by project id. */
+const modrinthBuilds = new Map<string, unknown[]>();
+vi.mock('../src/core/mods/modrinth-api', async (original) => ({
+  ...(await original<typeof import('../src/core/mods/modrinth-api')>()),
+  getModVersions: async (projectId: string) => modrinthBuilds.get(projectId) ?? [],
+}));
 vi.mock('../src/core/config/paths', () => ({
   paths: {
     profileGameDir: () => path.join(root, 'game'),
@@ -70,6 +76,7 @@ vi.mock('../src/core/config/paths', () => ({
 const { syncManifest, installResolvedMod, toggleModEnabled, getProfileSyncStatus } =
   await import('../src/core/mods/mod-sync');
 const { readLockFile } = await import('../src/core/mods/lock-file');
+const { pendingChanges } = await import('../src/core/mods/pack-diff');
 const { cancelJob, isCancellation } = await import('../src/core/util/cancellation');
 
 const sha256 = (body: string) => crypto.createHash('sha256').update(body).digest('hex');
@@ -116,6 +123,7 @@ beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-sync-files-'));
   await fs.mkdir(modsDir(), { recursive: true });
   published.clear();
+  modrinthBuilds.clear();
   fetched.length = 0;
   beforeDownload = () => {};
   afterDownload = async () => {};
@@ -367,5 +375,48 @@ describe('a pack that moves to a newer loader build', () => {
     await syncManifest('p1', pack([mod('jei')], { modLoaderVersion: '21.1.250' }));
 
     expect(updateProfile).not.toHaveBeenCalled();
+  });
+});
+
+describe('a pack that names a Modrinth build by its id', () => {
+  it('is level with the pack once it has synced', async () => {
+    // The lock recorded Modrinth's version number, and what is compared with
+    // the manifest is the manifest's own label — so an entry pinned by id read
+    // as out of date the moment the sync that installed it had finished, and
+    // stayed that way through every sync after.
+    const body = 'jar of sodium 0.6.5';
+    published.set(urlOf('sodium-0.6.5.jar'), body);
+    modrinthBuilds.set('AANobbMI', [
+      {
+        id: 'pinnedId',
+        version_number: '0.6.5',
+        files: [
+          {
+            url: urlOf('sodium-0.6.5.jar'),
+            filename: 'sodium-0.6.5.jar',
+            hashes: { sha512: crypto.createHash('sha512').update(body).digest('hex'), sha1: '' },
+            primary: true,
+            size: body.length,
+          },
+        ],
+      },
+    ]);
+    const manifest = pack([
+      {
+        id: 'sodium',
+        name: 'Sodium',
+        version: 'pinnedId',
+        source: 'modrinth',
+        projectId: 'AANobbMI',
+        required: true,
+        side: 'both',
+      } as unknown as ReturnType<typeof mod>,
+    ]);
+
+    await syncManifest('p1', manifest);
+
+    expect(await jars()).toEqual(['sodium-0.6.5.jar']);
+    expect((await lock())[0].version).toBe('pinnedId');
+    expect(pendingChanges(manifest.mods, await lock())).toBe(0);
   });
 });

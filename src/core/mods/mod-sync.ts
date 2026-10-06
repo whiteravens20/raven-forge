@@ -271,7 +271,6 @@ interface ResolvedDownload {
   /** Set instead of `url` for `source: "local"` entries */
   localPath?: string;
   fileName: string;
-  version: string;
   /**
    * Integrity data the source API supplied, used only where the manifest itself
    * published none. A manifest hash is the stronger claim — it can be covered
@@ -284,8 +283,14 @@ interface ResolvedDownload {
  * Turn a manifest entry into something downloadable.
  *
  * `modrinth` entries carry a project ID plus a version label; the label is
- * matched against Modrinth's `version_number` first and its opaque version `id`
- * second, so manifests can pin either.
+ * matched against Modrinth's `version_number` and its opaque version `id`, so
+ * manifests can pin either.
+ *
+ * A label that names neither is refused. It used to fall back to the newest
+ * build, which is how a profile came to run a different version of a mod from
+ * the server its pack was written for, with nothing said — and since no sync
+ * would ever install the version the manifest did name, the profile was counted
+ * as behind the pack by that entry for good.
  */
 export async function resolveModEntry(
   entry: ModEntry,
@@ -307,7 +312,7 @@ export async function resolveModEntry(
         `${entry.name}: a mod given by url must declare a sha512, sha256 or sha1 hash`,
       );
     }
-    return { url: entry.url, fileName, version: entry.version };
+    return { url: entry.url, fileName };
   }
 
   switch (entry.source) {
@@ -317,19 +322,19 @@ export async function resolveModEntry(
       }
       const loaders = acceptedLoaders(manifest.modLoader);
       const versions = await getModVersions(entry.projectId, manifest.minecraftVersion, loaders);
-      const match =
-        versions.find((v) => v.version_number === entry.version || v.id === entry.version) ??
-        versions[0];
+      const match = versions.find(
+        (v) => v.version_number === entry.version || v.id === entry.version,
+      );
       if (!match) {
         throw new Error(
-          `${entry.name}: no Modrinth release for MC ${manifest.minecraftVersion} / ${manifest.modLoader}`,
+          `${entry.name}: no Modrinth version "${entry.version}" for ` +
+            `MC ${manifest.minecraftVersion} / ${manifest.modLoader}`,
         );
       }
       const file = primaryFile(match);
       return {
         url: file.url,
         fileName: file.filename,
-        version: match.version_number || match.id,
         // Verify against the hash Modrinth publishes for this exact build, even
         // when the manifest carried none of its own — the API always returns
         // sha512/sha1, so a modrinth entry is never installed unverified.
@@ -349,7 +354,7 @@ export async function resolveModEntry(
       if (!isSafeFileName(fileName)) {
         throw new Error(`${entry.name}: localPath does not name a file`);
       }
-      return { localPath: entry.localPath, fileName, version: entry.version };
+      return { localPath: entry.localPath, fileName };
     }
   }
 }
@@ -813,7 +818,11 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         synced.push({
           id: entry.id,
           name: entry.name,
-          version: resolved.version,
+          // The manifest's own label, whichever of a build's two names it is.
+          // It is what the update check compares, so recording Modrinth's
+          // version number for an entry pinned by id left that entry reading
+          // as out of date the moment the sync that installed it had finished.
+          version: entry.version,
           source: entry.source,
           fileName: resolved.fileName,
           required: entry.required,
