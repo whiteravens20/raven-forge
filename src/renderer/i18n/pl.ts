@@ -786,7 +786,7 @@ export const pl: Translations = {
     'Jeden plik na każdą awarię gry, już bez tokenu i danych konta. Nigdzie nie są wysyłane — to Ty decydujesz, czy dołączyć któryś do zgłoszenia.',
   'storage.browser.title': 'Pliki okna launchera',
   'storage.browser.body':
-    'Okno launchera to wbudowana przeglądarka i tu trzyma swoje pliki: pamięć podręczną obrazków (ikony modów, grafiki aktualności), zapamiętane ukryte ogłoszenia i ciasteczka strony logowania Microsoft.',
+    'Okno launchera to wbudowana przeglądarka i tu trzyma swoje pliki: pamięć podręczną obrazków (ikony modów, grafiki aktualności), zapamiętane ukryte ogłoszenia, ostatnio wybrany profil i ciasteczka strony logowania Microsoft.',
   'storage.pointer.title': 'Wskaźnik folderu danych',
   'storage.pointer.body':
     'Plik tekstowy z jedną linią: ścieżką do folderu danych. Po nim launcher i deinstalator trafiają do danych, które zostały przeniesione.',

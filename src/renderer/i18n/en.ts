@@ -792,7 +792,7 @@ export const en = {
     'One file per game crash, with the token and the account details already taken out. They are sent nowhere — you decide whether to attach one to a report.',
   'storage.browser.title': 'The launcher window’s files',
   'storage.browser.body':
-    'The launcher’s window is an embedded browser, and this is where it keeps its own files: a cache of images (mod icons, news pictures), the announcements you dismissed, and the cookies of the Microsoft sign-in page.',
+    'The launcher’s window is an embedded browser, and this is where it keeps its own files: a cache of images (mod icons, news pictures), the announcements you dismissed, which profile was selected last, and the cookies of the Microsoft sign-in page.',
   'storage.pointer.title': 'Pointer to the data folder',
   'storage.pointer.body':
     'A text file with one line: the path of the data folder. It is how the launcher and the uninstaller find data that has been moved.',

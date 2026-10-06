@@ -86,10 +86,10 @@ W folderze danych:
 
 W folderze launchera, gdziekolwiek są dane:
 
-| Ścieżka         | Zawartość                                                                                                                                                                                      |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `browser/`      | Okno launchera to wbudowana przeglądarka, a to jej własne pliki: pamięć podręczna obrazków (ikony modów, grafiki z wiadomości), zamknięte ogłoszenia i ciasteczka strony logowania Microsoftu. |
-| `data-root.txt` | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, dokąd trafił, i nic poza tym. Czytają go launcher i deinstalator Windows, żeby znaleźć dane.                          |
+| Ścieżka         | Zawartość                                                                                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `browser/`      | Okno launchera to wbudowana przeglądarka, a to jej własne pliki: pamięć podręczna obrazków (ikony modów, grafiki z aktualności), zamknięte ogłoszenia, ostatnio wybrany profil i ciasteczka strony logowania Microsoftu. |
+| `data-root.txt` | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, dokąd trafił, i nic poza tym. Czytają go launcher i deinstalator Windows, żeby znaleźć dane.                                                    |
 
 I poza oboma:
 

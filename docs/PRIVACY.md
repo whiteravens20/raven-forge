@@ -83,10 +83,10 @@ In the data folder:
 
 In the launcher folder, wherever the data is:
 
-| Path            | Contents                                                                                                                                                                                            |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `browser/`      | The launcher's window is an embedded browser, and this is its own storage: a cache of images (mod icons, news pictures), the announcements you dismissed, and the Microsoft sign-in page's cookies. |
-| `data-root.txt` | Present only if you moved the data folder: one line naming where it went, and nothing else. The launcher and the Windows uninstaller read it to find the data.                                      |
+| Path            | Contents                                                                                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `browser/`      | The launcher's window is an embedded browser, and this is its own storage: a cache of images (mod icons, news pictures), the announcements you dismissed, which profile was selected last, and the Microsoft sign-in page's cookies. |
+| `data-root.txt` | Present only if you moved the data folder: one line naming where it went, and nothing else. The launcher and the Windows uninstaller read it to find the data.                                                                       |
 
 And outside both:
 

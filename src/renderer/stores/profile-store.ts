@@ -36,6 +36,25 @@ interface ProfileStore {
   duplicate: (profileId: string, name?: string) => Promise<IpcResult<Profile>>;
 }
 
+/** Where the last selected profile is kept between runs — the page's own storage. */
+const SELECTION_KEY = 'rf-selected-profile';
+
+function recallSelection(): string | null {
+  try {
+    return localStorage.getItem(SELECTION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberSelection(profileId: string): void {
+  try {
+    localStorage.setItem(SELECTION_KEY, profileId);
+  } catch {
+    /* storage switched off — the selection simply is not remembered */
+  }
+}
+
 export const useProfileStore = create<ProfileStore>((set, get) => ({
   profiles: [],
   selectedProfileId: null,
@@ -48,9 +67,13 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     if (result.success && result.data) {
       const profiles = result.data;
       set({ profiles, loading: false });
-      // Auto-select first if none selected
+      // The one that was selected last time, when it is still there; the first
+      // otherwise. The launcher used to open on the first profile whatever had
+      // been played the night before.
       if (!get().selectedProfileId && profiles.length > 0) {
-        set({ selectedProfileId: profiles[0].id });
+        const remembered = recallSelection();
+        const selected = profiles.find((p) => p.id === remembered) ?? profiles[0];
+        set({ selectedProfileId: selected.id });
       }
     } else {
       set({ loading: false });
@@ -104,3 +127,10 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     }
   },
 }));
+
+// Whichever way the selection changes — a click, a new profile, a deletion.
+useProfileStore.subscribe((state, before) => {
+  if (state.selectedProfileId && state.selectedProfileId !== before.selectedProfileId) {
+    rememberSelection(state.selectedProfileId);
+  }
+});
