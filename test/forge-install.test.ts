@@ -155,4 +155,12 @@ describe.skipIf(!posix)('installing Forge', () => {
       id: `${MC}-forge-${BUILD}`,
     });
   });
+
+  it('runs one installer when two launches want the same build', async () => {
+    const javaPath = await writeFakeJava();
+
+    await Promise.all([install({ javaPath }), install({ javaPath })]);
+
+    expect(await installerRuns()).toHaveLength(1);
+  });
 });

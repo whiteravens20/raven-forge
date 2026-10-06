@@ -33,8 +33,9 @@ import { getVersionMeta } from '../minecraft/version-manifest';
 import { verifyDownload, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
 import { loaderCacheDir } from './loader-paths';
-import { loaderProfilePath } from './loader-profile';
+import { loaderProfilePath, readLoaderProfile } from './loader-profile';
 import { writeJsonAtomic } from '../util/atomic-file';
+import { serializeByKey } from '../util/serialize';
 import { downloadToFile } from '../net/download';
 import { getSettings } from '../config/settings-manager';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
@@ -386,12 +387,30 @@ export interface LoaderInstallOptions {
  * installer is an opaque Java process and inventing a progress bar for it would
  * be a lie.
  */
-export async function installForgeLike(
+export function installForgeLike(
   loader: ForgeLikeLoader,
   loaderVersion: string,
   mcVersion: string,
   onProgress: (fraction: number, message: ProgressMessage) => void,
-  { signal, javaPath }: LoaderInstallOptions = {},
+  options: LoaderInstallOptions = {},
+): Promise<void> {
+  // One installer at a time, whichever build it is for. They all write into the
+  // launcher's one cache — the same `versions/` folder, the same libraries — and
+  // two profiles on one build, got ready together, used to run two of them over
+  // the same files.
+  return serializeByKey('forge-like-install', async () => {
+    // Whoever held the turn before may have installed this very build.
+    if (await readLoaderProfile(loader, loaderVersion, mcVersion)) return;
+    await runInstaller(loader, loaderVersion, mcVersion, onProgress, options);
+  });
+}
+
+async function runInstaller(
+  loader: ForgeLikeLoader,
+  loaderVersion: string,
+  mcVersion: string,
+  onProgress: (fraction: number, message: ProgressMessage) => void,
+  { signal, javaPath }: LoaderInstallOptions,
 ): Promise<void> {
   const label = loader === 'forge' ? 'Forge' : 'NeoForge';
   const destDir = loaderCacheDir(loader, mcVersion, loaderVersion);
