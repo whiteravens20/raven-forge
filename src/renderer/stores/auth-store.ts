@@ -14,6 +14,8 @@ const api = window.ravenforge;
 type AuthResult = Promise<string | null>;
 
 interface AuthStore extends AuthState {
+  /** A sign-in started from this window has not come back yet. */
+  isAuthenticating: boolean;
   load: () => Promise<void>;
   loginMicrosoft: () => AuthResult;
   loginOffline: (username: string) => AuthResult;

@@ -22,7 +22,7 @@ beforeEach(() => {
   api = installRendererApi();
   api.call('auth', 'getState').mockResolvedValue({
     success: true,
-    data: { accounts: [{ id: 'a' }, { id: 'b' }], activeAccountId: 'a', isAuthenticating: false },
+    data: { accounts: [{ id: 'a' }, { id: 'b' }], activeAccountId: 'a' },
   });
 });
 

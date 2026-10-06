@@ -407,7 +407,6 @@ async function fullMicrosoftAuthChain(
     username: profile.name,
     type: 'microsoft',
     skinUrl: activeSkinUrl(profile),
-    lastAuthenticated: new Date().toISOString(),
   };
 
   await saveAccount(account, msRefreshToken, {
@@ -449,7 +448,6 @@ export async function loginOffline(username: string): Promise<MinecraftAccount> 
     uuid: offlineUuid(username),
     username,
     type: 'offline',
-    lastAuthenticated: new Date().toISOString(),
   };
 
   // Must complete before returning: the renderer re-reads auth state the moment

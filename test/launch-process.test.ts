@@ -86,7 +86,6 @@ vi.mock('../src/core/auth/microsoft-auth', () => ({
   getAuthState: async () => ({
     accounts: [state.account],
     activeAccountId: state.noActiveAccount ? null : state.account.id,
-    isAuthenticating: false,
   }),
   getMinecraftAccessToken: async () => TOKEN,
 }));

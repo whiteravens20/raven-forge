@@ -208,7 +208,6 @@ export async function getAuthState(): Promise<AuthState> {
   return {
     accounts: store.accounts,
     activeAccountId: store.activeAccountId,
-    isAuthenticating: false,
     // Surfaced, not only logged. The fallback is the right behaviour — better
     // than refusing to log in on a machine with no keyring daemon — but the
     // person whose Microsoft refresh token is in a plaintext file is the one
