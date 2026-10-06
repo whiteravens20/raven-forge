@@ -55,7 +55,6 @@ vi.mock('electron', () => ({
   },
   shell: { openExternal: () => Promise.resolve(), openPath: () => Promise.resolve('') },
   session: { defaultSession: { setProxy: () => Promise.resolve() } },
-  safeStorage: { isEncryptionAvailable: () => false },
   BrowserWindow: class {},
 }));
 

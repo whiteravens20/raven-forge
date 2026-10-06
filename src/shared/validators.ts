@@ -99,7 +99,6 @@ export const globalSettingsSchema = z.object({
   proxyUrl: z
     .string()
     .optional()
-    .or(z.literal(''))
     .refine(
       (v) => {
         if (!v) return true;

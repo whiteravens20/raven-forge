@@ -33,4 +33,3 @@ export const session = {
 export const BrowserWindow = class {};
 export const ipcMain = { handle: () => {}, on: () => {} };
 export const shell = { openExternal: () => Promise.resolve() };
-export const safeStorage = { isEncryptionAvailable: () => false };

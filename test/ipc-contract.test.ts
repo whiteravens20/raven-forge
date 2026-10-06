@@ -65,7 +65,6 @@ vi.mock('electron', () => ({
       webRequest: { onHeadersReceived: () => {} },
     },
   },
-  safeStorage: { isEncryptionAvailable: () => false },
   BrowserWindow: class {},
   nativeTheme: { on: () => {} },
 }));

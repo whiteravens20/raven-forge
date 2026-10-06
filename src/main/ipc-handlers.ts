@@ -44,8 +44,9 @@ import {
   restoreBackup,
   deleteBackup,
 } from '../core/profiles/world-backup';
-import { getProfileSyncStatus, getLastManifestVerification } from '../core/mods/mod-sync';
 import {
+  getProfileSyncStatus,
+  getLastManifestVerification,
   getInstalledMods,
   syncManifest,
   installModFromSearch,

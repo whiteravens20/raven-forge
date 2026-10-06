@@ -119,10 +119,9 @@ function readRaw(): Promise<AuthStoreData> {
 
 async function writeStore(data: AuthStoreData): Promise<void> {
   const file = getAuthPath();
+  // Written beside the file with this mode and renamed onto it, so the mode an
+  // older build left on the file goes with the file it replaces.
   await writeJsonAtomic(file, data, AUTH_FILE_MODE);
-  // The rename preserves the temporary file's mode, but an auth.json written by
-  // an older build keeps its own until something re-applies it.
-  await fs.chmod(file, AUTH_FILE_MODE).catch(() => undefined);
 }
 
 let migration: Promise<void> | undefined;

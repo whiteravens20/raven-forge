@@ -390,8 +390,6 @@ export interface EventChannels {
   // -- Updater Events --
   'updater:update-available': (info: UpdateInfo) => void;
   'updater:update-downloaded': (info: UpdateInfo) => void;
-  // -- Announcement Events --
-
   // -- Window Events --
   'window:maximized-changed': (isMaximized: boolean) => void;
 }
