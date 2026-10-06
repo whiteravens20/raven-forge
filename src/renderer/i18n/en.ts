@@ -43,6 +43,9 @@ export const en = {
   'content.installFailed': 'Could not install {name}.',
   'content.removeFailed': 'Could not remove that.',
   'content.reorderFailed': 'Could not save the new order.',
+  'content.listFailed': 'Could not read what is installed.',
+  'content.loaderCheckFailed':
+    'The shader pack is installed, but the launcher could not check whether this profile has a shader loader to run it.',
   'content.emptyShaders': 'No shaders installed',
   'content.emptyPacks': 'No resource packs installed',
   'content.emptyHint': 'Browse to add one, or let a manifest sync bring it in.',

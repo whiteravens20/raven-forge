@@ -32,6 +32,9 @@ export const pl: Translations = {
   'content.installFailed': 'Nie udało się zainstalować {name}.',
   'content.removeFailed': 'Nie udało się usunąć.',
   'content.reorderFailed': 'Nie udało się zapisać nowej kolejności.',
+  'content.listFailed': 'Nie udało się odczytać listy zainstalowanych.',
+  'content.loaderCheckFailed':
+    'Paczka shaderów jest zainstalowana, ale launcher nie mógł sprawdzić, czy ten profil ma loader shaderów, który ją uruchomi.',
   'content.emptyShaders': 'Brak zainstalowanych shaderów',
   'content.emptyPacks': 'Brak zainstalowanych paczek zasobów',
   'content.emptyHint':

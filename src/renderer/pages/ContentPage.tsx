@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { usePagedSearch } from '@hooks/use-paged-search';
@@ -83,15 +83,27 @@ export function ContentPage() {
   const isInstalled = (item: ModSearchResult) =>
     installed.some((entry) => isProject(entry, item.id) || entry.id === item.slug);
 
+  // Which list is on screen, for an answer that arrives after it has changed.
+  const shown = useRef({ selectedId, kind });
+  useEffect(() => {
+    shown.current = { selectedId, kind };
+  }, [selectedId, kind]);
+
   const loadInstalled = useCallback(async () => {
     if (!selectedId) return;
     const result =
       kind === 'shaders'
         ? await api.content.getShaders(selectedId)
         : await api.content.getResourcePacks(selectedId);
+    // An install started under Shaders finishes whenever it finishes, and then
+    // reloads the list it was started from. By then the page may be showing
+    // resource packs — which used to get the shaders written over them.
+    if (shown.current.selectedId !== selectedId || shown.current.kind !== kind) return;
     if (result.success && result.data) setInstalled(result.data);
-    else setInstalled([]);
-  }, [selectedId, kind]);
+    // A list that could not be read is not an empty one: "nothing installed"
+    // over a folder full of packs is the wrong thing to be told.
+    else setError(result.error ?? t('content.listFailed'));
+  }, [selectedId, kind, t]);
 
   useEffect(() => {
     void loadInstalled();
@@ -199,7 +211,12 @@ export function ContentPage() {
    */
   const checkShaderLoader = async (profileId: string) => {
     const state = await api.content.getShaderLoaderState(profileId);
-    if (!state.success || !state.data) return;
+    if (!state.success || !state.data) {
+      // The pack is in; whether anything can read it is what could not be found
+      // out, and that is worth knowing about a shader that then does nothing.
+      setError(state.error ?? t('content.loaderCheckFailed'));
+      return;
+    }
     if (state.data.status === 'choose') setChoosingLoader(state.data.options);
     // `already-installed` says nothing: it is the expected case, and a banner
     // confirming that nothing happened is a banner people learn to ignore.
