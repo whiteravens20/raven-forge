@@ -144,12 +144,14 @@ const install = (options: Parameters<Installer['installForgeLike']>[4] = {}) =>
   mod.installForgeLike('forge', BUILD, MC, () => {}, options);
 
 describe.skipIf(!posix)('installing Forge', () => {
-  it('runs the installer on the Java the profile names', async () => {
+  it('runs the installer on the Java the profile names, from its own folder', async () => {
     const javaPath = await writeFakeJava();
 
     await install({ javaPath });
 
-    expect(await installerRuns()).toHaveLength(1);
+    // Its own folder, so the log the installer writes beside itself does not
+    // land wherever the launcher happened to be started from.
+    expect(await installerRuns()).toEqual([path.join(root, 'loaders', 'forge', `${MC}-${BUILD}`)]);
     const profile = path.join(root, 'loaders', 'forge', `${MC}-${BUILD}`, 'forge-profile.json');
     expect(JSON.parse(await fs.readFile(profile, 'utf-8'))).toMatchObject({
       id: `${MC}-forge-${BUILD}`,
