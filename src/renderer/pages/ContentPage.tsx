@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
+import { useGameStore } from '@stores/game-store';
 import { usePagedSearch } from '@hooks/use-paged-search';
 import { InstalledEntryInfo, SearchPager, SearchResultRow } from '@components/SearchResults';
 import { projectKey, useProjectDetails } from '@hooks/use-project-details';
@@ -73,6 +74,10 @@ export function ContentPage() {
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
+  // The game has these folders open, and rewrites `options.txt` when it closes.
+  const gameBusy = useGameStore((s) =>
+    selectedId ? s.running.has(selectedId) || s.preparing.has(selectedId) : false,
+  );
   // What a browse row is matched against. Installed entries are keyed by
   // whatever named them: a project id when the launcher installed them, a slug
   // when a pack manifest did — and a search result carries both. Switching kind
@@ -424,6 +429,8 @@ export function ContentPage() {
                     size="sm"
                     icon={<Download size={14} />}
                     loading={busyId === item.id}
+                    disabled={gameBusy}
+                    title={gameBusy ? t('mods.gameBusy') : undefined}
                     onClick={() => void handleInstall(item)}
                   >
                     {t('common.install')}
@@ -466,7 +473,7 @@ export function ContentPage() {
                   <div className="flex flex-col">
                     <button
                       onClick={() => void handleMove(index, -1)}
-                      disabled={index === 0}
+                      disabled={gameBusy || index === 0}
                       aria-label={t('content.moveUp', { name: item.name })}
                       className="text-rf-text-muted hover:text-rf-text disabled:opacity-30 disabled:cursor-not-allowed"
                     >
@@ -474,7 +481,7 @@ export function ContentPage() {
                     </button>
                     <button
                       onClick={() => void handleMove(index, 1)}
-                      disabled={index === installed.length - 1}
+                      disabled={gameBusy || index === installed.length - 1}
                       aria-label={t('content.moveDown', { name: item.name })}
                       className="text-rf-text-muted hover:text-rf-text disabled:opacity-30 disabled:cursor-not-allowed"
                     >
@@ -497,6 +504,8 @@ export function ContentPage() {
                     variant="danger"
                     size="sm"
                     loading={busyId === item.id}
+                    disabled={gameBusy}
+                    title={gameBusy ? t('mods.gameBusy') : undefined}
                     onClick={() => void handleRemove(item.id)}
                   >
                     {t('common.remove')}
