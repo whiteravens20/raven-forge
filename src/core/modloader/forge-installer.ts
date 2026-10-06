@@ -209,20 +209,24 @@ function installerUrl(loader: ForgeLikeLoader, loaderVersion: string, mcVersion:
 }
 
 /** Read one entry out of a zip into memory. Returns null when it is not there. */
-function readZipEntry(jarPath: string, wanted: string): Promise<Buffer | null> {
-  return new Promise((resolve, reject) => {
-    yauzl.open(jarPath, { lazyEntries: true }, (openErr, zip) => {
-      if (openErr || !zip) {
-        reject(openErr ?? new Error(`Could not open ${jarPath}`));
-        return;
-      }
-      let found = false;
+async function readZipEntry(jarPath: string, wanted: string): Promise<Buffer | null> {
+  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
+    yauzl.open(jarPath, { lazyEntries: true }, (err, opened) => {
+      if (err || !opened) reject(err ?? new Error(`Could not open ${jarPath}`));
+      else resolve(opened);
+    });
+  });
+
+  // Closed here whichever way it goes. yauzl closes the file by itself only
+  // when it runs off the end of the entries, and this stops at the one it
+  // wants — so every install used to leave the installer jar open.
+  try {
+    return await new Promise<Buffer | null>((resolve, reject) => {
       zip.on('entry', (entry: yauzl.Entry) => {
         if (entry.fileName !== wanted) {
           zip.readEntry();
           return;
         }
-        found = true;
         zip.openReadStream(entry, (err, stream) => {
           if (err || !stream) {
             reject(err ?? new Error(`Could not read ${wanted} from ${jarPath}`));
@@ -234,13 +238,13 @@ function readZipEntry(jarPath: string, wanted: string): Promise<Buffer | null> {
           stream.on('error', reject);
         });
       });
-      zip.on('end', () => {
-        if (!found) resolve(null);
-      });
+      zip.on('end', () => resolve(null));
       zip.on('error', reject);
       zip.readEntry();
     });
-  });
+  } finally {
+    zip.close();
+  }
 }
 
 /** The checksum sidecars a Maven repository publishes, strongest first. */
