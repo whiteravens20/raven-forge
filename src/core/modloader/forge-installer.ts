@@ -111,7 +111,11 @@ export function neoForgePrefix(mcVersion: string): string {
 
 export function neoForgeVersionsFor(all: string[], mcVersion: string): string[] {
   const prefix = neoForgePrefix(mcVersion);
-  return all.filter((v) => v.startsWith(prefix));
+  // A `+` names what the build was really made for: `26.1.0.0-alpha.15+pre-3`
+  // is NeoForge for the third pre-release of 26.1, and its installer says so.
+  // It has the release's prefix all the same, and was offered for 26.1 — where
+  // installing it sets up the pre-release under the release's name.
+  return all.filter((v) => v.startsWith(prefix) && !v.includes('+'));
 }
 
 /** NeoForge marks unfinished builds in the version string itself. */
@@ -234,6 +238,15 @@ export function isLegacyNeoForge(loaderVersion: string, mcVersion: string): bool
   return !loaderVersion.startsWith(neoForgePrefix(mcVersion));
 }
 
+/**
+ * Builds NeoForge lists and publishes no installer for.
+ *
+ * One, out of 1,846: the repository was asked about every build on 2026-10-06.
+ * It is the second build of the 1.20.1 line, and offered to choose from it was
+ * a profile that could be made and never installed.
+ */
+const NEOFORGE_WITHOUT_INSTALLER: ReadonlySet<string> = new Set(['47.1.7']);
+
 export async function getNeoForgeVersions(mcVersion: string): Promise<LoaderVersion[]> {
   const xml = await fetchText(`${NEOFORGE_MAVEN_ROOT}/maven-metadata.xml`, 'NeoForge Maven');
   const versions = neoForgeVersionsFor(parseMavenVersions(xml), mcVersion);
@@ -251,15 +264,18 @@ export async function getNeoForgeVersions(mcVersion: string): Promise<LoaderVers
     `${NEOFORGE_LEGACY_MAVEN_ROOT}/maven-metadata.xml`,
     'NeoForge (1.20.1) Maven',
   );
-  const legacy = forgeVersionsFor(parseMavenVersions(legacyXml), mcVersion);
+  const legacy = forgeVersionsFor(parseMavenVersions(legacyXml), mcVersion).filter(
+    (build) => !NEOFORGE_WITHOUT_INSTALLER.has(build),
+  );
   if (legacy.length === 0) {
     log.info(`NeoForge has no builds for Minecraft ${mcVersion}`);
     return [];
   }
 
   log.info(`NeoForge ${mcVersion}: ${legacy.length} build(s) from the legacy artifact`);
-  // That line never shipped a prerelease under this artifact.
-  return legacy.reverse().map((version) => ({ version, stable: true }));
+  // That line never shipped a prerelease under this artifact. Sorted, because
+  // its two oldest builds are listed the wrong way round.
+  return legacy.sort(compareLoaderVersionsDesc).map((version) => ({ version, stable: true }));
 }
 
 // ── Installation ───────────────────────────────────────────

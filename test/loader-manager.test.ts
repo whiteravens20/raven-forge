@@ -186,6 +186,32 @@ describe('getLoaderVersions', () => {
     expect(versions.map((v) => v.version)).toEqual(['10.13.4.1614-1.7.10', '10.13.3.1388-1.7.10']);
   });
 
+  it('offers no NeoForge build that has no installer, and sorts the 1.20.1 line', async () => {
+    // The 1.20.1 line as its own artifact lists it: the two oldest the wrong way
+    // round, and the second of them published without an installer.
+    const modern =
+      '<metadata><versioning><versions><version>21.1.256</version></versions></versioning></metadata>';
+    const legacy =
+      '<metadata><versioning><versions>' +
+      ['1.20.1-47.1.7', '1.20.1-47.1.5', '1.20.1-47.1.8', '1.20.1-47.1.106']
+        .map((v) => `<version>${v}</version>`)
+        .join('') +
+      '</versions></versioning></metadata>';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async (url: string | URL) =>
+          new Response(String(url).includes('/neoforged/forge/') ? legacy : modern, {
+            status: 200,
+          }),
+      ),
+    );
+
+    const versions = await mod.getLoaderVersions('neoforge', '1.20.1');
+
+    expect(versions.map((v) => v.version)).toEqual(['47.1.106', '47.1.8', '47.1.5']);
+  });
+
   it('offers no Forge build for a Minecraft version from before Forge could be installed like this', async () => {
     // Forge lists 72 builds for 1.6.4 and 133 for 1.3.2. None of them is
     // something this launcher installs, so none is offered — and nobody is asked.

@@ -144,6 +144,14 @@ describe('neoForgeVersionsFor', () => {
     expect(neoForgeVersionsFor(all, '26.1.2')).toEqual(['26.1.2.94']);
   });
 
+  it('leaves out a build made for a snapshot or a pre-release of that version', () => {
+    // NeoForge for the third pre-release of 26.1 and for its first snapshot.
+    // Both carry the release's prefix, and neither is NeoForge for 26.1.
+    const listed = ['26.1.0.0-alpha.15+pre-3', '26.1.0.0-alpha.1+snapshot-1', '26.1.0.1-beta'];
+
+    expect(neoForgeVersionsFor(listed, '26.1')).toEqual(['26.1.0.1-beta']);
+  });
+
   it('returns nothing for Minecraft versions NeoForge never supported', () => {
     // 1.20.1 is empty *here* on purpose: it lives under the legacy artifact,
     // which getNeoForgeVersions falls back to.
