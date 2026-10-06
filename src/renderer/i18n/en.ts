@@ -354,6 +354,7 @@ export const en = {
   'profiles.notes': 'Notes',
   'profiles.lastPlayed': 'Last played: {date}',
   'profiles.totalPlayTime': '{hours} h total',
+  'profiles.totalPlayMinutes': '{minutes} min total',
   'profiles.syncStatus.synced': 'In sync',
   'profiles.syncStatus.updates': 'Updates available ({count})',
   'profiles.syncStatus.error': 'Sync error',

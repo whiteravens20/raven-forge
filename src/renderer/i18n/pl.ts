@@ -381,6 +381,7 @@ export const pl: Translations = {
   'profiles.notes': 'Notatki',
   'profiles.lastPlayed': 'Ostatnio grano: {date}',
   'profiles.totalPlayTime': '{hours} h łącznie',
+  'profiles.totalPlayMinutes': '{minutes} min łącznie',
   'profiles.syncStatus.synced': 'Zsynchronizowano',
   'profiles.syncStatus.updates': 'Dostępne aktualizacje ({count})',
   'profiles.syncStatus.error': 'Błąd synchronizacji',

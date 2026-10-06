@@ -887,7 +887,13 @@ function ProfileDetail({
             date: new Date(profile.lastPlayed).toLocaleDateString(locale),
           })}
           {profile.totalPlayTimeMinutes
-            ? ` • ${t('profiles.totalPlayTime', { hours: Math.round(profile.totalPlayTimeMinutes / 60) })}`
+            ? ` • ${
+                profile.totalPlayTimeMinutes < 60
+                  ? t('profiles.totalPlayMinutes', { minutes: profile.totalPlayTimeMinutes })
+                  : t('profiles.totalPlayTime', {
+                      hours: Math.round(profile.totalPlayTimeMinutes / 60),
+                    })
+              }`
             : ''}
         </p>
       )}
