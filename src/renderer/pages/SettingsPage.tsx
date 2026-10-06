@@ -312,16 +312,13 @@ export function SettingsPage() {
       {showLogs && <LogViewer onClose={() => setShowLogs(false)} />}
 
       <div className="pt-4 border-t border-rf-border">
-        <Button
-          variant="danger"
-          onClick={() => {
-            if (confirm(t('settings.confirmReset'))) {
-              void reset();
-            }
-          }}
+        <ConfirmButton
+          question={t('settings.confirmReset')}
+          confirmLabel={t('settings.reset')}
+          onConfirm={() => void reset()}
         >
           {t('settings.reset')}
-        </Button>
+        </ConfirmButton>
       </div>
     </div>
   );
