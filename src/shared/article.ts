@@ -40,9 +40,15 @@ function isSafeHref(href: string): boolean {
  * The link target allows one level of nested parentheses — Wikipedia URLs have
  * them, and stopping at the first `)` closed the link early and left the rest
  * of the URL sitting in the prose.
+ *
+ * Every run has a length it may not pass. Without one, each `[` that is never
+ * closed sends the search to the end of the line and back, and a feed is a
+ * document from an address somebody pasted: forty thousand brackets took over a
+ * second of the page doing nothing else. No real link, emphasis or code span is
+ * anywhere near these.
  */
 const INLINE =
-  /\[([^\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`/g;
+  /\[([^\]\n]{1,300})\]\(((?:[^()\s]|\([^()\s]{0,2000}\)){1,2000})\)|\*\*([^*\n]{1,300})\*\*|\*([^*\n]{1,300})\*|`([^`\n]{1,300})`/g;
 
 export function parseSpans(line: string): Span[] {
   const spans: Span[] = [];

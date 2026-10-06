@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { useEffect, Fragment } from 'react';
+import { useEffect, useMemo, Fragment } from 'react';
 import { X, ExternalLink } from 'lucide-react';
 import { parseArticle, type Block, type Span } from '@shared/article';
 import { useT } from '@renderer/i18n';
@@ -38,7 +38,9 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const blocks = article.body ? parseArticle(article.body) : parseArticle(article.excerpt ?? '');
+  // Once per article, not once per render.
+  const text = article.body || article.excerpt || '';
+  const blocks = useMemo(() => parseArticle(text), [text]);
 
   return (
     <div
