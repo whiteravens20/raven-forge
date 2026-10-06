@@ -7,8 +7,7 @@ import { useAuthStore } from '@stores/auth-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { useT } from '@renderer/i18n';
-
-const api = window.ravenforge;
+import { openLink } from '@renderer/open';
 
 /**
  * Where a Microsoft account is actually managed — skin, cape and username.
@@ -209,7 +208,7 @@ export function AccountsPage() {
                     variant="ghost"
                     size="sm"
                     icon={<ExternalLink size={12} />}
-                    onClick={() => void api.system.openUrl(MC_ACCOUNT_URL)}
+                    onClick={() => void openLink(MC_ACCOUNT_URL)}
                   >
                     {t('accounts.manage')}
                   </Button>

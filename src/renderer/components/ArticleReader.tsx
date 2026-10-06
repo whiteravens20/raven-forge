@@ -4,8 +4,7 @@ import { useEffect, useMemo, Fragment } from 'react';
 import { X, ExternalLink } from 'lucide-react';
 import { parseArticle, type Block, type Span } from '@shared/article';
 import { useT } from '@renderer/i18n';
-
-const api = window.ravenforge;
+import { openLink } from '@renderer/open';
 
 export interface Article {
   title: string;
@@ -82,7 +81,7 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
         {article.url && (
           <footer className="border-t border-rf-border px-5 py-2.5">
             <button
-              onClick={() => void api.system.openUrl(article.url!)}
+              onClick={() => void openLink(article.url!)}
               className="inline-flex items-center gap-1.5 text-xs text-rf-accent-text hover:underline"
             >
               <ExternalLink size={13} />
@@ -149,7 +148,7 @@ function SpanView({ span }: { span: Span }) {
     case 'link':
       return (
         <button
-          onClick={() => void api.system.openUrl(span.href)}
+          onClick={() => void openLink(span.href)}
           className="text-rf-accent-text hover:underline"
         >
           {span.text}

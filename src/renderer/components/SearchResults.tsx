@@ -6,8 +6,7 @@ import { Button } from '@components/ui/Button';
 import { useLocale, useT } from '@renderer/i18n';
 import { modrinthProjectUrl } from '@shared/constants';
 import type { InstalledMod, ModSearchResult, ProjectDetails } from '@shared/ipc-types';
-
-const api = window.ravenforge;
+import { openLink } from '@renderer/open';
 
 /**
  * One search hit, drawn the same way wherever Modrinth is searched.
@@ -69,7 +68,7 @@ export function ProjectLink({ slug, name }: { slug: string; name: string }) {
   const label = t('search.openProject', { name });
   return (
     <button
-      onClick={() => void api.system.openUrl(modrinthProjectUrl(slug))}
+      onClick={() => void openLink(modrinthProjectUrl(slug))}
       aria-label={label}
       title={label}
       className="shrink-0 text-rf-text-muted hover:text-rf-accent-text"

@@ -6,8 +6,7 @@ import { Button } from '@components/ui/Button';
 import { NEW_CRASH_ISSUE_URL } from '@shared/branding';
 import { useT } from '@renderer/i18n';
 import type { GameExitInfo } from '@shared/ipc-types';
-
-const api = window.ravenforge;
+import { openLink, openPath } from '@renderer/open';
 
 interface CrashReporterProps {
   crashInfo: GameExitInfo;
@@ -74,7 +73,7 @@ export function CrashReporter({ crashInfo, profileName, onDismiss }: CrashReport
               variant="secondary"
               size="sm"
               icon={<FolderOpen size={12} />}
-              onClick={() => void api.system.openPath(crashInfo.reportPath!)}
+              onClick={() => void openPath(crashInfo.reportPath!)}
             >
               {t('crash.openReport')}
             </Button>
@@ -82,7 +81,7 @@ export function CrashReporter({ crashInfo, profileName, onDismiss }: CrashReport
               variant="secondary"
               size="sm"
               icon={<Bug size={12} />}
-              onClick={() => void api.system.openUrl(NEW_CRASH_ISSUE_URL)}
+              onClick={() => void openLink(NEW_CRASH_ISSUE_URL)}
             >
               {t('crash.reportBug')}
             </Button>

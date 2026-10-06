@@ -21,8 +21,7 @@ import { WHITE_RAVENS_PACKS_URL, privacyPolicyUrl } from '@shared/branding';
 import { useSettingsStore } from '@stores/settings-store';
 import { StorageMap } from '@components/StorageMap';
 import { useT, useLocale, type TranslationKey } from '@renderer/i18n';
-
-const api = window.ravenforge;
+import { openLink } from '@renderer/open';
 
 /**
  * What this page is for.
@@ -217,7 +216,7 @@ export function PrivacyPage() {
 
       <footer className="flex flex-col gap-2 border-t border-rf-border pt-4">
         <button
-          onClick={() => void api.system.openUrl(privacyPolicyUrl(locale))}
+          onClick={() => void openLink(privacyPolicyUrl(locale))}
           className="flex items-center gap-1.5 self-start text-sm text-rf-accent-text hover:underline"
         >
           <ExternalLink size={14} />

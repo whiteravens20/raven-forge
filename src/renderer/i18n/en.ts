@@ -110,6 +110,7 @@ export const en = {
   'common.dismiss': 'Dismiss',
   'common.refresh': 'Refresh',
   'common.openFolder': 'Open folder',
+  'common.openFailed': 'Could not open {what}.',
   'common.copy': 'Copy',
   'common.copied': 'Copied',
   'common.restart': 'Restart',

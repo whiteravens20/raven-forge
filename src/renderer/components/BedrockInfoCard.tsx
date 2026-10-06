@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { ExternalLink, Info, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useT } from '@renderer/i18n';
-
-const api = window.ravenforge;
+import { openLink } from '@renderer/open';
 
 const DISMISS_KEY = 'rf-bedrock-card-dismissed';
 const BEDROCK_URL = 'https://www.minecraft.net/en-us/download';
@@ -45,7 +44,7 @@ export function BedrockInfoCard() {
             size="sm"
             icon={<ExternalLink size={12} />}
             className="mt-2.5"
-            onClick={() => void api.system.openUrl(BEDROCK_URL)}
+            onClick={() => void openLink(BEDROCK_URL)}
           >
             {t('bedrock.open')}
           </Button>

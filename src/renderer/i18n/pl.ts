@@ -99,6 +99,7 @@ export const pl: Translations = {
   'common.dismiss': 'Odrzuć',
   'common.refresh': 'Odśwież',
   'common.openFolder': 'Otwórz folder',
+  'common.openFailed': 'Nie udało się otworzyć: {what}.',
   'common.copy': 'Kopiuj',
   'common.copied': 'Skopiowano',
   'common.restart': 'Uruchom ponownie',

@@ -18,6 +18,7 @@ import { useSettingsStore } from './stores/settings-store';
 import { useNewsStore } from './stores/news-store';
 import { InstallProgressOverlay } from './components/InstallProgressOverlay';
 import { UpdateToast } from './components/UpdateToast';
+import { Notice } from './components/Notice';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 export function App() {
@@ -53,6 +54,7 @@ export function App() {
               </Routes>
             </main>
           </div>
+          <Notice />
           <InstallProgressOverlay />
           <UpdateToast />
         </HashRouter>

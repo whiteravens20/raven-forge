@@ -12,6 +12,7 @@ import { ForgeChronicle } from '@components/ForgeChronicle';
 import { ForgeBackdrop } from '@components/layout/ForgeBackdrop';
 import { useT } from '@renderer/i18n';
 import { interleave } from '@renderer/i18n/rich';
+import { openLink } from '@renderer/open';
 
 const api = window.ravenforge;
 
@@ -34,7 +35,7 @@ function ExtLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <button
       type="button"
-      onClick={() => void api.system.openUrl(href)}
+      onClick={() => void openLink(href)}
       className="underline decoration-current/30 underline-offset-2 transition-colors hover:text-rf-accent-text hover:decoration-rf-accent-text/60"
     >
       {children}

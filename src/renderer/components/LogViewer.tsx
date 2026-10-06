@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardCheck, Copy, FileText, FolderOpen, RefreshCw, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useT } from '@renderer/i18n';
+import { openPath } from '@renderer/open';
 
 const api = window.ravenforge;
 
@@ -141,7 +142,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
 
   const handleOpenFolder = async () => {
     const result = await api.system.getLogsPath();
-    if (result.success && result.data) await api.system.openPath(result.data);
+    if (result.success && result.data) await openPath(result.data);
   };
 
   const counts = useMemo(

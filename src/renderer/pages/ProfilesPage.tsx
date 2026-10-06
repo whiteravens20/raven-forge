@@ -54,6 +54,7 @@ import type {
   JavaInstallation,
   JavaProbe,
 } from '@shared/ipc-types';
+import { openProfileFolder } from '@renderer/open';
 
 const api = window.ravenforge;
 
@@ -631,7 +632,7 @@ export function ProfilesPage() {
             onExport={handleExport}
             onExportPack={askExportPack}
             exportingPack={exportingPack}
-            onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
+            onOpenFolder={() => void openProfileFolder(selectedProfile.id, selectedProfile.name)}
             onSync={handleSync}
           />
         ) : (
