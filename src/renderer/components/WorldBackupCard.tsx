@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Archive, RotateCcw, Trash2, Save } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { ConfirmButton } from '@components/ui/ConfirmButton';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useLocale, useT } from '@renderer/i18n';
@@ -153,13 +154,13 @@ export function WorldBackupCard({ profileId }: { profileId: string }) {
                     onClick={() => setConfirming(backup.id)}
                     title={t('worlds.restore')}
                   />
-                  <Button
-                    variant="danger"
-                    size="sm"
+                  <ConfirmButton
                     icon={<Trash2 size={12} />}
-                    loading={busy}
-                    onClick={() => void remove(backup.id)}
                     title={t('common.delete')}
+                    question={t('worlds.confirmDelete')}
+                    confirmLabel={t('common.delete')}
+                    loading={busy}
+                    onConfirm={() => void remove(backup.id)}
                   />
                 </>
               )}

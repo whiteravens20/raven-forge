@@ -19,6 +19,7 @@ import { useProfileStore } from '@stores/profile-store';
 import { useAuthStore } from '@stores/auth-store';
 import { useGameStore } from '@stores/game-store';
 import { Button } from '@components/ui/Button';
+import { ConfirmButton } from '@components/ui/ConfirmButton';
 import { Input } from '@components/ui/Input';
 import { Select } from '@components/ui/Select';
 import { Switch } from '@components/ui/Switch';
@@ -204,7 +205,9 @@ export function ProfilesPage() {
   };
 
   const discard = async (profileId: string) => {
-    await api.profiles.discardOrphaned(profileId);
+    setActionError(null);
+    const r = await api.profiles.discardOrphaned(profileId);
+    if (!r.success) setActionError(r.error ?? t('orphans.discardFailed'));
     await refreshOrphans();
   };
   /**
@@ -493,9 +496,13 @@ export function ProfilesPage() {
                     <Button size="sm" variant="secondary" onClick={() => void adopt(profile.id)}>
                       {t('orphans.restore')}
                     </Button>
-                    <Button size="sm" variant="danger" onClick={() => void discard(profile.id)}>
+                    <ConfirmButton
+                      question={t('orphans.confirmDiscard')}
+                      confirmLabel={t('common.delete')}
+                      onConfirm={() => void discard(profile.id)}
+                    >
                       {t('orphans.discard')}
-                    </Button>
+                    </ConfirmButton>
                   </div>
                 </div>
               ))}

@@ -223,6 +223,7 @@ export const en = {
   'worlds.restore': 'Restore this copy',
   'worlds.confirmRestore': 'Replace the current worlds?',
   'worlds.confirmRestoreYes': 'Replace',
+  'worlds.confirmDelete': 'Delete this backup?',
   'worlds.restored': 'The worlds were restored.',
   'worlds.restoredWithSafety':
     'The worlds were restored. What was there before is now a copy of its own, so this is undoable.',
@@ -318,6 +319,8 @@ export const en = {
     'Profiles you deleted but kept the files of. Restoring one puts it back exactly as it was.',
   'orphans.restore': 'Restore',
   'orphans.discard': 'Delete for good',
+  'orphans.confirmDiscard': 'Delete these files, worlds included?',
+  'orphans.discardFailed': 'Could not delete those files.',
 
   'profiles.fieldMinecraft': 'Minecraft',
   'profiles.fieldLoader': 'Loader',
@@ -562,6 +565,9 @@ export const en = {
   'settings.trustedKeyUnusable':
     'Not an Ed25519 public key: it can verify nothing, and being on the list it still makes a signature required. Remove it.',
   'settings.trustedKeyRemoveFailed': 'Could not remove the key',
+  'settings.trustedKeyConfirm': 'Remove this key?',
+  'settings.trustedKeyConfirmLast':
+    'Remove the last key? Signatures will no longer be required of packs from outside White Ravens.',
   'settings.dataFolder': 'Data folder',
   'settings.dataFolderHint':
     'Profiles, mods, game files, downloaded Java runtimes, logs and crash reports. Several gigabytes once a pack is installed. The full list, with sizes, is below.',

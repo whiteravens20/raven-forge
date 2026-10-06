@@ -7,6 +7,7 @@ import { useNewsStore } from '@stores/news-store';
 import { Select } from '@components/ui/Select';
 import { Input } from '@components/ui/Input';
 import { Button } from '@components/ui/Button';
+import { ConfirmButton } from '@components/ui/ConfirmButton';
 import { LogViewer } from '@components/LogViewer';
 import { DataFolderCard } from '@components/DataFolderCard';
 import { StorageMap } from '@components/StorageMap';
@@ -222,11 +223,16 @@ export function SettingsPage() {
                   )}
                 </div>
                 {!builtIn && (
-                  <Button
-                    variant="danger"
-                    size="sm"
+                  <ConfirmButton
                     icon={<Trash2 size={12} />}
-                    onClick={() => void handleRemoveKey(key.publicKey)}
+                    title={t('common.remove')}
+                    question={
+                      settings.trustedPublicKeys.length === 1
+                        ? t('settings.trustedKeyConfirmLast')
+                        : t('settings.trustedKeyConfirm')
+                    }
+                    confirmLabel={t('common.remove')}
+                    onConfirm={() => void handleRemoveKey(key.publicKey)}
                   />
                 )}
               </div>

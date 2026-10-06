@@ -228,6 +228,7 @@ export const pl: Translations = {
   'worlds.restore': 'Przywróć tę kopię',
   'worlds.confirmRestore': 'Zastąpić obecne światy?',
   'worlds.confirmRestoreYes': 'Zastąp',
+  'worlds.confirmDelete': 'Usunąć tę kopię?',
   'worlds.restored': 'Światy zostały przywrócone.',
   'worlds.restoredWithSafety':
     'Światy zostały przywrócone. To, co było wcześniej, jest teraz osobną kopią — da się to cofnąć.',
@@ -343,6 +344,8 @@ export const pl: Translations = {
     'Profile, które usunąłeś, zostawiając pliki. Przywrócenie stawia profil dokładnie tak, jak był.',
   'orphans.restore': 'Przywróć',
   'orphans.discard': 'Usuń trwale',
+  'orphans.confirmDiscard': 'Usunąć te pliki razem ze światami?',
+  'orphans.discardFailed': 'Nie udało się usunąć tych plików.',
 
   'profiles.fieldMinecraft': 'Minecraft',
   'profiles.fieldLoader': 'Loader',
@@ -592,6 +595,9 @@ export const pl: Translations = {
   'settings.trustedKeyUnusable':
     'To nie jest klucz publiczny Ed25519: niczego nie zweryfikuje, a będąc na liście i tak włącza wymaganie podpisu. Usuń go.',
   'settings.trustedKeyRemoveFailed': 'Nie udało się usunąć klucza',
+  'settings.trustedKeyConfirm': 'Usunąć ten klucz?',
+  'settings.trustedKeyConfirmLast':
+    'Usunąć ostatni klucz? Podpis przestanie być wymagany od paczek spoza White Ravens.',
   'settings.dataFolder': 'Folder danych',
   'settings.dataFolderHint':
     'Profile, mody, pliki gry, pobrane wersje Javy, logi i raporty z awarii. Po instalacji paczki to kilka gigabajtów. Pełna lista z rozmiarami jest poniżej.',
