@@ -20,6 +20,7 @@ import { InstallProgressOverlay } from './components/InstallProgressOverlay';
 import { UpdateToast } from './components/UpdateToast';
 import { Notice } from './components/Notice';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useLocale } from './i18n';
 
 export function App() {
   useEffect(() => {
@@ -28,6 +29,13 @@ export function App() {
     void useSettingsStore.getState().load();
     void useNewsStore.getState().load();
   }, []);
+
+  // A screen reader pronounces the page in the language the document claims,
+  // and it claimed English whatever was on it.
+  const locale = useLocale();
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-rf-bg text-rf-text font-sans">
