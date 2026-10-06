@@ -297,6 +297,29 @@ describe('exportProfileAsMrpack', () => {
     });
   });
 
+  it('leaves the server the player last joined out of the settings it carries', async () => {
+    await write('options.txt', 'fov:90\nlastServer:play.example.net:25565\nlang:pl_pl\n');
+
+    await exportProfileAsMrpack('p1', dest());
+
+    expect((await overridesOf(dest()))['options.txt']).toBe('fov:90\nlang:pl_pl\n');
+    // The player's own file is as it was.
+    expect(await fs.readFile(path.join(gameDir, 'options.txt'), 'utf-8')).toContain('lastServer:');
+  });
+
+  it('carries no settings at all when asked not to', async () => {
+    await write('mods/private.jar', 'a jar nobody publishes');
+    await write('config/sodium-options.json', '{"quality":"fast"}');
+    await write('options.txt', 'fov:90');
+    await lock([mod({ id: 'local-1', fileName: 'private.jar', source: 'local' })]);
+
+    const summary = await exportProfileAsMrpack('p1', dest(), { settings: false });
+
+    expect(summary.overrides).toBe(0);
+    // The mods are the pack; only the settings were the question.
+    expect(Object.keys(await overridesOf(dest()))).toEqual(['mods/private.jar']);
+  });
+
   it('leaves out content that is switched off', async () => {
     await write('mods/on.jar', 'on');
     await write('mods/off.jar.disabled', 'off');

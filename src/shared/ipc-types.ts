@@ -30,6 +30,7 @@ import type {
   LoaderVersion,
   ModLoaderType,
   MrpackExport,
+  MrpackExportOptions,
   OrphanedProfile,
   PackInstall,
   WorldBackup,
@@ -109,7 +110,10 @@ export interface InvokeChannels {
    * Write the profile out as a Modrinth modpack — the mods, not just the
    * settings. Asks where to put it; `null` means the player closed the dialog.
    */
-  'profiles:export-pack': (profileId: string) => Promise<IpcResult<MrpackExport | null>>;
+  'profiles:export-pack': (
+    profileId: string,
+    options: MrpackExportOptions,
+  ) => Promise<IpcResult<MrpackExport | null>>;
   /**
    * Make a profile from an exported profile file. Asks which file; `null` means
    * the player closed the dialog.

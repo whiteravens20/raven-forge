@@ -11,7 +11,12 @@ import { readLockFile } from '../mods/lock-file';
 import { listContent } from '../mods/content-manager';
 import { versionsByHash, primaryFile, type ModrinthFile } from '../mods/modrinth-api';
 import { ZipWriter } from './zip-writer';
-import type { InstalledMod, ModLoaderType, MrpackExport } from '../../shared/ipc-types';
+import type {
+  InstalledMod,
+  ModLoaderType,
+  MrpackExport,
+  MrpackExportOptions,
+} from '../../shared/ipc-types';
 
 /**
  * Writing a profile out as a Modrinth modpack.
@@ -187,6 +192,19 @@ async function resolveDownloads(items: Candidate[]): Promise<Map<number, Modrint
   return resolved;
 }
 
+/**
+ * The player's `options.txt` as it may leave the machine: every setting but the
+ * one that says where they play. `lastServer` is the address of the server they
+ * last joined, written there by the game, and a pack handed to somebody else is
+ * no place for it.
+ */
+function shareableOptions(file: Buffer): Buffer {
+  const text = file.toString('utf-8');
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const kept = text.split(/\r?\n/).filter((line) => !line.startsWith('lastServer:'));
+  return Buffer.from(kept.join(eol), 'utf-8');
+}
+
 /** Files under `config/`, plus `options.txt`, relative to the game directory. */
 async function configOverrides(gameDir: string): Promise<string[]> {
   const found: string[] = [];
@@ -229,6 +247,7 @@ async function configOverrides(gameDir: string): Promise<string[]> {
 export async function exportProfileAsMrpack(
   profileId: string,
   destPath: string,
+  { settings = true }: MrpackExportOptions = {},
 ): Promise<MrpackExport> {
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
@@ -287,7 +306,7 @@ export async function exportProfileAsMrpack(
   }
 
   const gameDir = paths.profileGameDir(profile.id);
-  const overrides = await configOverrides(gameDir);
+  const overrides = settings ? await configOverrides(gameDir) : [];
 
   const index = {
     formatVersion: 1,
@@ -331,7 +350,11 @@ export async function exportProfileAsMrpack(
         log.warn(`Leaving ${relative} out of the pack: too large to be configuration`);
         continue;
       }
-      await zip.addFile(`overrides/${relative}`, source);
+      if (relative === 'options.txt') {
+        await zip.addBuffer('overrides/options.txt', shareableOptions(await fs.readFile(source)));
+      } else {
+        await zip.addFile(`overrides/${relative}`, source);
+      }
       written++;
     }
 

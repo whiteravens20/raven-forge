@@ -198,6 +198,11 @@ export const pl: Translations = {
   'profiles.openFolder': 'Otwórz folder profilu',
   'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
   'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',
+  'profiles.exportPackAsk': 'W paczce znajdą się mody, shadery i paczki zasobów tego profilu.',
+  'profiles.exportPackSettings': 'Dołącz ustawienia gry i konfigurację modów',
+  'profiles.exportPackSettingsHint':
+    'To plik options.txt i folder config: przypisania klawiszy, ustawienia grafiki i własne opcje każdego moda, takie jak na tym komputerze. Serwer, na którym ostatnio grano, nie trafia do paczki w żadnym przypadku.',
+  'profiles.exportPackGo': 'Wybierz, gdzie zapisać…',
   'profiles.exportPackDone.one': 'Zapisano do {path}. Paczka odsyła do 1 pliku na Modrinth.',
   // `do` governs the genitive, so `few` and `many` come out identical here.
   // Two forms that happen to agree, not one form written twice — leaving them

@@ -183,6 +183,9 @@ export function ProfilesPage() {
   /** Something worth saying that is not a failure — what an import left out. */
   const [notice, setNotice] = useState<string | null>(null);
   const [exportingPack, setExportingPack] = useState(false);
+  /** Open while the player is asked what a pack export should hold. */
+  const [askingExport, setAskingExport] = useState(false);
+  const [exportSettings, setExportSettings] = useState(true);
   /** Set while a Minecraft version change is waiting to be confirmed. */
   const [versionChange, setVersionChange] = useState<ProfileFileSummary | null>(null);
 
@@ -404,19 +407,31 @@ export function ProfilesPage() {
   /**
    * Export the profile as a `.mrpack` — the mods, not just the settings.
    *
-   * Where it goes is asked in the main process, so nothing here names a path.
-   * A `null` result is the player closing that dialog, which is not a failure
-   * and should say nothing at all.
+   * Asked about first: a pack carries the author's own game settings and mod
+   * configuration unless they say otherwise, and it used to carry them without
+   * saying so. Where it goes is asked in the main process, so nothing here names
+   * a path. A `null` result is the player closing that dialog, which is not a
+   * failure and should say nothing at all.
    */
-  const handleExportPack = async () => {
-    if (!selectedId) return;
+  // The question is about one profile; it does not follow the selection to another.
+  useEffect(() => {
+    setAskingExport(false);
+  }, [selectedId]);
+
+  const askExportPack = () => {
     setExported(null);
     setActionError(null);
+    setAskingExport(true);
+  };
+
+  const handleExportPack = async () => {
+    if (!selectedId) return;
     setExportingPack(true);
     try {
-      const r = await api.profiles.exportPack(selectedId);
+      const r = await api.profiles.exportPack(selectedId, { settings: exportSettings });
       if (!r.success) setActionError(r.error ?? t('profiles.exportPackFailed'));
       else if (r.data) setExported(r.data);
+      setAskingExport(false);
     } finally {
       setExportingPack(false);
     }
@@ -530,6 +545,44 @@ export function ProfilesPage() {
             </Banner>
           </div>
         )}
+        {askingExport && (
+          <div
+            className="mx-auto mb-4 max-w-2xl rounded-lg border border-rf-border bg-rf-surface p-4"
+            role="group"
+            aria-label={t('profiles.exportPack')}
+          >
+            <p className="text-sm text-rf-text">{t('profiles.exportPackAsk')}</p>
+            <label className="mt-3 flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={exportSettings}
+                onChange={(e) => setExportSettings(e.target.checked)}
+                className="mt-0.5 accent-rf-accent"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-rf-text">
+                  {t('profiles.exportPackSettings')}
+                </span>
+                <span className="mt-0.5 block text-xs text-rf-text-muted">
+                  {t('profiles.exportPackSettingsHint')}
+                </span>
+              </span>
+            </label>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={exportingPack}
+                onClick={() => setAskingExport(false)}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button size="sm" loading={exportingPack} onClick={() => void handleExportPack()}>
+                {t('profiles.exportPackGo')}
+              </Button>
+            </div>
+          </div>
+        )}
         {exported && (
           <div className="mx-auto mb-4 max-w-2xl">
             <Banner
@@ -576,7 +629,7 @@ export function ProfilesPage() {
             duplicating={duplicating}
             onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
-            onExportPack={handleExportPack}
+            onExportPack={askExportPack}
             exportingPack={exportingPack}
             onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
             onSync={handleSync}

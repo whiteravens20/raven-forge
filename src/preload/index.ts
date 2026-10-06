@@ -32,7 +32,8 @@ const api: RavenForgeAPI = {
     duplicate: (profileId, name) => ipcRenderer.invoke('profiles:duplicate', profileId, name),
     openFolder: (profileId) => ipcRenderer.invoke('profiles:open-folder', profileId),
     export: (profileId) => ipcRenderer.invoke('profiles:export', profileId),
-    exportPack: (profileId) => ipcRenderer.invoke('profiles:export-pack', profileId),
+    exportPack: (profileId, options) =>
+      ipcRenderer.invoke('profiles:export-pack', profileId, options),
     import: () => ipcRenderer.invoke('profiles:import'),
     getSyncStatus: (profileId) => ipcRenderer.invoke('profiles:get-sync-status', profileId),
     setIcon: (profileId, sourcePath) =>

@@ -206,6 +206,11 @@ export const en = {
   'profiles.openFolder': 'Open profile folder',
   'profiles.exportPack': 'Export as a modpack (.mrpack)',
   'profiles.exportPackFailed': 'Could not export that profile as a pack.',
+  'profiles.exportPackAsk': 'The pack will hold this profile’s mods, shaders and resource packs.',
+  'profiles.exportPackSettings': 'Include the game settings and the mods’ configuration',
+  'profiles.exportPackSettingsHint':
+    'That is options.txt and the config folder: key bindings, video settings and each mod’s own options, as they are on this computer. The server you last joined is left out either way.',
+  'profiles.exportPackGo': 'Choose where to save…',
   'profiles.exportPackDone.one': 'Saved to {path}. The pack links to one file on Modrinth.',
   'profiles.exportPackDone.other': 'Saved to {path}. The pack links to {count} files on Modrinth.',
   'profiles.exportPackBundled.one':

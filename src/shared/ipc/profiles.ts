@@ -134,6 +134,16 @@ export interface ProfileImport {
  * can install and a 300 MB one carrying somebody's hand-built mods. Reporting
  * both is what lets the player see which they got, and why.
  */
+/** What the player chose to put in an exported pack beyond its mods. */
+export interface MrpackExportOptions {
+  /**
+   * The game's settings and each mod's configuration: `options.txt` and the
+   * `config` folder. They are what makes a pack play the way its author set it
+   * up, and they are also the author's own — so it is asked.
+   */
+  settings?: boolean;
+}
+
 export interface MrpackExport {
   path: string;
   /** Entries the recipient downloads from Modrinth. */
