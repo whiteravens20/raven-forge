@@ -25,7 +25,8 @@ for Forge, `21.1.248` for NeoForge — and never carries the Minecraft version i
 front of it. For the few Minecraft versions where Forge publishes a build with a
 branch after its number (`10.13.4.1614-1.7.10`), the number alone is enough: the
 launcher finds the build by it. Which Minecraft versions each loader can be
-installed for is in the [architecture notes](ARCHITECTURE.md#installing-a-mod-loader).
+installed for, and which of its builds start them, is in the
+[architecture notes](ARCHITECTURE.md#installing-a-mod-loader).
 
 `recommendedRamMb` is optional and bounded to 512–65536. It is applied **only
 when the profile is created**, so a later sync never overwrites a figure the
