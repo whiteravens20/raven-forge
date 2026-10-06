@@ -125,6 +125,21 @@ interface DownloadTask {
 const CHECK_EMIT_INTERVAL_MS = 100;
 
 /**
+ * One task per destination, the first one named.
+ *
+ * Mojang's lists repeat themselves. A version from 1.13 to 1.18.2 names each
+ * LWJGL jar once per rule set, an asset index gives one object to every name
+ * that shares its content — 524 of the legacy index's 1,120 entries are a file
+ * already listed — and each repeat used to be checked and, when missing,
+ * fetched again: twice the requests of a first install, and two downloads
+ * taking turns at one file.
+ */
+function uniqueByDestination(tasks: DownloadTask[]): DownloadTask[] {
+  const seen = new Set<string>();
+  return tasks.filter((task) => !seen.has(task.dest) && seen.add(task.dest));
+}
+
+/**
  * Fetch whatever is missing or wrong, and leave the rest alone.
  *
  * Which files are already correct is decided **once**. This used to ask twice
@@ -141,7 +156,7 @@ const CHECK_EMIT_INTERVAL_MS = 100;
  * same correction the pack sync already got.
  */
 async function downloadBatch(
-  tasks: DownloadTask[],
+  listed: DownloadTask[],
   concurrency: number,
   opts?: {
     operationId: string;
@@ -152,6 +167,7 @@ async function downloadBatch(
     signal?: AbortSignal;
   },
 ): Promise<void> {
+  const tasks = uniqueByDestination(listed);
   const total = tasks.length;
 
   const emit = (progress: number, message: ProgressMessage, done: number, installing = false) => {
