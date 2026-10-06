@@ -88,11 +88,18 @@ export function NewsStrip({
         aria-label={t('home.news')}
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rf-accent-text rounded-lg"
       >
-        {items.map((item) => (
+        {items.map((item, index) => (
           // `min-w` is the floor a quarter of the row may not go below; past it
           // the cards overflow and the arrows appear, rather than shrinking
           // into four unreadable slivers.
-          <div key={item.id} style={{ width: CARD_WIDTH }} className="min-w-40 shrink-0 snap-start">
+          //
+          // The position is in the key because the id is the feed's word for
+          // it, and a feed that repeats one must not cost a card.
+          <div
+            key={`${item.id}:${index}`}
+            style={{ width: CARD_WIDTH }}
+            className="min-w-40 shrink-0 snap-start"
+          >
             <NewsCard item={item} onOpen={() => onOpen(item)} />
           </div>
         ))}
