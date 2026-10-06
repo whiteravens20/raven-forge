@@ -207,7 +207,28 @@ export function ProfilesPage() {
     await api.profiles.discardOrphaned(profileId);
     await refreshOrphans();
   };
-  const [syncing, setSyncing] = useState(false);
+  /**
+   * The profiles a sync was started for from this page and has not come back.
+   *
+   * By id. This was one flag for the page, so a sync started on one profile
+   * showed as running on whichever profile was looked at next — with a Cancel
+   * that stopped that other profile's launch instead — and its result, when it
+   * arrived, was written onto the badge of the profile then on screen.
+   */
+  const [syncingIds, setSyncingIds] = useState<ReadonlySet<string>>(new Set());
+  const syncing = selectedId ? syncingIds.has(selectedId) : false;
+  /** Whichever profile is on screen now, for a reply that arrives later. */
+  const shownId = useRef(selectedId);
+  useEffect(() => {
+    shownId.current = selectedId;
+  }, [selectedId]);
+  // A sync rewrites the mods folder, and a launch being prepared or a game
+  // that is up is reading it. Starting one under the other also aborted the
+  // launch without a word: both register a job for the profile, and the second
+  // cancels the first.
+  const gameBusy = useGameStore((s) =>
+    selectedId ? s.preparing.has(selectedId) || s.running.has(selectedId) : false,
+  );
   /** Why the main process would not save what is in the form. */
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -319,14 +340,29 @@ export function ProfilesPage() {
   };
 
   const handleSync = async () => {
-    if (!selectedId) return;
-    setSyncing(true);
+    const id = selectedId;
+    if (!id || syncingIds.has(id) || gameBusy) return;
+    const hasAddress = Boolean(selectedProfile?.manifestUrl);
+    setSyncingIds((ids) => new Set(ids).add(id));
     try {
-      await api.mods.syncManifest(selectedId);
-      const r = await api.profiles.getSyncStatus(selectedId);
-      if (r.success && r.data) setSyncStatus(r.data);
+      await api.mods.syncManifest(id);
+      // Both badges are asked again, and only shown if this profile is still
+      // the one on screen. The signature badge was not asked at all, so a
+      // profile that read "Not checked yet" went on reading it after the sync
+      // that had just checked.
+      const [status, verified] = await Promise.all([
+        api.profiles.getSyncStatus(id),
+        hasAddress ? api.manifest.verify(id) : undefined,
+      ]);
+      if (shownId.current !== id) return;
+      if (status.success && status.data) setSyncStatus(status.data);
+      if (verified?.success && verified.data) setVerification(verified.data);
     } finally {
-      setSyncing(false);
+      setSyncingIds((ids) => {
+        const next = new Set(ids);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -526,6 +562,7 @@ export function ProfilesPage() {
             syncStatus={syncStatus}
             verification={verification}
             syncing={syncing}
+            syncBlocked={gameBusy}
             onCancelSync={handleCancelSync}
             onEdit={startEdit}
             onDuplicate={() => void handleDuplicate()}
@@ -619,6 +656,8 @@ interface DetailProps {
   syncStatus: ProfileSyncStatus | null;
   verification: ManifestVerification | null;
   syncing: boolean;
+  /** The game is running or being got ready, so the mods cannot be changed. */
+  syncBlocked: boolean;
   onCancelSync: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
@@ -636,6 +675,7 @@ function ProfileDetail({
   syncStatus,
   verification,
   syncing,
+  syncBlocked,
   onCancelSync,
   onEdit,
   onDuplicate,
@@ -730,7 +770,8 @@ function ProfileDetail({
               size="sm"
               icon={<RefreshCw size={12} />}
               loading={syncing}
-              disabled={syncing}
+              disabled={syncing || syncBlocked}
+              title={syncBlocked ? t('profiles.syncBlocked') : undefined}
               onClick={onSync}
             >
               {t(profile.manifestUrl ? 'profiles.sync' : 'profiles.repair')}
@@ -751,6 +792,14 @@ function ProfileDetail({
             {syncStatus && <SyncBadge status={syncStatus} />}
             {verification && <VerificationBadge verification={verification} />}
           </div>
+          {/* The reason, in the main process's words. The badge alone said
+              "Sync error" for a dead address, a file that failed its hash and
+              a manifest refused over its signature alike. */}
+          {syncStatus?.status === 'error' && syncStatus.errorMessage && (
+            <p role="alert" className="break-words text-xs text-rf-danger">
+              {syncStatus.errorMessage}
+            </p>
+          )}
         </div>
       )}
 

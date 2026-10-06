@@ -348,6 +348,8 @@ export const pl: Translations = {
   'profiles.fieldServer': 'Serwer',
   'profiles.manifestUrl': 'Manifest URL',
   'profiles.sync': 'Synchronizuj',
+  'profiles.syncBlocked':
+    'Nie w trakcie gry ani jej uruchamiania — synchronizacja zmienia mody, z których gra korzysta.',
   'profiles.importedPack': 'Zaimportowana paczka',
   'profiles.importedPackHint':
     'Migawka — sama się nie aktualizuje. Naprawa sprawdza pliki z paczką, z której ten profil powstał, i pobiera to, czego brakuje.',

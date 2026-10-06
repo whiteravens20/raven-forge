@@ -323,6 +323,8 @@ export const en = {
   'profiles.fieldServer': 'Server',
   'profiles.manifestUrl': 'Manifest URL',
   'profiles.sync': 'Sync',
+  'profiles.syncBlocked':
+    'Not while the game is running or starting — a sync changes the mods it is using.',
   'profiles.importedPack': 'Imported pack',
   'profiles.importedPackHint':
     'A snapshot — it does not update itself. Repair checks the files against the pack this profile was made from and downloads whatever is missing.',
