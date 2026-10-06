@@ -525,6 +525,17 @@ describe.skipIf(!posix)('a Forge profile', () => {
     expect(args[args.indexOf('-cp') + 1].split(':')).toContain(patched());
   });
 
+  it('is told where the libraries are, whatever folder it is started in', async () => {
+    await installForge();
+
+    await launch('exit 0', forge);
+    await exitInfo();
+
+    // Forge 49.0.1 to 49.0.3 look in `./libraries` otherwise, and the game is
+    // started in the profile's own folder, which has none.
+    expect(await gameArgs()).toContain(`-DlibraryDirectory=${path.join(cacheDir(), 'libraries')}`);
+  });
+
   it('has the installer run again when a file only that can make has gone', async () => {
     await installForge();
     await fs.rm(patched());
@@ -592,6 +603,15 @@ describe.skipIf(!posix)('a Forge profile', () => {
     const err = await launch('exit 0', forge).catch((e: unknown) => e);
 
     expect(refusalOf(err)?.key).toBe('launchError.loaderFileMissing');
+  });
+});
+
+describe.skipIf(!posix)('a profile with no Forge in it', () => {
+  it('is not given Forge’s library property', async () => {
+    await launch('exit 0');
+    await exitInfo();
+
+    expect((await gameArgs()).some((arg) => arg.startsWith('-DlibraryDirectory='))).toBe(false);
   });
 });
 

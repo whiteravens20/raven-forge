@@ -573,6 +573,15 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   const log4jConfig = await log4jConfigArgument(path.join(paths.cacheDir, 'log4j'), meta.libraries);
   if (log4jConfig) jvmArgs.push(log4jConfig);
 
+  // Forge's first builds on its own bootstrap — both there are for 1.20.3, and
+  // the first for 1.20.4 — look for the libraries in a `libraries` folder under
+  // wherever they were started, unless this says otherwise. Mojang's launcher
+  // starts the game in the folder that has one; here the game is started in the
+  // profile's own, and those builds stopped on "Library directory: `libraries`
+  // does not exist". Every other Forge profile sets the property itself, to the
+  // same place, and being later on the line that is the one that counts.
+  if (profile.modLoader === 'forge') jvmArgs.push(`-DlibraryDirectory=${librariesDir}`);
+
   if (meta.arguments?.jvm) {
     const resolved = resolveConditionalArgs(meta.arguments.jvm, features);
     jvmArgs.push(...substituteVars(resolved, templateVars));
