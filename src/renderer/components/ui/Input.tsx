@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import type { InputHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -8,10 +8,11 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Input({ label, error, className = '', id, ...props }: InputProps) {
-  const baseId =
-    id ??
-    label?.toLowerCase().replace(/\s+/g, '-') ??
-    `input-${Math.random().toString(36).slice(2, 8)}`;
+  // React's own, so that it is the same from one render to the next and no two
+  // fields share it. It used to be made from the label — two fields labelled
+  // "Port" were one id — or, with no label, afresh at every render.
+  const generated = useId();
+  const baseId = id ?? generated;
   const inputId = `${baseId}-field`;
   const errorId = `${baseId}-error`;
 

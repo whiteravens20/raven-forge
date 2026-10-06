@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import type { SelectHTMLAttributes } from 'react';
+import { useId, type SelectHTMLAttributes } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -11,7 +11,8 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export function Select({ label, options, error, className = '', id, ...props }: SelectProps) {
-  const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+  const generated = useId();
+  const selectId = id ?? generated;
   const errorId = `${selectId}-error`;
 
   return (
