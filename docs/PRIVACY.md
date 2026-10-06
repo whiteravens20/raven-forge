@@ -2,7 +2,7 @@
 
 **English** · [Polski](PRIVACY.pl.md)
 
-**Last updated: 2026-08-18**
+**Last updated: 2026-10-06**
 
 This document describes every piece of data Raven Forge stores, every server it
 contacts, and what it sends there. It is written from the source code, not from
@@ -24,8 +24,8 @@ and it will be fixed in whichever of the two is wrong.
 - **Your Minecraft credentials go to Microsoft and Mojang, and nowhere else.**
   The launcher never sees your Microsoft password — you type it into Microsoft's
   own page.
-- **Everything else stays on your computer**, in one folder you can open from
-  Settings and delete at any time.
+- **Everything else stays on your computer**, in folders that Settings lists
+  with their sizes, opens for you, and that you can delete at any time.
 - The launcher makes outbound requests to do its job — download Minecraft, find
   mods, check for updates. Each one is listed below, along with what it reveals.
 
@@ -46,44 +46,61 @@ and it will be fixed in whichever of the two is wrong.
 
 ## What is stored on your computer
 
-Everything the launcher keeps about you is in one folder, and nothing outside it.
-It holds your profiles and their worlds, your launcher settings, your list of
-accounts, a record of what the launcher has been doing, and crash reports.
+The launcher writes in two folders, and usually they are the same one.
 
-You never have to find that folder by hand: **Settings → Data → Data folder**
-opens it on any system, and the in-app privacy page (Info → Privacy) shows the
-exact path this install uses. Unless you have moved it, it is:
+**The launcher folder** is where the launcher itself lives, and it never moves:
 
 | Platform | Location                                             |
 | -------- | ---------------------------------------------------- |
-| Windows  | `%APPDATA%\Raven Forge Launcher`                     |
-| Linux    | `~/.config/Raven Forge Launcher`                     |
-| macOS    | `~/Library/Application Support/Raven Forge Launcher` |
+| Windows  | `%APPDATA%\raven-forge-launcher`                     |
+| Linux    | `~/.config/raven-forge-launcher`                     |
+| macOS    | `~/Library/Application Support/raven-forge-launcher` |
 
-**Settings → Data → Move…** puts it wherever you like — another drive, usually,
-since the game files run to gigabytes. The launcher carries the contents across
-and restarts into the new location. Two things stay behind in the folder above,
-because they are diagnostics about the launcher rather than data about you, and
-because you want them readable on a day the other drive is not plugged in:
-`logs/` and `crash-reports/`. A one-line `data-root.txt` stays there too,
-naming where the rest went — the Windows uninstaller reads it, so that "delete
-my data" still means all of it.
+**The data folder** holds everything that is yours: profiles and their worlds,
+settings, the list of accounts, logs and crash reports. Until you move it, it is
+the launcher folder. **Settings → Data → Move…** puts it wherever you like —
+another drive, usually, since the game files run to gigabytes. The launcher
+carries all of it across, checks the copy, and only then removes the original;
+if anything fails on the way it puts things back as they were, and if something
+could not be removed from the old place it lists exactly what.
 
-Inside it:
+You never have to find either by hand. **Settings → Data** and the in-app
+privacy page (Info → Privacy) list every place the launcher writes to on this
+computer, with the path, the size measured on your disk, and a button that
+opens it.
+
+In the data folder:
 
 | Path                          | Contents                                                                                                                                                                                          |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `settings.json`               | Your preferences — theme, language, proxy address, feed URLs, download concurrency, trusted signing keys.                                                                                         |
 | `profiles.json`               | Your profiles: names, Minecraft versions, mod loaders, allocated RAM, manifest URLs, play time and last-played timestamps.                                                                        |
-| `profiles/<id>/.minecraft/`   | A real Minecraft game directory per profile — worlds, screenshots, `options.txt`, mods, resource packs, shaders. Minecraft's own files, kept apart per profile.                                   |
+| `profiles/<id>/`              | One folder per profile: `.minecraft/` — a real game directory with worlds, screenshots, `options.txt`, mods, resource packs and shaders — plus world backups and the profile's picture.           |
 | `auth.json`                   | The account list: Minecraft username, UUID, account type, skin URL, and when each was last authenticated. Written with `0600` permissions. **Secrets are not normally in this file** — see below. |
 | `logs/main.log`               | The launcher's log, rotated at 5 MB. See "What ends up in the log".                                                                                                                               |
 | `crash-reports/`              | One file per crash, redacted, newest 20 kept. See "Crash reports".                                                                                                                                |
-| `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loader installers, and cached metadata. Nothing personal.                                                                                                           |
-| `data-root.txt`               | Present only if you moved the data folder: one line naming where you moved it, and nothing else. Stays in the location above.                                                                     |
+| `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loaders, Minecraft's own files, and cached metadata. Nothing personal; deleted, they are downloaded again.                                                          |
 
-Chromium also keeps its own storage in that folder, including cookies from the
-Microsoft sign-in window. Those are cleared when you log a Microsoft account out.
+In the launcher folder, wherever the data is:
+
+| Path            | Contents                                                                                                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `browser/`      | The launcher's window is an embedded browser, and this is its own storage: a cache of images (mod icons, news pictures), the announcements you dismissed, and the Microsoft sign-in page's cookies. |
+| `data-root.txt` | Present only if you moved the data folder: one line naming where it went, and nothing else. The launcher and the Windows uninstaller read it to find the data.                                      |
+
+And outside both:
+
+| Where                                                                                            | Contents                                                                         |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| The system's credential store                                                                    | The Microsoft sign-in. See "Where credentials are kept".                         |
+| `%LOCALAPPDATA%\raven-forge-launcher-updater` (Windows), `~/.cache/raven-forge-launcher-updater` | The installer of a new launcher version, downloaded and waiting to be installed. |
+| Wherever the launcher is installed                                                               | The program itself. It writes nothing there.                                     |
+
+Versions up to 0.7.1 called the launcher folder `Raven Forge Launcher`. A newer
+version renames it on its first start and files the embedded browser's storage
+away into `browser/`; nothing in it is lost. If the old folder cannot be renamed
+at that moment — something else has it open — the launcher goes on using it
+under its old name.
 
 ### Where credentials are kept
 
@@ -97,9 +114,20 @@ Two secrets exist per Microsoft account: the **Microsoft refresh token** (which
 can obtain new sessions) and the **Minecraft session token** (which proves to
 game servers that you are you).
 
-Both go into your operating system's credential store — Credential Manager on
-Windows, Keychain on macOS, libsecret/kwallet on Linux — under the service name
-`com.ravenforge.launcher`. They are not written to disk by the launcher itself.
+Both go into your operating system's credential store, as entries of the service
+`com.ravenforge.launcher` — two per Microsoft account. They are not written to
+disk by the launcher itself.
+
+| Platform | Where, and how to look at it                                                                                                                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Windows  | Credential Manager: Control Panel → User Accounts → Credential Manager → Windows Credentials. Windows encrypts the entries with your user account; programs running as you can ask for them, other users cannot.         |
+| Linux    | The desktop's keyring, through the Secret Service: GNOME Keyring (the "Passwords and Keys" app) or KWallet (KWalletManager). Encrypted with your login password, open while you are logged in, readable by your session. |
+| macOS    | The Keychain (the "Keychain Access" app).                                                                                                                                                                                |
+
+"Log out" on the Accounts page removes both of that account's entries. Deleting
+them by hand in the places above does the same; the launcher then asks you to
+sign in again. The in-app privacy page says how many entries there are on this
+computer.
 
 **The exception is stated out loud.** On a machine with no working keyring (a
 common Linux case: no `gnome-keyring` or `kwallet` running), the keychain write
@@ -118,14 +146,16 @@ files were downloaded, which errors occurred. It includes your Minecraft
 username (`Authenticated Microsoft account: <name>`) and absolute file paths,
 which on Windows contain your account name.
 
-It also echoes **the game's own output verbatim**, and that is the part to be
-careful with: a mod can print anything into it, including launch arguments that
-contain a live session token. The launcher's own "Launching:" line is truncated
-to 200 characters and reaches only the JVM options, never the token — but the
-game's output is not filtered.
+It also keeps **the game's own output**, and that is the part to be careful
+with: a mod can print anything into it. The launcher takes the session token out
+of every line before it is logged or shown in the live console — the token of
+that launch, and anything shaped like one — and its own "Launching:" line never
+reaches the token at all. Your player name, your UUID and file paths stay in,
+because the log is yours to read.
 
-**So: redact `logs/main.log` before sharing it.** The crash reports below exist
-precisely so you do not have to.
+**So: read `logs/main.log` through before sharing it.** The crash reports below
+exist so that you do not have to — they are written with those details already
+taken out.
 
 ---
 
@@ -163,8 +193,9 @@ your Microsoft account.
 
 | Host                                    | When                                                                  | What is sent                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api.modrinth.com`, `cdn.modrinth.com`  | Browsing or installing mods, shaders, resource packs                  | **Your search terms and filters.** Modrinth's API terms require an identifying User-Agent, so requests carry `whiteravens20/raven-forge/<version> (<repo URL>)` — the launcher name and version, not you.                                                                                                                                             |
+| `api.modrinth.com`, `cdn.modrinth.com`  | Browsing or installing mods, shaders, resource packs and modpacks     | **Your search terms and filters.** Modrinth's API terms require an identifying User-Agent, so requests carry `whiteravens20/raven-forge/<version> (<repo URL>)` — the launcher name and version, not you.                                                                                                                                             |
 | `api.modrinth.com`                      | Checking installed mods for updates, or exporting a profile as a pack | **A SHA-512 hash of each mod file in that profile.** That is how Modrinth is asked what a file is and what has replaced it, and it is what lets a jar you added by hand be recognised at all. A hash names a file, not you — but the set of them describes which mods that profile holds, so it is only sent when you press one of those two buttons. |
+| `api.modrinth.com`                      | Opening a profile's list of mods, shaders or resource packs           | **The Modrinth ids of the ones that profile holds.** That is how their descriptions and icons are fetched; the answer is kept for a week, so the list is not asked about again each time. The ids describe which content the profile has, not who you are.                                                                                            |
 | Whatever hosts a mod icon or news image | Displaying them                                                       | The request goes to that host. Images are loaded straight from wherever a project publishes them.                                                                                                                                                                                                                                                     |
 
 ### To White Ravens
@@ -262,39 +293,44 @@ UUID and player name used by that launch, and your home directory path — which
 on Windows contains your account name — replaced with `~`.
 
 **Nothing uploads it.** It sits in a folder until you decide otherwise. The card
-shown after a crash offers to open it; **Settings → Data → Crash reports** opens
-the folder at any time.
+shown after a crash offers to open it, and **Settings → Data** lists the folder
+with a button that opens it at any time.
 
 The redaction cannot know what a mod chose to print into the game's output, so
 read a report through before attaching it to a public issue.
 
 ---
 
-## What you can turn off
+## What you decide
 
-| Setting                                                       | Effect                                                                                      |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| **Offline mode** (Settings → Behaviour)                       | Never contacts any authentication server. Singleplayer and LAN only.                        |
-| **News / announcement feed URL** (Settings → Content sources) | Clear the field and that feed is never fetched.                                             |
-| **Proxy** (Settings → Network)                                | Routes every launcher request through a proxy you control.                                  |
-| **Discord status** (Settings → Behaviour)                     | Off by default. On, your Discord profile shows what you are playing.                        |
-| Not using the Mods page                                       | Nothing is sent to Modrinth unless you search, install, check for updates or export a pack. |
-| Using an offline account                                      | No Microsoft or Xbox server is ever contacted.                                              |
+| What                  | Where, and what it does                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Signing in            | **Settings → Behaviour → "Always launch offline"**: the launcher never contacts the Microsoft, Xbox or Mojang sign-in servers. Game files and mods are still downloaded. An offline account signs in nowhere. |
+| News                  | **Settings → Content sources**: clear both addresses and no feed is fetched; enter your own and only those are asked.                                                                                         |
+| A proxy               | **Settings → Network and downloads → Proxy URL**: every connection the launcher makes goes through it. The game, once running, connects for itself and is not covered.                                        |
+| Discord               | **Settings → Behaviour → "Show the game on your Discord status"**, off by default.                                                                                                                            |
+| Packs                 | A profile that follows a pack asks the address in its **Manifest URL** field — when the launcher starts and before every launch. Remove the address in the profile editor and it stops asking, and updating.  |
+| Content from Modrinth | Nothing is sent to Modrinth unless you search, open a profile's list of mods, shaders or resource packs, check for updates, or export a pack.                                                                 |
+| Launcher updates      | Checked at every start with one request to GitHub. This cannot be switched off yet — see "Known gaps".                                                                                                        |
+| Logs and reports      | They do not leave the computer until you send them yourself. "Report a bug" opens the issue page in your browser; you attach the file by hand.                                                                |
+| Where it all is       | **Settings → Data → Move…** moves the data folder to wherever you point.                                                                                                                                      |
 
 ---
 
 ## Deleting everything
 
 - **One account:** "Log out" on the Accounts page removes it from `auth.json`
-  and deletes its keychain entries. Logging out of a Microsoft account also
-  clears the sign-in window's cookies, so the next sign-in starts from a blank
-  page rather than recognising you.
-- **All launcher data:** quit the launcher and delete the data folder listed
-  above. Nothing survives outside it except the OS keychain entries, which are
-  removed by logging out first.
+  and deletes its entries in the credential store. Logging out of a Microsoft
+  account also clears the sign-in window's cookies, so the next sign-in starts
+  from a blank page rather than recognising you.
+- **All launcher data:** quit the launcher and delete the data folder and the
+  launcher folder listed above. Nothing survives outside them except the
+  credential-store entries, which are removed by logging out first, and the
+  downloaded update, if one is waiting.
 - **Uninstalling:** removing the launcher and removing your data are separate
-  steps. On Windows the uninstaller asks which you want; on Linux the package
-  never touches your home directory. [UNINSTALL.md](UNINSTALL.md) covers both.
+  steps. On Windows the uninstaller asks which you want, naming the folder the
+  data is really in; on Linux the package never touches your home directory.
+  [UNINSTALL.md](UNINSTALL.md) covers both.
 - **On our side:** there is nothing to delete. We hold nothing.
 
 ---
@@ -306,8 +342,9 @@ Listed on purpose. An honest list beats a clean-looking one.
 - **The update check on start cannot be disabled** from Settings. It is a single
   request to GitHub Releases on each launch. A blocked network simply makes it
   fail quietly.
-- **Log files are not redacted.** Only crash reports are. See "What ends up in
-  the log".
+- **Log files are only partly redacted.** The session token is taken out; your
+  player name, UUID and file paths are not. Crash reports have all of those
+  removed. See "What ends up in the log".
 - **Skin images are loaded from Microsoft's texture servers** by URL when the
   Accounts page is shown, which tells that host you opened the page.
 

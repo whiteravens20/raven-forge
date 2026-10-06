@@ -2,7 +2,7 @@
 
 [English](PRIVACY.md) · **Polski**
 
-**Ostatnia aktualizacja: 2026-08-18**
+**Ostatnia aktualizacja: 2026-10-06**
 
 Ten dokument opisuje każdą daną, którą Raven Forge przechowuje, każdy serwer, z
 którym się łączy, i to, co tam wysyła. Powstał na podstawie kodu źródłowego, a
@@ -26,8 +26,8 @@ a poprawimy to z tych dwóch, które się myli.
 - **Twoje dane logowania do Minecrafta trafiają do Microsoftu i Mojanga, i
   nigdzie indziej.** Launcher nigdy nie widzi Twojego hasła — wpisujesz je na
   stronie samego Microsoftu.
-- **Cała reszta zostaje na Twoim komputerze**, w jednym folderze, który możesz
-  otworzyć z Ustawień i w każdej chwili usunąć.
+- **Cała reszta zostaje na Twoim komputerze**, w folderach, które Ustawienia
+  wymieniają razem z rozmiarem, otwierają i które możesz w każdej chwili usunąć.
 - Launcher wykonuje połączenia wychodzące, żeby wykonywać swoją pracę — pobrać
   Minecrafta, znaleźć mody, sprawdzić aktualizacje. Każde z nich jest wymienione
   niżej razem z tym, co ujawnia.
@@ -49,45 +49,61 @@ a poprawimy to z tych dwóch, które się myli.
 
 ## Co jest przechowywane na Twoim komputerze
 
-Wszystko, co launcher o Tobie trzyma, leży w jednym folderze i nic poza nim.
-Są tam Twoje profile razem ze światami, ustawienia launchera, lista kont, zapis
-tego, co launcher robił, oraz raporty z awarii.
+Launcher zapisuje w dwóch folderach i zwykle jest to jeden i ten sam.
 
-Nie musisz szukać tego folderu ręcznie: **Ustawienia → Dane → Folder danych**
-otwiera go na każdym systemie, a strona prywatności w apce (Informacje →
-Prywatność) pokazuje dokładną ścieżkę tej instalacji. Jeśli go nie przeniosłeś,
-jest to:
+**Folder launchera** to miejsce samego launchera i nigdy się nie przenosi:
 
 | System  | Lokalizacja                                          |
 | ------- | ---------------------------------------------------- |
-| Windows | `%APPDATA%\Raven Forge Launcher`                     |
-| Linux   | `~/.config/Raven Forge Launcher`                     |
-| macOS   | `~/Library/Application Support/Raven Forge Launcher` |
+| Windows | `%APPDATA%\raven-forge-launcher`                     |
+| Linux   | `~/.config/raven-forge-launcher`                     |
+| macOS   | `~/Library/Application Support/raven-forge-launcher` |
 
-**Ustawienia → Dane → Przenieś…** przenosi go, gdzie chcesz — zwykle na inny
-dysk, bo pliki gry to gigabajty. Launcher przenosi zawartość i uruchamia się
-ponownie już w nowym miejscu. Dwie rzeczy zostają w folderze powyżej, bo są
-diagnostyką launchera, a nie danymi o Tobie — i bo chcesz je móc przeczytać w
-dniu, w którym tamten dysk nie jest podpięty: `logs/` i `crash-reports/`.
-Zostaje tam też jednolinijkowy `data-root.txt` z informacją, dokąd poszła
-reszta — czyta go deinstalator Windows, żeby „usuń moje dane" nadal znaczyło
-wszystkie.
+**Folder danych** trzyma wszystko, co Twoje: profile razem ze światami,
+ustawienia, listę kont, logi i raporty z awarii. Dopóki go nie przeniesiesz,
+jest nim folder launchera. **Ustawienia → Dane → Przenieś…** przenosi go, gdzie
+chcesz — zwykle na inny dysk, bo pliki gry to gigabajty. Launcher przenosi
+całość, sprawdza kopię i dopiero wtedy usuwa oryginał; jeśli coś po drodze się
+nie uda, przywraca stan sprzed przenoszenia, a jeśli czegoś nie dało się usunąć
+ze starego miejsca, wymienia dokładnie co.
 
-W środku:
+Żadnego z nich nie musisz szukać ręcznie. **Ustawienia → Dane** oraz strona
+prywatności w apce (Informacje → Prywatność) wymieniają każde miejsce, w którym
+launcher zapisuje na tym komputerze — ze ścieżką, rozmiarem zmierzonym na Twoim
+dysku i przyciskiem, który je otwiera.
 
-| Ścieżka                       | Zawartość                                                                                                                                                                                 |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `settings.json`               | Twoje ustawienia — motyw, język, adres proxy, adresy kanałów, liczba równoległych pobrań, zaufane klucze podpisu.                                                                         |
-| `profiles.json`               | Twoje profile: nazwy, wersje Minecrafta, loadery, przydzielony RAM, adresy manifestów, czas gry i daty ostatniego uruchomienia.                                                           |
-| `profiles/<id>/.minecraft/`   | Prawdziwy katalog gry, osobny dla każdego profilu — światy, zrzuty ekranu, `options.txt`, mody, paczki zasobów, shadery. To pliki samego Minecrafta, trzymane osobno dla każdego profilu. |
-| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta, adres skórki i data ostatniego uwierzytelnienia. Zapisywany z uprawnieniami `0600`. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.  |
-| `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                             |
-| `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                |
-| `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, instalatory loaderów i zbuforowane metadane. Nic osobistego.                                                                                                     |
-| `data-root.txt`               | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, pod którą go przeniosłeś, i nic poza tym. Zostaje w lokalizacji powyżej.                                         |
+W folderze danych:
 
-Chromium trzyma w tym folderze także własne dane, w tym ciasteczka z okna
-logowania Microsoftu. Są kasowane, gdy wylogujesz konto Microsoft.
+| Ścieżka                       | Zawartość                                                                                                                                                                                     |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings.json`               | Twoje ustawienia — motyw, język, adres proxy, adresy kanałów, liczba równoległych pobrań, zaufane klucze podpisu.                                                                             |
+| `profiles.json`               | Twoje profile: nazwy, wersje Minecrafta, loadery, przydzielony RAM, adresy manifestów, czas gry i daty ostatniego uruchomienia.                                                               |
+| `profiles/<id>/`              | Po jednym folderze na profil: `.minecraft/` — prawdziwy katalog gry ze światami, zrzutami ekranu, `options.txt`, modami, paczkami zasobów i shaderami — oraz kopie światów i obrazek profilu. |
+| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta, adres skórki i data ostatniego uwierzytelnienia. Zapisywany z uprawnieniami `0600`. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.      |
+| `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                                 |
+| `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                    |
+| `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, loadery, pliki samego Minecrafta i zbuforowane metadane. Nic osobistego; usunięte, pobiorą się ponownie.                                                             |
+
+W folderze launchera, gdziekolwiek są dane:
+
+| Ścieżka         | Zawartość                                                                                                                                                                                      |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `browser/`      | Okno launchera to wbudowana przeglądarka, a to jej własne pliki: pamięć podręczna obrazków (ikony modów, grafiki z wiadomości), zamknięte ogłoszenia i ciasteczka strony logowania Microsoftu. |
+| `data-root.txt` | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, dokąd trafił, i nic poza tym. Czytają go launcher i deinstalator Windows, żeby znaleźć dane.                          |
+
+I poza oboma:
+
+| Gdzie                                                                                            | Zawartość                                                             |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Systemowy magazyn poświadczeń                                                                    | Logowanie Microsoft. Patrz „Gdzie leżą poświadczenia”.                |
+| `%LOCALAPPDATA%\raven-forge-launcher-updater` (Windows), `~/.cache/raven-forge-launcher-updater` | Instalator nowej wersji launchera, pobrany i czekający na instalację. |
+| Tam, gdzie launcher jest zainstalowany                                                           | Sam program. Niczego tam nie zapisuje.                                |
+
+Wersje do 0.7.1 nazywały folder launchera `Raven Forge Launcher`. Nowsza wersja
+przy pierwszym starcie zmienia mu nazwę i odkłada pliki wbudowanej przeglądarki
+do `browser/`; nic z jego zawartości nie ginie. Jeśli starego folderu nie da się
+w tej chwili przemianować — ma go otwartego coś innego — launcher dalej używa go
+pod starą nazwą.
 
 ### Gdzie leżą poświadczenia
 
@@ -101,9 +117,19 @@ Na jedno konto Microsoft przypadają dwa sekrety: **token odświeżający
 Microsoftu** (którym można uzyskać nowe sesje) i **token sesji Minecrafta**
 (którym udowadniasz serwerom gry, że to Ty).
 
-Oba trafiają do magazynu poświadczeń systemu operacyjnego — Menedżera
-poświadczeń na Windows, Keychain na macOS, libsecret/kwallet na Linuksie — pod
-nazwą usługi `com.ravenforge.launcher`. Sam launcher nie zapisuje ich na dysk.
+Oba trafiają do magazynu poświadczeń systemu operacyjnego jako wpisy usługi
+`com.ravenforge.launcher` — po dwa na konto Microsoft. Sam launcher nie zapisuje
+ich na dysk.
+
+| System  | Gdzie i jak to obejrzeć                                                                                                                                                                                                          |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows | Menedżer poświadczeń: Panel sterowania → Konta użytkowników → Menedżer poświadczeń → Poświadczenia systemu Windows. Windows szyfruje wpisy Twoim kontem; programy uruchomione jako Ty mogą o nie poprosić, inni użytkownicy nie. |
+| Linux   | Pęk kluczy pulpitu, przez Secret Service: GNOME Keyring (aplikacja „Hasła i klucze”) albo KWallet (KWalletManager). Zaszyfrowany Twoim hasłem logowania, otwarty, dopóki jesteś zalogowany, czytelny dla programów Twojej sesji. |
+| macOS   | Pęk kluczy (aplikacja „Dostęp do pęku kluczy”).                                                                                                                                                                                  |
+
+„Wyloguj” na stronie Konta usuwa oba wpisy tego konta. Usunięcie ich ręcznie w
+miejscach powyżej daje to samo; launcher poprosi wtedy o ponowne zalogowanie.
+Strona prywatności w apce podaje, ile wpisów jest na tym komputerze.
 
 **Wyjątek jest powiedziany wprost.** Na maszynie bez działającego pęku kluczy
 (częsty przypadek na Linuksie: nie działa `gnome-keyring` ani `kwallet`) zapis
@@ -122,14 +148,16 @@ pliki pobrał, jakie błędy wystąpiły. Zawiera Twoją nazwę gracza
 (`Authenticated Microsoft account: <nazwa>`) i bezwzględne ścieżki plików, w
 których na Windows siedzi nazwa Twojego konta systemowego.
 
-Przepisuje też **dosłownie wyjście samej gry** — i to jest ta część, na którą
-trzeba uważać: mod może wypisać tam cokolwiek, łącznie z argumentami
-uruchomienia zawierającymi żywy token sesji. Własna linia launchera
-(„Launching:”) jest ucięta do 200 znaków i sięga wyłącznie opcji JVM, nigdy
-tokenu — ale wyjście gry nie jest filtrowane.
+Trzyma też **wyjście samej gry** — i to jest ta część, na którą trzeba uważać:
+mod może wypisać tam cokolwiek. Launcher usuwa token sesji z każdej linii, zanim
+trafi ona do logu albo do konsoli na żywo — token tego uruchomienia i wszystko,
+co ma jego kształt — a jego własna linia „Launching:” w ogóle do tokenu nie
+sięga. Nazwa gracza, UUID i ścieżki plików zostają, bo log jest Twój do
+czytania.
 
-**Zatem: zredaguj `logs/main.log`, zanim go komuś wyślesz.** Opisane niżej
-raporty z awarii istnieją właśnie po to, żebyś nie musiał.
+**Zatem: przeczytaj `logs/main.log`, zanim go komuś wyślesz.** Opisane niżej
+raporty z awarii istnieją po to, żebyś nie musiał — zapisywane są już bez tych
+szczegółów.
 
 ---
 
@@ -167,8 +195,9 @@ na Twoim koncie Microsoft.
 
 | Host                                                     | Kiedy                                                                           | Co jest wysyłane                                                                                                                                                                                                                                                                                                                            |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api.modrinth.com`, `cdn.modrinth.com`                   | Przeglądanie lub instalowanie modów, shaderów i paczek zasobów                  | **Twoje frazy wyszukiwania i filtry.** Regulamin API Modrinth wymaga identyfikującego się User-Agenta, więc żądania niosą `whiteravens20/raven-forge/<wersja> (<adres repo>)` — nazwę i wersję launchera, nie Ciebie.                                                                                                                       |
+| `api.modrinth.com`, `cdn.modrinth.com`                   | Przeglądanie lub instalowanie modów, shaderów, paczek zasobów i modpacków       | **Twoje frazy wyszukiwania i filtry.** Regulamin API Modrinth wymaga identyfikującego się User-Agenta, więc żądania niosą `whiteravens20/raven-forge/<wersja> (<adres repo>)` — nazwę i wersję launchera, nie Ciebie.                                                                                                                       |
 | `api.modrinth.com`                                       | Sprawdzanie aktualizacji zainstalowanych modów albo eksport profilu jako paczki | **Skrót SHA-512 każdego pliku moda w tym profilu.** Tak właśnie pyta się Modrinth, czym jest dany plik i co go zastąpiło — i tylko dzięki temu da się rozpoznać jar wrzucony ręcznie. Skrót nazywa plik, nie Ciebie, ale ich zestaw opisuje, jakie mody ma ten profil, więc idzie wyłącznie po naciśnięciu jednego z tych dwóch przycisków. |
+| `api.modrinth.com`                                       | Otwarcie listy modów, shaderów albo paczek zasobów profilu                      | **Identyfikatory Modrinth tych, które ten profil ma.** Tak pobierane są ich opisy i ikony; odpowiedź jest pamiętana przez tydzień, więc lista nie jest odpytywana za każdym razem. Identyfikatory mówią, jaką zawartość ma profil, a nie kim jesteś.                                                                                        |
 | Serwer, na którym leży ikona moda lub obrazek wiadomości | Przy ich wyświetlaniu                                                           | Żądanie idzie do tego serwera. Obrazki ładują się prosto stamtąd, gdzie projekt je opublikował.                                                                                                                                                                                                                                             |
 
 ### Do White Ravens
@@ -271,24 +300,27 @@ katalogu domowego — która na Windows zawiera nazwę Twojego konta — zastęp
 znakiem `~`.
 
 **Nic go nie wysyła.** Leży w folderze, dopóki nie zdecydujesz inaczej. Karta
-pokazywana po awarii proponuje jego otwarcie; **Ustawienia → Dane → Raporty z
-awarii** otwiera ten folder w dowolnym momencie.
+pokazywana po awarii proponuje jego otwarcie, a **Ustawienia → Dane** wymieniają
+ten folder z przyciskiem, który otwiera go w dowolnym momencie.
 
 Redakcja nie może wiedzieć, co mod postanowił wypisać w wyjściu gry, więc
 przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 ---
 
-## Co możesz wyłączyć
+## O czym decydujesz Ty
 
-| Ustawienie                                                          | Efekt                                                                                                                                 |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Tryb offline** (Ustawienia → Zachowanie)                          | Nigdy nie kontaktuje się z serwerami uwierzytelniania. Tylko gra jednoosobowa i LAN.                                                  |
-| **Adres kanału wiadomości / ogłoszeń** (Ustawienia → Źródła treści) | Wyczyść pole, a dany kanał nie będzie już pobierany.                                                                                  |
-| **Proxy** (Ustawienia → Sieć i pobieranie)                          | Kieruje każde żądanie launchera przez proxy, które kontrolujesz.                                                                      |
-| **Status na Discordzie** (Ustawienia → Zachowanie)                  | Domyślnie wyłączony. Włączony — Twój profil na Discordzie pokazuje, w co grasz.                                                       |
-| Nieużywanie strony Mody                                             | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz, nie zainstalujesz, nie sprawdzisz aktualizacji ani nie wyeksportujesz paczki. |
-| Konto offline                                                       | Żaden serwer Microsoftu ani Xboxa nie jest w ogóle dotykany.                                                                          |
+| Co                     | Gdzie i co to daje                                                                                                                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Logowanie              | **Ustawienia → Zachowanie → „Zawsze uruchamiaj offline”**: launcher nigdy nie łączy się z serwerami logowania Microsoftu, Xboxa i Mojang. Pliki gry i mody nadal są pobierane. Konto offline nie loguje się nigdzie.  |
+| Wiadomości             | **Ustawienia → Źródła treści**: wyczyść oba adresy, a żaden kanał nie będzie pobierany; wpisz własne, a pytane będą tylko one.                                                                                        |
+| Proxy                  | **Ustawienia → Sieć i pobieranie → Proxy URL**: każde połączenie launchera idzie przez nie. Gra, gdy już działa, łączy się sama i proxy launchera jej nie obejmuje.                                                   |
+| Discord                | **Ustawienia → Zachowanie → „Pokazuj grę na statusie Discorda”**, domyślnie wyłączone.                                                                                                                                |
+| Paczki                 | Profil, który trzyma się paczki, pyta o nią adres z pola **Manifest URL** — przy starcie launchera i przed każdym uruchomieniem gry. Usuń ten adres w edytorze profilu, a profil przestanie pytać i się aktualizować. |
+| Zawartość z Modrinth   | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz, nie otworzysz listy modów, shaderów albo paczek zasobów profilu, nie sprawdzisz aktualizacji ani nie wyeksportujesz paczki.                                   |
+| Aktualizacje launchera | Sprawdzane przy każdym starcie jednym zapytaniem do GitHuba. Tego na razie nie da się wyłączyć — patrz „Znane luki”.                                                                                                  |
+| Logi i raporty         | Nie opuszczają komputera, dopóki sam ich komuś nie wyślesz. „Zgłoś błąd” otwiera stronę zgłoszeń w przeglądarce; plik dołączasz ręcznie.                                                                              |
+| Gdzie to wszystko leży | **Ustawienia → Dane → Przenieś…** przenosi folder danych tam, gdzie wskażesz.                                                                                                                                         |
 
 ---
 
@@ -298,12 +330,14 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
   jego wpisy w magazynie poświadczeń. Wylogowanie z konta Microsoft czyści też
   ciasteczka okna logowania, więc następne logowanie zaczyna się od pustej
   strony, a nie od rozpoznania Ciebie.
-- **Wszystkie dane launchera:** zamknij launcher i usuń wymieniony wyżej folder
-  danych. Poza nim nie zostaje nic oprócz wpisów w magazynie poświadczeń
-  systemu, które znikają, jeśli najpierw się wylogujesz.
+- **Wszystkie dane launchera:** zamknij launcher i usuń wymienione wyżej folder
+  danych i folder launchera. Poza nimi nie zostaje nic oprócz wpisów w magazynie
+  poświadczeń, które znikają, jeśli najpierw się wylogujesz, i pobranej
+  aktualizacji, jeśli jakaś czeka.
 - **Odinstalowanie:** usunięcie launchera i usunięcie danych to dwie osobne
-  rzeczy. Na Windows deinstalator pyta, co zrobić; na Linuksie pakiet w ogóle nie
-  rusza katalogu domowego. Opisuje to [UNINSTALL.md](UNINSTALL.md).
+  rzeczy. Na Windows deinstalator pyta, co zrobić, i podaje folder, w którym dane
+  naprawdę są; na Linuksie pakiet w ogóle nie rusza katalogu domowego. Opisuje to
+  [UNINSTALL.md](UNINSTALL.md).
 - **Po naszej stronie:** nie ma czego usuwać. Nie mamy niczego.
 
 ---
@@ -315,8 +349,9 @@ Wymienione celowo. Uczciwa lista jest lepsza niż taka, która ładnie wygląda.
 - **Sprawdzania aktualizacji przy starcie nie da się wyłączyć** z Ustawień. To
   jedno żądanie do GitHub Releases przy każdym uruchomieniu. Przy zablokowanej
   sieci po prostu cicho zawodzi.
-- **Pliki logów nie są redagowane.** Redagowane są tylko raporty z awarii. Patrz
-  „Co trafia do logu”.
+- **Pliki logów są redagowane tylko częściowo.** Token sesji jest usuwany; nazwa
+  gracza, UUID i ścieżki plików nie. Raporty z awarii mają usunięte wszystkie te
+  rzeczy. Patrz „Co trafia do logu”.
 - **Skórki ładują się z serwerów tekstur Microsoftu** po adresie URL przy
   otwarciu strony Konta, co mówi tamtemu serwerowi, że ją otworzyłeś.
 
