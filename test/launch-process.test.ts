@@ -401,6 +401,68 @@ describe.skipIf(!posix)('a launch', () => {
   });
 });
 
+/**
+ * The versions up to 1.7.2, which are started with one line of arguments and
+ * expect three things no later version asks for.
+ */
+describe.skipIf(!posix)('a version from before 1.7.10', () => {
+  const sound = 'a cave sound';
+  const hash = crypto.createHash('sha1').update(sound).digest('hex');
+
+  beforeEach(async () => {
+    const index = await place(
+      path.join(cacheDir(), 'assets', 'indexes', 'legacy.json'),
+      JSON.stringify({
+        virtual: true,
+        objects: { 'sounds/ambient/cave1.ogg': { hash, size: sound.length } },
+      }),
+    );
+    await place(path.join(cacheDir(), 'assets', 'objects', hash.slice(0, 2), hash), sound);
+    state.meta = {
+      ...state.meta!,
+      assets: 'legacy',
+      assetIndex: { id: 'legacy', ...index, totalSize: 0, url: NOT_FETCHED },
+      arguments: undefined,
+      minecraftArguments:
+        '${auth_player_name} ${auth_session} --gameDir ${game_directory} ' +
+        '--assetsDir ${game_assets} --userProperties ${user_properties}',
+    };
+  });
+
+  const gameSide = async () => {
+    const args = await gameArgs();
+    return args.slice(args.indexOf('net.minecraft.client.main.Main') + 1);
+  };
+
+  it('is given its assets by name, its session as one argument, and properties that parse', async () => {
+    await launch('exit 0');
+    await exitInfo();
+
+    const named = path.join(cacheDir(), 'assets', 'virtual', 'legacy');
+    expect(await gameSide()).toEqual([
+      'RavenPlayer',
+      `token:${TOKEN}:069a79f444e94726a5befca90e38aaf5`,
+      '--gameDir',
+      gameDir(),
+      '--assetsDir',
+      named,
+      '--userProperties',
+      '{}',
+    ]);
+    expect(await fs.readFile(path.join(named, 'sounds', 'ambient', 'cave1.ogg'), 'utf-8')).toBe(
+      sound,
+    );
+  });
+
+  it('is given no session when it is started offline', async () => {
+    state.settings.offlineMode = true;
+    await launch('exit 0');
+    await exitInfo();
+
+    expect((await gameSide())[1]).toBe('-');
+  });
+});
+
 describe.skipIf(!posix)('the launch after a crash', () => {
   const marker = () => path.join(root, 'data', 'profiles', 'p1', '.recheck-game-files');
 

@@ -102,4 +102,8 @@ export interface Library {
 
 export interface AssetIndex {
   objects: Record<string, { hash: string; size: number }>;
+  /** 1.6 to 1.7.2: the game reads its assets by name, from one folder of them. */
+  virtual?: boolean;
+  /** Before 1.6: the game reads them from `resources/` in its own directory. */
+  map_to_resources?: boolean;
 }

@@ -485,11 +485,63 @@ function uniqueJars<T extends { jarPath: string }>(jars: T[]): T[] {
 
 // ── Download assets ────────────────────────────────────────
 
+/**
+ * Where a version expects to find its assets by name, when it does.
+ *
+ * Everything since 1.7.10 reads `objects/` through the index and wants nothing
+ * else. The versions before it cannot: 1.6 to 1.7.2 look in one folder of real
+ * file names — the index calls that `virtual` — and everything older reads
+ * `resources/` inside its own game directory. Returns null for a modern index.
+ */
+function namedAssetsDir(
+  index: AssetIndex,
+  indexId: string,
+  assetsDir: string,
+  gameDir: string | undefined,
+): string | null {
+  if (index.map_to_resources && gameDir) return path.join(gameDir, 'resources');
+  if (index.virtual || index.map_to_resources) return path.join(assetsDir, 'virtual', indexId);
+  return null;
+}
+
+/**
+ * Lay the objects out under the names the index gives them.
+ *
+ * Copies, because the game opens them as ordinary files; made once, since a
+ * copy that is already there at the right size is left alone. Without this the
+ * oldest twenty releases started with every asset downloaded and none of them
+ * found: no sounds, no language files, and in the very oldest no icon.
+ */
+async function materialiseAssets(
+  index: AssetIndex,
+  objectsDir: string,
+  namedDir: string,
+): Promise<void> {
+  const root = path.resolve(namedDir);
+  for (const [name, obj] of Object.entries(index.objects)) {
+    const dest = path.resolve(root, name);
+    // The names are Mojang's, and are still not allowed to choose a place
+    // outside the folder they are being laid out in.
+    if (!dest.startsWith(root + path.sep)) {
+      throw new Error(`The asset index names a file outside its folder: ${name}`);
+    }
+    if (await hasSize(dest, obj.size)) continue;
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.copyFile(path.join(objectsDir, obj.hash.substring(0, 2), obj.hash), dest);
+  }
+}
+
+/**
+ * Make sure every asset the version needs is on disk.
+ *
+ * @returns the folder to hand the game as `${game_assets}`: the assets root,
+ *          or for the versions that read assets by name, the folder of names
+ */
 export async function ensureAssets(
   assetsDir: string,
   meta: VersionMeta,
-  options: GameFileOptions = {},
-): Promise<void> {
+  options: GameFileOptions & { gameDir?: string } = {},
+): Promise<string> {
   const settings = await getSettings();
   const indexDir = path.join(assetsDir, 'indexes');
   const objectsDir = path.join(assetsDir, 'objects');
@@ -508,7 +560,11 @@ export async function ensureAssets(
   const assetIndex = JSON.parse(indexRaw) as AssetIndex;
 
   const tasks: DownloadTask[] = [];
-  for (const [, obj] of Object.entries(assetIndex.objects)) {
+  for (const [name, obj] of Object.entries(assetIndex.objects)) {
+    // It becomes a file name and a URL, so it has to be what it says it is.
+    if (!/^[0-9a-f]{40}$/.test(obj.hash)) {
+      throw new Error(`The asset index gives ${name} a hash that is not one`);
+    }
     const prefix = obj.hash.substring(0, 2);
     const dest = path.join(objectsDir, prefix, obj.hash);
     const url = `${MOJANG_RESOURCES}/${prefix}/${obj.hash}`;
@@ -522,4 +578,10 @@ export async function ensureAssets(
     checkLabel: { key: 'progress.msg.checkingAssets' },
     downloadLabel: { key: 'progress.msg.assets' },
   });
+
+  const namedDir = namedAssetsDir(assetIndex, meta.assetIndex.id, assetsDir, options.gameDir);
+  if (!namedDir) return assetsDir;
+  throwIfCancelled(options.signal, 'Download');
+  await materialiseAssets(assetIndex, objectsDir, namedDir);
+  return namedDir;
 }

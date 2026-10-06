@@ -454,7 +454,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   const libClasspath = await ensureLibraries(librariesDir, meta, nativesDir, files);
 
   log.info('Ensuring assets...');
-  await ensureAssets(assetsDir, meta, files);
+  const gameAssets = await ensureAssets(assetsDir, meta, { ...files, gameDir });
 
   throwIfCancelled(signal, 'Launch');
   if (files.thorough) await fs.rm(recheck, { force: true });
@@ -496,6 +496,13 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     assets_index_name: meta.assetIndex.id,
     auth_uuid: uuid,
     auth_access_token: accessToken,
+    // The three the versions up to 1.7.2 are started with. They take the token
+    // and the profile as one argument, find their assets by name in a folder of
+    // their own, and — up to 1.8.9 — expect a JSON object of account properties
+    // where an empty string is not one.
+    auth_session: accessToken === '0' ? '-' : `token:${accessToken}:${uuid}`,
+    game_assets: gameAssets,
+    user_properties: '{}',
     clientid: '',
     auth_xuid: '',
     user_type: account.type === 'microsoft' ? 'msa' : 'legacy',

@@ -273,3 +273,100 @@ describe('native libraries', () => {
     expect(nativesClassifier(map, 'osx', 'arm64')).toBeUndefined();
   });
 });
+
+describe('assets a version reads by name', () => {
+  const assets = () => path.join(dir, 'assets');
+  const gameDir = () => path.join(dir, 'game');
+
+  /** An index of these files, with their objects already on disk. */
+  async function indexOf(
+    id: string,
+    files: Record<string, string>,
+    flags: { virtual?: boolean; map_to_resources?: boolean },
+  ): Promise<VersionMeta> {
+    const objects: Record<string, { hash: string; size: number }> = {};
+    for (const [name, body] of Object.entries(files)) {
+      const hash = sha1(body);
+      objects[name] = { hash, size: Buffer.byteLength(body) };
+      const object = path.join(assets(), 'objects', hash.slice(0, 2), hash);
+      await fs.mkdir(path.dirname(object), { recursive: true });
+      await fs.writeFile(object, body);
+    }
+    const index = JSON.stringify({ ...flags, objects });
+    await fs.mkdir(path.join(assets(), 'indexes'), { recursive: true });
+    await fs.writeFile(path.join(assets(), 'indexes', `${id}.json`), index);
+    return {
+      id: '1.6.4',
+      assetIndex: { id, sha1: sha1(index), size: index.length, totalSize: 0, url: '' },
+    } as unknown as VersionMeta;
+  }
+
+  it('are laid out in a folder of names for 1.6 to 1.7.2', async () => {
+    const meta = await indexOf(
+      'legacy',
+      { 'lang/en_US.lang': 'menu.quit=Quit' },
+      { virtual: true },
+    );
+
+    const handed = await ensureAssets(assets(), meta, { gameDir: gameDir() });
+
+    expect(handed).toBe(path.join(assets(), 'virtual', 'legacy'));
+    expect(await fs.readFile(path.join(handed, 'lang', 'en_US.lang'), 'utf-8')).toBe(
+      'menu.quit=Quit',
+    );
+  });
+
+  it('are laid out in the game directory itself for everything older', async () => {
+    const meta = await indexOf(
+      'pre-1.6',
+      { 'newsound/random/click.ogg': 'click' },
+      { map_to_resources: true },
+    );
+
+    const handed = await ensureAssets(assets(), meta, { gameDir: gameDir() });
+
+    expect(handed).toBe(path.join(gameDir(), 'resources'));
+    expect(await fs.readFile(path.join(handed, 'newsound', 'random', 'click.ogg'), 'utf-8')).toBe(
+      'click',
+    );
+  });
+
+  it('are left where they are for a version that reads them through the index', async () => {
+    const meta = await indexOf('17', { 'minecraft/lang/en_us.json': '{}' }, {});
+
+    expect(await ensureAssets(assets(), meta, { gameDir: gameDir() })).toBe(assets());
+    await expect(fs.access(path.join(assets(), 'virtual'))).rejects.toThrow();
+  });
+
+  it('are not copied again when they are already laid out', async () => {
+    const meta = await indexOf('legacy', { 'icons/icon_16x16.png': 'icon' }, { virtual: true });
+    const handed = await ensureAssets(assets(), meta);
+    const before = await fs.stat(path.join(handed, 'icons', 'icon_16x16.png'));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await ensureAssets(assets(), meta);
+
+    expect((await fs.stat(path.join(handed, 'icons', 'icon_16x16.png'))).mtimeMs).toBe(
+      before.mtimeMs,
+    );
+  });
+
+  it('are refused a name that leads out of their folder', async () => {
+    const meta = await indexOf('legacy', { '../../outside.txt': 'x' }, { virtual: true });
+
+    await expect(ensureAssets(assets(), meta)).rejects.toThrow(/outside its folder/);
+    await expect(fs.access(path.join(dir, 'outside.txt'))).rejects.toThrow();
+  });
+
+  it('are refused an object that is not named by a hash', async () => {
+    const index = JSON.stringify({ objects: { 'a.txt': { hash: '../../etc/passwd', size: 1 } } });
+    await fs.mkdir(path.join(assets(), 'indexes'), { recursive: true });
+    await fs.writeFile(path.join(assets(), 'indexes', 'bad.json'), index);
+    const meta = {
+      id: '1.21.4',
+      assetIndex: { id: 'bad', sha1: sha1(index), size: index.length, totalSize: 0, url: '' },
+    } as unknown as VersionMeta;
+
+    await expect(ensureAssets(assets(), meta)).rejects.toThrow(/a hash that is not one/);
+  });
+});
