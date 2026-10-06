@@ -299,6 +299,15 @@ export function isLegacyNeoForge(loaderVersion: string, mcVersion: string): bool
  */
 const NEOFORGE_WITHOUT_INSTALLER: ReadonlySet<string> = new Set(['47.1.7']);
 
+/**
+ * The builds of NeoForge's 1.20.1 line for a Minecraft version — its first
+ * release, still published under the pre-rename `forge` artifact with
+ * Forge-style `<mc>-<build>` names.
+ */
+function legacyNeoForgeVersionsFor(all: string[], mcVersion: string): string[] {
+  return forgeVersionsFor(all, mcVersion).filter((build) => !NEOFORGE_WITHOUT_INSTALLER.has(build));
+}
+
 export async function getNeoForgeVersions(mcVersion: string): Promise<LoaderVersion[]> {
   const xml = await fetchText(`${NEOFORGE_MAVEN_ROOT}/maven-metadata.xml`, 'NeoForge Maven');
   const versions = neoForgeVersionsFor(parseMavenVersions(xml), mcVersion);
@@ -308,17 +317,13 @@ export async function getNeoForgeVersions(mcVersion: string): Promise<LoaderVers
   }
 
   // Nothing under the modern artifact. Before reporting none, check the 1.20.1
-  // line — NeoForge's first release, still published under the pre-rename
-  // `forge` artifact with Forge-style `<mc>-<build>` versions. Only reached when
-  // the modern lookup came up empty, so it costs a request on a miss and nothing
-  // otherwise.
+  // line. Only reached when the modern lookup came up empty, so it costs a
+  // request on a miss and nothing otherwise.
   const legacyXml = await fetchText(
     `${NEOFORGE_LEGACY_MAVEN_ROOT}/maven-metadata.xml`,
     'NeoForge (1.20.1) Maven',
   );
-  const legacy = forgeVersionsFor(parseMavenVersions(legacyXml), mcVersion).filter(
-    (build) => !NEOFORGE_WITHOUT_INSTALLER.has(build),
-  );
+  const legacy = legacyNeoForgeVersionsFor(parseMavenVersions(legacyXml), mcVersion);
   if (legacy.length === 0) {
     log.info(`NeoForge has no builds for Minecraft ${mcVersion}`);
     return [];
@@ -334,9 +339,10 @@ export async function getNeoForgeVersions(mcVersion: string): Promise<LoaderVers
  * Whether a build would be on the list offered for a Minecraft version, going
  * by its name alone.
  *
- * The two lists above with nothing fetched: a build these rules leave out is
- * left out here, and every other name passes — one no repository has ever
- * published included, because that is not something a name says.
+ * Each of the lists above, given a list of one and nothing fetched: a build
+ * their rules leave out is left out here, and every other name passes — one no
+ * repository has ever published included, because that is not something a name
+ * says.
  */
 export function isWorkingForgeLikeBuild(
   loader: ForgeLikeLoader,
@@ -344,8 +350,10 @@ export function isWorkingForgeLikeBuild(
   mcVersion: string,
 ): boolean {
   if (loader === 'forge') return workingForgeBuilds([build], mcVersion).length > 0;
-  if (isLegacyNeoForge(build, mcVersion)) return !NEOFORGE_WITHOUT_INSTALLER.has(build);
-  return neoForgeVersionsFor([build], mcVersion).length > 0;
+  const listed = isLegacyNeoForge(build, mcVersion)
+    ? legacyNeoForgeVersionsFor([`${mcVersion}-${build}`], mcVersion)
+    : neoForgeVersionsFor([build], mcVersion);
+  return listed.length > 0;
 }
 
 // ── Installation ───────────────────────────────────────────
