@@ -64,18 +64,25 @@ export function requiredJavaFor(
   // becomes the directory in `jre-<n>/bin/java`, which the launcher then
   // executes on every launch, and the version in the Adoptium download URL. A
   // version meta that said `../../../something` would be choosing the binary we
-  // run. Re-derive it as an integer and require a Java release that exists.
-  const stated = meta?.javaVersion?.majorVersion;
-  if (
-    typeof stated === 'number' &&
-    Number.isInteger(stated) &&
-    stated >= OLDEST_JAVA &&
-    stated <= NEWEST_PLAUSIBLE_JAVA
-  ) {
-    return stated;
-  }
+  // run. So what is handed on is never the value the meta held — see below.
+  return javaMajor(meta?.javaVersion?.majorVersion) ?? javaForRelease(mcVersion);
+}
 
-  return javaForRelease(mcVersion);
+/**
+ * The Java release `value` names, as a number of the launcher's own — or null
+ * when it names none.
+ *
+ * Counted up to, not converted. What comes back is this loop's counter, picked
+ * out by the value and never made from it, so nothing a version meta can put in
+ * that field reaches a path or a URL: not a string that parses as a number, not
+ * a fraction, not something with a `toString` of its own. It is one of the
+ * integers between the two bounds or it is nothing.
+ */
+export function javaMajor(value: unknown): number | null {
+  for (let major = OLDEST_JAVA; major <= NEWEST_PLAUSIBLE_JAVA; major++) {
+    if (value === major) return major;
+  }
+  return null;
 }
 
 /** Minecraft has never asked for anything older; 1.8 wants exactly this. */

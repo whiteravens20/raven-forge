@@ -1,7 +1,11 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { describe, it, expect } from 'vitest';
-import { parseJavaVersion, requiredJavaFor } from '../src/core/minecraft/java-requirement';
+import {
+  javaMajor,
+  parseJavaVersion,
+  requiredJavaFor,
+} from '../src/core/minecraft/java-requirement';
 
 /**
  * The version meta is JSON fetched from Mojang, and `requiredJavaFor` is the
@@ -74,6 +78,28 @@ describe('requiredJavaFor', () => {
     // value reaching the path is not the value the meta contained.
     const meta = { javaVersion: { component: 'java-runtime', majorVersion: '21abc' } } as never;
     expect(requiredJavaFor('1.20.4', meta)).toBe(17);
+  });
+});
+
+describe('javaMajor', () => {
+  it('answers with the release a number names', () => {
+    expect(javaMajor(8)).toBe(8);
+    expect(javaMajor(21)).toBe(21);
+    expect(javaMajor(99)).toBe(99);
+  });
+
+  it.each([
+    ['a number below any Java Minecraft has used', 7],
+    ['a number past any plausible release', 100],
+    ['a fraction', 21.5],
+    ['a string that reads as a number', '21'],
+    ['a path', '../../21'],
+    ['an object that prints as one', { toString: () => '21' }],
+    ['nothing', undefined],
+    ['null', null],
+    ['not a number', Number.NaN],
+  ])('answers with nothing for %s', (_label, value) => {
+    expect(javaMajor(value)).toBeNull();
   });
 });
 
