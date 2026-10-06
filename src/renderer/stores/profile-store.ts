@@ -25,6 +25,8 @@ interface ProfileStore {
    * that could not remove every file says so.
    */
   remove: (profileId: string, deleteFiles: boolean) => Promise<IpcResult<void>>;
+  /** Profiles being deleted right now. A profile with worlds in it takes a while to go. */
+  removing: Set<string>;
   /**
    * Profiles being copied right now, by the id of the original.
    *
@@ -60,6 +62,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   selectedProfileId: null,
   loading: false,
   duplicating: new Set(),
+  removing: new Set(),
 
   load: async () => {
     set({ loading: true });
@@ -98,15 +101,24 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   },
 
   remove: async (profileId, deleteFiles) => {
-    const result = await api.profiles.delete(profileId, deleteFiles);
-    // Reloaded whatever the answer: a delete that could not remove every file
-    // has still taken the profile off the list.
-    await get().load();
-    const { profiles, selectedProfileId } = get();
-    if (selectedProfileId === profileId && !profiles.some((p) => p.id === profileId)) {
-      set({ selectedProfileId: profiles[0]?.id ?? null });
+    set((state) => ({ removing: new Set(state.removing).add(profileId) }));
+    try {
+      const result = await api.profiles.delete(profileId, deleteFiles);
+      // Reloaded whatever the answer: a delete that could not remove every file
+      // has still taken the profile off the list.
+      await get().load();
+      const { profiles, selectedProfileId } = get();
+      if (selectedProfileId === profileId && !profiles.some((p) => p.id === profileId)) {
+        set({ selectedProfileId: profiles[0]?.id ?? null });
+      }
+      return result;
+    } finally {
+      set((state) => {
+        const next = new Set(state.removing);
+        next.delete(profileId);
+        return { removing: next };
+      });
     }
-    return result;
   },
 
   duplicate: async (profileId, name) => {

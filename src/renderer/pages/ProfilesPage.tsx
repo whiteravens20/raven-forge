@@ -171,6 +171,9 @@ export function ProfilesPage() {
   const duplicating = useProfileStore((s) =>
     s.selectedProfileId ? s.duplicating.has(s.selectedProfileId) : false,
   );
+  const removing = useProfileStore((s) =>
+    s.selectedProfileId ? s.removing.has(s.selectedProfileId) : false,
+  );
   const reload = useProfileStore((s) => s.load);
 
   const t = useT();
@@ -206,24 +209,44 @@ export function ProfilesPage() {
     void refreshOrphans();
   }, [refreshOrphans, profiles.length]);
 
-  const adopt = async (profileId: string) => {
+  /**
+   * The kept profiles being put back or deleted right now. Deleting one removes
+   * its worlds, which takes as long as they are large, and both buttons used to
+   * sit there looking unpressed for all of it.
+   */
+  const [orphanBusy, setOrphanBusy] = useState<ReadonlySet<string>>(new Set());
+  const whileOrphanBusy = async (profileId: string, work: () => Promise<void>) => {
+    if (orphanBusy.has(profileId)) return;
     setActionError(null);
-    const result = await api.profiles.adoptOrphaned(profileId);
-    if (result.success) {
-      await reload();
-      select(profileId);
-    } else {
-      setActionError(result.error ?? t('orphans.restoreFailed'));
+    setOrphanBusy((ids) => new Set(ids).add(profileId));
+    try {
+      await work();
+      await refreshOrphans();
+    } finally {
+      setOrphanBusy((ids) => {
+        const next = new Set(ids);
+        next.delete(profileId);
+        return next;
+      });
     }
-    await refreshOrphans();
   };
 
-  const discard = async (profileId: string) => {
-    setActionError(null);
-    const r = await api.profiles.discardOrphaned(profileId);
-    if (!r.success) setActionError(r.error ?? t('orphans.discardFailed'));
-    await refreshOrphans();
-  };
+  const adopt = (profileId: string) =>
+    whileOrphanBusy(profileId, async () => {
+      const result = await api.profiles.adoptOrphaned(profileId);
+      if (result.success) {
+        await reload();
+        select(profileId);
+      } else {
+        setActionError(result.error ?? t('orphans.restoreFailed'));
+      }
+    });
+
+  const discard = (profileId: string) =>
+    whileOrphanBusy(profileId, async () => {
+      const r = await api.profiles.discardOrphaned(profileId);
+      if (!r.success) setActionError(r.error ?? t('orphans.discardFailed'));
+    });
   /**
    * The profiles a sync was started for from this page and has not come back.
    *
@@ -397,12 +420,33 @@ export function ProfilesPage() {
         next.delete(id);
         return next;
       });
+      stopCancelling(id);
     }
   };
 
+  /** Profiles whose sync has been asked to stop and has not let go yet. */
+  const [cancellingSync, setCancellingSync] = useState<ReadonlySet<string>>(new Set());
+  const stopCancelling = (id: string) =>
+    setCancellingSync((ids) => {
+      const next = new Set(ids);
+      next.delete(id);
+      return next;
+    });
+
   const handleCancelSync = async () => {
-    if (!selectedId) return;
-    await api.game.cancel(selectedId);
+    const id = selectedId;
+    if (!id || cancellingSync.has(id)) return;
+    setActionError(null);
+    setCancellingSync((ids) => new Set(ids).add(id));
+    const r = await api.game.cancel(id);
+    // `false` is the main process having nothing registered for the profile at
+    // that moment — a sync between two of its steps, or one just finishing. The
+    // button is given back so it can be pressed again, with a word about why
+    // nothing stopped; when it did stop, the sync returning is what clears this.
+    if (!r.success || !r.data) {
+      stopCancelling(id);
+      setActionError(r.error ?? t('profiles.cancelSyncFailed'));
+    }
   };
 
   const handleDuplicate = async () => {
@@ -540,12 +584,18 @@ export function ProfilesPage() {
                     </p>
                   )}
                   <div className="mt-1.5 flex gap-1">
-                    <Button size="sm" variant="secondary" onClick={() => void adopt(profile.id)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={orphanBusy.has(profile.id)}
+                      onClick={() => void adopt(profile.id)}
+                    >
                       {t('orphans.restore')}
                     </Button>
                     <ConfirmButton
                       question={t('orphans.confirmDiscard')}
                       confirmLabel={t('common.delete')}
+                      loading={orphanBusy.has(profile.id)}
                       onConfirm={() => void discard(profile.id)}
                     >
                       {t('orphans.discard')}
@@ -656,7 +706,9 @@ export function ProfilesPage() {
             verification={verification}
             syncing={syncing}
             syncBlocked={gameBusy}
-            onCancelSync={handleCancelSync}
+            onCancelSync={() => void handleCancelSync()}
+            cancellingSync={cancellingSync.has(selectedProfile.id)}
+            deleting={removing}
             onEdit={startEdit}
             onDuplicate={() => void handleDuplicate()}
             duplicating={duplicating}
@@ -757,6 +809,10 @@ interface DetailProps {
   /** The game is running or being got ready, so the mods cannot be changed. */
   syncBlocked: boolean;
   onCancelSync: () => void;
+  /** Cancel was pressed and the sync has not let go yet. */
+  cancellingSync: boolean;
+  /** The profile is on its way out. */
+  deleting: boolean;
   onEdit: () => void;
   onDuplicate: () => void;
   duplicating: boolean;
@@ -775,6 +831,8 @@ function ProfileDetail({
   syncing,
   syncBlocked,
   onCancelSync,
+  cancellingSync,
+  deleting,
   onEdit,
   onDuplicate,
   duplicating,
@@ -835,6 +893,7 @@ function ProfileDetail({
             variant="danger"
             size="sm"
             icon={<Trash2 size={14} />}
+            loading={deleting}
             onClick={onDelete}
             title={t('common.delete')}
           />
@@ -876,7 +935,13 @@ function ProfileDetail({
             </Button>
             {/* A modpack sync is a long download — let the user stop it. */}
             {syncing && (
-              <Button variant="ghost" size="sm" icon={<X size={12} />} onClick={onCancelSync}>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<X size={12} />}
+                loading={cancellingSync}
+                onClick={onCancelSync}
+              >
                 {t('common.cancel')}
               </Button>
             )}
