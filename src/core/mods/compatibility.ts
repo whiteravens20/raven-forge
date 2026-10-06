@@ -8,7 +8,6 @@ import type {
   InstallPlan,
   InstalledMod,
   ModSearchResult,
-  PlannedDependency,
   Profile,
 } from '../../shared/ipc-types';
 
@@ -248,22 +247,17 @@ export async function planModInstall(
   const { version, issues } = await chooseBuild(mod.id, target, true);
   if (!version) return { name: mod.name, dependencies: [], issues };
 
-  const conflicts = await conflictingWith(version, installed);
+  const conflicts = conflictingWith(version, installed);
   if (conflicts.length > 0) issues.push({ kind: 'conflicts-with', names: conflicts });
 
   const { resolved, unresolved } = await resolveDependencies(version, target, installed);
   if (unresolved.length > 0) issues.push({ kind: 'dependency-no-build', names: unresolved });
-  const dependencies: PlannedDependency[] = resolved.map((dep) => ({
-    id: dep.projectId,
-    name: dep.name,
-    version: dep.version.version_number || dep.version.id,
-  }));
 
   return {
     name: mod.name,
     versionId: version.id,
     versionName: version.version_number || version.id,
-    dependencies,
+    dependencies: resolved.map((dep) => dep.name),
     issues,
   };
 }

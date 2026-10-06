@@ -1024,12 +1024,12 @@ export async function installModFromSearch(
   versionId?: string,
 ): Promise<ModInstallResult> {
   const version = await resolveInstallVersion(profileId, mod, versionId);
-  const installed = await installResolvedMod(
+  await installResolvedMod(
     profileId,
     { id: mod.id, name: mod.name, source: 'modrinth' },
     downloadFor(version),
   );
-  return { mod: installed, dependencies: await installRequiredDependencies(profileId, version) };
+  return { dependencies: await installRequiredDependencies(profileId, version) };
 }
 
 /**

@@ -81,9 +81,7 @@ export interface ModSearchResult {
  * a file — nothing that says what the thing does or where it came from.
  */
 export interface ProjectDetails {
-  id: string;
   slug: string;
-  title: string;
   description: string;
   iconUrl?: string;
 }
@@ -140,12 +138,12 @@ export interface ShaderLoaderOption {
  * this is asked *before* nagging: the install looks identical either way.
  */
 export type ShaderLoaderState =
-  | { status: 'already-installed'; name: string }
+  | { status: 'already-installed' }
   | { status: 'choose'; options: ShaderLoaderOption[] }
   /** Candidates exist but none publishes anything for this Minecraft version. */
   | { status: 'no-build'; mcVersion: string; modLoader: ModLoaderType }
   /** A vanilla profile cannot run shaders at all — they need a mod. */
-  | { status: 'unsupported'; modLoader: ModLoaderType };
+  | { status: 'unsupported' };
 
 export type ShaderLoaderResult =
   | { status: 'installed'; name: string; dependencies: string[] }
@@ -202,13 +200,6 @@ export type CompatibilityIssue =
   /** A required dependency exists but publishes nothing for this profile. */
   | { kind: 'dependency-no-build'; names: string[] };
 
-/** A required dependency that is missing and would be installed alongside. */
-export interface PlannedDependency {
-  id: string;
-  name: string;
-  version: string;
-}
-
 /**
  * What installing something into a profile would actually do, worked out before
  * anything is downloaded.
@@ -222,19 +213,19 @@ export interface InstallPlan {
   name: string;
   versionId?: string;
   versionName?: string;
-  dependencies: PlannedDependency[];
+  /** The required dependencies that are missing and would be installed alongside, by name. */
+  dependencies: string[];
   issues: CompatibilityIssue[];
 }
 
 /**
- * The outcome of installing a mod: the mod, plus whatever had to come with it.
+ * The outcome of installing a mod: whatever had to come with it.
  *
- * `dependencies` is not decoration. Required dependencies are installed without
- * being asked for, and a launcher that silently adds files to a profile is a
- * launcher nobody can debug — so the names come back to be shown.
+ * Required dependencies are installed without being asked for, and a launcher
+ * that silently adds files to a profile is a launcher nobody can debug — so
+ * the names come back to be shown.
  */
 export interface ModInstallResult {
-  mod: InstalledMod;
   dependencies: string[];
 }
 

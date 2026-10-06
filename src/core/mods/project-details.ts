@@ -101,9 +101,7 @@ export async function getProjectDetails(keys: string[]): Promise<Record<string, 
           at: now,
           details: project
             ? {
-                id: project.id,
                 slug: project.slug,
-                title: project.title,
                 description: project.description,
                 iconUrl: project.icon_url ?? undefined,
               }
@@ -124,9 +122,4 @@ export async function getProjectDetails(keys: string[]): Promise<Record<string, 
     if (details) found[key] = details;
   }
   return found;
-}
-
-/** Forget what is held in memory, so the next question re-reads the file. For tests. */
-export function resetProjectDetailsCache(): void {
-  cache = null;
 }

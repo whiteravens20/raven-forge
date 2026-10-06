@@ -66,11 +66,11 @@ export async function getShaderLoaderState(
   modLoader: ModLoaderType,
 ): Promise<ShaderLoaderState> {
   const candidates = shaderLoaderCandidates(modLoader);
-  if (candidates.length === 0) return { status: 'unsupported', modLoader };
+  if (candidates.length === 0) return { status: 'unsupported' };
 
   const installed = await getInstalledMods(profileId);
   const present = candidates.find((c) => installed.some((m) => isProject(m, c.id)));
-  if (present) return { status: 'already-installed', name: present.name };
+  if (present) return { status: 'already-installed' };
 
   const options: ShaderLoaderOption[] = [];
   for (const candidate of candidates) {

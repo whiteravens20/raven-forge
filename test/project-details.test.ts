@@ -62,9 +62,7 @@ describe('getProjectDetails', () => {
     const found = await mod.getProjectDetails(['sodium', 'AANobbMI']);
 
     expect(found.sodium).toEqual({
-      id: 'AANobbMI',
       slug: 'sodium',
-      title: 'Sodium',
       description: 'A rendering engine replacement.',
       iconUrl: 'https://cdn.modrinth.com/data/AANobbMI/icon.png',
     });
@@ -74,7 +72,7 @@ describe('getProjectDetails', () => {
   it('matches a slug without regard to case, and an id exactly', async () => {
     const found = await mod.getProjectDetails(['Sodium', 'aanobbmi']);
 
-    expect(found.Sodium?.title).toBe('Sodium');
+    expect(found.Sodium?.slug).toBe('sodium');
     // Ids are case-sensitive: this is some other project's name, or nobody's.
     expect(found.aanobbmi).toBeUndefined();
   });
@@ -106,7 +104,7 @@ describe('getProjectDetails', () => {
     const again = await mod.getProjectDetails(['sodium']);
 
     expect(getProjects).toHaveBeenCalledTimes(1);
-    expect(again.sodium?.title).toBe('Sodium');
+    expect(again.sodium?.slug).toBe('sodium');
   });
 
   it('remembers across a restart', async () => {
@@ -146,7 +144,7 @@ describe('getProjectDetails', () => {
     getProjects.mockRejectedValue(new Error('fetch failed'));
     const found = await mod.getProjectDetails(['sodium', 'lithium']);
 
-    expect(found.sodium?.title).toBe('Sodium');
+    expect(found.sodium?.slug).toBe('sodium');
     expect(found.lithium).toBeUndefined();
   });
 });

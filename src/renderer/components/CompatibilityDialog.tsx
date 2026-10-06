@@ -111,7 +111,7 @@ export function CompatibilityDialog({ plan, busy, onCancel, onInstall }: Props) 
               />
               <span>
                 {t('compat.alsoInstalls', {
-                  deps: plan.dependencies.map((d) => d.name).join(', '),
+                  deps: plan.dependencies.join(', '),
                 })}
               </span>
             </p>

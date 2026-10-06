@@ -209,7 +209,7 @@ describe('planModInstall', () => {
     // Not an issue — it is going to be handled — but it must be said. Files
     // appearing in a profile nobody asked for is how a profile stops making sense.
     expect(plan.issues).toEqual([]);
-    expect(plan.dependencies).toEqual([{ id: 'fapi', name: 'Fabric API', version: '0.115.0' }]);
+    expect(plan.dependencies).toEqual(['Fabric API']);
   });
 
   it('does not re-list a dependency the profile already has', async () => {
@@ -271,10 +271,7 @@ describe('planModInstall', () => {
 
     const plan = await planModInstall(FABRIC_1214, MOD, []);
 
-    expect(plan.dependencies).toEqual([
-      { id: 'ae2', name: 'AE2', version: '19.0.1' },
-      { id: 'guideme', name: 'GuideME', version: '21.1.0' },
-    ]);
+    expect(plan.dependencies).toEqual(['AE2', 'GuideME']);
     expect(plan.issues).toEqual([]);
   });
 
@@ -292,7 +289,7 @@ describe('planModInstall', () => {
     const plan = await planModInstall(FABRIC_1214, MOD, []);
 
     // Once each: the mod being installed is not its own dependency.
-    expect(plan.dependencies.map((d) => d.id)).toEqual(['other']);
+    expect(plan.dependencies).toEqual(['The Other Half']);
   });
 
   it('names a missing build two levels down as plainly as one level down', async () => {
