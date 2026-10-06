@@ -28,6 +28,8 @@ import type { GlobalSettings } from '../../shared/ipc-types';
 const directDispatcher: Dispatcher = getGlobalDispatcher();
 
 let appliedUrl: string | undefined;
+/** The dispatcher made for `appliedUrl`, to be closed once it is replaced. */
+let appliedDispatcher: Dispatcher | undefined;
 
 /**
  * The Node half of a proxy address. Throws when the address cannot be one.
@@ -39,6 +41,22 @@ let appliedUrl: string | undefined;
 function dispatcherFor(url: string): Dispatcher {
   return isSocksProxy(url) ? createSocksDispatcher(url) : new ProxyAgent(url);
 }
+
+/**
+ * How Chromium spells each scheme the setting accepts. It knows `socks4` and
+ * `socks5` and takes neither `socks5h` nor `socks4a`, which were being handed to
+ * it as typed: a rule it could not read, so the sign-in window and every remote
+ * image went wherever Chromium went with no rule at all.
+ */
+const CHROMIUM_SCHEME: Record<string, string> = {
+  'http:': 'http',
+  'https:': 'https',
+  'socks:': 'socks5',
+  'socks5:': 'socks5',
+  'socks5h:': 'socks5',
+  'socks4:': 'socks4',
+  'socks4a:': 'socks4',
+};
 
 /**
  * Refuse a proxy address that could not be put to use — asked before it is
@@ -66,39 +84,70 @@ export async function assertProxyUsable(proxyUrl: string | undefined): Promise<v
   await trial.close();
 }
 
+/**
+ * The name and password to answer the configured proxy with, when Chromium is
+ * asked for them — or nothing, for any other proxy and for an address that has
+ * none in it.
+ *
+ * undici reads them out of the address itself. Chromium takes a host and a port
+ * and then asks, and with nobody answering, a proxy that wants a password worked
+ * for every download and for neither the sign-in window nor a single image.
+ */
+export function proxyCredentialsFor(
+  host: string,
+  port: number,
+): { username: string; password: string } | undefined {
+  if (!appliedUrl) return undefined;
+  const proxy = new URL(appliedUrl);
+  if (!proxy.username || proxy.hostname !== host) return undefined;
+  const proxyPort = Number(proxy.port) || (proxy.protocol === 'https:' ? 443 : 80);
+  if (proxyPort !== port) return undefined;
+  return {
+    username: decodeURIComponent(proxy.username),
+    password: decodeURIComponent(proxy.password),
+  };
+}
+
 export async function applyProxySettings(settings: GlobalSettings): Promise<void> {
   const url = settings.proxyUrl?.trim() || undefined;
   if (url === appliedUrl) return;
-
-  if (!url) {
-    setGlobalDispatcher(directDispatcher);
-    await session.defaultSession.setProxy({ mode: 'direct' });
-    appliedUrl = url;
-    log.info('Proxy cleared — requests go direct.');
-    return;
-  }
 
   // Everything that can refuse the address happens before anything is switched
   // over, and the address counts as applied only once both stacks have it. It
   // used to be recorded first: an address that then failed was never tried
   // again, and the next change of any other setting reported it as in use.
-  const parsed = new URL(url);
-  const dispatcher = dispatcherFor(url);
+  const parsed = url ? new URL(url) : undefined;
+  const dispatcher = url ? dispatcherFor(url) : directDispatcher;
 
-  // Chromium wants host:port with a scheme prefix, not a full URL. Credentials
-  // in the URL are honoured by undici but would be ignored here, so they are
-  // dropped rather than silently half-applied.
-  await session.defaultSession.setProxy({
-    proxyRules: `${parsed.protocol}//${parsed.host}`,
-    proxyBypassRules: '<local>',
-  });
+  // Chromium wants host:port with a scheme prefix, not a full URL; what the
+  // address says about who is asking is given when the proxy asks for it. With
+  // no proxy it goes back to following the system's settings, which is where it
+  // starts — not to "direct", which it was never on before a proxy was set.
+  await session.defaultSession.setProxy(
+    parsed
+      ? {
+          proxyRules: `${CHROMIUM_SCHEME[parsed.protocol] ?? parsed.protocol.slice(0, -1)}://${parsed.host}`,
+          proxyBypassRules: '<local>',
+        }
+      : { mode: 'system' },
+  );
   setGlobalDispatcher(dispatcher);
+
+  const replaced = appliedDispatcher;
+  appliedDispatcher = url ? dispatcher : undefined;
   appliedUrl = url;
+
+  // Connections opened under the old setting would go on being reused under the
+  // new one.
+  await session.defaultSession.closeAllConnections();
+  void replaced?.close().catch(() => undefined);
 
   // Never log the URL itself — it may carry credentials.
   log.info(
-    `Proxy enabled for all downloads (${parsed.protocol}//${parsed.hostname})${
-      isSocksProxy(url) ? ' — SOCKS, DNS resolved at the proxy' : ''
-    }.`,
+    parsed
+      ? `Proxy enabled for all downloads (${parsed.protocol}//${parsed.hostname})${
+          isSocksProxy(url!) ? ' — SOCKS, DNS resolved at the proxy' : ''
+        }.`
+      : 'Proxy cleared — requests go direct.',
   );
 }

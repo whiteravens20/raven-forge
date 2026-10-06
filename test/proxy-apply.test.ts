@@ -18,6 +18,7 @@ import type { GlobalSettings } from '../src/shared/ipc-types';
  */
 
 const setProxy = vi.fn(async (_config: { proxyRules?: string; mode?: string }) => undefined);
+const closeAllConnections = vi.fn(async () => undefined);
 /** Dispatchers made for a proxy, in the order they were made. */
 const made: Array<{ url: string; close: ReturnType<typeof vi.fn> }> = [];
 const setGlobalDispatcher = vi.fn();
@@ -27,7 +28,7 @@ const direct = { kind: 'direct' };
 const logged: string[] = [];
 
 vi.mock('electron', () => ({
-  session: { defaultSession: { setProxy } },
+  session: { defaultSession: { setProxy, closeAllConnections } },
   app: { getVersion: () => '0.0.0-test', getPath: () => '/tmp' },
 }));
 vi.mock('../src/main/logger', () => ({
@@ -65,14 +66,17 @@ const settings = (proxyUrl?: string) => ({ proxyUrl }) as GlobalSettings;
 type Proxy = typeof import('../src/core/net/proxy');
 let applyProxySettings: Proxy['applyProxySettings'];
 let assertProxyUsable: Proxy['assertProxyUsable'];
+let proxyCredentialsFor: Proxy['proxyCredentialsFor'];
 
 beforeEach(async () => {
   setProxy.mockClear();
+  closeAllConnections.mockClear();
   setGlobalDispatcher.mockClear();
   logged.length = 0;
   made.length = 0;
   vi.resetModules();
-  ({ applyProxySettings, assertProxyUsable } = await import('../src/core/net/proxy'));
+  ({ applyProxySettings, assertProxyUsable, proxyCredentialsFor } =
+    await import('../src/core/net/proxy'));
 });
 
 describe('applyProxySettings', () => {
@@ -118,7 +122,27 @@ describe('applyProxySettings', () => {
     await applyProxySettings(settings('   '));
 
     expect(setGlobalDispatcher).toHaveBeenCalledWith(direct);
-    expect(setProxy).toHaveBeenCalledWith({ mode: 'direct' });
+    // Back to where Chromium starts — following the system — and not to a
+    // "direct" it was never on before a proxy was set.
+    expect(setProxy).toHaveBeenCalledWith({ mode: 'system' });
+  });
+
+  it('drops the connections made under the setting it replaces', async () => {
+    await applyProxySettings(settings('http://one.example.net:8080'));
+    await applyProxySettings(settings('http://two.example.net:8080'));
+
+    expect(closeAllConnections).toHaveBeenCalledTimes(2);
+    expect(made[0].close).toHaveBeenCalled();
+    expect(made[1].close).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['socks5h://127.0.0.1:9050', 'socks5://127.0.0.1:9050'],
+    ['socks://127.0.0.1:9050', 'socks5://127.0.0.1:9050'],
+    ['socks4a://127.0.0.1:9050', 'socks4://127.0.0.1:9050'],
+  ])('gives Chromium %s in a spelling it knows', async (typed, understood) => {
+    await applyProxySettings(settings(typed));
+    expect(setProxy).toHaveBeenCalledWith(expect.objectContaining({ proxyRules: understood }));
   });
 
   it('changes nothing for an address no proxy can be made from, and tries it again', async () => {
@@ -171,5 +195,28 @@ describe('assertProxyUsable', () => {
     expect(setGlobalDispatcher).not.toHaveBeenCalled();
     expect(setProxy).not.toHaveBeenCalled();
     expect(made[0].close).toHaveBeenCalled();
+  });
+});
+
+describe('proxyCredentialsFor', () => {
+  it('answers the configured proxy with the name and password in its address', async () => {
+    await applyProxySettings(settings('http://jan:p%40ss@proxy.example.net:3128'));
+    expect(proxyCredentialsFor('proxy.example.net', 3128)).toEqual({
+      username: 'jan',
+      password: 'p@ss',
+    });
+  });
+
+  it('answers no other proxy, and nothing when the address names nobody', async () => {
+    await applyProxySettings(settings('http://jan:secret@proxy.example.net:3128'));
+    expect(proxyCredentialsFor('other.example.net', 3128)).toBeUndefined();
+    expect(proxyCredentialsFor('proxy.example.net', 8080)).toBeUndefined();
+
+    await applyProxySettings(settings('http://proxy.example.net:3128'));
+    expect(proxyCredentialsFor('proxy.example.net', 3128)).toBeUndefined();
+  });
+
+  it('answers nothing when no proxy is set', () => {
+    expect(proxyCredentialsFor('proxy.example.net', 3128)).toBeUndefined();
   });
 });

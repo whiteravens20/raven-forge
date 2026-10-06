@@ -9,7 +9,7 @@ import { installContentSecurityPolicy } from './security';
 import { registerAllIpcHandlers } from './ipc-handlers';
 import { loadSettings } from '../core/config/settings-manager';
 import { ensureDataDirectories } from './init';
-import { applyProxySettings } from '../core/net/proxy';
+import { applyProxySettings, proxyCredentialsFor } from '../core/net/proxy';
 import { initUpdater, checkForUpdates } from '../core/updater/launcher-updater';
 import { checkAllProfilesForPackUpdates } from '../core/mods/mod-sync';
 
@@ -121,6 +121,16 @@ function registerAppLifecycle(home: AppHome): void {
     void checkAllProfilesForPackUpdates();
 
     log.info('Raven Forge Launcher ready.');
+  });
+
+  // A proxy that wants a name and a password asks Chromium, and Chromium asks
+  // here. Only the proxy from Settings is answered, with what its address says.
+  app.on('login', (event, _contents, _details, authInfo, callback) => {
+    if (!authInfo.isProxy) return;
+    const credentials = proxyCredentialsFor(authInfo.host, authInfo.port);
+    if (!credentials) return;
+    event.preventDefault();
+    callback(credentials.username, credentials.password);
   });
 
   app.on('window-all-closed', () => {

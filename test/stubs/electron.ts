@@ -26,6 +26,7 @@ export const app = {
 export const session = {
   defaultSession: {
     setProxy: () => Promise.resolve(),
+    closeAllConnections: () => Promise.resolve(),
   },
 };
 
