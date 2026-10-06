@@ -176,4 +176,37 @@ describe.skipIf(!posix)('installing Forge', () => {
 
     expect(await fs.readFile(jar)).toEqual(clientBytes);
   });
+
+  it('refuses an installer that is not the one the repository vouches for', async () => {
+    const javaPath = await writeFakeJava();
+    served[`${INSTALLER}.sha1`] = sha1(Buffer.from('some other jar'));
+
+    await expect(install({ javaPath })).rejects.toThrow(/sha1 mismatch/);
+    expect(await installerRuns()).toEqual([]);
+  });
+
+  it('says the build does not exist rather than offering to skip verification', async () => {
+    const javaPath = await writeFakeJava();
+    delete served[INSTALLER];
+    delete served[`${INSTALLER}.sha1`];
+
+    await expect(install({ javaPath })).rejects.toThrow(/does not publish this build/);
+  });
+
+  it('still refuses a real build that has no checksum beside it', async () => {
+    const javaPath = await writeFakeJava();
+    delete served[`${INSTALLER}.sha1`];
+
+    await expect(install({ javaPath })).rejects.toThrow(/cannot be verified/);
+    expect(await installerRuns()).toEqual([]);
+  });
+
+  it('reports a repository that cannot be reached as that', async () => {
+    const javaPath = await writeFakeJava();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+
+    await expect(install({ javaPath })).rejects.toThrow(/Could not reach 127\.0\.0\.1/);
+    // Left listening for `afterEach`, which closes it.
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  });
 });

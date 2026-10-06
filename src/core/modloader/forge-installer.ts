@@ -30,7 +30,7 @@ import {
   NEOFORGE_MAVEN_ROOT,
 } from '../../shared/constants';
 import { getVersionMeta } from '../minecraft/version-manifest';
-import { verifyDownload, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
+import type { HashAlgorithm, HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
 import { ensureClientJar } from '../minecraft/asset-downloader';
 import { loaderCacheDir } from './loader-paths';
@@ -261,23 +261,44 @@ const MAVEN_CHECKSUMS: Array<{ ext: string; algorithm: HashAlgorithm }> = [
  *
  * Maven writes these beside every artifact, so the launcher can check what it
  * is about to *execute* rather than trusting that nothing went wrong between
- * the repository and here. Returns null when none of the sidecars exist, which
- * is a real possibility for an old artifact and not a reason to refuse the
- * install — HTTPS is still underneath.
+ * the repository and here. Returns null when the repository answers that none
+ * of the sidecars exist, which is a real possibility for an old artifact and
+ * not a reason to refuse the install — HTTPS is still underneath.
+ *
+ * Null means the repository was asked and said no. A request that got no
+ * answer is thrown instead: it used to be swallowed here, so being offline read
+ * as "publishes no checksum" and the player was told to switch verification
+ * off.
  */
 async function mavenChecksum(url: string, signal?: AbortSignal): Promise<HashedEntry | null> {
   for (const { ext, algorithm } of MAVEN_CHECKSUMS) {
+    throwIfCancelled(signal, 'Loader install');
+    let res: Response;
     try {
-      const res = await fetch(`${url}${ext}`, { signal: withTimeout(signal, 15_000) });
-      if (!res.ok) continue;
-      // The file is the hex digest, sometimes followed by the filename.
-      const value = (await res.text()).trim().split(/\s+/)[0]?.toLowerCase();
-      if (value && /^[0-9a-f]{32,128}$/.test(value)) return { [algorithm]: value };
-    } catch {
-      /* sidecar unreachable — try the next, then go without */
+      res = await fetch(`${url}${ext}`, { signal: withTimeout(signal, 15_000) });
+    } catch (err) {
+      throwIfCancelled(signal, 'Loader install');
+      throw new Error(`Could not reach ${new URL(url).host} to check the installer: ${err}`, {
+        cause: err,
+      });
     }
+    if (!res.ok) continue;
+    // The file is the hex digest, sometimes followed by the filename.
+    const value = (await res.text()).trim().split(/\s+/)[0]?.toLowerCase();
+    if (value && /^[0-9a-f]{32,128}$/.test(value)) return { [algorithm]: value };
   }
   return null;
+}
+
+/** Whether the repository has the file at all — asked only when it has no checksum for it. */
+async function isPublished(url: string, signal?: AbortSignal): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: 'HEAD', signal: withTimeout(signal, 15_000) });
+    return res.status !== 404;
+  } catch {
+    // No answer is not a "no": let the download itself say what is wrong.
+    return true;
+  }
 }
 
 async function downloadInstaller(
@@ -289,6 +310,12 @@ async function downloadInstaller(
   // Asked for first, so a repository serving a good checksum and a bad jar
   // cannot be answered in the other order.
   const expected = await mavenChecksum(url, signal);
+
+  // A build that does not exist has no checksum either, and must not be
+  // answered with advice about unverified installers.
+  if (!expected && !(await isPublished(url, signal))) {
+    throw new Error(`${label} does not publish this build: ${url} was not found`);
+  }
 
   // Refused before a byte is fetched. This jar is executed as a Java process a
   // few lines below, which is the same argument that makes an unverifiable JRE
@@ -303,17 +330,16 @@ async function downloadInstaller(
     );
   }
 
-  // Through the shared downloader: stall timeout, backpressure, and the file
-  // removed on any failure. This used to be `res.arrayBuffer()`, which held the
-  // whole installer in memory and left a partial file behind when it failed.
-  // Executed as a Java process a few lines on, so https is enforced on the way
-  // down as well as the checksum once it lands.
-  await downloadToFile(url, dest, { signal, secure: true });
+  // Through the shared downloader: stall timeout, backpressure, the hash taken
+  // as the bytes arrive, and no file under this name unless it matched. Executed
+  // as a Java process a few lines on, so https is enforced on the way down too.
+  await downloadToFile(url, dest, {
+    signal,
+    secure: true,
+    verify: expected ? { hashes: expected, label: `${label} installer` } : undefined,
+  });
 
-  if (expected) {
-    // Deletes the file and throws on mismatch — this jar is about to be run.
-    await verifyDownload(dest, expected, `${label} installer`);
-  } else {
+  if (!expected) {
     log.warn(`${label} publishes no checksum for ${url} — the installer was not verified`);
   }
 }
