@@ -213,6 +213,7 @@ export const en = {
   'profiles.exportPack': 'Export as a modpack (.mrpack)',
   'profiles.exportSettings': 'Export the profile’s settings (.json) — not its mods',
   'profiles.exportPackFailed': 'Could not export that profile as a pack.',
+  'profiles.exportFailed': 'Could not export that profile’s settings.',
   'profiles.exportPackAsk': 'The pack will hold this profile’s mods, shaders and resource packs.',
   'profiles.exportPackSettings': 'Include the game settings and the mods’ configuration',
   'profiles.exportPackSettingsHint':
@@ -337,6 +338,7 @@ export const en = {
   'orphans.discard': 'Delete for good',
   'orphans.confirmDiscard': 'Delete these files, worlds included?',
   'orphans.discardFailed': 'Could not delete those files.',
+  'orphans.restoreFailed': 'Could not put that profile back.',
 
   'profiles.fieldMinecraft': 'Minecraft',
   'profiles.fieldLoader': 'Loader',

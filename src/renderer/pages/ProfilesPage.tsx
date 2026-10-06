@@ -207,10 +207,13 @@ export function ProfilesPage() {
   }, [refreshOrphans, profiles.length]);
 
   const adopt = async (profileId: string) => {
+    setActionError(null);
     const result = await api.profiles.adoptOrphaned(profileId);
     if (result.success) {
       await reload();
       select(profileId);
+    } else {
+      setActionError(result.error ?? t('orphans.restoreFailed'));
     }
     await refreshOrphans();
   };
@@ -402,7 +405,10 @@ export function ProfilesPage() {
   const handleExport = async () => {
     if (!selectedId) return;
     const r = await api.profiles.export(selectedId);
-    if (!r.success || !r.data) return;
+    if (!r.success || !r.data) {
+      setActionError(r.error ?? t('profiles.exportFailed'));
+      return;
+    }
     const blob = new Blob([r.data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

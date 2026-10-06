@@ -55,10 +55,18 @@ export function ProfileIconPicker({ profile }: { profile: Profile }) {
     setError(null);
     // Drop any uploaded file first, otherwise it would keep winning.
     if (profile.iconPath) {
-      await api.profiles.setIcon(profile.id, null);
+      const cleared = await api.profiles.setIcon(profile.id, null);
+      if (!cleared.success) {
+        setError(cleared.error ?? t('profileIcon.failed'));
+        setBusy(false);
+        return;
+      }
       invalidateAvatarCache(profile.id);
     }
-    await update(profile.id, { iconPreset: profile.iconPreset === id ? undefined : id });
+    const saved = await update(profile.id, {
+      iconPreset: profile.iconPreset === id ? undefined : id,
+    });
+    if (!saved.success) setError(saved.error ?? t('profileIcon.failed'));
     setBusy(false);
   };
 

@@ -205,6 +205,7 @@ export const pl: Translations = {
   'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
   'profiles.exportSettings': 'Eksportuj ustawienia profilu (.json) — bez modów',
   'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',
+  'profiles.exportFailed': 'Nie udało się wyeksportować ustawień tego profilu.',
   'profiles.exportPackAsk': 'W paczce znajdą się mody, shadery i paczki zasobów tego profilu.',
   'profiles.exportPackSettings': 'Dołącz ustawienia gry i konfigurację modów',
   'profiles.exportPackSettingsHint':
@@ -364,6 +365,7 @@ export const pl: Translations = {
   'orphans.discard': 'Usuń trwale',
   'orphans.confirmDiscard': 'Usunąć te pliki razem ze światami?',
   'orphans.discardFailed': 'Nie udało się usunąć tych plików.',
+  'orphans.restoreFailed': 'Nie udało się przywrócić tego profilu.',
 
   'profiles.fieldMinecraft': 'Minecraft',
   'profiles.fieldLoader': 'Loader',
