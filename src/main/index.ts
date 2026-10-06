@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, Menu, session } from 'electron';
 import { initLogger, log } from './logger';
 import { establishAppHome } from './home';
 import type { AppHome } from '../core/config/app-home';
@@ -121,6 +121,12 @@ function registerAppLifecycle(home: AppHome): void {
     // is what starts that load; the Microsoft sign-in window shares this session.
     session.defaultSession.setSpellCheckerLanguages([]);
     session.defaultSession.setSpellCheckerEnabled(false);
+
+    // A packaged launcher has no menu, and so none of the shortcuts Electron's
+    // default one brings with it: reload, the developer tools, close-window.
+    // Its window is frameless, so the menu was never seen — only its shortcuts
+    // were live, and a reload in the middle of an install is nobody's intention.
+    if (app.isPackaged) Menu.setApplicationMenu(null);
 
     // The window is opened before any of the setup below it. None of that setup
     // is slow — six mkdirs and a settings file — but all of it used to run with
