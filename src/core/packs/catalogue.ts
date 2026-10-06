@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { log } from '../../main/logger';
-import { WHITE_RAVENS_PACKS_URL } from '../../shared/branding';
+import { WHITE_RAVENS_PACKS_URL, isFirstPartyManifestUrl } from '../../shared/branding';
 import { assertSecureAnswer, readJsonCapped } from '../net/json';
 import type { CataloguePack } from '../../shared/ipc-types';
 
@@ -69,9 +69,21 @@ export async function listCataloguePacks(): Promise<CataloguePack[]> {
     );
   }
 
-  const packs = parsed.data.packs.filter((pack) => Boolean(pack.manifestUrl));
-  const dropped = parsed.data.packs.length - packs.length;
+  const listed = parsed.data.packs.filter((pack) => Boolean(pack.manifestUrl));
+  const dropped = parsed.data.packs.length - listed.length;
   if (dropped > 0) log.warn(`${dropped} pack(s) in the catalogue carry no manifest URL`);
+
+  // Only a manifest on the White Ravens packs site. The picker offers these as
+  // White Ravens' own, and what makes that true of a pack is the built-in key —
+  // which is only demanded of a first-party address. The catalogue itself is
+  // not signed: whoever could change that one file, without the key, could
+  // otherwise list a manifest of their own under the White Ravens heading and
+  // have it installed with no signature asked for.
+  const packs = listed.filter((pack) => isFirstPartyManifestUrl(pack.manifestUrl!));
+  const foreign = listed.length - packs.length;
+  if (foreign > 0) {
+    log.warn(`${foreign} pack(s) in the catalogue point outside the White Ravens packs site`);
+  }
 
   return packs.map((pack) => ({
     slug: pack.slug,

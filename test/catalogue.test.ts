@@ -111,6 +111,30 @@ describe('listCataloguePacks', () => {
     expect((await listCataloguePacks()).map((p) => p.slug)).toEqual(['ok']);
   });
 
+  it('lists only manifests on the White Ravens packs site', async () => {
+    // The picker offers these as White Ravens' own, and the built-in key is
+    // only demanded of a first-party address. The catalogue is not signed, so
+    // an entry pointing elsewhere would be a manifest of somebody else's,
+    // installed under that heading with no signature asked for.
+    respondWith({
+      indexVersion: 1,
+      packs: [
+        entry({ slug: 'elsewhere', manifestUrl: 'https://example.test/pack/manifest.json' }),
+        entry({
+          slug: 'lookalike',
+          manifestUrl: 'https://whiteravens20.github.io.example.test/raven-packs/x/manifest.json',
+        }),
+        entry({
+          slug: 'other-repo',
+          manifestUrl: 'https://whiteravens20.github.io/something-else/manifest.json',
+        }),
+        entry({ slug: 'ours' }),
+      ],
+    });
+
+    expect((await listCataloguePacks()).map((p) => p.slug)).toEqual(['ours']);
+  });
+
   it('survives a catalogue that omits the optional fields', async () => {
     respondWith({
       indexVersion: 1,
@@ -121,7 +145,7 @@ describe('listCataloguePacks', () => {
           version: '0.1.0',
           minecraft: '1.21.4',
           loader: { type: 'fabric' },
-          manifestUrl: 'https://example.test/bare/manifest.json',
+          manifestUrl: 'https://whiteravens20.github.io/raven-packs/bare/manifest.json',
         },
       ],
     });
