@@ -307,7 +307,24 @@ export function ProfilesPage() {
 
   const cancel = () => setMode('view');
 
-  const save = async () => {
+  /**
+   * True from Save until the profile is written. Two things in between take
+   * time and showed nothing: counting a profile's files before a version
+   * change, and copying its worlds aside when that was asked for.
+   */
+  const [saving, setSaving] = useState(false);
+  const whileSaving = async (work: () => Promise<void>) => {
+    setSaving(true);
+    try {
+      await work();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const save = () => whileSaving(saveDraft);
+
+  const saveDraft = async () => {
     if (!draft.name.trim()) return;
     // Changing the Minecraft version is not an edit like the others: the mods
     // stay behind at the version they were built for, and a world opened by a
@@ -625,7 +642,8 @@ export function ProfilesPage() {
             draft={draft}
             onChange={setDraft}
             onCancel={cancel}
-            onSave={save}
+            onSave={() => void save()}
+            saving={saving}
             saveError={saveError}
             isCreate={mode === 'create'}
             profile={mode === 'edit' ? selectedProfile : undefined}
@@ -703,7 +721,7 @@ export function ProfilesPage() {
           onCancel={() => setVersionChange(null)}
           onConfirm={(backupFirst) => {
             setVersionChange(null);
-            void commit(backupFirst);
+            void whileSaving(() => commit(backupFirst));
           }}
         />
       )}
@@ -1040,6 +1058,8 @@ interface FormProps {
   onChange: (next: DraftProfile) => void;
   onCancel: () => void;
   onSave: () => void;
+  /** True while the profile is being written, or prepared for that. */
+  saving: boolean;
   /** Why the last Save was refused, in the main process's words. */
   saveError: string | null;
   isCreate: boolean;
@@ -1054,6 +1074,7 @@ function ProfileForm({
   onChange,
   onCancel,
   onSave,
+  saving,
   saveError,
   isCreate,
   profile,
@@ -1508,6 +1529,7 @@ function ProfileForm({
         <Button
           onClick={onSave}
           icon={<Save size={14} />}
+          loading={saving}
           disabled={
             !draft.name.trim() ||
             sizeProblem !== null ||
