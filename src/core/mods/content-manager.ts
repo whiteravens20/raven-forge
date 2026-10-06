@@ -11,7 +11,7 @@ import { getVersion, getModVersions, getProjectTitle, primaryFile } from './modr
 import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
-import { sha256File, fileMatches, verifyDownload, type HashedEntry } from './integrity';
+import { sha256File, fileMatches, type HashedEntry } from './integrity';
 import type { InstalledMod } from '../../shared/ipc-types';
 import {
   fileNameFromUrl,
@@ -181,10 +181,12 @@ export async function installContent(
 
   const dest = path.join(dir, fileName);
   log.info(`Downloading ${kind.slice(0, -1)}: ${displayName}`);
-  await downloadToFile(downloadUrl, dest, { secure: true });
   // A Modrinth build is checked against the API's own hash; a direct `url:` the
   // player pasted has none to check, so its https transport is the guarantee.
-  if (expectedHashes) await verifyDownload(dest, expectedHashes, displayName);
+  await downloadToFile(downloadUrl, dest, {
+    secure: true,
+    verify: expectedHashes && { hashes: expectedHashes, label: displayName },
+  });
   const hash = await sha256File(dest);
 
   const installed: InstalledMod = {
@@ -287,10 +289,12 @@ export async function syncContentFromManifest(
     }
 
     log.info(`Syncing ${kind.slice(0, -1)}: ${entry.name}`);
-    await downloadToFile(downloadUrl, dest, { secure: true });
     // The manifest's own hash wins where it has one; the API hash is the floor,
     // so a modrinth entry that declared none is still checked against the build.
-    await verifyDownload(dest, { ...apiHashes, ...entry }, entry.name);
+    await downloadToFile(downloadUrl, dest, {
+      secure: true,
+      verify: { hashes: { ...apiHashes, ...entry }, label: entry.name },
+    });
     const hash = await sha256File(dest);
 
     fromManifest.push({

@@ -32,12 +32,6 @@ vi.mock('../src/core/net/download', () => ({
   downloadToFile: (url: string, dest: string, opts: unknown) => downloadToFile(url, dest, opts),
 }));
 
-const verifyDownload = vi.fn(async (_file: string, _hashes: unknown, _label: string) => {});
-vi.mock('../src/core/mods/integrity', () => ({
-  verifyDownload: (file: string, hashes: unknown, label: string) =>
-    verifyDownload(file, hashes, label),
-}));
-
 const readMrpack = vi.fn(async (_file: string) => ({
   name: 'Fabulously Optimized',
   version: '6.4.0',
@@ -95,7 +89,6 @@ beforeEach(async () => {
   for (const mock of [
     getModVersions,
     downloadToFile,
-    verifyDownload,
     applyOverrides,
     createProfile,
     deleteProfile,
@@ -120,25 +113,23 @@ describe('installModrinthPack', () => {
     expect(getModVersions).toHaveBeenCalledWith('1KVo5zza', '1.21.1', 'fabric');
   });
 
-  it('checks the pack file against the published hash before opening it', async () => {
+  it('has the pack file checked against the published hash as it arrives', async () => {
     await installer.installModrinthPack(pack);
 
-    expect(verifyDownload).toHaveBeenCalledWith(
+    // The download is what checks it, so a file that fails never exists under
+    // the name this then opens.
+    expect(downloadToFile).toHaveBeenCalledWith(
+      packVersion.files[0].url,
       expect.stringContaining(path.join(root, 'cache')),
-      { sha512: 'abc' },
-      'fo.mrpack',
-    );
-    // Verified first, read second.
-    expect(verifyDownload.mock.invocationCallOrder[0]).toBeLessThan(
-      readMrpack.mock.invocationCallOrder.at(-1)!,
+      expect.objectContaining({ verify: { hashes: { sha512: 'abc' }, label: 'fo.mrpack' } }),
     );
   });
 
   it('does not open a pack file that fails the check, and leaves nothing behind', async () => {
     readMrpack.mockClear();
-    verifyDownload.mockRejectedValueOnce(new Error('hash mismatch'));
+    downloadToFile.mockRejectedValueOnce(new Error('sha512 mismatch for fo.mrpack'));
 
-    await expect(installer.installModrinthPack(pack)).rejects.toThrow(/hash mismatch/);
+    await expect(installer.installModrinthPack(pack)).rejects.toThrow(/sha512 mismatch/);
 
     expect(readMrpack).not.toHaveBeenCalled();
     expect(createProfile).not.toHaveBeenCalled();

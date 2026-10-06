@@ -372,21 +372,38 @@ function pinnedHashes(entry: ModEntry, resolved: ResolvedDownload): HashedEntry 
   return expectedHash(entry) ? entry : (resolved.hashes ?? {});
 }
 
-/** Download (or copy) one entry into the profile and verify its hash. */
+/**
+ * Download (or copy) one entry into the profile, once its hash has been checked.
+ *
+ * Either way the file takes its place only when it is whole and correct, so an
+ * entry that fails leaves the build already in `mods/` where it was.
+ */
 async function fetchModEntry(
   entry: ModEntry,
   resolved: ResolvedDownload,
   destPath: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  if (resolved.localPath) {
-    await fs.mkdir(path.dirname(destPath), { recursive: true });
-    await fs.copyFile(resolved.localPath, destPath);
-  } else {
-    await downloadToFile(resolved.url!, destPath, { signal, secure: true });
-  }
+  const hashes = pinnedHashes(entry, resolved);
 
-  await verifyDownload(destPath, pinnedHashes(entry, resolved), entry.name);
+  if (resolved.localPath) {
+    const part = `${destPath}.part`;
+    await fs.mkdir(path.dirname(destPath), { recursive: true });
+    try {
+      await fs.copyFile(resolved.localPath, part);
+      await verifyDownload(part, hashes, entry.name);
+      await fs.rename(part, destPath);
+    } catch (err) {
+      await fs.rm(part, { force: true });
+      throw err;
+    }
+  } else {
+    await downloadToFile(resolved.url!, destPath, {
+      signal,
+      secure: true,
+      verify: { hashes, label: entry.name },
+    });
+  }
 
   // installed.lock always records sha256 so local integrity checks stay uniform,
   // whichever algorithm the manifest happened to publish.
@@ -744,8 +761,12 @@ export async function syncManifest(profileId: string, supplied?: ModManifest): P
         // this write out of the tree: the parent is proven contained through
         // realpath here, and `noFollow` refuses a link at the file itself.
         await resolveWithin(gameDir, config.path);
-        await downloadToFile(config.url, dest, { signal, noFollow: true, secure: true });
-        await verifyDownload(dest, config, `config ${config.path}`);
+        await downloadToFile(config.url, dest, {
+          signal,
+          noFollow: true,
+          secure: true,
+          verify: { hashes: config, label: `config ${config.path}` },
+        });
         log.info(`Applied config override: ${config.path}`);
         configsWritten++;
         fetched++;
@@ -928,13 +949,12 @@ export async function installResolvedMod(
   const destPath = modFilePath(modsDir, resolved.fileName, enabled);
 
   log.info(`Installing mod ${identity.name} (${resolved.fileName}) from ${identity.source}`);
-  await downloadToFile(resolved.url, destPath, { secure: true });
-
-  // Deletes the file and throws on mismatch. Modrinth supplies sha512; a
-  // manifest may supply any of sha512/sha256/sha1. An entry that supplies none
-  // is installed unverified, which is why nothing here invents a hash to check
-  // against.
-  await verifyDownload(destPath, resolved.hashes, identity.name);
+  // Checked against the hash Modrinth publishes for the build before it takes
+  // its place, so an update that arrives wrong leaves the old jar standing.
+  await downloadToFile(resolved.url, destPath, {
+    secure: true,
+    verify: { hashes: resolved.hashes, label: identity.name },
+  });
 
   // installed.lock always records sha256, whatever the source published.
   const hash = await sha256File(destPath);

@@ -2,8 +2,11 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { constants as fsConstants } from 'node:fs';
 import { assertSecureContentUrl, isSecureContentUrl } from '../../shared/validators';
+import { expectedHash, type HashedEntry } from '../mods/integrity';
+import { serializeByKey } from '../util/serialize';
 
 /** No data for this long means the transfer is dead, not merely slow. */
 const STALL_TIMEOUT_MS = 45_000;
@@ -27,9 +30,11 @@ export interface DownloadOptions {
    */
   maxBytes?: number;
   /**
-   * Open the destination with `O_NOFOLLOW`, so a symlink already sitting where
-   * the file is about to be written is refused rather than followed out of the
-   * directory tree.
+   * Refuse a symlink already sitting where the file is about to go, rather than
+   * replace it. Nothing is ever written *through* one — the body goes to a
+   * temporary file and is renamed into place, and a rename replaces a link
+   * instead of following it — but a link at that path is something a person
+   * put there, and a pack's config file is not a reason to remove it quietly.
    */
   noFollow?: boolean;
   /**
@@ -41,6 +46,16 @@ export interface DownloadOptions {
    * otherwise accepted on trust and a plaintext hop is a place to swap it.
    */
   secure?: boolean;
+  /**
+   * What the body has to hash to, and what to call the file when it does not.
+   *
+   * Digested as the bytes are written and compared before the file is given its
+   * name. Every caller used to check afterwards, by which time the wrong bytes
+   * had already replaced whatever was there — and deleting them then left
+   * nothing at all — and the whole file was read back from disk just to be
+   * hashed. Hashes that name no algorithm accept the body as it arrives.
+   */
+  verify?: { hashes: HashedEntry; label: string };
   /**
    * Called as the body arrives, with what has been written so far and what the
    * server declared — `undefined` when it declared nothing. Here rather than in
@@ -59,24 +74,53 @@ export interface DownloadOptions {
  * a normal connection aborts halfway every time. What actually indicates a dead
  * transfer is silence, so the deadline resets on every chunk.
  *
- * A failed download must not leave its partial file behind. It would sit in the
- * profile looking installed while being absent from every index — which is
- * exactly the state an earlier version of this produced.
+ * The body is received into `<dest>.part` and renamed onto the destination once
+ * it is whole and, where a hash was given, correct. Writing straight to the
+ * destination meant a download that failed took the file already there with
+ * it: a pack whose new `options.txt` answered 503 deleted the player's own. A
+ * failure now leaves the destination exactly as it was, and nothing half
+ * written beside it.
  */
 export async function downloadToFile(
   url: string,
   dest: string,
   options: DownloadOptions = {},
 ): Promise<void> {
-  const { signal, maxBytes, noFollow, onProgress, secure } = options;
   // Before any request or side effect: a plaintext URL is refused outright, not
   // fetched and then discarded.
-  if (secure) assertSecureContentUrl(url);
+  if (options.secure) assertSecureContentUrl(url);
   await fs.mkdir(path.dirname(dest), { recursive: true });
+
+  // One at a time per destination. Two downloads of one file share its
+  // temporary name, and each would be hashing what it received while the disk
+  // held a mixture of both — which would then be renamed into place as verified.
+  return serializeByKey(dest, () => receive(url, dest, options));
+}
+
+async function isSymlink(file: string): Promise<boolean> {
+  try {
+    return (await fs.lstat(file)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+async function receive(url: string, dest: string, options: DownloadOptions): Promise<void> {
+  const { signal, maxBytes, noFollow, onProgress, secure, verify } = options;
+
+  if (noFollow && (await isSymlink(dest))) {
+    throw new Error(`Refusing to replace a symlink: ${dest}`);
+  }
+
+  // The name is fixed rather than random so that what a killed launcher left
+  // behind is overwritten by the next attempt instead of accumulating.
+  const part = `${dest}.part`;
 
   const controller = new AbortController();
   const abort = () => controller.abort();
-  signal?.addEventListener('abort', abort, { once: true });
+  // A signal that fired before this turn came up never fires again.
+  if (signal?.aborted) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
 
   let stall = setTimeout(abort, STALL_TIMEOUT_MS);
   const keepAlive = () => {
@@ -87,6 +131,9 @@ export async function downloadToFile(
   // Set when the cap is hit, so the shared abort path below does not misreport a
   // deliberate size refusal as a stalled transfer.
   let tooBig = false;
+
+  const expected = verify ? expectedHash(verify.hashes) : null;
+  const digest = expected ? crypto.createHash(expected.algorithm) : null;
 
   try {
     const res = await fetch(url, { redirect: 'follow', signal: controller.signal });
@@ -115,13 +162,14 @@ export async function downloadToFile(
     }
 
     // A FileHandle rather than a write stream so `O_NOFOLLOW` can go in as a
-    // numeric flag when asked; the ordinary case opens with a plain `'w'`.
-    // Awaiting each write is its own backpressure — a chunk is on disk before
-    // the next is read — so nothing buffers unbounded whatever the link speed.
-    const flags = noFollow
-      ? fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC | O_NOFOLLOW
-      : 'w';
-    const handle = await fs.open(dest, flags);
+    // numeric flag: the temporary name is the launcher's own, and nothing that
+    // belongs there is ever a link. Awaiting each write is its own backpressure
+    // — a chunk is on disk before the next is read — so nothing buffers
+    // unbounded whatever the link speed.
+    const handle = await fs.open(
+      part,
+      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC | O_NOFOLLOW,
+    );
     const reader = res.body.getReader();
     let received = 0;
     try {
@@ -135,14 +183,27 @@ export async function downloadToFile(
           controller.abort();
           throw new Error(`Download exceeded the ${maxBytes}-byte limit: ${new URL(url).host}`);
         }
+        digest?.update(value);
         await handle.write(value);
         onProgress?.(received, declared > 0 ? declared : undefined);
       }
     } finally {
       await handle.close();
     }
+
+    if (expected && digest) {
+      const actual = digest.digest('hex');
+      if (actual !== expected.value) {
+        throw new Error(
+          `${expected.algorithm} mismatch for ${verify!.label}: ` +
+            `expected ${expected.value}, got ${actual}`,
+        );
+      }
+    }
+
+    await fs.rename(part, dest);
   } catch (err) {
-    await fs.rm(dest, { force: true });
+    await fs.rm(part, { force: true });
     // A cancelled download and a dead one abort identically; only the caller's
     // signal tells them apart, and only one of them is a failure worth naming.
     // A size refusal aborted the fetch itself, so it must not be read as either.

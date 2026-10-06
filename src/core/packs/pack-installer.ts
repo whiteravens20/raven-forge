@@ -9,7 +9,6 @@ import { downloadToFile } from '../net/download';
 import { createProfile, deleteProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
 import { getModVersions, primaryFile } from '../mods/modrinth-api';
-import { verifyDownload } from '../mods/integrity';
 import { loaderLabel } from '../../shared/labels';
 import { readMrpack, applyOverrides, type MrpackContents, type MrpackFile } from './mrpack';
 import { assertSecureContentUrl } from '../../shared/validators';
@@ -266,8 +265,11 @@ export async function installModrinthPack(
 
   const scratch = path.join(paths.cacheDir, `pack-${crypto.randomUUID()}`);
   try {
-    await downloadToFile(file.url, scratch, { maxBytes: MAX_PACK_DOWNLOAD_BYTES, secure: true });
-    await verifyDownload(scratch, { sha512: file.hashes.sha512 }, file.filename);
+    await downloadToFile(file.url, scratch, {
+      maxBytes: MAX_PACK_DOWNLOAD_BYTES,
+      secure: true,
+      verify: { hashes: { sha512: file.hashes.sha512 }, label: file.filename },
+    });
     // The project's own icon, so the profile is recognisable in the list. Only
     // an https address: the renderer's policy would not load anything else.
     return await importMrpack(scratch, {

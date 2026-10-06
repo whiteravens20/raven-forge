@@ -1,5 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
@@ -20,6 +21,8 @@ let dir: string;
 let server: http.Server;
 let base: string;
 let handler: http.RequestListener;
+
+const sha256 = (body: string) => crypto.createHash('sha256').update(body).digest('hex');
 
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-dl-'));
@@ -70,6 +73,35 @@ describe('downloadToFile', () => {
 
     await expect(downloadToFile(`${base}/x`, dest)).rejects.toThrow();
     await expect(fs.stat(dest)).rejects.toThrow();
+  });
+
+  it('leaves the file that was there when the server refuses', async () => {
+    // A pack's new `options.txt` answered 503, and the player's own was deleted
+    // to make room for it.
+    handler = (_req, res) => {
+      res.statusCode = 503;
+      res.end('try later');
+    };
+    const dest = path.join(dir, 'options.txt');
+    await fs.writeFile(dest, 'fov:110.0');
+
+    await expect(downloadToFile(`${base}/x`, dest)).rejects.toThrow(/503/);
+    expect(await fs.readFile(dest, 'utf-8')).toBe('fov:110.0');
+  });
+
+  it('leaves the file that was there when the connection dies mid-body', async () => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-length': '1000' });
+      res.write('half');
+      res.socket?.destroy();
+    };
+    const dest = path.join(dir, 'mod.jar');
+    await fs.writeFile(dest, 'the build already installed');
+
+    await expect(downloadToFile(`${base}/x`, dest)).rejects.toThrow();
+    expect(await fs.readFile(dest, 'utf-8')).toBe('the build already installed');
+    // And nothing half-written beside it.
+    expect(await fs.readdir(dir)).toEqual(['mod.jar']);
   });
 
   it('refuses a body larger than the cap, by its declared length', async () => {
@@ -154,6 +186,70 @@ describe('downloadToFile', () => {
 
     await expect(downloadToFile(`${base}/x`, dest, { noFollow: true })).rejects.toThrow();
     expect(await fs.readFile(outside, 'utf-8')).toBe('original');
+    // Refused, not replaced: the link is still the link somebody made.
+    expect((await fs.lstat(dest)).isSymbolicLink()).toBe(true);
+  });
+
+  describe('a body with a hash to match', () => {
+    const verify = (body: string) => ({ hashes: { sha256: sha256(body) }, label: 'mod.jar' });
+
+    it('takes its place when it matches', async () => {
+      handler = (_req, res) => res.end('the right bytes');
+      const dest = path.join(dir, 'mod.jar');
+
+      await downloadToFile(`${base}/x`, dest, { verify: verify('the right bytes') });
+
+      expect(await fs.readFile(dest, 'utf-8')).toBe('the right bytes');
+    });
+
+    it('never takes its place when it does not, and says which hash failed', async () => {
+      handler = (_req, res) => res.end('something else entirely');
+      const dest = path.join(dir, 'mod.jar');
+      await fs.writeFile(dest, 'the build already installed');
+
+      await expect(
+        downloadToFile(`${base}/x`, dest, { verify: verify('the right bytes') }),
+      ).rejects.toThrow(/^sha256 mismatch for mod\.jar/);
+
+      // Checked after it was written, the wrong file had already replaced this
+      // one, and deleting it then left the profile with neither.
+      expect(await fs.readFile(dest, 'utf-8')).toBe('the build already installed');
+      expect(await fs.readdir(dir)).toEqual(['mod.jar']);
+    });
+
+    it('accepts a body nothing was published for', async () => {
+      handler = (_req, res) => res.end('unverifiable');
+      const dest = path.join(dir, 'pack.zip');
+
+      await downloadToFile(`${base}/x`, dest, { verify: { hashes: {}, label: 'pack.zip' } });
+
+      expect(await fs.readFile(dest, 'utf-8')).toBe('unverifiable');
+    });
+
+    it('does not let two downloads of one file write into each other', async () => {
+      // Both are hashed as they arrive, which only proves anything about the
+      // file if nobody else is writing to it at the same time.
+      const bodies: Record<string, string> = {
+        '/a': 'a'.repeat(64 * 1024),
+        '/b': 'b'.repeat(64 * 1024),
+      };
+      handler = (req, res) => {
+        const body = bodies[req.url ?? ''];
+        res.writeHead(200, { 'content-length': String(body.length) });
+        // In two halves with a pause between, so both transfers are under way
+        // before either has finished.
+        res.write(body.slice(0, body.length / 2));
+        setTimeout(() => res.end(body.slice(body.length / 2)), 20);
+      };
+      const dest = path.join(dir, 'shared.jar');
+
+      await Promise.all([
+        downloadToFile(`${base}/a`, dest, { verify: verify(bodies['/a']) }),
+        downloadToFile(`${base}/b`, dest, { verify: verify(bodies['/b']) }),
+      ]);
+
+      expect([bodies['/a'], bodies['/b']]).toContain(await fs.readFile(dest, 'utf-8'));
+    });
   });
 
   describe('secure transport', () => {
