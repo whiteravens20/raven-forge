@@ -30,6 +30,8 @@ export const pl: Translations = {
   'content.searchPacks': 'Szukaj paczek zasobów na Modrinth…',
   'content.searchFailed': 'Wyszukiwanie nie powiodło się.',
   'content.installFailed': 'Nie udało się zainstalować {name}.',
+  'content.addFile': 'Dodaj z pliku…',
+  'content.addFileFailed': 'Nie udało się dodać tego pliku.',
   'content.removeFailed': 'Nie udało się usunąć.',
   'content.reorderFailed': 'Nie udało się zapisać nowej kolejności.',
   'content.listFailed': 'Nie udało się odczytać listy zainstalowanych.',
@@ -38,7 +40,7 @@ export const pl: Translations = {
   'content.emptyShaders': 'Brak zainstalowanych shaderów',
   'content.emptyPacks': 'Brak zainstalowanych paczek zasobów',
   'content.emptyHint':
-    'Przeglądaj, żeby coś dodać, albo pozwól synchronizacji manifestu je przynieść.',
+    'Przeglądaj, żeby coś dodać, dodaj plik, który już masz, albo pozwól synchronizacji manifestu je przynieść.',
   'content.orderHint': 'Wygrywa góra listy. Paczka zmienia tylko to, czego nie ruszyły te pod nią.',
   'content.moveUp': 'Przesuń {name} w górę',
   'content.moveDown': 'Przesuń {name} w dół',
@@ -152,6 +154,17 @@ export const pl: Translations = {
     'Ten profil ma startować przez {path}, a to nie jest środowisko Java, które ten komputer potrafi uruchomić. Wskaż w edytorze profilu coś innego albo wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
   'launchError.javaTooOld':
     'Ten profil ma startować przez {path}, czyli Javę {found}, a ta wersja Minecrafta potrzebuje Javy {required}. Gra wystartowałaby i zaraz padła z błędem o wersji plików klas. Wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
+  'contentError.notZip': 'Ten plik nie jest archiwum zip.',
+  'contentError.notResourcePack':
+    'To archiwum nie jest paczką zasobów: na jego najwyższym poziomie nie ma pliku pack.mcmeta.',
+  'contentError.nestedResourcePack':
+    'Paczka leży w tym archiwum wewnątrz folderu ({folder}), a Minecraft wczytuje tylko taką, której pack.mcmeta jest na najwyższym poziomie. Spakuj zawartość tego folderu, a nie sam folder.',
+  'contentError.notShaderPack':
+    'To archiwum nie jest paczką shaderów: na jego najwyższym poziomie nie ma folderu shaders.',
+  'contentError.nestedShaderPack':
+    'Paczka shaderów leży w tym archiwum wewnątrz folderu ({folder}), a jest wczytywana tylko wtedy, gdy jej folder shaders jest na najwyższym poziomie. Spakuj zawartość tego folderu, a nie sam folder.',
+  'contentError.ownedByPack':
+    '{name} już tu jest — pochodzi z modpacka, za którym podąża ten profil. Synchronizacja i tak przywróciłaby wersję z modpacka.',
   'home.showConsole': 'Pokaż konsolę',
   'home.hideConsole': 'Ukryj konsolę',
   'home.news': 'Aktualności',

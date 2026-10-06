@@ -8,6 +8,7 @@ import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ResourcePackEntry } from '../src/shared/manifest-schema';
 import type { ModrinthVersion } from '../src/core/mods/modrinth-api';
+import { ZipWriter } from './helpers/zip';
 
 /**
  * Shaders and resource packs: the index, and the file the game actually reads.
@@ -262,6 +263,219 @@ describe('installContent', () => {
     expect((await content.listContent('resourcepacks', PROFILE)).map((i) => i.name).sort()).toEqual(
       ['A', 'B', 'C'],
     );
+  });
+});
+
+/** A zip on the player's disk, somewhere that is not the launcher's. */
+async function fileOnDisk(name: string, entries: Record<string, string>): Promise<string> {
+  const zip = new ZipWriter();
+  for (const [entry, body] of Object.entries(entries)) zip.add(entry, body);
+  const dir = path.join(root, 'downloads');
+  await fs.mkdir(dir, { recursive: true });
+  const file = path.join(dir, name);
+  await fs.writeFile(file, zip.toBuffer());
+  return file;
+}
+
+const RESOURCE_PACK = { 'pack.mcmeta': '{"pack":{"pack_format":34}}', 'assets/x.png': 'pixels' };
+const SHADER_PACK = { 'shaders/composite.fsh': 'void main() {}' };
+
+/** The profile these packs are added to: adding to one that is not there is refused. */
+async function profileExists(): Promise<void> {
+  const now = '2026-10-06T00:00:00.000Z';
+  await fs.mkdir(path.join(root, 'data'), { recursive: true });
+  await fs.writeFile(
+    path.join(root, 'data', 'profiles.json'),
+    JSON.stringify([
+      {
+        id: PROFILE,
+        name: 'Ravens',
+        minecraftVersion: '1.21.4',
+        modLoader: 'fabric',
+        allocatedRamMb: 4096,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]),
+  );
+}
+
+async function refusalOf(err: unknown) {
+  const refusal = await import('../src/core/util/refusal');
+  return refusal.refusalOf(err);
+}
+
+describe('addContentFromFile', () => {
+  beforeEach(profileExists);
+
+  it('copies the pack in, lists it and leaves the original where it was', async () => {
+    const file = await fileOnDisk('Faithful 32x.zip', RESOURCE_PACK);
+
+    const added = await content.addContentFromFile('resourcepacks', PROFILE, file);
+
+    expect(added).toMatchObject({
+      name: 'Faithful 32x',
+      source: 'local',
+      fileName: 'Faithful 32x.zip',
+      enabled: true,
+      fromManifest: false,
+    });
+    expect(added.id).toMatch(/^local-/);
+    expect(await fs.readFile(path.join(packsDir(), 'Faithful 32x.zip'))).toEqual(
+      await fs.readFile(file),
+    );
+    expect(await content.listContent('resourcepacks', PROFILE)).toEqual([added]);
+  });
+
+  it('switches a resource pack on in the file the game reads', async () => {
+    await content.addContentFromFile(
+      'resourcepacks',
+      PROFILE,
+      await fileOnDisk('Mine.zip', RESOURCE_PACK),
+    );
+    expect(await fs.readFile(optionsFile(), 'utf-8')).toContain('file/Mine.zip');
+  });
+
+  it('takes a shader pack by its shaders folder, and leaves options.txt alone', async () => {
+    const added = await content.addContentFromFile(
+      'shaders',
+      PROFILE,
+      await fileOnDisk('Sky.zip', SHADER_PACK),
+    );
+
+    expect(added.fileName).toBe('Sky.zip');
+    expect((await content.listContent('shaders', PROFILE)).map((i) => i.name)).toEqual(['Sky']);
+    await expect(fs.stat(optionsFile())).rejects.toThrow();
+  });
+
+  it('refuses a file that is not a zip archive, whatever it is called', async () => {
+    const dir = path.join(root, 'downloads');
+    await fs.mkdir(dir, { recursive: true });
+    const renamed = path.join(dir, 'notes.zip');
+    await fs.writeFile(renamed, 'not an archive at all');
+    const other = path.join(dir, 'pack.rar');
+    await fs.writeFile(other, 'Rar!');
+
+    for (const file of [renamed, other]) {
+      const err = await content.addContentFromFile('resourcepacks', PROFILE, file).catch((e) => e);
+      expect(await refusalOf(err)).toEqual({ key: 'contentError.notZip' });
+    }
+    expect(await content.listContent('resourcepacks', PROFILE)).toEqual([]);
+  });
+
+  it('refuses an archive that is not the kind of pack it is being added as', async () => {
+    const shader = await fileOnDisk('Sky.zip', SHADER_PACK);
+    const pack = await fileOnDisk('Mine.zip', RESOURCE_PACK);
+
+    const asPack = await content
+      .addContentFromFile('resourcepacks', PROFILE, shader)
+      .catch((e) => e);
+    expect(await refusalOf(asPack)).toEqual({ key: 'contentError.notResourcePack' });
+    const asShader = await content.addContentFromFile('shaders', PROFILE, pack).catch((e) => e);
+    expect(await refusalOf(asShader)).toEqual({ key: 'contentError.notShaderPack' });
+
+    // Nothing was copied for either: the check comes first.
+    await expect(fs.stat(path.join(packsDir(), 'Sky.zip'))).rejects.toThrow();
+  });
+
+  it('names the folder when the pack was zipped one level too high', async () => {
+    // Zipping the folder instead of what is in it. The game shows nothing for
+    // such a file and says nothing about why.
+    const pack = await fileOnDisk('Mine.zip', {
+      'Mine/pack.mcmeta': '{}',
+      'Mine/assets/x.png': 'pixels',
+    });
+    const shader = await fileOnDisk('Sky.zip', {
+      'Sky v2/shaders/composite.fsh': 'void main() {}',
+    });
+
+    const first = await content.addContentFromFile('resourcepacks', PROFILE, pack).catch((e) => e);
+    expect(await refusalOf(first)).toEqual({
+      key: 'contentError.nestedResourcePack',
+      vars: { folder: 'Mine' },
+    });
+    const second = await content.addContentFromFile('shaders', PROFILE, shader).catch((e) => e);
+    expect(await refusalOf(second)).toEqual({
+      key: 'contentError.nestedShaderPack',
+      vars: { folder: 'Sky v2' },
+    });
+  });
+
+  it('will not write over a pack the modpack put there', async () => {
+    await content.syncContentFromManifest(
+      'resourcepacks',
+      PROFILE,
+      [manifestPack('server-pack', 'server-bytes')],
+      '1.21.4',
+    );
+    const mine = await fileOnDisk('server-pack.zip', RESOURCE_PACK);
+
+    const err = await content.addContentFromFile('resourcepacks', PROFILE, mine).catch((e) => e);
+
+    expect(await refusalOf(err)).toEqual({
+      key: 'contentError.ownedByPack',
+      vars: { name: 'server-pack.zip' },
+    });
+    expect(await fs.readFile(path.join(packsDir(), 'server-pack.zip'), 'utf-8')).toBe(
+      'server-bytes',
+    );
+  });
+
+  it('takes a newer copy of a file added before, in the same place on the list', async () => {
+    const first = await content.addContentFromFile(
+      'resourcepacks',
+      PROFILE,
+      await fileOnDisk('A.zip', RESOURCE_PACK),
+    );
+    await content.addContentFromFile(
+      'resourcepacks',
+      PROFILE,
+      await fileOnDisk('B.zip', RESOURCE_PACK),
+    );
+
+    const newer = await fileOnDisk('A.zip', { ...RESOURCE_PACK, 'assets/y.png': 'more pixels' });
+    const again = await content.addContentFromFile('resourcepacks', PROFILE, newer);
+
+    expect(again.id).toBe(first.id);
+    expect((await content.listContent('resourcepacks', PROFILE)).map((i) => i.name)).toEqual([
+      'A',
+      'B',
+    ]);
+    expect(await fs.readFile(path.join(packsDir(), 'A.zip'))).toEqual(await fs.readFile(newer));
+  });
+
+  it('lists a pack that was dropped into the folder by hand, without touching it', async () => {
+    await fs.mkdir(packsDir(), { recursive: true });
+    const zip = new ZipWriter();
+    for (const [entry, body] of Object.entries(RESOURCE_PACK)) zip.add(entry, body);
+    const inPlace = path.join(packsDir(), 'Dropped.zip');
+    await fs.writeFile(inPlace, zip.toBuffer());
+    const before = await fs.readFile(inPlace);
+
+    const added = await content.addContentFromFile('resourcepacks', PROFILE, inPlace);
+
+    expect(added.fileName).toBe('Dropped.zip');
+    expect(await fs.readFile(inPlace)).toEqual(before);
+    expect(await fs.readFile(optionsFile(), 'utf-8')).toContain('file/Dropped.zip');
+  });
+
+  it('leaves no half of a pack behind when the copy does not finish', async () => {
+    const file = await fileOnDisk('Mine.zip', RESOURCE_PACK);
+    // A folder where the copy has to land is the portable way to make it fail.
+    await fs.mkdir(path.join(packsDir(), 'Mine.zip.part'), { recursive: true });
+
+    await expect(content.addContentFromFile('resourcepacks', PROFILE, file)).rejects.toThrow();
+
+    expect(await content.listContent('resourcepacks', PROFILE)).toEqual([]);
+    await expect(fs.stat(path.join(packsDir(), 'Mine.zip'))).rejects.toThrow();
+  });
+
+  it('refuses a profile that is not there instead of making a folder for it', async () => {
+    const file = await fileOnDisk('Mine.zip', RESOURCE_PACK);
+    await expect(content.addContentFromFile('resourcepacks', 'ghost', file)).rejects.toThrow(
+      /not found/,
+    );
+    await expect(fs.stat(path.join(root, 'data', 'profiles', 'ghost'))).rejects.toThrow();
   });
 });
 

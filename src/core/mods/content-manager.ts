@@ -2,6 +2,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
@@ -11,14 +12,15 @@ import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
 import { fileMatches, type HashedEntry } from './integrity';
-import type { InstalledMod } from '../../shared/ipc-types';
+import type { ContentKind, InstalledMod } from '../../shared/ipc-types';
 import {
   fileNameFromUrl,
+  isSafeFileName,
   type ResourcePackEntry,
   type ShaderEntry,
 } from '../../shared/manifest-schema';
-
-type ContentKind = 'shaders' | 'resourcepacks';
+import { RefusedError } from '../util/refusal';
+import { STOP, eachEntry } from '../util/zip-read';
 
 function targetDir(kind: ContentKind, profileId: string): string {
   return kind === 'shaders'
@@ -162,6 +164,149 @@ export async function installContent(
   });
   if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
   return installed;
+}
+
+/**
+ * What makes an archive the kind of pack it is being added as, and the same
+ * thing one folder down — which is what zipping the folder instead of what is
+ * in it produces, and the usual reason a pack that "is there" never shows up.
+ */
+const PACK_LAYOUT: Record<ContentKind, { top: RegExp; nested: RegExp }> = {
+  resourcepacks: { top: /^pack\.mcmeta$/, nested: /^([^/]+)\/pack\.mcmeta$/ },
+  shaders: { top: /^shaders\//, nested: /^([^/]+)\/shaders\// },
+};
+
+/**
+ * Refuse a file the game would not read as this kind of pack.
+ *
+ * Checked before anything is copied, because the failure it prevents is silent:
+ * the zip sits in the folder, the launcher lists it, and the game shows nothing
+ * — with no error anywhere, since to the game it is simply not a pack.
+ */
+async function assertPackLayout(kind: ContentKind, file: string): Promise<void> {
+  const layout = PACK_LAYOUT[kind];
+  const name = path.basename(file);
+  let found = false;
+  let nestedIn: string | undefined;
+  try {
+    await eachEntry(file, async (_zip, entry) => {
+      if (layout.top.test(entry.fileName)) {
+        found = true;
+        return STOP;
+      }
+      nestedIn ??= layout.nested.exec(entry.fileName)?.[1];
+    });
+  } catch {
+    throw new RefusedError({ key: 'contentError.notZip' }, `${name} is not a zip archive`);
+  }
+  if (found) return;
+
+  const shaders = kind === 'shaders';
+  if (nestedIn) {
+    throw new RefusedError(
+      {
+        key: shaders ? 'contentError.nestedShaderPack' : 'contentError.nestedResourcePack',
+        vars: { folder: nestedIn },
+      },
+      `${name} holds its pack inside the folder ${nestedIn}, not at the top level`,
+    );
+  }
+  throw new RefusedError(
+    { key: shaders ? 'contentError.notShaderPack' : 'contentError.notResourcePack' },
+    `${name} is not a ${shaders ? 'shader' : 'resource'} pack`,
+  );
+}
+
+/** Whether two paths are one file on disk, whatever they are spelled like. */
+async function isSameFile(a: string, b: string): Promise<boolean> {
+  try {
+    const [first, second] = await Promise.all([
+      fs.stat(a, { bigint: true }),
+      fs.stat(b, { bigint: true }),
+    ]);
+    return first.dev === second.dev && first.ino === second.ino;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Add a shader or a resource pack the player already has as a file.
+ *
+ * Plenty of both are published only on their authors' own sites, or generated
+ * to order, so Modrinth cannot be the one way in. Until this existed the route
+ * was to open the profile folder and drop the zip there — which works for the
+ * game, and leaves the launcher listing a profile that is not the one being
+ * played: nothing to reorder, nothing to remove, nothing in an exported pack.
+ *
+ * The file is copied, never moved: it is the player's, and stays where it was.
+ */
+export async function addContentFromFile(
+  kind: ContentKind,
+  profileId: string,
+  filePath: string,
+): Promise<InstalledMod> {
+  const dir = targetDir(kind, profileId);
+  if (!(await getProfile(profileId))) throw new Error(`Profile ${profileId} not found`);
+  const fileName = path.basename(filePath);
+  if (!/\.zip$/i.test(fileName) || !isSafeFileName(fileName)) {
+    throw new RefusedError({ key: 'contentError.notZip' }, `${fileName} is not a zip archive`);
+  }
+  await assertPackLayout(kind, filePath);
+  await fs.mkdir(dir, { recursive: true });
+  const dest = path.join(dir, fileName);
+
+  const added = await mutateIndex(kind, profileId, async (items) => {
+    // Without regard to case: on Windows and macOS two names that differ only
+    // in that are one file, and the second would land on top of the first.
+    const idx = items.findIndex((item) => item.fileName.toLowerCase() === fileName.toLowerCase());
+    const existing = idx >= 0 ? items[idx] : undefined;
+    if (existing?.fromManifest) {
+      throw new RefusedError(
+        { key: 'contentError.ownedByPack', vars: { name: existing.fileName } },
+        `${existing.fileName} belongs to the pack this profile follows`,
+      );
+    }
+
+    // A pack already in this folder is listed where it lies. That is how one
+    // dropped here by hand gets onto the list, and copying a file onto itself
+    // would empty it.
+    if (!(await isSameFile(filePath, dest))) {
+      if (existing && existing.fileName !== fileName) {
+        const previous = path.join(dir, existing.fileName);
+        if (!(await isSameFile(filePath, previous))) await fs.rm(previous, { force: true });
+      }
+      // Beside its name and then renamed onto it, so a copy that stops half-way
+      // — a full disk, a stick pulled out — leaves no half of a pack behind.
+      const part = `${dest}.part`;
+      try {
+        await fs.copyFile(filePath, part);
+        await fs.rename(part, dest);
+      } catch (err) {
+        await fs.rm(part, { force: true });
+        throw err;
+      }
+    }
+
+    const installed: InstalledMod = {
+      // The same entry when it is a newer copy of a file added before, so it
+      // keeps its place in the order.
+      id: existing?.source === 'local' ? existing.id : `local-${crypto.randomUUID()}`,
+      name: fileName.replace(/\.zip$/i, ''),
+      version: 'local',
+      source: 'local',
+      fileName,
+      enabled: true,
+      fromManifest: false,
+    };
+    if (idx >= 0) items[idx] = installed;
+    else items.push(installed);
+    return installed;
+  });
+
+  if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
+  log.info(`Added ${kind === 'shaders' ? 'shader' : 'resource'} pack from a file: ${fileName}`);
+  return added;
 }
 
 /**

@@ -86,6 +86,9 @@ export interface ProjectDetails {
   iconUrl?: string;
 }
 
+/** The two kinds of pack the Looks page keeps, named after their folders. */
+export type ContentKind = 'shaders' | 'resourcepacks';
+
 /** What Modrinth calls a project type. Shaders and resource packs are not mods. */
 export type ContentProjectType = 'mod' | 'shader' | 'resourcepack' | 'modpack';
 

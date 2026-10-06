@@ -1,7 +1,7 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown, FilePlus } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { useGameStore } from '@stores/game-store';
 import { usePagedSearch } from '@hooks/use-paged-search';
@@ -25,6 +25,7 @@ import { CompatibilityBadge } from '@components/CompatibilityBadge';
 import { CompatibilityDialog } from '@components/CompatibilityDialog';
 import { InstalledMark } from '@components/InstalledMark';
 import type {
+  ContentKind,
   FacetGroups,
   InstallPlan,
   ModSearchResult,
@@ -37,8 +38,6 @@ import type {
 const api = window.ravenforge;
 
 const NO_FACETS: FacetGroups = { loaders: [], groups: [], gameVersions: [] };
-
-type Kind = 'shaders' | 'resourcepacks';
 
 /**
  * Shaders and resource packs.
@@ -55,7 +54,7 @@ export function ContentPage() {
   const selectedId = useProfileStore((s) => s.selectedProfileId);
 
   const t = useT();
-  const [kind, setKind] = useState<Kind>('shaders');
+  const [kind, setKind] = useState<ContentKind>('shaders');
   const [tab, setTab] = useState<'installed' | 'browse'>('installed');
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
   const [query, setQuery] = useState('');
@@ -70,6 +69,8 @@ export function ContentPage() {
   /** Non-null while the "which shader loader?" dialog is open. */
   const [choosingLoader, setChoosingLoader] = useState<ShaderLoaderOption[] | null>(null);
   const [installingLoader, setInstallingLoader] = useState(false);
+  /** A file is being asked for, checked and copied in. */
+  const [addingFile, setAddingFile] = useState(false);
   /** Non-null while a compatibility warning is waiting on a decision. */
   const [plan, setPlan] = useState<{ item: ModSearchResult; plan: InstallPlan } | null>(null);
 
@@ -208,6 +209,40 @@ export function ContentPage() {
   };
 
   /**
+   * Add a pack the player already has as a file.
+   *
+   * Which file is asked by the main process, so all this hears back is what
+   * was added — or nothing, when the dialog was closed, which says nothing.
+   */
+  const handleAddFile = async () => {
+    if (!selectedId || addingFile) return;
+    const profileId = selectedId;
+    setError(null);
+    setLoaderNote(null);
+    setAddingFile(true);
+    try {
+      const result = await api.content.addFromFile(profileId, kind);
+      if (!result.success) {
+        // A refusal is about the file that was picked, and comes with words
+        // for it: what is wrong with it, and what to pick instead.
+        setError(
+          result.errorMessage
+            ? t(result.errorMessage.key, result.errorMessage.vars)
+            : (result.error ?? t('content.addFileFailed')),
+        );
+        return;
+      }
+      if (!result.data) return;
+      // Where it has just appeared.
+      setTab('installed');
+      await loadInstalled();
+      if (kind === 'shaders') await checkShaderLoader(profileId);
+    } finally {
+      setAddingFile(false);
+    }
+  };
+
+  /**
    * Does this profile have something that can *read* a shader pack?
    *
    * A pack with no loader behind it is a zip in a folder nothing opens, and the
@@ -319,26 +354,41 @@ export function ContentPage() {
         </div>
       </div>
 
-      <div
-        className="flex gap-1 self-start rounded-lg border border-rf-border bg-rf-surface p-0.5"
-        role="tablist"
-        aria-label={t('content.kindLabel')}
-      >
-        {(['shaders', 'resourcepacks'] as const).map((value) => (
-          <button
-            key={value}
-            role="tab"
-            aria-selected={kind === value}
-            onClick={() => setKind(value)}
-            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-              kind === value
-                ? 'bg-rf-accent text-white'
-                : 'text-rf-text-secondary hover:text-rf-text'
-            }`}
-          >
-            {value === 'shaders' ? t('content.shaders') : t('content.resourcePacks')}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-3">
+        <div
+          className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5"
+          role="tablist"
+          aria-label={t('content.kindLabel')}
+        >
+          {(['shaders', 'resourcepacks'] as const).map((value) => (
+            <button
+              key={value}
+              role="tab"
+              aria-selected={kind === value}
+              onClick={() => setKind(value)}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                kind === value
+                  ? 'bg-rf-accent text-white'
+                  : 'text-rf-text-secondary hover:text-rf-text'
+              }`}
+            >
+              {value === 'shaders' ? t('content.shaders') : t('content.resourcePacks')}
+            </button>
+          ))}
+        </div>
+        {/* For the packs Modrinth does not have: an author's own site, a pack
+            made to order. Whichever kind is showing is the kind it is added as. */}
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<FilePlus size={14} />}
+          loading={addingFile}
+          disabled={gameBusy}
+          title={gameBusy ? t('mods.gameBusy') : undefined}
+          onClick={() => void handleAddFile()}
+        >
+          {t('content.addFile')}
+        </Button>
       </div>
 
       {error && <Banner type="urgent">{error}</Banner>}
@@ -494,7 +544,10 @@ export function ContentPage() {
                   details={details[projectKey(item)]}
                   fallbackIcon={<Icon size={18} className="shrink-0 text-rf-text-muted" />}
                 >
-                  {item.version} • {t(`mods.source.${item.source}`)}
+                  {/* A file off the disk has no version anybody recorded. */}
+                  {item.source === 'local'
+                    ? t('mods.source.local')
+                    : `${item.version} • ${t(`mods.source.${item.source}`)}`}
                   {item.fromManifest && ` • ${t('mods.fromManifest')}`}
                 </InstalledEntryInfo>
                 {/* Manifest-managed entries are re-added by the next sync, so

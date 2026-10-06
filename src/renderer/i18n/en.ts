@@ -41,6 +41,8 @@ export const en = {
   'content.searchPacks': 'Search Modrinth for resource packs…',
   'content.searchFailed': 'Search failed.',
   'content.installFailed': 'Could not install {name}.',
+  'content.addFile': 'Add from a file…',
+  'content.addFileFailed': 'Could not add that file.',
   'content.removeFailed': 'Could not remove that.',
   'content.reorderFailed': 'Could not save the new order.',
   'content.listFailed': 'Could not read what is installed.',
@@ -48,7 +50,8 @@ export const en = {
     'The shader pack is installed, but the launcher could not check whether this profile has a shader loader to run it.',
   'content.emptyShaders': 'No shaders installed',
   'content.emptyPacks': 'No resource packs installed',
-  'content.emptyHint': 'Browse to add one, or let a manifest sync bring it in.',
+  'content.emptyHint':
+    'Browse to add one, add a file you already have, or let a manifest sync bring it in.',
   'content.orderHint':
     'Top of the list wins. A pack only changes what the ones below it left alone.',
   'content.moveUp': 'Move {name} up',
@@ -163,6 +166,17 @@ export const en = {
     'This profile is set to launch with {path}, and that is not a Java runtime this machine can run. Point it somewhere else in the profile editor, or clear the field to use the runtime the launcher installs itself.',
   'launchError.javaTooOld':
     'This profile is set to launch with {path}, which is Java {found}, and this version of Minecraft needs Java {required}. It would start and then stop with an error about class file versions. Clear the field to use the runtime the launcher installs itself.',
+  'contentError.notZip': 'That file is not a zip archive.',
+  'contentError.notResourcePack':
+    'That archive is not a resource pack: there is no pack.mcmeta at its top level.',
+  'contentError.nestedResourcePack':
+    'The pack is inside a folder ({folder}) in that archive, and Minecraft only reads one whose pack.mcmeta is at the top level. Zip what is in that folder, not the folder itself.',
+  'contentError.notShaderPack':
+    'That archive is not a shader pack: there is no shaders folder at its top level.',
+  'contentError.nestedShaderPack':
+    'The shader pack is inside a folder ({folder}) in that archive, and it is only read when its shaders folder is at the top level. Zip what is in that folder, not the folder itself.',
+  'contentError.ownedByPack':
+    '{name} is already here, put there by the modpack this profile follows. A sync would put the modpack’s copy back.',
   'home.showConsole': 'Show console',
   'home.hideConsole': 'Hide console',
   'home.news': 'News',

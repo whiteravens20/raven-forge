@@ -66,6 +66,7 @@ import {
 import { exportProfileAsMrpack } from '../core/packs/mrpack-export';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
 import {
+  addContentFromFile,
   listContent,
   installContent,
   removeContent,
@@ -97,6 +98,7 @@ import type {
   IpcResult,
   IpcErrorCode,
   ErrorMessage,
+  ContentKind,
   GlobalSettings,
   TrustedKey,
   MrpackExportOptions,
@@ -1018,6 +1020,30 @@ export function registerAllIpcHandlers(): void {
       }
     },
   );
+  handle('content:add-from-file', async (_event, profileId: string, kind: ContentKind) => {
+    try {
+      // Checked here, not assumed: it picks the folder the file is copied into.
+      if (kind !== 'shaders' && kind !== 'resourcepacks') return fail('Not a kind of pack');
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
+      const win = getMainWindow();
+      if (!win) return fail('No window available');
+
+      // Which file is asked here, so the page never names a path: a channel
+      // that took one would copy any file on the disk into a profile, for
+      // whoever could send it a message.
+      const chosen = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        defaultPath: app.getPath('downloads'),
+        filters: [{ name: 'Zip archive', extensions: ['zip'] }],
+      });
+      if (chosen.canceled || chosen.filePaths.length === 0) return ok(null);
+      return ok(await addContentFromFile(kind, profileId, chosen.filePaths[0]));
+    } catch (err) {
+      // A refusal carries the same sentence twice: English here for the log,
+      // and a key the page says in the player's language.
+      return fail(`Failed to add that file: ${reason(err)}`, undefined, refusalOf(err));
+    }
+  });
 
   // ── Java ─────────────────────────────────────────────────
   handle('java:detect-system', async () => {

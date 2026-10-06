@@ -42,6 +42,7 @@ import type {
 } from './ipc/profiles';
 import type {
   CataloguePack,
+  ContentKind,
   ContentProjectType,
   FacetGroups,
   InstallPlan,
@@ -246,6 +247,16 @@ export interface InvokeChannels {
     profileId: string,
     orderedIds: string[],
   ) => Promise<IpcResult<void>>;
+  /**
+   * Add a shader or a resource pack from a file on this computer.
+   *
+   * Which file is asked in the main process, so the page never names a path.
+   * `null` is the player closing that dialog, which is not a failure.
+   */
+  'content:add-from-file': (
+    profileId: string,
+    kind: ContentKind,
+  ) => Promise<IpcResult<InstalledMod | null>>;
 
   // -- Java --
   'java:detect-system': () => Promise<IpcResult<JavaInstallation[]>>;
@@ -453,6 +464,7 @@ export interface RavenForgeAPI {
     removeShader: InvokeChannels['content:remove-shader'];
     removeResourcePack: InvokeChannels['content:remove-resourcepack'];
     reorderResourcePacks: InvokeChannels['content:reorder-resourcepacks'];
+    addFromFile: InvokeChannels['content:add-from-file'];
   };
   java: {
     detectSystem: InvokeChannels['java:detect-system'];

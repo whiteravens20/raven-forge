@@ -7,7 +7,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import nacl from 'tweetnacl';
 import { encodeBase64 } from 'tweetnacl-util';
 import { WHITE_RAVENS_PUBLIC_KEY } from '../src/shared/branding';
-import type { GlobalSettings, IpcResult, Profile } from '../src/shared/ipc-types';
+import type { GlobalSettings, InstalledMod, IpcResult, Profile } from '../src/shared/ipc-types';
+import { ZipWriter } from './helpers/zip';
 
 /**
  * What a handler answers, asked the way the renderer asks it.
@@ -20,11 +21,13 @@ import type { GlobalSettings, IpcResult, Profile } from '../src/shared/ipc-types
 
 type Listener = (event: unknown, ...args: unknown[]) => unknown;
 
-const { handlers, mainFrame, running } = vi.hoisted(() => ({
+const { handlers, mainFrame, running, picked } = vi.hoisted(() => ({
   handlers: new Map<string, Listener>(),
   mainFrame: {},
   /** Profiles this suite says have a game up; nothing is ever spawned. */
   running: new Set<string>(),
+  /** What the next "choose a file" dialog answers; nothing is a closed dialog. */
+  picked: { files: [] as string[], asked: 0 },
 }));
 
 let root: string;
@@ -38,7 +41,12 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: (channel: string, listener: Listener) => handlers.set(channel, listener),
   },
-  dialog: {},
+  dialog: {
+    showOpenDialog: async () => {
+      picked.asked += 1;
+      return { canceled: picked.files.length === 0, filePaths: picked.files };
+    },
+  },
   shell: { openExternal: () => Promise.resolve(), openPath: () => Promise.resolve('') },
   session: { defaultSession: { setProxy: () => Promise.resolve() } },
   safeStorage: { isEncryptionAvailable: () => false },
@@ -78,6 +86,8 @@ beforeEach(async () => {
   vi.resetModules();
   handlers.clear();
   running.clear();
+  picked.files = [];
+  picked.asked = 0;
   const { reloadDataRoot } = await import('../src/core/config/data-root');
   reloadDataRoot();
   const { registerAllIpcHandlers } = await import('../src/main/ipc-handlers');
@@ -149,11 +159,12 @@ describe('changing a profile’s files under its running game', () => {
     ['mods:uninstall', ['sodium']],
     ['mods:toggle-enabled', ['sodium', false]],
     ['mods:update', [['sodium']]],
-    ['content:install-shader', ['modrinth:complementary']],
-    ['content:install-resourcepack', ['modrinth:faithful']],
+    ['content:install-shader', ['complementary']],
+    ['content:install-resourcepack', ['faithful']],
     ['content:remove-shader', ['x']],
     ['content:remove-resourcepack', ['x']],
     ['content:reorder-resourcepacks', [[]]],
+    ['content:add-from-file', ['resourcepacks']],
     ['content:install-shader-loader', ['iris']],
   ])('%s is refused, and says why', async (channel, args) => {
     const id = await profileWithMod();
@@ -173,6 +184,75 @@ describe('changing a profile’s files under its running game', () => {
 
     expect((await call('mods:uninstall', id, 'sodium')).success).toBe(true);
     await expect(fs.access(path.join(modsDir(id), 'sodium.jar'))).rejects.toThrow();
+  });
+});
+
+/**
+ * A pack off the player's own disk.
+ *
+ * The page says which profile and which kind; the file is asked for here. A
+ * channel that took a path would copy any file on the disk into a profile for
+ * whoever could send it a message.
+ */
+describe('content:add-from-file', () => {
+  const packsDir = (id: string) =>
+    path.join(root, 'data', 'profiles', id, '.minecraft', 'resourcepacks');
+
+  async function zipOnDisk(name: string, entries: Record<string, string>): Promise<string> {
+    const zip = new ZipWriter();
+    for (const [entry, body] of Object.entries(entries)) zip.add(entry, body);
+    const file = path.join(root, name);
+    await fs.writeFile(file, zip.toBuffer());
+    return file;
+  }
+
+  it('asks for the file itself and adds the one that was picked', async () => {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Looks'))).data!;
+    picked.files = [await zipOnDisk('Faithful.zip', { 'pack.mcmeta': '{}' })];
+
+    const result = await call<InstalledMod | null>('content:add-from-file', id, 'resourcepacks');
+
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({ fileName: 'Faithful.zip', source: 'local' });
+    await expect(fs.access(path.join(packsDir(id), 'Faithful.zip'))).resolves.toBeUndefined();
+  });
+
+  it('takes no path from the page, whatever it is sent', async () => {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Looks'))).data!;
+    const stray = await zipOnDisk('Stray.zip', { 'pack.mcmeta': '{}' });
+
+    // A third argument is not part of the call; the dialog is still what decides.
+    const result = await call<InstalledMod | null>(
+      'content:add-from-file',
+      id,
+      'resourcepacks',
+      stray,
+    );
+
+    expect(picked.asked).toBe(1);
+    expect(result).toEqual({ success: true, data: null });
+    await expect(fs.access(path.join(packsDir(id), 'Stray.zip'))).rejects.toThrow();
+  });
+
+  it('answers a refusal with words the page can say in its own language', async () => {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Looks'))).data!;
+    picked.files = [await zipOnDisk('Sky.zip', { 'shaders/composite.fsh': 'void main() {}' })];
+
+    const result = await call('content:add-from-file', id, 'resourcepacks');
+
+    expect(result.success).toBe(false);
+    expect(result.errorMessage).toEqual({ key: 'contentError.notResourcePack' });
+    expect(result.error).toMatch(/Sky\.zip is not a resource pack/);
+  });
+
+  it('refuses a kind that is not one of the two, before asking for anything', async () => {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Looks'))).data!;
+    picked.files = [await zipOnDisk('Faithful.zip', { 'pack.mcmeta': '{}' })];
+
+    const result = await call('content:add-from-file', id, '../mods');
+
+    expect(result.success).toBe(false);
+    expect(picked.asked).toBe(0);
   });
 });
 

@@ -52,7 +52,13 @@ export type ErrorKey =
   | 'launchError.ramTooBig'
   | 'launchError.loaderVersionUnknown'
   | 'launchError.javaNotRuntime'
-  | 'launchError.javaTooOld';
+  | 'launchError.javaTooOld'
+  | 'contentError.notZip'
+  | 'contentError.notResourcePack'
+  | 'contentError.nestedResourcePack'
+  | 'contentError.notShaderPack'
+  | 'contentError.nestedShaderPack'
+  | 'contentError.ownedByPack';
 
 /** A failure the renderer can say in the user's language. */
 export interface ErrorMessage {

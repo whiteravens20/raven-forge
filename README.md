@@ -30,7 +30,7 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Java Management** — auto-download the Adoptium Temurin JRE the game actually asks for; Mojang's version metadata names the major (Java 25 for 26.2, 21 for 1.21, and so on), with a table covering versions old enough not to state one. A profile may name a JVM of its own instead — picked from the ones found on this machine or from a file — and the launcher checks it says what it needs to before the game gets it
 - **The Window The Game Starts In** — a size and a windowed/fullscreen choice per profile, both optional. Fullscreen is written into the game's own settings rather than passed as an argument, so switching it back off works as well as switching it on
 - **Snapshots** — Mojang's weekly test builds are one toggle away in the version picker, off by default, and a profile already on one opens with them shown
-- **Shaders & Resource Packs** — first-class content management per profile
+- **Shaders & Resource Packs** — found on Modrinth or added from a zip you already have, checked to be the kind of pack the game will read, then ordered and removed per profile
 - **Auto-Update** — launcher self-updates via GitHub Releases (electron-updater)
 - **Stop The Game** — a running profile can be stopped from the launcher: SIGTERM first, SIGKILL after ten seconds, and it does not report success until the process has actually gone
 - **Crash Reports** — one file per crash with versions, mods and the game's own report, written with tokens and account details already stripped out

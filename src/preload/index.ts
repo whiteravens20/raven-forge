@@ -84,6 +84,7 @@ const api: RavenForgeAPI = {
     removeShader: (profileId, id) => ipcRenderer.invoke('content:remove-shader', profileId, id),
     removeResourcePack: (profileId, id) =>
       ipcRenderer.invoke('content:remove-resourcepack', profileId, id),
+    addFromFile: (profileId, kind) => ipcRenderer.invoke('content:add-from-file', profileId, kind),
     reorderResourcePacks: (profileId, orderedIds) =>
       ipcRenderer.invoke('content:reorder-resourcepacks', profileId, orderedIds),
   },
