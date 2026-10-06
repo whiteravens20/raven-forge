@@ -3,11 +3,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createWriteStream } from 'node:fs';
+import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import yauzl from 'yauzl';
 import { log } from '../../main/logger';
 import { CancelledError, isCancellation, throwIfCancelled } from '../util/cancellation';
 import { forEachConcurrently } from '../util/concurrency';
+import { serializeByKey } from '../util/serialize';
 import { downloadToFile } from '../net/download';
 import { MOJANG_RESOURCES } from '../../shared/constants';
 import { hashFile } from '../mods/integrity';
@@ -271,7 +273,6 @@ function emitAssetProgress(event: ProgressEvent): void {
 interface MavenCoords {
   /** Repo-relative path, e.g. `org/ow2/asm/asm/9.10.1/asm-9.10.1.jar` */
   path: string;
-  classifier?: string;
 }
 
 function parseMavenCoords(name: string): MavenCoords | null {
@@ -284,15 +285,7 @@ function parseMavenCoords(name: string): MavenCoords | null {
   const ext = extFromAt ?? 'jar';
   const fileName = `${artifact}-${version}${classifier ? `-${classifier}` : ''}.${ext}`;
 
-  return {
-    path: [...group.split('.'), artifact, version, fileName].join('/'),
-    classifier,
-  };
-}
-
-/** The `natives-<os>` classifier marks a library whose payload must be unpacked. */
-function isNativeClassifier(classifier: string | undefined): boolean {
-  return classifier?.startsWith('natives-') ?? false;
+  return { path: [...group.split('.'), artifact, version, fileName].join('/') };
 }
 
 // ── Native library extraction ──────────────────────────────
@@ -305,12 +298,42 @@ function isNativeBinary(entryName: string): boolean {
 }
 
 /**
+ * The classifier a legacy `natives` map names for this machine.
+ *
+ * The oldest versions write the Windows one as `natives-windows-${arch}` and
+ * expect the launcher to say which. Left as written it matched no classifier,
+ * and those jars were skipped without a word.
+ */
+export function nativesClassifier(
+  natives: Record<string, string>,
+  osName: string = getMojangOsName(),
+  arch: string = process.arch,
+): string | undefined {
+  return natives[osName]?.replace('${arch}', arch === 'ia32' ? '32' : '64');
+}
+
+async function hasSize(file: string, size: number): Promise<boolean> {
+  try {
+    return (await fs.stat(file)).size === size;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Unpack the native binaries out of a jar into `nativesDir`.
  *
- * Minecraft passes `-Djava.library.path=<nativesDir>` and expects the platform
- * `.so`/`.dll`/`.dylib` files to be sitting there loose. Downloading the native
- * jars is not enough — without this step the game dies on LWJGL init with
- * UnsatisfiedLinkError.
+ * Up to 1.18.2 Minecraft passes `-Djava.library.path=<nativesDir>` and expects
+ * the platform `.so`/`.dll`/`.dylib` files to be sitting there loose. Downloading
+ * the native jars is not enough — without this step the game dies on LWJGL init
+ * with UnsatisfiedLinkError.
+ *
+ * The directory is shared by every profile on one Minecraft version, and one of
+ * them may be running. So a file that is already there at the right size is left
+ * alone, and one that is not is written beside its name and renamed onto it.
+ * Writing in place — which this did, for every file, at every launch — truncates
+ * a library the other game has mapped: starting a second profile on the same
+ * version killed the first with SIGBUS, with identical bytes on their way in.
  */
 async function extractNatives(
   jarPath: string,
@@ -343,28 +366,35 @@ function extractNativeEntries(
   excludes: string[],
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    zipFile.on('entry', (entry: yauzl.Entry) => {
+    const unpack = async (entry: yauzl.Entry): Promise<void> => {
       const name = entry.fileName;
-
       if (name.endsWith('/') || excludes.some((p) => name.startsWith(p)) || !isNativeBinary(name)) {
-        zipFile.readEntry();
         return;
       }
 
       // Flatten: java.library.path is not searched recursively.
       const dest = path.join(nativesDir, path.basename(name));
+      if (await hasSize(dest, entry.uncompressedSize)) return;
 
-      zipFile.openReadStream(entry, (err, readStream) => {
-        if (err || !readStream) {
-          reject(err ?? new Error(`Could not read ${name} from ${jarPath}`));
-          return;
-        }
-        pipeline(readStream, createWriteStream(dest))
-          .then(() => zipFile.readEntry())
-          .catch(reject);
+      const readStream = await new Promise<Readable>((opened, failed) => {
+        zipFile.openReadStream(entry, (err, stream) => {
+          if (err || !stream) failed(err ?? new Error(`Could not read ${name} from ${jarPath}`));
+          else opened(stream);
+        });
       });
-    });
+      const part = `${dest}.part`;
+      try {
+        await pipeline(readStream, createWriteStream(part));
+        await fs.rename(part, dest);
+      } catch (err) {
+        await fs.rm(part, { force: true });
+        throw err;
+      }
+    };
 
+    zipFile.on('entry', (entry: yauzl.Entry) => {
+      unpack(entry).then(() => zipFile.readEntry(), reject);
+    });
     zipFile.on('end', resolve);
     zipFile.on('error', reject);
     zipFile.readEntry();
@@ -386,39 +416,36 @@ export async function ensureLibraries(
   for (const lib of meta.libraries) {
     if (!shouldIncludeLibrary(lib)) continue;
 
-    const coords = parseMavenCoords(lib.name);
-
     if (lib.downloads?.artifact) {
+      // From 1.19 the natives are among these too, as ordinary artifacts with a
+      // `natives-<os>` classifier. They only go on the classpath: LWJGL, JNA and
+      // Netty each unpack their own into the natives directory the version's
+      // arguments point them at, so a copy made here was never the one loaded.
       const artifact = lib.downloads.artifact;
       const dest = path.join(librariesDir, artifact.path);
       tasks.push({ url: artifact.url, dest, sha1: artifact.sha1, size: artifact.size });
-
-      // Modern versions (1.19+) ship natives as ordinary artifacts tagged with a
-      // `natives-<os>` classifier. They belong on the classpath *and* unpacked.
-      if (isNativeClassifier(coords?.classifier)) {
-        nativeJars.push({ jarPath: dest, exclude: lib.extract?.exclude ?? [] });
-      }
       classpath.push(dest);
-    } else if (lib.url && coords) {
+    } else if (lib.url) {
       // Maven-style entry from a loader profile — no hashes are guaranteed, but
       // Fabric does publish sha1 alongside the coordinates when it has one.
-      const dest = path.join(librariesDir, coords.path);
-      const baseUrl = lib.url.endsWith('/') ? lib.url : `${lib.url}/`;
-      tasks.push({ url: `${baseUrl}${coords.path}`, dest, sha1: lib.sha1, size: lib.size });
-      classpath.push(dest);
+      const coords = parseMavenCoords(lib.name);
+      if (coords) {
+        const dest = path.join(librariesDir, coords.path);
+        const baseUrl = lib.url.endsWith('/') ? lib.url : `${lib.url}/`;
+        tasks.push({ url: `${baseUrl}${coords.path}`, dest, sha1: lib.sha1, size: lib.size });
+        classpath.push(dest);
+      }
     }
 
-    // Legacy versions (≤1.18) declare a `natives` map pointing into `classifiers`.
+    // Versions up to 1.18.2 declare a `natives` map pointing into `classifiers`.
     // These are extraction-only — never on the classpath.
     if (lib.natives && lib.downloads?.classifiers) {
-      const nativeKey = lib.natives[getMojangOsName()];
-      if (nativeKey) {
-        const classifier = lib.downloads.classifiers[nativeKey];
-        if (classifier) {
-          const dest = path.join(librariesDir, classifier.path);
-          tasks.push({ url: classifier.url, dest, sha1: classifier.sha1, size: classifier.size });
-          nativeJars.push({ jarPath: dest, exclude: lib.extract?.exclude ?? [] });
-        }
+      const nativeKey = nativesClassifier(lib.natives);
+      const classifier = nativeKey ? lib.downloads.classifiers[nativeKey] : undefined;
+      if (classifier) {
+        const dest = path.join(librariesDir, classifier.path);
+        tasks.push({ url: classifier.url, dest, sha1: classifier.sha1, size: classifier.size });
+        nativeJars.push({ jarPath: dest, exclude: lib.extract?.exclude ?? [] });
       }
     }
   }
@@ -432,18 +459,28 @@ export async function ensureLibraries(
   });
 
   if (nativesDir && nativeJars.length > 0) {
-    await fs.mkdir(nativesDir, { recursive: true });
-    log.info(`Extracting ${nativeJars.length} native libraries to ${nativesDir}...`);
-    for (const { jarPath, exclude } of nativeJars) {
-      try {
-        await extractNatives(jarPath, nativesDir, exclude);
-      } catch (err) {
-        log.warn(`Failed to extract natives from ${path.basename(jarPath)}: ${err}`);
+    // One at a time per directory: two profiles on one version are got ready at
+    // once often enough, and both would be writing the same `.part` names.
+    await serializeByKey(`natives:${nativesDir}`, async () => {
+      await fs.mkdir(nativesDir, { recursive: true });
+      log.info(`Extracting ${nativeJars.length} native libraries to ${nativesDir}...`);
+      for (const { jarPath, exclude } of uniqueJars(nativeJars)) {
+        try {
+          await extractNatives(jarPath, nativesDir, exclude);
+        } catch (err) {
+          log.warn(`Failed to extract natives from ${path.basename(jarPath)}: ${err}`);
+        }
       }
-    }
+    });
   }
 
   return classpath;
+}
+
+/** A native jar is named once per rule set that includes it; unpack it once. */
+function uniqueJars<T extends { jarPath: string }>(jars: T[]): T[] {
+  const seen = new Set<string>();
+  return jars.filter((jar) => !seen.has(jar.jarPath) && seen.add(jar.jarPath));
 }
 
 // ── Download assets ────────────────────────────────────────

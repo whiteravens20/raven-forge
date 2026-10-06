@@ -28,7 +28,9 @@ vi.mock('../src/core/config/settings-manager', () => ({
   getSettings: async () => ({ downloadConcurrency: 4 }),
 }));
 
-const { ensureLibraries, ensureAssets } = await import('../src/core/minecraft/asset-downloader');
+const { ensureLibraries, ensureAssets, nativesClassifier } =
+  await import('../src/core/minecraft/asset-downloader');
+const { ZipWriter } = await import('../src/core/packs/zip-writer');
 
 let dir: string;
 let server: http.Server;
@@ -62,6 +64,7 @@ afterEach(async () => {
 
 const sha1 = (body: Buffer | string) => crypto.createHash('sha1').update(body).digest('hex');
 const libs = () => path.join(dir, 'libraries');
+const natives = () => path.join(dir, 'natives');
 const metaOf = (libraries: Library[]) => ({ id: '1.16.5', libraries }) as unknown as VersionMeta;
 
 /** A library the server has, described the way a version lists it. */
@@ -79,6 +82,32 @@ function library(name: string, body: string): Library & { file: string } {
         size: Buffer.byteLength(body),
       },
     },
+  };
+}
+
+/** A jar of native libraries, as the versions up to 1.18.2 ship them. */
+async function nativesJar(name: string, files: Record<string, string>): Promise<Library> {
+  const jar = path.join(dir, `${name}.jar`);
+  const zip = await ZipWriter.create(jar);
+  for (const [entry, body] of Object.entries(files)) await zip.addBuffer(entry, Buffer.from(body));
+  await zip.finish();
+  const bytes = await fs.readFile(jar);
+  await fs.rm(jar);
+
+  const jarPath = `org/lwjgl/${name}/3.2.2/${name}-3.2.2-natives.jar`;
+  served[`/${jarPath}`] = bytes;
+  const classifier = {
+    path: jarPath,
+    url: `${base}/${jarPath}`,
+    sha1: sha1(bytes),
+    size: bytes.length,
+  };
+  return {
+    name: `org.lwjgl:${name}:3.2.2`,
+    // Whichever machine runs this: the same jar under every name.
+    natives: { linux: 'natives-here', windows: 'natives-here', osx: 'natives-here' },
+    downloads: { classifiers: { 'natives-here': classifier } },
+    extract: { exclude: ['META-INF/'] },
   };
 }
 
@@ -170,5 +199,77 @@ describe('a file that is already there', () => {
 
     expect(await fs.readFile(lib.file, 'utf-8')).toBe('short');
     expect(await fs.readdir(path.dirname(lib.file))).toEqual([path.basename(lib.file)]);
+  });
+});
+
+describe('native libraries', () => {
+  it('are unpacked loose for a version that lists them the old way', async () => {
+    const jar = await nativesJar('lwjgl', {
+      'liblwjgl.so': 'linux build',
+      'windows/x64/lwjgl.dll': 'windows build',
+      'META-INF/MANIFEST.MF': 'Manifest-Version: 1.0',
+      'README.txt': 'not a library',
+    });
+
+    const classpath = await ensureLibraries(libs(), metaOf([jar]), natives());
+
+    // Flattened: the JVM does not look into subfolders of `java.library.path`.
+    expect((await fs.readdir(natives())).sort()).toEqual(['liblwjgl.so', 'lwjgl.dll']);
+    // Extraction only — the jar itself is not something to put on the classpath.
+    expect(classpath).toEqual([]);
+  });
+
+  it('are left untouched at the next launch when nothing changed', async () => {
+    // Another profile on the same version may be running with these mapped.
+    // Rewriting one in place, even with the same bytes, kills that game.
+    const jar = await nativesJar('lwjgl', { 'liblwjgl.so': 'linux build' });
+    await ensureLibraries(libs(), metaOf([jar]), natives());
+    const before = await fs.stat(path.join(natives(), 'liblwjgl.so'));
+
+    await ensureLibraries(libs(), metaOf([jar]), natives());
+
+    const after = await fs.stat(path.join(natives(), 'liblwjgl.so'));
+    expect(after.ino).toBe(before.ino);
+    expect(after.mtimeMs).toBe(before.mtimeMs);
+  });
+
+  it('are replaced by a new file, not written over, when they did change', async () => {
+    const jar = await nativesJar('lwjgl', { 'liblwjgl.so': 'linux build' });
+    const file = path.join(natives(), 'liblwjgl.so');
+    await fs.mkdir(natives(), { recursive: true });
+    await fs.writeFile(file, 'an older, longer build of it');
+    // Held open the way a running game holds it.
+    const held = await fs.open(file, 'r');
+
+    try {
+      await ensureLibraries(libs(), metaOf([jar]), natives());
+
+      expect(await fs.readFile(file, 'utf-8')).toBe('linux build');
+      expect((await held.readFile('utf-8')).toString()).toBe('an older, longer build of it');
+    } finally {
+      await held.close();
+    }
+    expect(await fs.readdir(natives())).toEqual(['liblwjgl.so']);
+  });
+
+  it('are not unpacked for a version that puts them on the classpath', async () => {
+    // From 1.19: an ordinary artifact with a `natives-<os>` classifier, which
+    // LWJGL unpacks for itself.
+    const modern = library('lwjgl-natives', 'a jar of natives');
+    modern.name = 'org.lwjgl:lwjgl:3.3.3:natives-linux';
+
+    const classpath = await ensureLibraries(libs(), metaOf([modern]), natives());
+
+    expect(classpath).toEqual([modern.file]);
+    await expect(fs.readdir(natives())).rejects.toThrow();
+  });
+
+  it('are found under the name that says which processor', () => {
+    // The oldest versions leave that for the launcher to fill in.
+    const map = { windows: 'natives-windows-${arch}', linux: 'natives-linux' };
+    expect(nativesClassifier(map, 'windows', 'x64')).toBe('natives-windows-64');
+    expect(nativesClassifier(map, 'windows', 'ia32')).toBe('natives-windows-32');
+    expect(nativesClassifier(map, 'linux', 'x64')).toBe('natives-linux');
+    expect(nativesClassifier(map, 'osx', 'arm64')).toBeUndefined();
   });
 });
