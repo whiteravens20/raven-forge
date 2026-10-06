@@ -54,7 +54,7 @@ type Manager = typeof import('../src/core/java/java-manager');
 
 let root: string;
 /** What the stubbed Adoptium endpoint answers with, set per test. */
-let adoptium: () => Response;
+let adoptium: (url: string) => Response;
 /** Requests the archive server actually received. */
 let archiveHits: string[];
 let server: http.Server;
@@ -149,7 +149,8 @@ beforeEach(async () => {
   vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
     // Only Adoptium's index is invented. The archive comes down the real
     // downloader, over a real socket, into a real file.
-    if (String(input).startsWith('https://api.adoptium.net')) return Promise.resolve(adoptium());
+    const url = String(input);
+    if (url.startsWith('https://api.adoptium.net')) return Promise.resolve(adoptium(url));
     return realFetch(input, init);
   });
 });
@@ -344,7 +345,27 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
     const { ensureJavaVersion } = await loadModule();
     adoptium = () => new Response('[]', { status: 200 });
 
-    await expect(ensureJavaVersion(21)).rejects.toThrow(/listed no JRE 21 binary/);
+    await expect(ensureJavaVersion(21)).rejects.toThrow(/listed no Java 21 runtime/);
+  });
+
+  it('takes the JDK when Adoptium has no JRE of that version', async () => {
+    // Java 16, which is what Minecraft 1.17 and 1.17.1 ask for: Temurin
+    // published it as a JDK and nothing else, so asking only for a JRE left
+    // both versions unable to start.
+    const { ensureJavaVersion } = await loadModule();
+    const asked: string[] = [];
+    adoptium = (url) => {
+      const imageType = new URL(url).searchParams.get('image_type') ?? '';
+      asked.push(imageType);
+      return imageType === 'jdk'
+        ? assetsFor(archiveUrl, sha256(archiveBytes))
+        : new Response('[]', { status: 200 });
+    };
+
+    const result = await ensureJavaVersion(21);
+
+    expect(asked).toEqual(['jre', 'jdk']);
+    expect((await fs.stat(result.path)).isFile()).toBe(true);
   });
 
   it('fails when Adoptium cannot be reached', async () => {

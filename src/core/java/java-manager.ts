@@ -234,32 +234,39 @@ async function resolveAdoptiumBinary(
   arch: string,
   signal?: AbortSignal,
 ): Promise<{ url: string; sha256: string }> {
-  const query = new URLSearchParams({
-    architecture: arch,
-    image_type: 'jre',
-    os: platform,
-    vendor: 'eclipse',
-  });
-  const res = await fetch(`${ADOPTIUM_API}/assets/latest/${majorVersion}/hotspot?${query}`, {
-    signal: withTimeout(signal, 15_000),
-  });
-  if (!res.ok) {
-    throw new Error(`Could not reach Adoptium to resolve JRE ${majorVersion}: HTTP ${res.status}`);
+  // A JRE where there is one, the JDK where there is not. Temurin published
+  // Java 16 as a JDK only, and 16 is what Minecraft 1.17 and 1.17.1 ask for: with
+  // the JRE the only thing asked about, neither version could be started, and no
+  // Forge or NeoForge build for them could even be installed.
+  for (const imageType of ['jre', 'jdk']) {
+    const query = new URLSearchParams({
+      architecture: arch,
+      image_type: imageType,
+      os: platform,
+      vendor: 'eclipse',
+    });
+    const res = await fetch(`${ADOPTIUM_API}/assets/latest/${majorVersion}/hotspot?${query}`, {
+      signal: withTimeout(signal, 15_000),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Could not reach Adoptium to resolve Java ${majorVersion}: HTTP ${res.status}`,
+      );
+    }
+
+    const assets = (await res.json()) as AdoptiumAsset[];
+    const pkg = assets.find((a) => a.binary?.package?.link)?.binary?.package;
+    if (!pkg?.link) continue;
+    if (!pkg.checksum) {
+      throw new Error(
+        `Adoptium listed Java ${majorVersion} for ${platform}/${arch} with no checksum — ` +
+          'refusing to install a runtime that cannot be verified',
+      );
+    }
+    return { url: pkg.link, sha256: pkg.checksum };
   }
 
-  const assets = (await res.json()) as AdoptiumAsset[];
-  const pkg = assets.find((a) => a.binary?.package?.link)?.binary?.package;
-  if (!pkg?.link) {
-    throw new Error(`Adoptium listed no JRE ${majorVersion} binary for ${platform}/${arch}`);
-  }
-  if (!pkg.checksum) {
-    throw new Error(
-      `Adoptium listed JRE ${majorVersion} for ${platform}/${arch} with no checksum — ` +
-        'refusing to install a runtime that cannot be verified',
-    );
-  }
-
-  return { url: pkg.link, sha256: pkg.checksum };
+  throw new Error(`Adoptium listed no Java ${majorVersion} runtime for ${platform}/${arch}`);
 }
 
 async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Promise<string> {
