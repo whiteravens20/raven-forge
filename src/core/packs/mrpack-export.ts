@@ -45,18 +45,26 @@ const MAX_PACK_BYTES = 1024 * 1024 * 1024;
 
 /** Where each kind of content lives, in the profile and in the pack. */
 const KINDS = [
-  { kind: 'mods' as const, dir: paths.profileModsDir, packDir: 'mods', clientOnly: false },
+  {
+    kind: 'mods' as const,
+    dir: paths.profileModsDir,
+    packDir: 'mods',
+    clientOnly: false,
+    extension: '.jar',
+  },
   {
     kind: 'shaders' as const,
     dir: paths.profileShadersDir,
     packDir: 'shaderpacks',
     clientOnly: true,
+    extension: '.zip',
   },
   {
     kind: 'resourcepacks' as const,
     dir: paths.profileResourcePacksDir,
     packDir: 'resourcepacks',
     clientOnly: true,
+    extension: '.zip',
   },
 ];
 
@@ -71,18 +79,48 @@ interface Candidate {
   clientOnly: boolean;
 }
 
+/** A file found in a content folder that no list names. */
+function unlisted(fileName: string, extension: string): InstalledMod {
+  return {
+    id: `unlisted-${fileName}`,
+    name: fileName.slice(0, -extension.length),
+    version: 'local',
+    source: 'local',
+    fileName,
+    required: false,
+    side: 'client',
+    enabled: true,
+    fromManifest: false,
+  };
+}
+
+async function filesIn(dir: string): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Everything the profile has installed and switched on.
  *
  * Disabled entries are left out on purpose. A pack is what someone else is
  * meant to play; a mod the author turned off is not part of it, and shipping it
  * as an inert `.jar.disabled` only makes the download bigger.
+ *
+ * What is in the folders counts as well as what is in the lists. A jar dropped
+ * into `mods/` by hand, or a resource pack that came in as a file inside a pack,
+ * is something the game loads and no list names — and a pack that left those
+ * out was not the profile it was exported from.
  */
 async function collect(profileId: string): Promise<{ items: Candidate[]; disabled: number }> {
   const items: Candidate[] = [];
   let disabled = 0;
 
-  for (const { kind, dir, packDir, clientOnly } of KINDS) {
+  for (const { kind, dir, packDir, clientOnly, extension } of KINDS) {
+    const folder = dir(profileId);
     const installed =
       kind === 'mods' ? await readLockFile(profileId) : await listContent(kind, profileId);
     for (const item of installed) {
@@ -90,7 +128,19 @@ async function collect(profileId: string): Promise<{ items: Candidate[]; disable
         disabled++;
         continue;
       }
-      items.push({ item, source: path.join(dir(profileId), item.fileName), packDir, clientOnly });
+      items.push({ item, source: path.join(folder, item.fileName), packDir, clientOnly });
+    }
+
+    const listed = new Set(installed.map((item) => item.fileName.toLowerCase()));
+    for (const fileName of await filesIn(folder)) {
+      const lower = fileName.toLowerCase();
+      if (!lower.endsWith(extension) || listed.has(lower)) continue;
+      items.push({
+        item: unlisted(fileName, extension),
+        source: path.join(folder, fileName),
+        packDir,
+        clientOnly,
+      });
     }
   }
 

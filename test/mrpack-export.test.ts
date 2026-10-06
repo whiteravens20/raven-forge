@@ -279,6 +279,24 @@ describe('exportProfileAsMrpack', () => {
     ]);
   });
 
+  it('carries what is in the folders and in no list', async () => {
+    // A jar dropped into `mods/` by hand, a resource pack a pack shipped as a
+    // file: the game loads them, and a pack without them is not this profile.
+    await write('mods/dropped-in.jar', 'by hand');
+    await write('mods/notes.txt', 'not a mod');
+    await write('resourcepacks/Bundled.zip', 'a pack');
+    await write('resourcepacks/Unzipped/pack.mcmeta', '{}');
+    await lock([]);
+
+    const summary = await exportProfileAsMrpack('p1', dest());
+
+    expect(summary.bundled).toBe(2);
+    expect(await overridesOf(dest())).toEqual({
+      'mods/dropped-in.jar': 'by hand',
+      'resourcepacks/Bundled.zip': 'a pack',
+    });
+  });
+
   it('leaves out content that is switched off', async () => {
     await write('mods/on.jar', 'on');
     await write('mods/off.jar.disabled', 'off');
