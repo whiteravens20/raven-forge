@@ -1,7 +1,10 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import { describe, it, expect } from 'vitest';
+import net from 'node:net';
+import { fetch as fetchThrough } from 'undici';
 import { AuthServersUnreachableError, isNetworkFailure } from '../src/core/auth/auth-errors';
+import { createSocksDispatcher } from '../src/core/net/socks-dispatcher';
 
 /**
  * This predicate decides which of two very different things a user is told:
@@ -36,8 +39,30 @@ describe('isNetworkFailure', () => {
     'UND_ERR_CONNECT_TIMEOUT',
     'UND_ERR_SOCKET',
     'CERT_HAS_EXPIRED',
+    'ERR_SOCKS_PROXY',
   ])('treats %s as unreachable', (code) => {
     expect(isNetworkFailure(Object.assign(new Error('boom'), { code }))).toBe(true);
+  });
+
+  it('recognises a SOCKS proxy that is not there', async () => {
+    // The proxy client's own errors carry no code, so a proxy that had gone
+    // away read as the auth servers saying no: "log in again", with no offer to
+    // play offline, for something a password has nothing to do with.
+    const closed = net.createServer();
+    await new Promise<void>((resolve) => closed.listen(0, '127.0.0.1', resolve));
+    const { port } = closed.address() as net.AddressInfo;
+    await new Promise<void>((resolve) => closed.close(() => resolve()));
+
+    const dispatcher = createSocksDispatcher(`socks5://jan:hunter2@127.0.0.1:${port}`);
+    const err = await fetchThrough('https://login.example.net/', { dispatcher }).catch(
+      (e: unknown) => e,
+    );
+    await dispatcher.close();
+
+    expect(isNetworkFailure(err)).toBe(true);
+    // The client's error holds the options it was made with, the proxy's
+    // password among them. What is passed on does not.
+    expect((err as { cause?: unknown }).cause).not.toHaveProperty('options');
   });
 
   it('recognises an AbortSignal.timeout rejection', () => {

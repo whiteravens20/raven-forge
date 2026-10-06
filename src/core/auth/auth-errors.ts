@@ -43,7 +43,9 @@ export function isNetworkFailure(err: unknown): boolean {
       code === 'ENETUNREACH' ||
       code === 'UND_ERR_CONNECT_TIMEOUT' ||
       code === 'UND_ERR_SOCKET' ||
-      code === 'CERT_HAS_EXPIRED'
+      code === 'CERT_HAS_EXPIRED' ||
+      // The configured SOCKS proxy did not get the request through.
+      code === 'ERR_SOCKS_PROXY'
     ) {
       return true;
     }
