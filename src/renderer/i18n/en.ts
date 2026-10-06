@@ -481,6 +481,7 @@ export const en = {
   'mods.updated': 'Updated: {names}',
   'mods.updateFailed': 'Could not update: {names}',
   'mods.updateNotDone': 'Could not update the mods.',
+  'mods.listFailed': 'Could not read which mods are installed.',
   'mods.toggleFailed': 'Could not switch {name}.',
   'mods.removeFailed': 'Could not remove {name}.',
   'mods.gameBusy': 'Not while the game is running or starting — it is using these files.',

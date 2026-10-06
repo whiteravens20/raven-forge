@@ -105,7 +105,9 @@ export function ModsPage() {
     if (!selectedId) return;
     const result = await api.mods.getInstalled(selectedId);
     if (result.success && result.data) setInstalled(result.data);
-  }, [selectedId]);
+    // Said, and the list left as it was: an unread list is not an empty one.
+    else setError(result.error ?? t('mods.listFailed'));
+  }, [selectedId, t]);
 
   const handleSearch = () => {
     setError(null);
