@@ -13,6 +13,7 @@ import { LaunchRefusedError } from '../minecraft/launch-errors';
 import { emitProgress } from '../util/progress';
 import { downloadToFile } from '../net/download';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
+import { forEachConcurrently } from '../util/concurrency';
 import { serializeByKey } from '../util/serialize';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
 
@@ -133,25 +134,68 @@ export async function resolveChosenJava(
 
 // ── Detect system Java ─────────────────────────────────────
 
-export async function detectSystemJava(): Promise<JavaInstallation[]> {
-  const installations: JavaInstallation[] = [];
+/** Folders under Program Files that hold one runtime per subfolder. */
+const WINDOWS_JAVA_VENDORS = new Set(
+  [
+    'Java',
+    'Eclipse Adoptium',
+    'Eclipse Foundation',
+    'AdoptOpenJDK',
+    'Amazon Corretto',
+    'BellSoft',
+    'Microsoft',
+    'OpenJDK',
+    'RedHat',
+    'Semeru',
+    'Zulu',
+  ].map((name) => name.toLowerCase()),
+);
 
+/** A folder that is itself a runtime: `jdk-21`, `jre1.8.0_401`, `zulu-17`. */
+const RUNTIME_FOLDER = /^(java|jdk|jre|openjdk|temurin|zulu|corretto|liberica|semeru)/i;
+
+async function subfolders(dir: string): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Where a JVM may be under one Program Files folder.
+ *
+ * Every vendor's installer nests one level: `Java\jdk-21\bin`,
+ * `Zulu\zulu-21\bin`, `Eclipse Adoptium\jdk-21.0.2.13-hotspot\bin`. Looking
+ * for `bin\java.exe` directly inside the vendor's folder found none of them, so
+ * on Windows the list in the profile editor only ever held whatever `JAVA_HOME`
+ * named.
+ */
+export async function windowsJavaCandidates(programFiles: string): Promise<string[]> {
+  const candidates: string[] = [];
+  for (const entry of await subfolders(programFiles)) {
+    const dir = path.join(programFiles, entry);
+    if (RUNTIME_FOLDER.test(entry)) candidates.push(path.join(dir, 'bin', 'java.exe'));
+    if (!WINDOWS_JAVA_VENDORS.has(entry.toLowerCase())) continue;
+    for (const runtime of await subfolders(dir)) {
+      candidates.push(path.join(dir, runtime, 'bin', 'java.exe'));
+    }
+  }
+  return candidates;
+}
+
+/** How many JVMs are asked for their version at once. Each is a process. */
+const PROBES_AT_ONCE = 4;
+
+export async function detectSystemJava(): Promise<JavaInstallation[]> {
   const candidates: string[] = [];
 
   if (process.platform === 'win32') {
     const programFiles = process.env.ProgramFiles ?? 'C:\\Program Files';
     const programFilesX86 = process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)';
     for (const base of [programFiles, programFilesX86]) {
-      try {
-        const entries = await fs.readdir(base);
-        for (const entry of entries) {
-          if (/^(java|jdk|jre|adopt|temurin|zulu|corretto)/i.test(entry)) {
-            candidates.push(path.join(base, entry, 'bin', 'java.exe'));
-          }
-        }
-      } catch {
-        /* dir doesn't exist */
-      }
+      candidates.push(...(await windowsJavaCandidates(base)));
     }
   } else {
     // Linux/macOS common paths
@@ -161,14 +205,8 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
       '/usr/lib/jvm/default/bin/java',
       '/usr/lib/jvm/java/bin/java',
     );
-    // Add all /usr/lib/jvm entries
-    try {
-      const jvmEntries = await fs.readdir('/usr/lib/jvm');
-      for (const entry of jvmEntries) {
-        candidates.push(path.join('/usr/lib/jvm', entry, 'bin', 'java'));
-      }
-    } catch {
-      /* no jvm dir */
+    for (const entry of await subfolders('/usr/lib/jvm')) {
+      candidates.push(path.join('/usr/lib/jvm', entry, 'bin', 'java'));
     }
   }
 
@@ -177,28 +215,37 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
     candidates.push(path.join(process.env.JAVA_HOME, 'bin', getJavaExecutable()));
   }
 
+  // One entry per real file: `/usr/bin/java` and three names under
+  // `/usr/lib/jvm` are routinely the same runtime.
   const seen = new Set<string>();
+  const distinct: string[] = [];
   for (const candidate of candidates) {
     try {
       const resolved = await fs.realpath(candidate);
       if (seen.has(resolved)) continue;
       seen.add(resolved);
-
-      const version = await probeJava(candidate);
-      if (version) {
-        installations.push({
-          version,
-          path: candidate,
-          vendor: 'system',
-          managed: false,
-        });
-      }
+      distinct.push(candidate);
     } catch {
       /* realpath failed — nothing there */
     }
   }
 
-  return installations;
+  // Several at a time, and still listed in the order they were found: asking
+  // one JVM after another took a second or more per runtime before the list
+  // appeared.
+  const versions = new Array<number | null>(distinct.length).fill(null);
+  await forEachConcurrently(
+    distinct.map((candidate, index) => ({ candidate, index })),
+    PROBES_AT_ONCE,
+    async ({ candidate, index }) => {
+      versions[index] = await probeJava(candidate);
+    },
+  );
+
+  return distinct.flatMap((candidate, index) => {
+    const version = versions[index];
+    return version ? [{ version, path: candidate, vendor: 'system', managed: false }] : [];
+  });
 }
 
 function emitJavaProgress(event: ProgressEvent): void {

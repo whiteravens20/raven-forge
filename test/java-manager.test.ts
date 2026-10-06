@@ -421,6 +421,40 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
   });
 });
 
+describe('windowsJavaCandidates', () => {
+  it('looks one level into the folders the vendors install under', async () => {
+    const { windowsJavaCandidates } = await loadModule();
+    const programFiles = path.join(root, 'Program Files');
+    for (const dir of [
+      'Java/jdk-21',
+      'Eclipse Adoptium/jdk-17.0.9.9-hotspot',
+      'Zulu/zulu-8',
+      'jdk-25',
+      'Notepad++/plugins',
+    ]) {
+      await fs.mkdir(path.join(programFiles, ...dir.split('/')), { recursive: true });
+    }
+
+    const found = await windowsJavaCandidates(programFiles);
+    const under = (...parts: string[]) => path.join(programFiles, ...parts, 'bin', 'java.exe');
+
+    expect(found).toEqual(
+      expect.arrayContaining([
+        under('Java', 'jdk-21'),
+        under('Eclipse Adoptium', 'jdk-17.0.9.9-hotspot'),
+        under('Zulu', 'zulu-8'),
+        under('jdk-25'),
+      ]),
+    );
+    expect(found.some((candidate) => candidate.includes('Notepad'))).toBe(false);
+  });
+
+  it('answers with nothing for a folder that is not there', async () => {
+    const { windowsJavaCandidates } = await loadModule();
+    expect(await windowsJavaCandidates(path.join(root, 'absent'))).toEqual([]);
+  });
+});
+
 describe.skipIf(!posix)('detectSystemJava', () => {
   /**
    * However long every JVM on this machine takes to say what it is.
