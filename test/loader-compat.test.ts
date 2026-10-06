@@ -9,6 +9,7 @@ import {
   neoForgeVersionsFor,
   isNeoForgeStable,
   isLegacyNeoForge,
+  isWorkingForgeLikeBuild,
 } from '../src/core/modloader/forge-installer';
 
 /**
@@ -209,6 +210,41 @@ describe('isLegacyNeoForge', () => {
     expect(isLegacyNeoForge('21.0.167', '1.21')).toBe(false);
     expect(isLegacyNeoForge('26.2.0.46-beta', '26.2')).toBe(false);
     expect(isLegacyNeoForge('26.1.2.94', '26.1.2')).toBe(false);
+  });
+});
+
+describe('isWorkingForgeLikeBuild', () => {
+  it('answers for one Forge build what the list would have done with it', () => {
+    expect(isWorkingForgeLikeBuild('forge', '36.2.25', '1.16.5')).toBe(false);
+    expect(isWorkingForgeLikeBuild('forge', '36.2.26', '1.16.5')).toBe(true);
+    expect(isWorkingForgeLikeBuild('forge', '35.1.37', '1.16.4')).toBe(false);
+    expect(isWorkingForgeLikeBuild('forge', '37.0.28', '1.17.1')).toBe(false);
+    expect(isWorkingForgeLikeBuild('forge', '9.11.1.1345', '1.6.4')).toBe(false);
+    expect(isWorkingForgeLikeBuild('forge', '14.23.5.2859', '1.12.2')).toBe(true);
+  });
+
+  it('knows a Forge build by its number, the way a pack names it', () => {
+    // The list says `10.13.4.1614-1.7.10`; a pack says `10.13.4.1614`.
+    expect(isWorkingForgeLikeBuild('forge', '10.13.4.1614', '1.7.10')).toBe(true);
+    expect(isWorkingForgeLikeBuild('forge', '10.13.4.1614-1.7.10', '1.7.10')).toBe(true);
+    expect(isWorkingForgeLikeBuild('forge', '10.13.2.1291', '1.7.10')).toBe(false);
+  });
+
+  it('answers for one NeoForge build under the artifact it belongs to', () => {
+    expect(isWorkingForgeLikeBuild('neoforge', '20.4.0-beta', '1.20.4')).toBe(false);
+    expect(isWorkingForgeLikeBuild('neoforge', '20.4.1-beta', '1.20.4')).toBe(true);
+    expect(isWorkingForgeLikeBuild('neoforge', '26.1.0.0-alpha.15+pre-3', '26.1')).toBe(false);
+    expect(isWorkingForgeLikeBuild('neoforge', '21.1.248', '1.21.1')).toBe(true);
+    // The 1.20.1 line, which is named Forge-style and has one build with no installer.
+    expect(isWorkingForgeLikeBuild('neoforge', '47.1.7', '1.20.1')).toBe(false);
+    expect(isWorkingForgeLikeBuild('neoforge', '47.1.106', '1.20.1')).toBe(true);
+  });
+
+  it('passes a name it knows nothing against', () => {
+    // Whether a build exists is not something its name says, and this is asked
+    // in order to tell a player their profile holds a bad build.
+    expect(isWorkingForgeLikeBuild('forge', '99.0.0', '1.21.1')).toBe(true);
+    expect(isWorkingForgeLikeBuild('neoforge', '21.1.9999', '1.21.1')).toBe(true);
   });
 });
 

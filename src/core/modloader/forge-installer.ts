@@ -330,6 +330,24 @@ export async function getNeoForgeVersions(mcVersion: string): Promise<LoaderVers
   return legacy.sort(compareLoaderVersionsDesc).map((version) => ({ version, stable: true }));
 }
 
+/**
+ * Whether a build would be on the list offered for a Minecraft version, going
+ * by its name alone.
+ *
+ * The two lists above with nothing fetched: a build these rules leave out is
+ * left out here, and every other name passes — one no repository has ever
+ * published included, because that is not something a name says.
+ */
+export function isWorkingForgeLikeBuild(
+  loader: ForgeLikeLoader,
+  build: string,
+  mcVersion: string,
+): boolean {
+  if (loader === 'forge') return workingForgeBuilds([build], mcVersion).length > 0;
+  if (isLegacyNeoForge(build, mcVersion)) return !NEOFORGE_WITHOUT_INSTALLER.has(build);
+  return neoForgeVersionsFor([build], mcVersion).length > 0;
+}
+
 // ── Installation ───────────────────────────────────────────
 
 function installerUrl(loader: ForgeLikeLoader, loaderVersion: string, mcVersion: string): string {

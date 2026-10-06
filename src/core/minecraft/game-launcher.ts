@@ -19,6 +19,7 @@ import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
 import {
   installLoader,
   isLoaderInstalled,
+  loaderBuildStarts,
   resolveDefaultLoaderVersion,
 } from '../modloader/loader-manager';
 import { resolveLaunchMeta } from '../modloader/loader-profile';
@@ -658,7 +659,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
 
   // Both ways out of here end the same way: with a file the player can attach to
   // a bug report without first having to learn where the launcher keeps its logs.
-  const reportCrash = (
+  const reportCrash = async (
     ended: Pick<CrashReportInput, 'exitCode' | 'signal' | 'minecraftCrash' | 'spawnError'>,
     playTimeMinutes: number,
     logTail: string[],
@@ -668,6 +669,15 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
       ...ended,
       playTimeMinutes,
       logTail,
+      // Asked now and not before the start: only a game that went down needs it.
+      // Not being able to tell is no reason to go without the report.
+      loaderBuildOffered: profile.modLoaderVersion
+        ? await loaderBuildStarts(
+            profile.modLoader,
+            profile.modLoaderVersion,
+            profile.minecraftVersion,
+          ).catch(() => undefined)
+        : undefined,
       gameDir,
       java,
       accountType: account.type,

@@ -606,6 +606,60 @@ describe.skipIf(!posix)('a Forge profile', () => {
   });
 });
 
+describe.skipIf(!posix)('a profile on a loader build that is not offered', () => {
+  // Forge for 1.16.5 from before 36.2.26: installed because a pack named it,
+  // and stopped by a constructor the Java 8 of today no longer has.
+  const onForge = (build: string) =>
+    ({ minecraftVersion: '1.16.5', modLoader: 'forge', modLoaderVersion: build }) as const;
+
+  /** That build as its install leaves it, beside the game it extends. */
+  async function installForge(build: string): Promise<void> {
+    await place(path.join(cacheDir(), 'versions', '1.16.5', '1.16.5.jar'), 'the client jar');
+    const made = `net/minecraftforge/forge/1.16.5-${build}/forge-1.16.5-${build}.jar`;
+    const jar = await place(path.join(cacheDir(), 'libraries', made), 'forge itself');
+    const dir = path.join(root, 'data', 'loaders', 'forge', `1.16.5-${build}`);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, 'forge-profile.json'),
+      JSON.stringify({
+        id: `1.16.5-forge-${build}`,
+        inheritsFrom: '1.16.5',
+        mainClass: 'cpw.mods.modlauncher.Launcher',
+        libraries: [
+          {
+            name: `net.minecraftforge:forge:1.16.5-${build}`,
+            downloads: { artifact: { path: made, url: '', ...jar } },
+          },
+        ],
+      }),
+    );
+  }
+
+  const crash = [`echo 'java.lang.NoSuchMethodError: ManifestEntryVerifier'`, 'exit 1'].join('\n');
+
+  it('is started all the same, and says what it is in the report its crash leaves', async () => {
+    await installForge('36.2.20');
+
+    await launch(crash, onForge('36.2.20'));
+
+    const info = await exitInfo();
+    expect(info.crashed).toBe(true);
+    expect(await fs.readFile(info.reportPath!, 'utf-8')).toContain(
+      'Mod loader: forge 36.2.20 — not a build the launcher offers for this Minecraft version',
+    );
+  });
+
+  it('is not what a crash on an offered build is called', async () => {
+    await installForge('36.2.34');
+
+    await launch(crash, onForge('36.2.34'));
+
+    const report = await fs.readFile((await exitInfo()).reportPath!, 'utf-8');
+    expect(report).toContain('Mod loader: forge 36.2.34\n');
+    expect(report).not.toContain('not a build the launcher offers');
+  });
+});
+
 describe.skipIf(!posix)('a profile with no Forge in it', () => {
   it('is not given Forge’s library property', async () => {
     await launch('exit 0');

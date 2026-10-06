@@ -378,3 +378,92 @@ describe('isLoaderInstalled', () => {
     expect(await mod.isLoaderInstalled('vanilla', '', '1.21.4')).toBe(true);
   });
 });
+
+describe('loaderBuildStarts', () => {
+  /** A Fabric or Quilt profile as its install leaves it, down to the libraries that decide. */
+  async function installed(
+    loader: 'fabric' | 'quilt',
+    version: string,
+    mcVersion: string,
+    libraries: Array<{ name: string; url?: string }>,
+  ): Promise<void> {
+    const dir = path.join(root, 'loaders', loader, `${mcVersion}-${version}`);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, `${loader}-profile.json`),
+      JSON.stringify({ mainClass: 'the.loader.Main', libraries }),
+    );
+  }
+
+  const fabricMaven = 'https://maven.fabricmc.net/';
+
+  it('judges a Fabric build by the libraries its installed profile names', async () => {
+    // 26.3 is compiled for Java 25, which ASM 9.8 is the first to read.
+    await installed('fabric', '0.16.13', '26.3', [
+      { name: 'org.ow2.asm:asm:9.7.1', url: fabricMaven },
+    ]);
+    await installed('fabric', '0.16.14', '26.3', [
+      { name: 'org.ow2.asm:asm:9.8', url: fabricMaven },
+    ]);
+
+    expect(await mod.loaderBuildStarts('fabric', '0.16.13', '26.3')).toBe(false);
+    expect(await mod.loaderBuildStarts('fabric', '0.16.14', '26.3')).toBe(true);
+  });
+
+  it('says no to a build whose profile sends for a library over plain http', async () => {
+    await installed('fabric', '0.2.0.71', '1.14.4', [
+      { name: 'org.ow2.asm:asm:7.0', url: 'http://repo.maven.apache.org/maven2/' },
+    ]);
+    await installed('fabric', '0.3.0.75', '1.14.4', [
+      { name: 'org.ow2.asm:asm:7.0', url: fabricMaven },
+    ]);
+
+    expect(await mod.loaderBuildStarts('fabric', '0.2.0.71', '1.14.4')).toBe(false);
+    expect(await mod.loaderBuildStarts('fabric', '0.3.0.75', '1.14.4')).toBe(true);
+  });
+
+  it('holds a Quilt build to the floor found for its Minecraft version', async () => {
+    const libraries = [{ name: 'org.ow2.asm:asm:9.9', url: 'https://maven.quiltmc.org/' }];
+    await installed('quilt', '0.30.0-beta.3', '26.3', libraries);
+    await installed('quilt', '0.30.0-beta.4', '26.3', libraries);
+
+    expect(await mod.loaderBuildStarts('quilt', '0.30.0-beta.3', '26.3')).toBe(false);
+    expect(await mod.loaderBuildStarts('quilt', '0.30.0-beta.4', '26.3')).toBe(true);
+  });
+
+  it('has only the number to go by for a build that is not installed', async () => {
+    // Under the floor for 1.19.1 and later, whatever its libraries are.
+    expect(await mod.loaderBuildStarts('fabric', '0.14.7', '1.20.1')).toBe(false);
+    // Nothing is known against this one without its profile, and "may be why
+    // it did not start" is not said on a guess.
+    expect(await mod.loaderBuildStarts('fabric', '0.16.13', '26.3')).toBe(true);
+  });
+
+  it('answers for Forge and NeoForge from the name of the build', async () => {
+    expect(await mod.loaderBuildStarts('forge', '36.2.20', '1.16.5')).toBe(false);
+    expect(await mod.loaderBuildStarts('forge', '36.2.34', '1.16.5')).toBe(true);
+    expect(await mod.loaderBuildStarts('neoforge', '20.4.0-beta', '1.20.4')).toBe(false);
+    expect(await mod.loaderBuildStarts('neoforge', '21.1.248', '1.21.1')).toBe(true);
+  });
+
+  it('has nothing against vanilla', async () => {
+    expect(await mod.loaderBuildStarts('vanilla', '', '1.21.4')).toBe(true);
+  });
+
+  it('asks nobody', async () => {
+    // It is asked about a launch that has just failed, and a machine with no
+    // network is one of the reasons a launch fails.
+    const asked = vi.fn(async () => {
+      throw new Error('no network');
+    });
+    vi.stubGlobal('fetch', asked);
+    await installed('quilt', '0.30.1', '26.3', [{ name: 'org.ow2.asm:asm:9.10.1' }]);
+
+    await mod.loaderBuildStarts('fabric', '0.19.5', '26.3');
+    await mod.loaderBuildStarts('quilt', '0.30.1', '26.3');
+    await mod.loaderBuildStarts('forge', '66.0.0', '26.3');
+    await mod.loaderBuildStarts('neoforge', '26.3.0.0-beta', '26.3');
+
+    expect(asked).not.toHaveBeenCalled();
+  });
+});

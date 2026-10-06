@@ -7,9 +7,10 @@ import {
   getForgeVersions,
   getNeoForgeVersions,
   installForgeLike,
+  isWorkingForgeLikeBuild,
   type LoaderInstallOptions,
 } from './forge-installer';
-import { isLoaderProfileComplete, loaderProfilePath } from './loader-profile';
+import { isLoaderProfileComplete, loaderProfilePath, readLoaderProfile } from './loader-profile';
 import { withTimeout } from '../util/cancellation';
 import { writeJsonAtomic } from '../util/atomic-file';
 import {
@@ -130,6 +131,45 @@ export async function getLoaderVersions(
       return getNeoForgeVersions(mcVersion);
     case 'vanilla':
       return [];
+    default:
+      throw new Error(`Unknown loader: ${loader}`);
+  }
+}
+
+/**
+ * Whether a build is one this launcher would offer for a Minecraft version —
+ * worked out from what is on this machine, with nobody asked.
+ *
+ * A profile can hold a build that was never chosen from a list: a pack names
+ * the one it wants, and it is installed as asked. When such a profile then
+ * fails to start, this is what says the build may be why. It is the rules the
+ * lists are drawn by, put to a single build: Forge and NeoForge are judged by
+ * the build's name, Fabric and Quilt by the libraries their installed profile
+ * lists as well. A Fabric or Quilt build that is not installed has only its
+ * number to go by, and a build nobody ever published passes — neither is
+ * something to tell a player their profile is wrong about.
+ */
+export async function loaderBuildStarts(
+  loader: ModLoaderType,
+  loaderVersion: string,
+  mcVersion: string,
+): Promise<boolean> {
+  switch (loader) {
+    case 'vanilla':
+      return true;
+    case 'forge':
+    case 'neoforge':
+      return isWorkingForgeLikeBuild(loader, loaderVersion, mcVersion);
+    case 'fabric':
+    case 'quilt': {
+      const profile = await readLoaderProfile(loader, loaderVersion, mcVersion);
+      const java = requiredJavaFor(mcVersion, await getCachedVersionMeta(mcVersion));
+      const entry: LoaderEntry = {
+        loader: { version: loaderVersion },
+        launcherMeta: { libraries: { common: profile?.libraries ?? [] } },
+      };
+      return startsMinecraft(loader, entry, mcVersion, java);
+    }
     default:
       throw new Error(`Unknown loader: ${loader}`);
   }
