@@ -1,0 +1,113 @@
+name: Branch Protection Audit
+
+# Asserts that branch protection on `main` and `dev` still matches expectations.
+# Drift here (a required check dropped, signed commits switched off, force
+# pushes allowed) silently weakens the supply chain — this catches it within a
+# day.
+#
+# `dev` is audited as well as `main` because Dependabot's patch bumps merge
+# themselves there. Auto-merge fires the moment a branch's requirements are met,
+# so the required checks on `dev` are the only thing between such a bump and the
+# branch: with none required it would land at once, CI unread.
+#
+# Not asserted: that administrators are bound by these rules. They are not while
+# the project is before 1.0, and the day that changes the assertion belongs here
+# with it — together with the one that no approving review is required, which is
+# what keeps a one-maintainer repository mergeable once admins are bound.
+
+on:
+  schedule:
+    # Daily at 07:00 UTC
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  audit:
+    name: Verify branch protection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # Reading branch-protection settings requires admin scope on the repo;
+      # provide a fine-grained PAT as `BRANCH_PROTECTION_READ_TOKEN` repo secret
+      # with `Administration: read` on this repo only. If absent, the job
+      # falls back to GITHUB_TOKEN and may report partial data.
+    steps:
+      - name: Compare protection rules with what is expected
+        env:
+          GH_TOKEN: ${{ secrets.BRANCH_PROTECTION_READ_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          fail=0
+
+          # audit <branch> <required check>...
+          audit() {
+            local branch="$1"; shift
+            echo "::group::${branch}"
+
+            local prot
+            prot=$(gh api "repos/${REPO}/branches/${branch}/protection" 2>/dev/null) || prot='{}'
+            if ! echo "$prot" | jq -e 'has("required_signatures")' >/dev/null 2>&1; then
+              echo "::error::Could not fetch branch protection for ${branch}. Set BRANCH_PROTECTION_READ_TOKEN with 'Administration: read'."
+              fail=1
+              echo "::endgroup::"
+              return
+            fi
+            echo "$prot" | jq .
+
+            assert() {
+              if [ "$(echo "$prot" | jq -r "$2")" != "true" ]; then
+                echo "::error::Branch protection drift on ${branch} — expected: $1"
+                fail=1
+              else
+                echo "ok: $1"
+              fi
+            }
+
+            # --- merge gate ---
+            # GitHub never lets anyone approve their own pull request, so on a
+            # one-maintainer repository a review requirement is not a gate, it
+            # is a lock.
+            assert "no approving review required"             '((.required_pull_request_reviews.required_approving_review_count // 0) == 0)'
+            assert "code-owner review not a merge gate"       '(.required_pull_request_reviews.require_code_owner_reviews // false) | not'
+            # `main` is brought up to `dev` with a merge commit, which linear
+            # history rejects outright.
+            assert "linear history not required"              '(.required_linear_history.enabled // false) | not'
+
+            # --- integrity ---
+            assert "signed commits required"                  '.required_signatures.enabled // false'
+            assert "status checks strict (branch up to date)" '.required_status_checks.strict // false'
+            assert "force pushes blocked"                     '(.allow_force_pushes.enabled // false) | not'
+            assert "branch deletions blocked"                 '(.allow_deletions.enabled // false) | not'
+
+            # Required CI contexts that must pass before a merge. These are the
+            # check names GitHub actually reports, not the workflow job ids — a
+            # matrix job reports its name with the matrix value appended, so a
+            # name no job ever produces can never be satisfied and blocks every
+            # merge.
+            local required
+            required=$(echo "$prot" | jq -r '.required_status_checks.contexts[]? // empty' | sort)
+            echo "Configured required checks:"
+            echo "$required" | sed 's/^/  - /'
+            local must
+            for must in "$@"; do
+              if ! echo "$required" | grep -Fxq "$must"; then
+                echo "::error::Required status check missing on ${branch}: '${must}'"
+                fail=1
+              fi
+            done
+            echo "::endgroup::"
+          }
+
+          audit main "lint-and-typecheck" "build-linux" "build-windows" "Analyze (javascript-typescript)" "npm audit" "Trivy secret & config scan"
+          audit dev  "lint-and-typecheck" "build-linux" "build-windows"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Branch-protection audit FAILED — see annotations above."
+            exit 1
+          fi
+
+          echo "Branch-protection audit passed."
