@@ -31,18 +31,43 @@ export function assertSecureAnswer(res: Response): void {
 /** Short lists of references. None of these documents is a large file. */
 const MAX_REMOTE_JSON_BYTES = 8 * 1024 * 1024;
 
+/**
+ * Parse a response as JSON, having read no more of it than `limit` bytes.
+ *
+ * Counted as the body arrives, and the transfer dropped the moment it is over.
+ * It used to read the whole body first and measure it afterwards, which refused
+ * to *parse* forty megabytes and had by then received every one of them — the
+ * cap protected the parser and not the memory it was written to protect.
+ */
 export async function readJsonCapped(
   res: Response,
   label: string,
   limit = MAX_REMOTE_JSON_BYTES,
 ): Promise<unknown> {
+  const tooLarge = () => new Error(`${label} is implausibly large — refusing to parse it`);
+
   const declared = Number(res.headers.get('content-length'));
-  if (declared > limit) throw new Error(`${label} is implausibly large — refusing to parse it`);
+  if (declared > limit) {
+    await res.body?.cancel();
+    throw tooLarge();
+  }
+  if (!res.body) return JSON.parse(await res.text());
 
-  const text = await res.text();
-  // Checked again after reading, because `Content-Length` is absent on a chunked
-  // response — which is exactly how a host would avoid declaring its size.
-  if (text.length > limit) throw new Error(`${label} is implausibly large — refusing to parse it`);
+  // `Content-Length` is absent on a chunked response — which is exactly how a
+  // host would avoid declaring its size — so the bytes themselves are counted.
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.length;
+    if (received > limit) {
+      await reader.cancel();
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
 
-  return JSON.parse(text);
+  return JSON.parse(new TextDecoder().decode(Buffer.concat(chunks)));
 }

@@ -35,6 +35,42 @@ describe('readJsonCapped', () => {
     await expect(readJsonCapped(res, 'manifest', 100)).rejects.toThrow(/implausibly large/);
   });
 
+  it('stops receiving a body the moment it is over the cap', async () => {
+    // The point of the cap is what reaches memory, not what reaches the parser.
+    // This used to take in all forty megabytes and then decline to parse them.
+    const chunk = new Uint8Array(64 * 1024);
+    let sent = 0;
+    let cancelled = false;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        sent += chunk.length;
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+
+    await expect(readJsonCapped(new Response(endless), 'manifest', 256 * 1024)).rejects.toThrow(
+      /implausibly large/,
+    );
+
+    expect(cancelled).toBe(true);
+    // A little past the cap at most — a chunk or two that were already on their way.
+    expect(sent).toBeLessThan(1024 * 1024);
+  });
+
+  it('counts bytes, which is what a size limit is in', async () => {
+    // Four hundred characters, eight hundred bytes.
+    const res = response(JSON.stringify({ pad: 'ż'.repeat(400) }));
+    await expect(readJsonCapped(res, 'manifest', 500)).rejects.toThrow(/implausibly large/);
+  });
+
+  it('reads a document that begins with a byte order mark', async () => {
+    const res = new Response(Buffer.from('\uFEFF{"ok":true}', 'utf-8'));
+    await expect(readJsonCapped(res, 'manifest')).resolves.toEqual({ ok: true });
+  });
+
   it('names the document it refused, so the log says which host misbehaved', async () => {
     const res = response('x'.repeat(200));
     await expect(readJsonCapped(res, 'the news feed', 100)).rejects.toThrow(/the news feed/);

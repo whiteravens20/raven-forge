@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { downloadToFile } from '../net/download';
-import { assertSecureAnswer } from '../net/json';
+import { assertSecureAnswer, readJsonCapped } from '../net/json';
 import { createProfile, deleteProfile } from '../profiles/profile-manager';
 import { syncManifest } from '../mods/mod-sync';
 import { getModVersions, primaryFile } from '../mods/modrinth-api';
@@ -346,13 +346,13 @@ export async function createProfileFromManifest(url: string): Promise<PackInstal
   // A page that is not JSON at all is the ordinary way to get this wrong — a
   // repository page pasted instead of the raw file — and it must read as "wrong
   // address", not as the parser's complaint about a `<` it did not expect.
-  let body: Partial<ModManifest>;
+  let body: Partial<ModManifest> | null;
   try {
-    body = (await res.json()) as Partial<ModManifest>;
+    body = (await readJsonCapped(res, 'The manifest')) as Partial<ModManifest> | null;
   } catch {
     throw new Error('That URL does not look like a Raven Forge manifest');
   }
-  if (!body.serverName || !body.minecraftVersion || !body.modLoader) {
+  if (!body?.serverName || !body.minecraftVersion || !body.modLoader) {
     throw new Error('That URL does not look like a Raven Forge manifest');
   }
 
