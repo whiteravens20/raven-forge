@@ -58,12 +58,8 @@ interface GameStore {
   /** Whether a profile shows the console */
   consoleVisible: Set<string>;
 
-  isRunning: (profileId: string) => boolean;
-  isPreparing: (profileId: string) => boolean;
-  isBusy: (profileId: string) => boolean;
   beginPreparing: (profileId: string) => void;
   endPreparing: (profileId: string) => void;
-  hasCrashed: (profileId: string) => boolean;
   getCrashInfo: (profileId: string) => GameExitInfo | undefined;
   addRunning: (profileId: string) => void;
   removeRunning: (profileId: string, exitInfo?: GameExitInfo) => void;
@@ -133,10 +129,6 @@ export const useGameStore = create<GameStore>((set, get) => {
     failures: {},
     consoleVisible: new Set(),
 
-    isRunning: (profileId) => get().running.has(profileId),
-    isPreparing: (profileId) => get().preparing.has(profileId),
-    isBusy: (profileId) => get().running.has(profileId) || get().preparing.has(profileId),
-    hasCrashed: (profileId) => !!get().crashInfo[profileId]?.crashed,
     getCrashInfo: (profileId) => get().crashInfo[profileId],
 
     beginPreparing: (profileId) => {

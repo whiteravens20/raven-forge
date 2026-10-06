@@ -8,7 +8,6 @@ const api = window.ravenforge;
 interface ProfileStore {
   profiles: Profile[];
   selectedProfileId: string | null;
-  loading: boolean;
 
   load: () => Promise<void>;
   select: (profileId: string | null) => void;
@@ -60,16 +59,14 @@ function rememberSelection(profileId: string): void {
 export const useProfileStore = create<ProfileStore>((set, get) => ({
   profiles: [],
   selectedProfileId: null,
-  loading: false,
   duplicating: new Set(),
   removing: new Set(),
 
   load: async () => {
-    set({ loading: true });
     const result = await api.profiles.getAll();
     if (result.success && result.data) {
       const profiles = result.data;
-      set({ profiles, loading: false });
+      set({ profiles });
       // The one that was selected last time, when it is still there; the first
       // otherwise. The launcher used to open on the first profile whatever had
       // been played the night before.
@@ -78,8 +75,6 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         const selected = profiles.find((p) => p.id === remembered) ?? profiles[0];
         set({ selectedProfileId: selected.id });
       }
-    } else {
-      set({ loading: false });
     }
   },
 

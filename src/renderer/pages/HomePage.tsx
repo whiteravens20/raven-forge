@@ -52,11 +52,11 @@ export function HomePage() {
 
   const settings = useSettingsStore((s) => s.settings);
 
-  // Both selected as derived booleans, not as the predicate functions.
-  // `useGameStore((s) => s.isRunning)` returns a stable function reference, so
-  // it never changes and never re-renders: closing the game left the button
-  // reading "Running" until some unrelated state (opening the console, say)
-  // forced a render. Select the value, not the getter.
+  // Selected as values, not as functions that work them out. A selector that
+  // hands back a function hands back the same one every time, so it never
+  // changes and never re-renders: closing the game left the button reading
+  // "Running" until some unrelated state (opening the console, say) forced a
+  // render.
   const runningNow = useGameStore((s) => (selectedId ? s.running.has(selectedId) : false));
   const preparingNow = useGameStore((s) => (selectedId ? s.preparing.has(selectedId) : false));
   const cancellingNow = useGameStore((s) => (selectedId ? s.cancelling.has(selectedId) : false));

@@ -13,7 +13,6 @@ type KeyResult = Promise<string | null>;
 
 interface SettingsStore {
   settings: GlobalSettings | null;
-  loading: boolean;
 
   load: () => Promise<void>;
   /**
@@ -33,19 +32,15 @@ interface SettingsStore {
   removeTrustedKey: (publicKey: string) => KeyResult;
 }
 
-export const useSettingsStore = create<SettingsStore>((set, _get) => ({
+export const useSettingsStore = create<SettingsStore>((set) => ({
   settings: null,
-  loading: false,
 
   load: async () => {
-    set({ loading: true });
     const result = await api.settings.get();
     if (result.success && result.data) {
-      set({ settings: result.data, loading: false });
+      set({ settings: result.data });
       // Apply theme
       document.documentElement.setAttribute('data-theme', result.data.theme);
-    } else {
-      set({ loading: false });
     }
   },
 
