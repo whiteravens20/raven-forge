@@ -932,10 +932,10 @@ export function registerAllIpcHandlers(): void {
   });
   handle(
     'content:install-shader',
-    async (_event, profileId: string, source: string, version?: string) => {
+    async (_event, profileId: string, projectId: string, version?: string) => {
       try {
         if (isGameBusy(profileId)) return fail(GAME_IS_UP);
-        await installContent('shaders', profileId, source, version);
+        await installContent('shaders', profileId, projectId, version);
         return ok(undefined);
       } catch (err) {
         return fail(`Failed to install shader: ${reason(err)}`);
@@ -982,10 +982,10 @@ export function registerAllIpcHandlers(): void {
   });
   handle(
     'content:install-resourcepack',
-    async (_event, profileId: string, source: string, version?: string) => {
+    async (_event, profileId: string, projectId: string, version?: string) => {
       try {
         if (isGameBusy(profileId)) return fail(GAME_IS_UP);
-        await installContent('resourcepacks', profileId, source, version);
+        await installContent('resourcepacks', profileId, projectId, version);
         return ok(undefined);
       } catch (err) {
         return fail(`Failed to install resource pack: ${reason(err)}`);

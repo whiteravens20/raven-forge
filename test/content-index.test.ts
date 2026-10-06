@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ResourcePackEntry } from '../src/shared/manifest-schema';
+import type { ModrinthVersion } from '../src/core/mods/modrinth-api';
 
 /**
  * Shaders and resource packs: the index, and the file the game actually reads.
@@ -23,13 +24,29 @@ import type { ResourcePackEntry } from '../src/shared/manifest-schema';
  */
 
 let root: string;
-let source: string;
 let server: http.Server;
 let base: string;
 let served: Record<string, string>;
+/** What Modrinth publishes, by project id: a title and the builds on offer. */
+let projects: Record<string, { title: string; versions: ModrinthVersion[] }>;
 
 vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
+}));
+
+// Modrinth is the one place a shader or a resource pack is installed from, so
+// it is what stands in here. The file itself still travels: over HTTP, from the
+// server below, and is checked against the hash this publishes for it.
+vi.mock('../src/core/mods/modrinth-api', async (original) => ({
+  ...(await original<typeof import('../src/core/mods/modrinth-api')>()),
+  getModVersions: async (projectId: string) => projects[projectId]?.versions ?? [],
+  getVersion: async (versionId: string) => {
+    const all = Object.values(projects).flatMap((project) => project.versions);
+    const found = all.find((version) => version.id === versionId);
+    if (!found) throw new Error(`No version ${versionId}`);
+    return found;
+  },
+  getProjectTitle: async (projectId: string) => projects[projectId].title,
 }));
 
 type Content = typeof import('../src/core/mods/content-manager');
@@ -37,7 +54,9 @@ type Content = typeof import('../src/core/mods/content-manager');
 let content: Content;
 const PROFILE = 'p1';
 
-const sha256 = (body: string) => crypto.createHash('sha256').update(body).digest('hex');
+const hash = (algorithm: string, body: string) =>
+  crypto.createHash(algorithm).update(body).digest('hex');
+const sha256 = (body: string) => hash('sha256', body);
 const packsDir = () => path.join(root, 'data', 'profiles', PROFILE, '.minecraft', 'resourcepacks');
 const indexFile = (name: string) => path.join(root, 'data', 'profiles', PROFILE, name);
 const optionsFile = () => path.join(root, 'data', 'profiles', PROFILE, '.minecraft', 'options.txt');
@@ -47,11 +66,10 @@ const readIndexFile = async (name: string) =>
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-content-'));
-  source = path.join(root, 'source');
-  await fs.mkdir(source, { recursive: true });
   process.env.RAVENFORGE_DATA_DIR = path.join(root, 'data');
 
   served = {};
+  projects = {};
   server = http.createServer((req, res) => {
     const body = served[req.url ?? ''];
     if (body === undefined) {
@@ -78,10 +96,35 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true });
 });
 
-async function localZip(name: string, body = 'pack-bytes'): Promise<string> {
-  const file = path.join(source, name);
-  await fs.writeFile(file, body);
-  return `file:${file}`;
+/**
+ * Publish a pack on the stand-in Modrinth and answer with its project id.
+ *
+ * `Fancy.zip` becomes the project `fancy`, titled `Fancy`, with one build whose
+ * file is served from here.
+ */
+function published(fileName: string, body = 'pack-bytes'): string {
+  const title = fileName.replace(/\.zip$/, '');
+  const projectId = title.toLowerCase();
+  served[`/${fileName}`] = body;
+  projects[projectId] = {
+    title,
+    versions: [
+      {
+        id: `${projectId}-1`,
+        project_id: projectId,
+        version_number: '1.0.0',
+        files: [
+          {
+            url: `${base}/${fileName}`,
+            filename: fileName,
+            primary: true,
+            hashes: { sha1: hash('sha1', body), sha512: hash('sha512', body) },
+          },
+        ],
+      } as ModrinthVersion,
+    ],
+  };
+  return projectId;
 }
 
 function manifestPack(id: string, body: string): ResourcePackEntry {
@@ -97,33 +140,40 @@ function manifestPack(id: string, body: string): ResourcePackEntry {
 }
 
 describe('installContent', () => {
-  it('copies a local zip in and records it', async () => {
+  it('fetches the build and records it under the project it came from', async () => {
     const installed = await content.installContent(
       'resourcepacks',
       PROFILE,
-      await localZip('Fancy.zip'),
+      published('Fancy.zip'),
     );
 
-    expect(installed).toMatchObject({ name: 'Fancy', fileName: 'Fancy.zip', fromManifest: false });
+    expect(installed).toMatchObject({
+      id: 'fancy',
+      name: 'Fancy',
+      version: '1.0.0',
+      source: 'modrinth',
+      fileName: 'Fancy.zip',
+      fromManifest: false,
+    });
     expect(await fs.readFile(path.join(packsDir(), 'Fancy.zip'), 'utf-8')).toBe('pack-bytes');
     expect(await content.listContent('resourcepacks', PROFILE)).toHaveLength(1);
   });
 
   it('switches a new resource pack on in the file the game reads', async () => {
-    await content.installContent('resourcepacks', PROFILE, await localZip('Fancy.zip'));
+    await content.installContent('resourcepacks', PROFILE, published('Fancy.zip'));
     expect(await fs.readFile(optionsFile(), 'utf-8')).toContain('file/Fancy.zip');
   });
 
   it('does not touch options.txt for a shader', async () => {
     // Iris and OptiFine read their own config; writing this one would be a
     // change to the player's settings for no reason.
-    await content.installContent('shaders', PROFILE, await localZip('Sky.zip'));
+    await content.installContent('shaders', PROFILE, published('Sky.zip'));
     await expect(fs.stat(optionsFile())).rejects.toThrow();
   });
 
   it('keeps the two indexes apart', async () => {
-    await content.installContent('resourcepacks', PROFILE, await localZip('Fancy.zip'));
-    await content.installContent('shaders', PROFILE, await localZip('Sky.zip'));
+    await content.installContent('resourcepacks', PROFILE, published('Fancy.zip'));
+    await content.installContent('shaders', PROFILE, published('Sky.zip'));
 
     expect((await content.listContent('resourcepacks', PROFILE)).map((i) => i.name)).toEqual([
       'Fancy',
@@ -133,23 +183,81 @@ describe('installContent', () => {
     expect(await readIndexFile('shaders.lock')).toHaveLength(1);
   });
 
-  it('refuses a source it does not understand', async () => {
-    await expect(content.installContent('shaders', PROFILE, '/tmp/pack.zip')).rejects.toThrow(
-      /Unsupported source format/,
+  it('says so when the project has no build to install', async () => {
+    projects.empty = { title: 'Empty', versions: [] };
+    await expect(content.installContent('shaders', PROFILE, 'empty')).rejects.toThrow(
+      /No shader build/,
     );
   });
 
+  it('refuses a file that is not the one Modrinth published', async () => {
+    const projectId = published('Fancy.zip');
+    served['/Fancy.zip'] = 'something-else-entirely';
+
+    await expect(content.installContent('resourcepacks', PROFILE, projectId)).rejects.toThrow(
+      /mismatch/,
+    );
+    await expect(fs.stat(path.join(packsDir(), 'Fancy.zip'))).rejects.toThrow();
+    expect(await content.listContent('resourcepacks', PROFILE)).toEqual([]);
+  });
+
+  it('installs the build it is told to, not the newest', async () => {
+    const projectId = published('Fancy.zip');
+    served['/Fancy-old.zip'] = 'old-bytes';
+    projects[projectId].versions.push({
+      id: 'fancy-0',
+      project_id: projectId,
+      version_number: '0.9.0',
+      files: [
+        {
+          url: `${base}/Fancy-old.zip`,
+          filename: 'Fancy-old.zip',
+          primary: true,
+          hashes: { sha1: hash('sha1', 'old-bytes'), sha512: hash('sha512', 'old-bytes') },
+        },
+      ],
+    } as ModrinthVersion);
+
+    const installed = await content.installContent('resourcepacks', PROFILE, projectId, 'fancy-0');
+    expect(installed).toMatchObject({ version: '0.9.0', fileName: 'Fancy-old.zip' });
+  });
+
+  it('replaces the build a project already has installed, and takes the old file away', async () => {
+    const projectId = published('Fancy.zip');
+    await content.installContent('resourcepacks', PROFILE, projectId);
+
+    served['/Fancy-2.zip'] = 'newer-bytes';
+    projects[projectId].versions.unshift({
+      id: 'fancy-2',
+      project_id: projectId,
+      version_number: '2.0.0',
+      files: [
+        {
+          url: `${base}/Fancy-2.zip`,
+          filename: 'Fancy-2.zip',
+          primary: true,
+          hashes: { sha1: hash('sha1', 'newer-bytes'), sha512: hash('sha512', 'newer-bytes') },
+        },
+      ],
+    } as ModrinthVersion);
+    await content.installContent('resourcepacks', PROFILE, projectId);
+
+    const items = await content.listContent('resourcepacks', PROFILE);
+    expect(items.map((item) => item.fileName)).toEqual(['Fancy-2.zip']);
+    await expect(fs.stat(path.join(packsDir(), 'Fancy.zip'))).rejects.toThrow();
+  });
+
   it('refuses a profile id that is not a path component', async () => {
-    await expect(
-      content.installContent('shaders', '../..', await localZip('a.zip')),
-    ).rejects.toThrow(/Not a profile id/);
+    await expect(content.installContent('shaders', '../..', published('a.zip'))).rejects.toThrow(
+      /Not a profile id/,
+    );
   });
 
   it('does not let two installs in flight lose each other', async () => {
     await Promise.all([
-      content.installContent('resourcepacks', PROFILE, await localZip('A.zip', 'a')),
-      content.installContent('resourcepacks', PROFILE, await localZip('B.zip', 'b')),
-      content.installContent('resourcepacks', PROFILE, await localZip('C.zip', 'c')),
+      content.installContent('resourcepacks', PROFILE, published('A.zip', 'a')),
+      content.installContent('resourcepacks', PROFILE, published('B.zip', 'b')),
+      content.installContent('resourcepacks', PROFILE, published('C.zip', 'c')),
     ]);
     expect((await content.listContent('resourcepacks', PROFILE)).map((i) => i.name).sort()).toEqual(
       ['A', 'B', 'C'],
@@ -162,7 +270,7 @@ describe('removeContent', () => {
     const installed = await content.installContent(
       'resourcepacks',
       PROFILE,
-      await localZip('Fancy.zip'),
+      published('Fancy.zip'),
     );
     await content.removeContent('resourcepacks', PROFILE, installed.id);
 
@@ -178,7 +286,7 @@ describe('removeContent', () => {
     const installed = await content.installContent(
       'resourcepacks',
       PROFILE,
-      await localZip('Fancy.zip'),
+      published('Fancy.zip'),
     );
     await fs.rm(path.join(packsDir(), 'Fancy.zip'));
     await fs.mkdir(path.join(packsDir(), 'Fancy.zip'));
@@ -197,8 +305,8 @@ describe('reorderResourcePacks', () => {
     // The UI's top entry wins; Minecraft's last entry wins. The file has to be
     // the mirror of the list, or the player's ordering does the opposite of
     // what it says.
-    const a = await content.installContent('resourcepacks', PROFILE, await localZip('A.zip', 'a'));
-    const b = await content.installContent('resourcepacks', PROFILE, await localZip('B.zip', 'b'));
+    const a = await content.installContent('resourcepacks', PROFILE, published('A.zip', 'a'));
+    const b = await content.installContent('resourcepacks', PROFILE, published('B.zip', 'b'));
 
     await content.reorderResourcePacks(PROFILE, [b.id, a.id]);
 
@@ -211,8 +319,8 @@ describe('reorderResourcePacks', () => {
   });
 
   it('keeps a pack the caller forgot to mention instead of dropping it', async () => {
-    const a = await content.installContent('resourcepacks', PROFILE, await localZip('A.zip', 'a'));
-    await content.installContent('resourcepacks', PROFILE, await localZip('B.zip', 'b'));
+    const a = await content.installContent('resourcepacks', PROFILE, published('A.zip', 'a'));
+    await content.installContent('resourcepacks', PROFILE, published('B.zip', 'b'));
 
     await content.reorderResourcePacks(PROFILE, [a.id]);
     expect((await content.listContent('resourcepacks', PROFILE)).map((i) => i.name)).toEqual([
@@ -297,7 +405,7 @@ describe('syncContentFromManifest', () => {
     const mine = await content.installContent(
       'resourcepacks',
       PROFILE,
-      await localZip('Mine.zip', 'mine'),
+      published('Mine.zip', 'mine'),
     );
     await content.syncContentFromManifest(
       'resourcepacks',

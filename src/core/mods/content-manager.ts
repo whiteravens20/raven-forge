@@ -2,7 +2,6 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
@@ -88,109 +87,61 @@ async function syncResourcePackSelection(profileId: string): Promise<void> {
   const items = await readIndex('resourcepacks', profileId);
   await applyResourcePackOrder(
     paths.profileGameDir(profileId),
-    items.filter((p) => p.enabled !== false).map((p) => p.fileName),
     items.map((p) => p.fileName),
   );
 }
 
 /**
- * Install shader / resource pack from a source string:
- *   - "modrinth:<projectId>" — newest build for the profile's Minecraft version
- *   - "url:https://..."       — direct URL to .zip
- *   - "file:/abs/path.zip"    — local file
+ * Install a shader or a resource pack from Modrinth: the newest build of the
+ * project for the profile's Minecraft version.
  *
- * `versionId` overrides the choice for the Modrinth case, and is how an install
- * the player accepted a compatibility warning about gets the build the warning
- * was about.
+ * `versionId` overrides that choice, and is how an install the player accepted
+ * a compatibility warning about gets the build the warning was about.
  */
 export async function installContent(
   kind: ContentKind,
   profileId: string,
-  source: string,
+  projectId: string,
   versionId?: string,
 ): Promise<InstalledMod> {
   const dir = targetDir(kind, profileId);
   await fs.mkdir(dir, { recursive: true });
 
-  let downloadUrl: string;
-  let fileName: string;
-  let displayName: string;
-  let version = 'unknown';
-  let modrinthProjectId: string | undefined;
-  // Set for a Modrinth source, whose API publishes a hash for the exact build —
-  // used to verify the download rather than accepting whatever the CDN returned.
-  let expectedHashes: HashedEntry | undefined;
-
-  if (source.startsWith('modrinth:')) {
-    const projectId = source.slice('modrinth:'.length);
-    modrinthProjectId = projectId;
-
-    // Pinned to the profile's Minecraft version. Taking whatever is newest —
-    // as this did — puts a pack built for 1.21.8 into a 1.20.1 profile, where a
-    // shader fails to compile and a resource pack lands in the game's
-    // "incompatible" list. Both look like a successful install from here.
-    const profile = await getProfile(profileId);
-    const chosen = versionId
-      ? await getVersion(versionId)
-      : (await getModVersions(projectId, profile?.minecraftVersion))[0];
-    if (!chosen) {
-      throw new Error(
-        `No ${kind === 'shaders' ? 'shader' : 'resource pack'} build for MC ` +
-          `${profile?.minecraftVersion ?? 'unknown'} (project ${projectId})`,
-      );
-    }
-
-    const fileInfo = primaryFile(chosen);
-    downloadUrl = fileInfo.url;
-    fileName = fileInfo.filename;
-    expectedHashes = { sha512: fileInfo.hashes.sha512, sha1: fileInfo.hashes.sha1 };
-    // The project's title, not the version's. `ModrinthVersion.name` is a build
-    // label — Complementary Reimagined publishes its as `r5.8.1`, so the
-    // installed list read "r5.8.1" where a pack name belonged.
-    displayName = await getProjectTitle(projectId);
-    version = chosen.version_number || chosen.id;
-  } else if (source.startsWith('url:')) {
-    downloadUrl = source.slice('url:'.length);
-    fileName = fileNameFromUrl(downloadUrl, `${kind}-${Date.now()}`, '.zip');
-    displayName = fileName.replace(/\.zip$/i, '');
-  } else if (source.startsWith('file:')) {
-    const localPath = source.slice('file:'.length);
-    fileName = path.basename(localPath);
-    displayName = fileName.replace(/\.zip$/i, '');
-    const dest = path.join(dir, fileName);
-    await fs.copyFile(localPath, dest);
-    const installed: InstalledMod = {
-      id: `local-${crypto.randomUUID()}`,
-      name: displayName,
-      version: 'local',
-      source: 'local',
-      fileName,
-      enabled: true,
-      fromManifest: false,
-    };
-    await mutateIndex(kind, profileId, (items) => items.push(installed));
-    if (kind === 'resourcepacks') await syncResourcePackSelection(profileId);
-    log.info(`Installed ${kind.slice(0, -1)} from file: ${fileName}`);
-    return installed;
-  } else {
-    throw new Error(`Unsupported source format: ${source} (expected modrinth:|url:|file:)`);
+  // Pinned to the profile's Minecraft version. Taking whatever is newest — as
+  // this did — puts a pack built for 1.21.8 into a 1.20.1 profile, where a
+  // shader fails to compile and a resource pack lands in the game's
+  // "incompatible" list. Both look like a successful install from here.
+  const profile = await getProfile(profileId);
+  const chosen = versionId
+    ? await getVersion(versionId)
+    : (await getModVersions(projectId, profile?.minecraftVersion))[0];
+  if (!chosen) {
+    throw new Error(
+      `No ${kind === 'shaders' ? 'shader' : 'resource pack'} build for MC ` +
+        `${profile?.minecraftVersion ?? 'unknown'} (project ${projectId})`,
+    );
   }
 
-  const dest = path.join(dir, fileName);
-  log.info(`Downloading ${kind.slice(0, -1)}: ${displayName}`);
-  // A Modrinth build is checked against the API's own hash; a direct `url:` the
-  // player pasted has none to check, so its https transport is the guarantee.
-  await downloadToFile(downloadUrl, dest, {
+  const file = primaryFile(chosen);
+  // The project's title, not the version's. `ModrinthVersion.name` is a build
+  // label — Complementary Reimagined publishes its as `r5.8.1`, so the
+  // installed list read "r5.8.1" where a pack name belonged.
+  const name = await getProjectTitle(projectId);
+
+  log.info(`Downloading ${kind.slice(0, -1)}: ${name}`);
+  // Checked against the hash Modrinth publishes for this exact build, rather
+  // than accepting whatever the CDN returned.
+  await downloadToFile(file.url, path.join(dir, file.filename), {
     secure: true,
-    verify: expectedHashes && { hashes: expectedHashes, label: displayName },
+    verify: { hashes: { sha512: file.hashes.sha512, sha1: file.hashes.sha1 }, label: name },
   });
 
   const installed: InstalledMod = {
-    id: modrinthProjectId ?? `url-${crypto.randomUUID()}`,
-    name: displayName,
-    version,
-    source: modrinthProjectId ? 'modrinth' : 'url',
-    fileName,
+    id: projectId,
+    name,
+    version: chosen.version_number || chosen.id,
+    source: 'modrinth',
+    fileName: file.filename,
     enabled: true,
     fromManifest: false,
   };

@@ -191,11 +191,10 @@ export function ContentPage() {
 
   const install = async (item: ModSearchResult, versionId?: string) => {
     if (!selectedId) return;
-    const source = `modrinth:${item.id}`;
     const result =
       kind === 'shaders'
-        ? await api.content.installShader(selectedId, source, versionId)
-        : await api.content.installResourcePack(selectedId, source, versionId);
+        ? await api.content.installShader(selectedId, item.id, versionId)
+        : await api.content.installResourcePack(selectedId, item.id, versionId);
     if (!result.success) {
       setError(result.error ?? t('content.installFailed', { name: item.name }));
       return;

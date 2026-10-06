@@ -72,15 +72,15 @@ const api: RavenForgeAPI = {
   content: {
     getShaders: (profileId) => ipcRenderer.invoke('content:get-shaders', profileId),
     getResourcePacks: (profileId) => ipcRenderer.invoke('content:get-resourcepacks', profileId),
-    installShader: (profileId, source, version) =>
-      ipcRenderer.invoke('content:install-shader', profileId, source, version),
+    installShader: (profileId, projectId, version) =>
+      ipcRenderer.invoke('content:install-shader', profileId, projectId, version),
     checkInstall: (profileId, item) => ipcRenderer.invoke('content:check-install', profileId, item),
     getShaderLoaderState: (profileId) =>
       ipcRenderer.invoke('content:get-shader-loader-state', profileId),
     installShaderLoader: (profileId, projectId) =>
       ipcRenderer.invoke('content:install-shader-loader', profileId, projectId),
-    installResourcePack: (profileId, source, version) =>
-      ipcRenderer.invoke('content:install-resourcepack', profileId, source, version),
+    installResourcePack: (profileId, projectId, version) =>
+      ipcRenderer.invoke('content:install-resourcepack', profileId, projectId, version),
     removeShader: (profileId, id) => ipcRenderer.invoke('content:remove-shader', profileId, id),
     removeResourcePack: (profileId, id) =>
       ipcRenderer.invoke('content:remove-resourcepack', profileId, id),

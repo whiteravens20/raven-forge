@@ -211,10 +211,13 @@ export interface InvokeChannels {
   // -- Shaders & Resource Packs --
   'content:get-shaders': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
   'content:get-resourcepacks': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
-  /** `version` pins a build; omitted, the newest one for the profile's MC version wins. */
+  /**
+   * Install a Modrinth project. `version` pins a build; omitted, the newest one
+   * for the profile's Minecraft version wins.
+   */
   'content:install-shader': (
     profileId: string,
-    source: string,
+    projectId: string,
     version?: string,
   ) => Promise<IpcResult<void>>;
   'content:get-shader-loader-state': (profileId: string) => Promise<IpcResult<ShaderLoaderState>>;
@@ -224,7 +227,7 @@ export interface InvokeChannels {
   ) => Promise<IpcResult<ShaderLoaderResult>>;
   'content:install-resourcepack': (
     profileId: string,
-    source: string,
+    projectId: string,
     version?: string,
   ) => Promise<IpcResult<void>>;
   /**

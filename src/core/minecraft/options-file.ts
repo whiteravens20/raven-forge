@@ -176,17 +176,15 @@ async function editOptions(gameDir: string, edit: (body: string) => string): Pro
 /**
  * Point the profile's `options.txt` at these packs, in this order.
  *
- * @param orderedFileNames pack file names, highest priority first
- * @param managedFileNames every pack the launcher's list holds, switched on or
- *        not — whatever else is in `resourcepacks/` is the player's own, and
- *        its place in the line is left as the game wrote it
+ * @param orderedFileNames every pack the launcher's list holds, highest
+ *        priority first — whatever else is in `resourcepacks/` is the player's
+ *        own, and its place in the line is left as the game wrote it
  */
 export async function applyResourcePackOrder(
   gameDir: string,
   orderedFileNames: string[],
-  managedFileNames: string[] = orderedFileNames,
 ): Promise<void> {
-  const managed = new Set(managedFileNames);
+  const managed = new Set(orderedFileNames);
   const inFolder = await fs.readdir(path.join(gameDir, 'resourcepacks')).catch(() => []);
   const handPlaced = new Set(inFolder.filter((name) => !managed.has(name)));
 
