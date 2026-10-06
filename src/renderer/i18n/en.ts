@@ -303,6 +303,7 @@ export const en = {
   'packs.loading': 'Loading the pack list…',
   'packs.none': 'No packs are published yet.',
   'packs.listFailed': 'Could not load the pack list.',
+  'packs.listRetry': 'Try again',
   'packs.installFailed': 'Could not install {name}.',
   'packs.installUnfinished':
     'Profile “{name}” was created, but its files did not all arrive. Press “{action}” on the profile and the install carries on from where it stopped. The reason given: {error}',

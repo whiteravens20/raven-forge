@@ -43,6 +43,8 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const locale = useLocale();
   const [route, setRoute] = useState<Route>('choose');
   const [packs, setPacks] = useState<CataloguePack[] | null>(null);
+  /** True when the catalogue could not be fetched — which is not "no packs". */
+  const [listFailed, setListFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [packUrl, setPackUrl] = useState('');
@@ -55,23 +57,27 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, busy]);
 
-  // Fetched when that route is opened, not on mount: two of the three routes
-  // never need it, and a network round trip to draw a menu is a menu that lags.
+  // Fetched when that route is opened, not on mount: the other routes never
+  // need it, and a network round trip to draw a menu is a menu that lags.
+  //
+  // A fetch that failed leaves the list unknown, not empty. It used to be
+  // recorded as an empty list: going back and in again then said "no packs are
+  // published yet", with the error gone and nothing left to try again with.
   useEffect(() => {
-    if (route !== 'white-ravens' || packs) return;
+    if (route !== 'white-ravens' || packs || listFailed) return;
     let cancelled = false;
     void api.packs.listCatalogue().then((r) => {
       if (cancelled) return;
       if (r.success && r.data) setPacks(r.data);
       else {
-        setPacks([]);
+        setListFailed(true);
         setError(r.error ?? t('packs.listFailed'));
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [route, packs, t]);
+  }, [route, packs, listFailed, t]);
 
   /**
    * Hand a pack install's outcome on.
@@ -148,6 +154,8 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
               onClick={() => {
                 setRoute('choose');
                 setError(null);
+                // Coming back in asks again.
+                setListFailed(false);
               }}
               disabled={Boolean(busy)}
               aria-label={t('common.back')}
@@ -217,8 +225,23 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                 <WhitelistBadge label={t('packs.whitelist')} />
                 {t('packs.whitelistNote')}
               </p>
-              {packs === null && <p className="text-sm text-rf-text-muted">{t('packs.loading')}</p>}
-              {packs?.length === 0 && !error && (
+              {packs === null && !listFailed && (
+                <p className="text-sm text-rf-text-muted">{t('packs.loading')}</p>
+              )}
+              {listFailed && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="self-start"
+                  onClick={() => {
+                    setError(null);
+                    setListFailed(false);
+                  }}
+                >
+                  {t('packs.listRetry')}
+                </Button>
+              )}
+              {packs?.length === 0 && (
                 <p className="text-sm text-rf-text-muted">{t('packs.none')}</p>
               )}
               {packs?.map((pack) => (

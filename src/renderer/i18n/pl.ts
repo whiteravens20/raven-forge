@@ -326,6 +326,7 @@ export const pl: Translations = {
   'packs.loading': 'Wczytuję listę paczek…',
   'packs.none': 'Nie opublikowano jeszcze żadnej paczki.',
   'packs.listFailed': 'Nie udało się wczytać listy paczek.',
+  'packs.listRetry': 'Spróbuj ponownie',
   'packs.installFailed': 'Nie udało się zainstalować {name}.',
   'packs.installUnfinished':
     'Profil „{name}” został utworzony, ale nie wszystkie jego pliki dotarły. Kliknij w profilu „{action}”, a instalacja ruszy dalej od miejsca, w którym stanęła. Podany powód: {error}',
