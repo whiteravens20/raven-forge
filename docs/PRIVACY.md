@@ -71,15 +71,15 @@ opens it.
 
 In the data folder:
 
-| Path                          | Contents                                                                                                                                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `settings.json`               | Your preferences — theme, language, proxy address, feed URLs, download concurrency, trusted signing keys.                                                                                         |
-| `profiles.json`               | Your profiles: names, Minecraft versions, mod loaders, allocated RAM, manifest URLs, play time and last-played timestamps.                                                                        |
-| `profiles/<id>/`              | One folder per profile: `.minecraft/` — a real game directory with worlds, screenshots, `options.txt`, mods, resource packs and shaders — plus world backups and the profile's picture.           |
-| `auth.json`                   | The account list: Minecraft username, UUID, account type and skin URL. Written with `0600` permissions. **Secrets are not normally in this file** — see below. |
-| `logs/main.log`               | The launcher's log, rotated at 5 MB. See "What ends up in the log".                                                                                                                               |
-| `crash-reports/`              | One file per crash, redacted, newest 20 kept. See "Crash reports".                                                                                                                                |
-| `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loaders, Minecraft's own files, and cached metadata. Nothing personal; deleted, they are downloaded again.                                                          |
+| Path                          | Contents                                                                                                                                                                                |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings.json`               | Your preferences — theme, language, proxy address, feed URLs, download concurrency, trusted signing keys.                                                                               |
+| `profiles.json`               | Your profiles: names, Minecraft versions, mod loaders, allocated RAM, manifest URLs, play time and last-played timestamps.                                                              |
+| `profiles/<id>/`              | One folder per profile: `.minecraft/` — a real game directory with worlds, screenshots, `options.txt`, mods, resource packs and shaders — plus world backups and the profile's picture. |
+| `auth.json`                   | The account list: Minecraft username, UUID, account type and skin URL. Written with `0600` permissions. **Secrets are not normally in this file** — see below.                          |
+| `logs/main.log`               | The launcher's log, rotated at 5 MB. See "What ends up in the log".                                                                                                                     |
+| `crash-reports/`              | One file per crash, redacted, newest 20 kept. See "Crash reports".                                                                                                                      |
+| `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loaders, Minecraft's own files, and cached metadata. Nothing personal; deleted, they are downloaded again.                                                |
 
 In the launcher folder, wherever the data is:
 
@@ -234,12 +234,13 @@ your normal browser and stop being the launcher's business at that point. What
 that site then sees is a visit from your browser, with whatever cookies and
 history it already carries.
 
-| Where                                 | Opens                                           |
-| ------------------------------------- | ----------------------------------------------- |
-| Accounts → Minecraft account settings | `minecraft.net`                                 |
-| The Bedrock Edition notice            | `minecraft.net`                                 |
-| Info → About, and the crash reporter  | `github.com` and `whiteravens.net`              |
-| A news article's "read on the site"   | Whichever address that article was published at |
+| Where                                                               | Opens                                           |
+| ------------------------------------------------------------------- | ----------------------------------------------- |
+| Accounts → Minecraft account settings                               | `minecraft.net`                                 |
+| The Bedrock Edition notice                                          | `minecraft.net`                                 |
+| The About page and the crash reporter                               | `github.com` and `whiteravens.net`              |
+| "What's new" on an update notice, and the releases link in Settings | `github.com`                                    |
+| A news article's "read on the site"                                 | Whichever address that article was published at |
 
 The launcher never opens one of these on its own.
 

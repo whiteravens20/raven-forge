@@ -79,7 +79,7 @@ W folderze danych:
 | `settings.json`               | Twoje ustawienia — motyw, język, adres proxy, adresy kanałów, liczba równoległych pobrań, zaufane klucze podpisu.                                                                             |
 | `profiles.json`               | Twoje profile: nazwy, wersje Minecrafta, loadery, przydzielony RAM, adresy manifestów, czas gry i daty ostatniego uruchomienia.                                                               |
 | `profiles/<id>/`              | Po jednym folderze na profil: `.minecraft/` — prawdziwy katalog gry ze światami, zrzutami ekranu, `options.txt`, modami, paczkami zasobów i shaderami — oraz kopie światów i obrazek profilu. |
-| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta i adres skórki. Zapisywany z uprawnieniami `0600`. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.      |
+| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta i adres skórki. Zapisywany z uprawnieniami `0600`. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.                                        |
 | `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                                 |
 | `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                    |
 | `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, loadery, pliki samego Minecrafta i zbuforowane metadane. Nic osobistego; usunięte, pobiorą się ponownie.                                                             |
@@ -238,12 +238,13 @@ przeglądarce i w tym momencie przestaje być sprawą launchera. Ta strona widzi
 wtedy wizytę Twojej przeglądarki, z wszystkimi ciasteczkami i historią, które
 ona już ma.
 
-| Gdzie                                       | Otwiera                                     |
-| ------------------------------------------- | ------------------------------------------- |
-| Konta → Ustawienia konta Minecraft          | `minecraft.net`                             |
-| Informacja o Bedrock Edition                | `minecraft.net`                             |
-| Info → O programie oraz raporter awarii     | `github.com` i `whiteravens.net`            |
-| „Przeczytaj na stronie” przy aktualnościach | Adres, pod którym opublikowano dany artykuł |
+| Gdzie                                                                            | Otwiera                                     |
+| -------------------------------------------------------------------------------- | ------------------------------------------- |
+| Konta → Ustawienia konta Minecraft                                               | `minecraft.net`                             |
+| Informacja o Bedrock Edition                                                     | `minecraft.net`                             |
+| Info → O programie oraz raporter awarii                                          | `github.com` i `whiteravens.net`            |
+| „Co nowego” przy powiadomieniu o aktualizacji i odnośnik do wydań w Ustawieniach | `github.com`                                |
+| „Przeczytaj na stronie” przy aktualnościach                                      | Adres, pod którym opublikowano dany artykuł |
 
 Launcher nigdy nie otwiera żadnego z nich sam z siebie.
 
