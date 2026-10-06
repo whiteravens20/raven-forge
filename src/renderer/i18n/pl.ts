@@ -130,7 +130,9 @@ export const pl: Translations = {
     'Nie udało się połączyć z serwerami logowania Microsoft. Możesz zagrać offline — tylko singleplayer i LAN, serwery w trybie online odrzucą połączenie.',
   'home.launchOffline': 'Graj offline',
   'home.updatingLauncher': 'Aktualizowanie launchera…',
-  'home.updateBeforePlay': 'Przed startem gry zostanie zainstalowany launcher {version}.',
+  'home.updateBeforePlay':
+    'Graj najpierw zainstaluje launcher {version}: launcher uruchomi się ponownie i trzeba będzie nacisnąć Graj jeszcze raz.',
+  'home.updateNotNow': 'Nie teraz',
   'home.updateFailedPlayAnyway':
     'Nie udało się pobrać aktualizacji launchera — gra i tak wystartuje.',
   'home.launchFailed': 'Nie udało się uruchomić gry',
@@ -550,7 +552,6 @@ export const pl: Translations = {
     'Automatyczna aktualizacja nie jest jeszcze dostępna na tej platformie. Pobierz najnowsze wydanie z GitHuba.',
   'settings.updateCheckFailed': 'Nie udało się sprawdzić aktualizacji.',
   'settings.updateCheckFailedWith': 'Nie udało się sprawdzić aktualizacji: {error}',
-  'settings.updateDownloadFailed': 'Nie udało się pobrać aktualizacji.',
   'settings.section.data': 'Dane',
   'settings.theme': 'Motyw',
   'settings.theme.dark': 'Ciemny',

@@ -1,78 +1,33 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { useEffect, useState } from 'react';
 import { Download, RotateCw, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
-import { formatBytes } from '@renderer/format';
+import { useUpdaterStore } from '@stores/updater-store';
 import { useT } from '@renderer/i18n';
-import type { ProgressEvent, UpdateInfo } from '@shared/ipc-types';
-
-const api = window.ravenforge;
-
-type Stage = 'available' | 'downloading' | 'downloaded';
 
 /**
  * Non-blocking launcher-update prompt.
  *
- * Deliberately never auto-installs: restarting mid-download or mid-session is
- * the single most annoying thing a launcher can do, so every transition is the
- * user's call. Dismissing hides the toast for this session only — the next
- * start surfaces it again if the update is still pending.
+ * Every transition is the user's call: restarting mid-download or mid-session
+ * is the single most annoying thing a launcher can do. "Later" puts the update
+ * off for this session — here and on the Play button alike — and the next start
+ * offers it again.
  */
 export function UpdateToast() {
   const t = useT();
-  const [info, setInfo] = useState<UpdateInfo | null>(null);
-  const [stage, setStage] = useState<Stage>('available');
-  const [percent, setPercent] = useState(0);
-  const [dismissed, setDismissed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const info = useUpdaterStore((s) => s.available);
+  const stage = useUpdaterStore((s) => s.stage);
+  const percent = useUpdaterStore((s) => s.percent);
+  const error = useUpdaterStore((s) => s.error);
+  const postponed = useUpdaterStore((s) => s.postponed);
+  const download = useUpdaterStore((s) => s.download);
+  const install = useUpdaterStore((s) => s.install);
+  const postpone = useUpdaterStore((s) => s.postpone);
 
-  useEffect(() => {
-    const onAvailable = (update: UpdateInfo) => {
-      setInfo(update);
-      setStage('available');
-      setDismissed(false);
-    };
+  if (!info || postponed) return null;
 
-    const onDownloaded = (update: UpdateInfo) => {
-      setInfo(update);
-      setStage('downloaded');
-      setDismissed(false);
-    };
-
-    const onProgress = (event: ProgressEvent) => {
-      setPercent(Math.round(event.progress * 100));
-    };
-
-    const stop = [
-      api.on('updater:update-available', onAvailable),
-      api.on('updater:update-downloaded', onDownloaded),
-      api.on('progress:launcher-update', onProgress),
-    ];
-    return () => stop.forEach((off) => off());
-  }, []);
-
-  if (!info || dismissed) return null;
-
-  const handleDownload = async () => {
-    setStage('downloading');
-    setError(null);
-    const result = await api.updater.download();
-    if (!result.success) {
-      setError(result.error ?? t('update.downloadFailed'));
-      setStage('available');
-    }
-  };
-
-  const handleInstall = async () => {
-    const result = await api.updater.install();
-    // Success quits the app, so only a failure ever gets here.
-    if (!result.success) {
-      setError(result.error ?? t('update.installFailed'));
-    }
-  };
-
-  const size = info.downloadSize ? formatBytes(info.downloadSize) : null;
+  const ready = stage === 'ready';
+  const downloading = stage === 'downloading';
 
   return (
     <div
@@ -83,19 +38,15 @@ export function UpdateToast() {
       <div className="flex items-start gap-2">
         <div className="flex-1">
           <p className="text-sm font-medium text-rf-text">
-            {stage === 'downloaded'
-              ? t('update.ready')
-              : t('update.available', { version: info.version })}
+            {ready ? t('update.ready') : t('update.available', { version: info.version })}
           </p>
           <p className="mt-0.5 text-xs text-rf-text-muted">
-            {stage === 'downloaded'
-              ? t('update.willInstall', { version: info.version })
-              : (size ?? t('update.pending'))}
+            {ready ? t('update.willInstall', { version: info.version }) : t('update.pending')}
           </p>
         </div>
 
         <button
-          onClick={() => setDismissed(true)}
+          onClick={postpone}
           className="shrink-0 text-rf-text-muted transition-colors hover:text-rf-text"
           aria-label={t('update.hide')}
         >
@@ -103,7 +54,7 @@ export function UpdateToast() {
         </button>
       </div>
 
-      {stage === 'downloading' && (
+      {downloading && (
         <div className="mt-2.5">
           <div className="h-1 overflow-hidden rounded-full bg-rf-bg-tertiary">
             <div
@@ -117,16 +68,21 @@ export function UpdateToast() {
         </div>
       )}
 
-      {error && <p className="mt-2 text-[11px] text-rf-danger">{error}</p>}
+      {(stage === 'failed' || error) && (
+        <p className="mt-2 select-text text-[11px] text-rf-danger">
+          {ready ? t('update.installFailed') : t('update.downloadFailed')}
+          {error ? `: ${error}` : ''}
+        </p>
+      )}
 
-      {stage !== 'downloading' && (
+      {!downloading && (
         <div className="mt-2.5 flex gap-2">
-          {stage === 'downloaded' ? (
+          {ready ? (
             <Button
               variant="primary"
               size="sm"
               icon={<RotateCw size={13} />}
-              onClick={() => void handleInstall()}
+              onClick={() => void install()}
             >
               {t('common.restart')}
             </Button>
@@ -135,12 +91,12 @@ export function UpdateToast() {
               variant="primary"
               size="sm"
               icon={<Download size={13} />}
-              onClick={() => void handleDownload()}
+              onClick={() => void download()}
             >
               {t('common.download')}
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
+          <Button variant="ghost" size="sm" onClick={postpone}>
             {t('common.later')}
           </Button>
         </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { useSettingsStore } from '@stores/settings-store';
 import { useNewsStore } from '@stores/news-store';
+import { useUpdaterStore } from '@stores/updater-store';
 import { Select } from '@components/ui/Select';
 import { Input } from '@components/ui/Input';
 import { Button } from '@components/ui/Button';
@@ -431,9 +432,15 @@ function UpdateRow() {
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<UpdateCheck | null>(null);
   const [version, setVersion] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What is known about the update itself is the store's, shared with the
+  // notification and the Play button — this row used to keep its own, and
+  // offered to download a file that was already there.
+  const available = useUpdaterStore((s) => s.available);
+  const stage = useUpdaterStore((s) => s.stage);
+  const updateError = useUpdaterStore((s) => s.error);
+  const downloadUpdate = useUpdaterStore((s) => s.download);
+  const installUpdate = useUpdaterStore((s) => s.install);
 
   useEffect(() => {
     void api.system.getInfo().then((r) => {
@@ -457,18 +464,6 @@ function UpdateRow() {
     }
   };
 
-  const download = async () => {
-    setDownloading(true);
-    setError(null);
-    try {
-      const r = await api.updater.download();
-      if (r.success) setDownloaded(true);
-      else setError(r.error ?? t('settings.updateDownloadFailed'));
-    } finally {
-      setDownloading(false);
-    }
-  };
-
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm text-rf-text-secondary">
@@ -480,17 +475,24 @@ function UpdateRow() {
           {t('settings.checkUpdates')}
         </Button>
 
-        {result?.status === 'available' && !downloaded && (
-          <Button size="sm" loading={downloading} onClick={() => void download()}>
+        {available && stage !== 'ready' && (
+          <Button size="sm" loading={stage === 'downloading'} onClick={() => void downloadUpdate()}>
             {t('settings.downloadUpdate')}
           </Button>
         )}
-        {downloaded && (
-          <Button size="sm" onClick={() => void api.updater.install()}>
+        {stage === 'ready' && (
+          <Button size="sm" onClick={() => void installUpdate()}>
             {t('settings.restartToUpdate')}
           </Button>
         )}
       </div>
+
+      {(stage === 'failed' || updateError) && (
+        <p className="select-text text-xs text-rf-danger">
+          {stage === 'ready' ? t('update.installFailed') : t('update.downloadFailed')}
+          {updateError ? `: ${updateError}` : ''}
+        </p>
+      )}
 
       {/* Four outcomes, four different sentences. Collapsing "could not check"
           into "you are up to date" is how someone stays on a build with a

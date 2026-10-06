@@ -77,9 +77,12 @@ export function HomePage() {
   const [reading, setReading] = useState<Article | null>(null);
   const pendingUpdate = useUpdaterStore((s) => s.available);
   const updateStage = useUpdaterStore((s) => s.stage);
-  const downloadPending = useUpdaterStore((s) => s.downloadPending);
+  const updatePostponed = useUpdaterStore((s) => s.postponed);
+  const downloadUpdate = useUpdaterStore((s) => s.download);
   const installUpdate = useUpdaterStore((s) => s.install);
-  const dismissUpdate = useUpdaterStore((s) => s.dismiss);
+  const postponeUpdate = useUpdaterStore((s) => s.postpone);
+  /** Whether pressing Play installs the waiting launcher update instead of starting the game. */
+  const updateFirst = Boolean(pendingUpdate) && !updatePostponed && updateStage !== 'failed';
   const t = useT();
   const locale = useLocale();
 
@@ -94,17 +97,16 @@ export function HomePage() {
     // launcher that is about to replace itself should not first spend minutes
     // downloading assets and then restart out from under a running game.
     //
-    // Only a *known* update blocks this. The state comes from the startup
-    // check's events, so a click never waits on the network — and a failed or
-    // never-completed check leaves `available` null and play proceeds.
-    if (pendingUpdate && updateStage !== 'failed') {
-      const ready = await downloadPending();
-      if (ready) {
-        await installUpdate(); // quits and relaunches into the new version
-        return;
-      }
-      // Download failed: say so, and let the game start anyway. Being unable to
-      // update is not a reason to be unable to play.
+    // Only a *known* update does this, and only until the player says "later":
+    // that used to hide the notification and change nothing here, so the next
+    // press of Play restarted the launcher all the same. The state comes from
+    // the startup check's events, so a click never waits on the network — and a
+    // failed or never-completed check leaves `available` null and play proceeds.
+    if (updateFirst) {
+      const ready = await downloadUpdate();
+      // Quits and relaunches into the new version — unless it could not, and
+      // being unable to update is not a reason to be unable to play.
+      if (ready && (await installUpdate())) return;
     }
 
     await launch(selectedId);
@@ -315,15 +317,18 @@ export function HomePage() {
 
         {/* Say it before the click, not after the restart. Someone who presses
             Play and gets a relaunching launcher deserves to have been told. */}
-        {pendingUpdate && updateStage !== 'failed' && (
-          <p className="text-xs text-rf-accent-text">
-            {t('home.updateBeforePlay', { version: pendingUpdate.version })}
+        {pendingUpdate && updateFirst && (
+          <p className="max-w-md text-center text-xs text-rf-accent-text">
+            {t('home.updateBeforePlay', { version: pendingUpdate.version })}{' '}
+            <button onClick={postponeUpdate} className="underline hover:text-rf-text">
+              {t('home.updateNotNow')}
+            </button>
           </p>
         )}
         {updateStage === 'failed' && (
           <p className="text-xs text-rf-text-muted">
             {t('home.updateFailedPlayAnyway')}{' '}
-            <button onClick={dismissUpdate} className="underline hover:text-rf-text">
+            <button onClick={postponeUpdate} className="underline hover:text-rf-text">
               {t('common.dismiss')}
             </button>
           </p>

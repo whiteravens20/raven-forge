@@ -141,7 +141,9 @@ export const en = {
     'Could not reach the Microsoft sign-in servers. You can play offline — singleplayer and LAN only, and online-mode servers will refuse the connection.',
   'home.launchOffline': 'Play offline',
   'home.updatingLauncher': 'Updating launcher…',
-  'home.updateBeforePlay': 'Launcher {version} will be installed before the game starts.',
+  'home.updateBeforePlay':
+    'Play installs launcher {version} first: the launcher restarts, and Play has to be pressed once more.',
+  'home.updateNotNow': 'Not now',
   'home.updateFailedPlayAnyway':
     'The launcher update could not be downloaded — the game will start anyway.',
   'home.launchFailed': 'Could not start the game',
@@ -520,7 +522,6 @@ export const en = {
     'Self-update is not available on this platform yet. Download the newest release from GitHub.',
   'settings.updateCheckFailed': 'Could not check for updates.',
   'settings.updateCheckFailedWith': 'Could not check for updates: {error}',
-  'settings.updateDownloadFailed': 'Could not download the update.',
   'settings.section.data': 'Data',
   'settings.theme': 'Theme',
   'settings.theme.dark': 'Dark',
