@@ -234,8 +234,14 @@ export function LogViewer({ onClose }: LogViewerProps) {
             </p>
           )}
 
+          {/* Thousands of rows, of which a screenful is ever on screen. The rest
+              are left unlaid-out until they scroll near, which is what makes a
+              full log open and filter at once instead of after a pause. */}
           {visible.map((line, idx) => (
-            <div key={idx} className={`whitespace-pre-wrap break-all ${levelClass(line.level)}`}>
+            <div
+              key={idx}
+              className={`whitespace-pre-wrap break-all [contain-intrinsic-size:auto_1.4em] [content-visibility:auto] ${levelClass(line.level)}`}
+            >
               {line.time && <span className="mr-2 text-rf-text-muted">{line.time}</span>}
               {line.message}
             </div>
