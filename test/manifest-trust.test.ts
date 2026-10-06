@@ -12,6 +12,7 @@ import {
   BUILT_IN_KEYS,
   WHITE_RAVENS_PUBLIC_KEY,
   isFirstPartyManifestUrl,
+  trustedKeyRing,
 } from '../src/shared/branding';
 import { isSecureContentUrl } from '../src/shared/validators';
 import type { TrustedKey } from '../src/shared/ipc-types';
@@ -96,13 +97,25 @@ describe('verifyManifestSignature', () => {
     expect(BUILT_IN_KEYS.map((k) => k.publicKey)).toContain(WHITE_RAVENS_PUBLIC_KEY);
   });
 
-  it('does not offer the publisher key twice when the user added it too', () => {
+  it('lists the publisher key once, under its own name, when the player added it too', () => {
     const mine: TrustedKey[] = [
       { name: 'Mine', publicKey: WHITE_RAVENS_PUBLIC_KEY, addedAt: '2026-01-01T00:00:00.000Z' },
     ];
-    const result = verifyManifestSignature(sign(manifest), mine);
-    // The user's name for it wins; the built-in copy is not consulted again.
-    expect(result).toMatchObject({ signed: true, valid: false });
+    expect(trustedKeyRing(mine)).toEqual(BUILT_IN_KEYS);
+  });
+
+  it('holds a first-party manifest to the built-in key, whatever else the player trusts', () => {
+    // Signed, and by a key in the player's own list — which is exactly what
+    // somebody who talked them into adding that key would present. For a pack
+    // from the White Ravens site only the key that ships with the launcher
+    // counts, and this is not it.
+    const signed = sign(manifest);
+    expect(verifyManifestSignature(signed, trusted('Somebody'))).toMatchObject({ valid: true });
+    expect(verifyManifestSignature(signed, trusted('Somebody'), true)).toMatchObject({
+      signed: true,
+      valid: false,
+      error: 'Signature does not match the White Ravens key',
+    });
   });
 });
 

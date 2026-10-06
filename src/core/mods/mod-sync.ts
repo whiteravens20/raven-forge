@@ -451,7 +451,11 @@ async function obtainManifest(
 
   /** Apply the trust policy, then hand back what the caller may install. */
   const approve = (loaded: LoadedManifest, etag: string | undefined) => {
-    const verification = verifyManifestSignature(loaded.raw as SignedManifest, trustedKeys);
+    const verification = verifyManifestSignature(
+      loaded.raw as SignedManifest,
+      trustedKeys,
+      firstParty,
+    );
     assertManifestTrusted(verification, trustedKeys, profileName, firstParty);
     return { manifest: loaded.manifest, etag, verification };
   };

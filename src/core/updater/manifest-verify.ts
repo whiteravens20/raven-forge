@@ -3,7 +3,7 @@
 import nacl from 'tweetnacl';
 import { decodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import { log } from '../../main/logger';
-import { trustedKeyRing } from '../../shared/branding';
+import { BUILT_IN_KEYS, trustedKeyRing } from '../../shared/branding';
 import type { ManifestVerification, TrustedKey } from '../../shared/ipc-types';
 import { canonicalize, type SignedManifest } from './canonical';
 
@@ -20,10 +20,13 @@ import { canonicalize, type SignedManifest } from './canonical';
  * The object must be the raw parsed JSON, not the schema's output. Zod strips
  * keys it does not know about, and a manifest that carries any would then
  * canonicalize to different bytes than the ones that were signed.
+ *
+ * @param firstParty whether the manifest came from the White Ravens packs site
  */
 export function verifyManifestSignature(
   manifest: SignedManifest,
   trustedKeys: TrustedKey[],
+  firstParty = false,
 ): ManifestVerification {
   if (!manifest.signature) return { signed: false, valid: false };
 
@@ -34,7 +37,12 @@ export function verifyManifestSignature(
     return { signed: true, valid: false, error: 'Signature is not valid base64' };
   }
 
-  const keys = trustedKeyRing(trustedKeys);
+  // A manifest from the White Ravens packs site is checked against the key
+  // that ships with the launcher and no other. It used to be checked against
+  // the whole ring, so a key the player had been talked into adding vouched for
+  // first-party packs too — which is the one thing "held to the built-in key"
+  // was written to rule out.
+  const keys = firstParty ? BUILT_IN_KEYS : trustedKeyRing(trustedKeys);
   const message = decodeUTF8(canonicalize(manifest));
   for (const key of keys) {
     try {
@@ -50,7 +58,9 @@ export function verifyManifestSignature(
   return {
     signed: true,
     valid: false,
-    error: 'Signature does not match any trusted public key',
+    error: firstParty
+      ? 'Signature does not match the White Ravens key'
+      : 'Signature does not match any trusted public key',
   };
 }
 
