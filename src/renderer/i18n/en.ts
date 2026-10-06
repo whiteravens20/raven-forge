@@ -528,6 +528,7 @@ export const en = {
     'Installed from a system package. Update it with your package manager (apt, dnf), not from here.',
   'settings.updateUnsignedPlatform':
     'Self-update is not available on this platform yet. Download the newest release from GitHub.',
+  'settings.openReleases': 'Open the releases page',
   'settings.updateCheckFailed': 'Could not check for updates.',
   'settings.updateCheckFailedWith': 'Could not check for updates: {error}',
   'settings.section.data': 'Data',

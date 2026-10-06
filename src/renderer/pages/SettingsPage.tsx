@@ -14,9 +14,10 @@ import { DataFolderCard } from '@components/DataFolderCard';
 import { StorageMap } from '@components/StorageMap';
 import { Spinner } from '@components/ui/Spinner';
 import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
-import { isBuiltInKey, trustedKeyRing } from '@shared/branding';
+import { RELEASES_URL, isBuiltInKey, trustedKeyRing } from '@shared/branding';
 import { EXAMPLE_PUBLIC_KEY, isEd25519PublicKey } from '@shared/trusted-key';
 import type { ThemeMode, LauncherBehaviorOnLaunch, UpdateCheck } from '@shared/ipc-types';
+import { openLink } from '@renderer/open';
 
 const api = window.ravenforge;
 
@@ -514,6 +515,18 @@ function UpdateRow() {
             : result.reason === 'system-package'
               ? t('settings.updateSystemPackage')
               : t('settings.updateUnsignedPlatform')}
+          {/* "Download it from GitHub", with nothing to click, is a search. */}
+          {result.reason === 'unsigned-platform' && (
+            <>
+              {' '}
+              <button
+                onClick={() => void openLink(RELEASES_URL)}
+                className="underline hover:text-rf-text"
+              >
+                {t('settings.openReleases')}
+              </button>
+            </>
+          )}
         </p>
       )}
       {result?.status === 'failed' && (

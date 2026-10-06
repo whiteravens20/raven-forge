@@ -117,6 +117,9 @@ export function isBuiltInKey(publicKey: string): boolean {
 /** The launcher's own source repository — About, and the bug-report links. */
 export const REPO_URL = 'https://github.com/whiteravens20/raven-forge';
 
+/** Where a build that cannot update itself is fetched from by hand. */
+export const RELEASES_URL = `${REPO_URL}/releases/latest`;
+
 /** The organisation behind it, for anyone who would rather not open a GitHub account. */
 export const ORG_URL = 'https://whiteravens.net';
 

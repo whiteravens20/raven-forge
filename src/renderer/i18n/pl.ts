@@ -558,6 +558,7 @@ export const pl: Translations = {
     'Zainstalowano z pakietu systemowego. Aktualizuj przez menedżer pakietów (apt, dnf), nie stąd.',
   'settings.updateUnsignedPlatform':
     'Automatyczna aktualizacja nie jest jeszcze dostępna na tej platformie. Pobierz najnowsze wydanie z GitHuba.',
+  'settings.openReleases': 'Otwórz stronę wydań',
   'settings.updateCheckFailed': 'Nie udało się sprawdzić aktualizacji.',
   'settings.updateCheckFailedWith': 'Nie udało się sprawdzić aktualizacji: {error}',
   'settings.section.data': 'Dane',
