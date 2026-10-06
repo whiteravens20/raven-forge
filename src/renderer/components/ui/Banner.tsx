@@ -38,7 +38,8 @@ export function Banner({ type, children, dismissible, onDismiss }: BadgeProps) {
       aria-live={type === 'urgent' ? 'assertive' : 'polite'}
     >
       <Icon size={16} className="shrink-0" aria-hidden="true" />
-      <span className="flex-1">{children}</span>
+      {/* What a banner says is often the thing to copy: a reason, a path. */}
+      <span className="flex-1 select-text">{children}</span>
       {dismissible && onDismiss && (
         <button
           onClick={onDismiss}

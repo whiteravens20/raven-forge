@@ -98,6 +98,7 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
 
       <div
         ref={containerRef}
+        role="log"
         className="flex-1 overflow-y-auto p-2 font-mono text-[11px] leading-relaxed"
         onScroll={handleScroll}
       >

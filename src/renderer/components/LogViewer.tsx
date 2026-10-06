@@ -218,6 +218,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
         <div
           ref={containerRef}
           onScroll={handleScroll}
+          role="log"
           className="flex-1 overflow-y-auto bg-rf-bg px-4 py-3 font-mono text-[11px] leading-relaxed"
         >
           {loading && <p className="text-rf-text-muted">{t('logs.loading')}</p>}
