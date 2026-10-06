@@ -71,7 +71,7 @@ function isFresh(entry: CacheEntry | undefined, now: number): boolean {
 }
 
 /** Whether a name is worth asking Modrinth about. */
-export function isProjectKey(key: unknown): key is string {
+function isProjectKey(key: unknown): key is string {
   return typeof key === 'string' && PROJECT_KEY.test(key) && !HASH_PREFIX.test(key);
 }
 

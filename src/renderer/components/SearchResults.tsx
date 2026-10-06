@@ -63,7 +63,7 @@ export function SearchResultRow({
 }
 
 /** A small way out to the project's own page, opened in the system browser. */
-export function ProjectLink({ slug, name }: { slug: string; name: string }) {
+function ProjectLink({ slug, name }: { slug: string; name: string }) {
   const t = useT();
   const label = t('search.openProject', { name });
   return (
