@@ -133,7 +133,6 @@ const input: CrashReportInput = {
   profile,
   exitCode: 1,
   playTimeMinutes: 3,
-  startedAt: Date.now(),
   logTail: [`[main/INFO]: --accessToken ${TOKEN}`, '[main/ERROR]: java.lang.NullPointerException'],
   gameDir: '/data/profiles/p1/.minecraft',
   java: { path: '/data/java/21/bin/java', version: 21, vendor: 'Adoptium Temurin' },
@@ -154,10 +153,11 @@ describe('buildCrashReport', () => {
   });
 
   it('carries no token, in the quoted output or anywhere else', () => {
-    const report = buildCrashReport(input, [], {
+    const minecraftCrash = {
       file: 'crash-2026-08-07_15.46.31-client.txt',
       content: `-- Head --\nUser: RavenPlayer\nToken: ${TOKEN}`,
-    });
+    };
+    const report = buildCrashReport({ ...input, minecraftCrash }, []);
     expect(report).not.toContain(TOKEN);
     expect(report).not.toContain('RavenPlayer');
     expect(report).toContain('crash-2026-08-07_15.46.31-client.txt');

@@ -627,7 +627,6 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
       profile,
       ...ended,
       playTimeMinutes,
-      startedAt: startTime,
       logTail,
       gameDir,
       java,

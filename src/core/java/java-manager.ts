@@ -132,7 +132,7 @@ export async function resolveChosenJava(
       `Profile Java ${version} at ${binPath} is newer than the ${requiredVersion} asked for`,
     );
   }
-  return { version, path: binPath, vendor: 'chosen in the profile', managed: false };
+  return { version, path: binPath, vendor: 'chosen in the profile' };
 }
 
 // ── Detect system Java ─────────────────────────────────────
@@ -247,7 +247,7 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
 
   return distinct.flatMap((candidate, index) => {
     const version = versions[index];
-    return version ? [{ version, path: candidate, vendor: 'system', managed: false }] : [];
+    return version ? [{ version, path: candidate, vendor: 'system' }] : [];
   });
 }
 
@@ -469,7 +469,6 @@ export async function ensureJavaVersion(
     version: majorVersion,
     path: javaPath,
     vendor: 'Adoptium Temurin',
-    managed: true,
   };
 
   return serializeByKey(`java:${dir}`, async () => {

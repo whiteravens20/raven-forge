@@ -206,7 +206,6 @@ describe.skipIf(!posix)('resolveChosenJava', () => {
       version: 21,
       path: bin,
       vendor: 'chosen in the profile',
-      managed: false,
     });
   });
 
@@ -269,7 +268,6 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
       version: 21,
       path: managedJava(),
       vendor: 'Adoptium Temurin',
-      managed: true,
     });
     expect(archiveHits).toEqual([]);
   });
@@ -285,7 +283,7 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
 
     const result = await ensureJavaVersion(21);
     expect(archiveHits).toHaveLength(1);
-    expect(result.managed).toBe(true);
+    expect(result.path).toBe(managedJava());
     expect(await execFileAsync(result.path, ['-version']).then(({ stderr }) => stderr)).toContain(
       '21.0.3',
     );
@@ -492,7 +490,6 @@ describe.skipIf(!posix)('detectSystemJava', () => {
         version: 21,
         path: path.join(home, 'bin', 'java'),
         vendor: 'system',
-        managed: false,
       });
     },
     WHATEVER_IS_INSTALLED,

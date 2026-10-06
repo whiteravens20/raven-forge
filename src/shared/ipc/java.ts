@@ -7,7 +7,6 @@ export interface JavaInstallation {
   version: number;
   path: string;
   vendor: string;
-  managed: boolean;
 }
 
 /** What a binary a profile was pointed at turned out to be. */

@@ -45,7 +45,6 @@ function crashOf(name: string): CrashReportInput {
     },
     exitCode: 1,
     playTimeMinutes: 3,
-    startedAt: Date.now(),
     logTail: [],
     gameDir: path.join(root, 'game'),
     java: { path: '/data/java/jre-21/bin/java', version: 21 },

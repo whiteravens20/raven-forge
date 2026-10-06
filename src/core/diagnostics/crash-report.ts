@@ -122,15 +122,13 @@ export interface CrashReportInput {
    */
   signal?: NodeJS.Signals | null;
   playTimeMinutes: number;
-  /** `Date.now()` at spawn, so the game's own crash file can be matched to this run. */
-  startedAt: number;
   /** The game's last output, as `getLogTail` returned it. */
   logTail: string[];
   /** Set when the process never started at all, in which case it is the whole finding. */
   spawnError?: string;
   /** Where the game actually ran — a profile can point somewhere else entirely. */
   gameDir: string;
-  java: { path: string; version?: number; vendor?: string; managed?: boolean };
+  java: { path: string; version?: number; vendor?: string };
   accountType: string;
   /** Whether this particular launch went online, which is not the global setting. */
   offlineLaunch: boolean;
@@ -235,12 +233,8 @@ async function listMods(gameDir: string): Promise<string[]> {
   }
 }
 
-export function buildCrashReport(
-  input: CrashReportInput,
-  mods: string[],
-  minecraftCrash?: { file: string; content: string },
-): string {
-  const { profile } = input;
+export function buildCrashReport(input: CrashReportInput, mods: string[]): string {
+  const { profile, minecraftCrash } = input;
   const sections: string[] = [];
 
   sections.push(
@@ -378,7 +372,7 @@ export async function writeCrashReport(input: CrashReportInput): Promise<string 
     const dir = paths.crashReportsDir;
     await fs.mkdir(dir, { recursive: true });
     const file = path.join(dir, `crash-${slug(input.profile.name)}-${stamp(Date.now())}.txt`);
-    await fs.writeFile(file, buildCrashReport(input, mods, input.minecraftCrash), 'utf-8');
+    await fs.writeFile(file, buildCrashReport(input, mods), 'utf-8');
     await prune(dir);
 
     log.info(`Wrote crash report for ${input.profile.name} to ${file}`);
