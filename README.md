@@ -152,7 +152,7 @@ test/               # Vitest suites — pure logic, the state files over a real
 
 ## Configuration: News Feed & Announcements
 
-A fresh install points at White Ravens' published feeds (listed under [Live endpoints](#live-endpoints)). Both are yours to change — under Settings, or in the settings JSON file at `<userData>/settings.json`. Clearing a field switches that section off rather than restoring the default.
+A fresh install points at White Ravens' published feeds (listed under [Live endpoints](#live-endpoints)). Both are yours to change — under Settings, or in `settings.json` in the data folder (Settings → Data shows where that is). Clearing a field switches that section off rather than restoring the default.
 
 ### News Feed
 
