@@ -7,7 +7,8 @@ import { useT } from '@renderer/i18n';
 import { openLink } from '@renderer/open';
 
 const DISMISS_KEY = 'rf-bedrock-card-dismissed';
-const BEDROCK_URL = 'https://www.minecraft.net/en-us/download';
+// Without the locale segment: left off, the site sends each visitor to their own.
+const BEDROCK_URL = 'https://www.minecraft.net/download';
 
 /**
  * Raven Forge is a Java Edition launcher and will stay one — Bedrock ships as a
