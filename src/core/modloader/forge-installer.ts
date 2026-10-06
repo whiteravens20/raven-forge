@@ -20,7 +20,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import yauzl from 'yauzl';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import {
@@ -37,6 +36,7 @@ import { loaderCacheDir } from './loader-paths';
 import { loaderProfilePath, readLoaderProfile } from './loader-profile';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
+import { readZipEntry } from '../util/zip-read';
 import { downloadToFile } from '../net/download';
 import { getSettings } from '../config/settings-manager';
 import { CancelledError, throwIfCancelled, withTimeout } from '../util/cancellation';
@@ -208,45 +208,6 @@ function installerUrl(loader: ForgeLikeLoader, loaderVersion: string, mcVersion:
     return `${NEOFORGE_LEGACY_MAVEN_ROOT}/${full}/forge-${full}-installer.jar`;
   }
   return `${NEOFORGE_MAVEN_ROOT}/${loaderVersion}/neoforge-${loaderVersion}-installer.jar`;
-}
-
-/** Read one entry out of a zip into memory. Returns null when it is not there. */
-async function readZipEntry(jarPath: string, wanted: string): Promise<Buffer | null> {
-  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
-    yauzl.open(jarPath, { lazyEntries: true }, (err, opened) => {
-      if (err || !opened) reject(err ?? new Error(`Could not open ${jarPath}`));
-      else resolve(opened);
-    });
-  });
-
-  // Closed here whichever way it goes. yauzl closes the file by itself only
-  // when it runs off the end of the entries, and this stops at the one it
-  // wants — so every install used to leave the installer jar open.
-  try {
-    return await new Promise<Buffer | null>((resolve, reject) => {
-      zip.on('entry', (entry: yauzl.Entry) => {
-        if (entry.fileName !== wanted) {
-          zip.readEntry();
-          return;
-        }
-        zip.openReadStream(entry, (err, stream) => {
-          if (err || !stream) {
-            reject(err ?? new Error(`Could not read ${wanted} from ${jarPath}`));
-            return;
-          }
-          const chunks: Buffer[] = [];
-          stream.on('data', (c: Buffer) => chunks.push(c));
-          stream.on('end', () => resolve(Buffer.concat(chunks)));
-          stream.on('error', reject);
-        });
-      });
-      zip.on('end', () => resolve(null));
-      zip.on('error', reject);
-      zip.readEntry();
-    });
-  } finally {
-    zip.close();
-  }
 }
 
 /** The checksum sidecars a Maven repository publishes, strongest first. */

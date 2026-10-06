@@ -3,13 +3,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createWriteStream } from 'node:fs';
-import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import yauzl from 'yauzl';
 import { log } from '../../main/logger';
 import { CancelledError, isCancellation, throwIfCancelled } from '../util/cancellation';
 import { forEachConcurrently } from '../util/concurrency';
 import { serializeByKey } from '../util/serialize';
+import { eachEntry, openEntry } from '../util/zip-read';
 import { downloadToFile } from '../net/download';
 import { MOJANG_RESOURCES } from '../../shared/constants';
 import { hashFile } from '../mods/integrity';
@@ -343,62 +342,22 @@ async function extractNatives(
 ): Promise<void> {
   const excludes = [...DEFAULT_NATIVE_EXCLUDES, ...exclude];
 
-  const zipFile = await new Promise<yauzl.ZipFile>((resolve, reject) => {
-    yauzl.open(jarPath, { lazyEntries: true }, (err, zip) => {
-      if (err || !zip) reject(err ?? new Error(`Could not open ${jarPath}`));
-      else resolve(zip);
-    });
-  });
+  await eachEntry(jarPath, async (zip, entry) => {
+    const name = entry.fileName;
+    if (excludes.some((p) => name.startsWith(p)) || !isNativeBinary(name)) return;
 
-  // `finally`, because every path out of the promise below other than the happy
-  // one used to leave the archive open: an unreadable entry rejected and the
-  // descriptor stayed held for as long as the launcher ran.
-  try {
-    await extractNativeEntries(zipFile, jarPath, nativesDir, excludes);
-  } finally {
-    zipFile.close();
-  }
-}
+    // Flatten: java.library.path is not searched recursively.
+    const dest = path.join(nativesDir, path.basename(name));
+    if (await hasSize(dest, entry.uncompressedSize)) return;
 
-function extractNativeEntries(
-  zipFile: yauzl.ZipFile,
-  jarPath: string,
-  nativesDir: string,
-  excludes: string[],
-): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const unpack = async (entry: yauzl.Entry): Promise<void> => {
-      const name = entry.fileName;
-      if (name.endsWith('/') || excludes.some((p) => name.startsWith(p)) || !isNativeBinary(name)) {
-        return;
-      }
-
-      // Flatten: java.library.path is not searched recursively.
-      const dest = path.join(nativesDir, path.basename(name));
-      if (await hasSize(dest, entry.uncompressedSize)) return;
-
-      const readStream = await new Promise<Readable>((opened, failed) => {
-        zipFile.openReadStream(entry, (err, stream) => {
-          if (err || !stream) failed(err ?? new Error(`Could not read ${name} from ${jarPath}`));
-          else opened(stream);
-        });
-      });
-      const part = `${dest}.part`;
-      try {
-        await pipeline(readStream, createWriteStream(part));
-        await fs.rename(part, dest);
-      } catch (err) {
-        await fs.rm(part, { force: true });
-        throw err;
-      }
-    };
-
-    zipFile.on('entry', (entry: yauzl.Entry) => {
-      unpack(entry).then(() => zipFile.readEntry(), reject);
-    });
-    zipFile.on('end', resolve);
-    zipFile.on('error', reject);
-    zipFile.readEntry();
+    const part = `${dest}.part`;
+    try {
+      await pipeline(await openEntry(zip, entry), createWriteStream(part));
+      await fs.rename(part, dest);
+    } catch (err) {
+      await fs.rm(part, { force: true });
+      throw err;
+    }
   });
 }
 

@@ -3,12 +3,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { constants as fsConstants } from 'node:fs';
-import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import yauzl from 'yauzl';
 import { z } from 'zod';
 import { log } from '../../main/logger';
 import { resolveWithin } from '../util/safe-path';
+import { eachEntry, openEntry } from '../util/zip-read';
 import type { ModLoaderType } from '../../shared/ipc-types';
 
 /** `O_NOFOLLOW` where the platform has it; 0 elsewhere leaves the flag off. */
@@ -145,50 +144,6 @@ function safeRelativePath(entry: string): string | null {
   if (normalised === '.' || normalised === '') return null;
 
   return normalised;
-}
-
-function openZip(file: string): Promise<yauzl.ZipFile> {
-  return new Promise((resolve, reject) => {
-    yauzl.open(file, { lazyEntries: true }, (err, opened) => {
-      if (err || !opened) reject(err ?? new Error(`Could not open ${file}`));
-      else resolve(opened);
-    });
-  });
-}
-
-function openEntry(zip: yauzl.ZipFile, entry: yauzl.Entry): Promise<Readable> {
-  return new Promise((resolve, reject) => {
-    zip.openReadStream(entry, (err, stream) => {
-      if (err || !stream) reject(err ?? new Error(`Could not read ${entry.fileName}`));
-      else resolve(stream);
-    });
-  });
-}
-
-/**
- * Go through an archive's files one at a time, in order.
- *
- * `visit` decides what to do with each; the next entry is not read until it has
- * finished. The archive is closed whichever way this ends.
- */
-async function eachEntry(
-  file: string,
-  visit: (zip: yauzl.ZipFile, entry: yauzl.Entry) => Promise<void>,
-): Promise<void> {
-  const zip = await openZip(file);
-  try {
-    await new Promise<void>((resolve, reject) => {
-      zip.on('entry', (entry: yauzl.Entry) => {
-        if (entry.fileName.endsWith('/')) zip.readEntry();
-        else visit(zip, entry).then(() => zip.readEntry(), reject);
-      });
-      zip.on('end', resolve);
-      zip.on('error', reject);
-      zip.readEntry();
-    });
-  } finally {
-    zip.close();
-  }
 }
 
 /** Where an archive entry goes in the game directory, or null when it is not an override. */
