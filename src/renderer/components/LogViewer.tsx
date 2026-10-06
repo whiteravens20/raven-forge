@@ -69,6 +69,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
   const [filter, setFilter] = useState<LevelFilter>('all');
   const [copied, setCopied] = useState(false);
   const [follow, setFollow] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -204,11 +205,19 @@ export function LogViewer({ onClose }: LogViewerProps) {
             ))}
 
             <button
-              onClick={() => void refresh()}
+              onClick={() => {
+                // Long enough to be seen: the read itself is over in a frame,
+                // and a button that does its work without moving looks dead.
+                setRefreshing(true);
+                void Promise.all([refresh(), new Promise((done) => setTimeout(done, 400))]).then(
+                  () => setRefreshing(false),
+                );
+              }}
+              disabled={refreshing}
               className="ml-1 rounded p-1.5 text-rf-text-muted transition-colors hover:text-rf-text"
               aria-label={t('common.refresh')}
             >
-              <RefreshCw size={13} />
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} />
             </button>
             <button
               onClick={onClose}
