@@ -24,11 +24,7 @@ export function initUpdater(): void {
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('update-available', (info) => {
-    pendingUpdate = {
-      version: info.version,
-      releaseDate: info.releaseDate,
-      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined,
-    };
+    pendingUpdate = { version: info.version };
     log.info(`Launcher update available: ${info.version}`);
     getMainWindow()?.webContents.send('updater:update-available', pendingUpdate);
   });
@@ -52,11 +48,7 @@ export function initUpdater(): void {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    downloadedUpdate = {
-      version: info.version,
-      releaseDate: info.releaseDate,
-      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined,
-    };
+    downloadedUpdate = { version: info.version };
     log.info(`Launcher update downloaded: ${info.version}`);
     getMainWindow()?.webContents.send('updater:update-downloaded', downloadedUpdate);
   });

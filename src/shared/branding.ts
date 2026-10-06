@@ -120,6 +120,11 @@ export const REPO_URL = 'https://github.com/whiteravens20/raven-forge';
 /** Where a build that cannot update itself is fetched from by hand. */
 export const RELEASES_URL = `${REPO_URL}/releases/latest`;
 
+/** The notes of one release: what an update brings, for whoever asks before taking it. */
+export function releaseNotesUrl(version: string): string {
+  return `${REPO_URL}/releases/tag/v${encodeURIComponent(version)}`;
+}
+
 /** The organisation behind it, for anyone who would rather not open a GitHub account. */
 export const ORG_URL = 'https://whiteravens.net';
 

@@ -723,6 +723,7 @@ export const en = {
   'update.available': 'Update available: v{version}',
   'update.willInstall': 'v{version} will be installed after a restart.',
   'update.pending': 'A new launcher version is ready to download.',
+  'update.whatsNew': 'What’s new',
   'update.downloading': 'Downloading… {percent}%',
   'update.downloadFailed': 'Downloading the update failed',
   'update.installFailed': 'Installing the update failed',

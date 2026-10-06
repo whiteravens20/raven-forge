@@ -15,7 +15,7 @@ import { DataFolderCard } from '@components/DataFolderCard';
 import { StorageMap } from '@components/StorageMap';
 import { Spinner } from '@components/ui/Spinner';
 import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
-import { RELEASES_URL, isBuiltInKey, trustedKeyRing } from '@shared/branding';
+import { RELEASES_URL, isBuiltInKey, releaseNotesUrl, trustedKeyRing } from '@shared/branding';
 import { EXAMPLE_PUBLIC_KEY, isEd25519PublicKey } from '@shared/trusted-key';
 import type { ThemeMode, LauncherBehaviorOnLaunch, UpdateCheck } from '@shared/ipc-types';
 import { openLink } from '@renderer/open';
@@ -537,7 +537,13 @@ function UpdateRow() {
       )}
       {result?.status === 'available' && (
         <p className="text-xs text-rf-accent-text">
-          {t('settings.updateAvailable', { version: result.update.version })}
+          {t('settings.updateAvailable', { version: result.update.version })}{' '}
+          <button
+            onClick={() => void openLink(releaseNotesUrl(result.update.version))}
+            className="underline hover:text-rf-text"
+          >
+            {t('update.whatsNew')}
+          </button>
         </p>
       )}
       {result?.status === 'unsupported' && (

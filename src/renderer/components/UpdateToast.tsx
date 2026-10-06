@@ -3,6 +3,8 @@
 import { Download, RotateCw, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useUpdaterStore } from '@stores/updater-store';
+import { releaseNotesUrl } from '@shared/branding';
+import { openLink } from '@renderer/open';
 import { useT } from '@renderer/i18n';
 
 /**
@@ -43,6 +45,13 @@ export function UpdateToast() {
           <p className="mt-0.5 text-xs text-rf-text-muted">
             {ready ? t('update.willInstall', { version: info.version }) : t('update.pending')}
           </p>
+          {/* What it brings, before it is taken: the release's own notes. */}
+          <button
+            onClick={() => void openLink(releaseNotesUrl(info.version))}
+            className="mt-1 text-xs text-rf-accent-text underline-offset-2 hover:underline"
+          >
+            {t('update.whatsNew')}
+          </button>
         </div>
 
         <button

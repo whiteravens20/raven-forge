@@ -719,6 +719,7 @@ export const pl: Translations = {
   'update.available': 'Dostępna aktualizacja: v{version}',
   'update.willInstall': 'v{version} zostanie zainstalowana po restarcie.',
   'update.pending': 'Nowa wersja launchera jest gotowa do pobrania.',
+  'update.whatsNew': 'Co nowego',
   'update.downloading': 'Pobieranie… {percent}%',
   'update.downloadFailed': 'Pobieranie aktualizacji nie powiodło się',
   'update.installFailed': 'Instalacja aktualizacji nie powiodła się',
