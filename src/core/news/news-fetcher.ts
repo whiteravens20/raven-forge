@@ -33,16 +33,20 @@ const FETCH_TIMEOUT_MS = 10_000;
  * whole feed. Returns `null` on any failure — the caller decides what a failed
  * fetch should show.
  *
- * `revalidate` is what makes the refresh button mean something. GitHub Pages
- * serves these feeds with `Cache-Control: max-age=600`, so without it a press
- * inside ten minutes is answered from the HTTP cache and the freshly published
- * item does not appear — a button that looks like it worked and did nothing.
+ * `fresh` is what makes the refresh button mean something. GitHub Pages serves
+ * these feeds through a CDN that keeps each one for ten minutes, so a press
+ * inside that time was answered with the copy the CDN already had and the newly
+ * published item did not appear — a button that looked like it worked and did
+ * nothing. Asking with `cache: 'no-cache'` did not change that: Node's fetch
+ * keeps no cache of its own for the option to bypass, and a CDN does not take
+ * instructions from a request header. It keeps its copies by address, so a
+ * forced refresh asks at an address it has not seen.
  */
 async function fetchFeed<T>(
   url: string,
   schema: z.ZodType<T>,
   label: string,
-  revalidate: boolean,
+  fresh: boolean,
 ): Promise<T[] | null> {
   if (!/^https?:\/\//i.test(url)) {
     log.warn(`${label} feed URL must be http(s): ${url}`);
@@ -50,9 +54,10 @@ async function fetchFeed<T>(
   }
 
   try {
-    const response = await fetch(url, {
+    const address = new URL(url);
+    if (fresh) address.searchParams.set('refreshed', String(Date.now()));
+    const response = await fetch(address, {
       headers: { 'User-Agent': modrinthUserAgent() },
-      cache: revalidate ? 'no-cache' : 'default',
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 

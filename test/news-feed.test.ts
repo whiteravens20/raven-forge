@@ -96,18 +96,32 @@ describe('feed caching', () => {
     expect((await fetchNews(true)).items.map((n) => n.id)).toEqual(['b']);
   });
 
-  it('makes a forced refresh revalidate rather than accept a cached body', async () => {
-    // The feeds ship on GitHub Pages behind `max-age=600`, so without this the
-    // refresh button is answered from cache for ten minutes and appears to have
-    // done nothing.
-    settings.newsFeedUrl = freshUrl();
+  it('asks for a forced refresh at an address the CDN has no copy of', async () => {
+    // The feeds ship on GitHub Pages, whose CDN keeps each one for ten minutes
+    // and keeps them by address. A request header does not change its mind; an
+    // address it has not seen does.
+    const url = freshUrl();
+    settings.newsFeedUrl = url;
     fetchMock.mockResolvedValue(jsonResponse([item('a')]));
 
     await fetchNews();
-    expect(fetchMock.mock.calls[0][1].cache).toBe('default');
+    expect(String(fetchMock.mock.calls[0][0])).toBe(url);
 
     await fetchNews(true);
-    expect(fetchMock.mock.calls[1][1].cache).toBe('no-cache');
+    const refreshed = new URL(String(fetchMock.mock.calls[1][0]));
+    expect(refreshed.origin + refreshed.pathname).toBe(url);
+    expect(refreshed.searchParams.get('refreshed')).toMatch(/^\d+$/);
+  });
+
+  it('keeps what a feed address already asks for when it refreshes', async () => {
+    settings.newsFeedUrl = 'https://feeds.example/news.json?channel=stable';
+    fetchMock.mockResolvedValue(jsonResponse([item('a')]));
+
+    await fetchNews(true);
+
+    const asked = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(asked.searchParams.get('channel')).toBe('stable');
+    expect(asked.searchParams.has('refreshed')).toBe(true);
   });
 
   it('refetches when the URL changes, even without a force', async () => {
