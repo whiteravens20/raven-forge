@@ -32,6 +32,7 @@ import {
 import { getVersionMeta } from '../minecraft/version-manifest';
 import { verifyDownload, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
+import { ensureClientJar } from '../minecraft/asset-downloader';
 import { loaderCacheDir } from './loader-paths';
 import { loaderProfilePath, readLoaderProfile } from './loader-profile';
 import { writeJsonAtomic } from '../util/atomic-file';
@@ -335,6 +336,12 @@ async function ensureLauncherProfilesStub(installRoot: string): Promise<void> {
 /**
  * The installer patches the vanilla client jar, so it has to be on disk first
  * and where the installer expects to find it.
+ *
+ * That place is the launcher's own `versions/` folder, so the jar is got the
+ * way a launch gets it: checked against Mojang's size and hash, and fetched
+ * again when it is not that file. This used to accept any file of that name —
+ * and wrote straight to it — so a launcher closed mid-download left a short jar
+ * that every later install went on to patch.
  */
 async function ensureVanillaClientForInstaller(
   installRoot: string,
@@ -342,34 +349,14 @@ async function ensureVanillaClientForInstaller(
   meta: VersionMeta,
   signal?: AbortSignal,
 ): Promise<void> {
-  const versionDir = path.join(installRoot, 'versions', mcVersion);
+  const versionsDir = path.join(installRoot, 'versions');
+  const versionDir = path.join(versionsDir, mcVersion);
   await fs.mkdir(versionDir, { recursive: true });
 
   // The installer reads the version JSON next to the jar to find the client
   // download; both have to be there.
   await fs.writeFile(path.join(versionDir, `${mcVersion}.json`), JSON.stringify(meta), 'utf-8');
-
-  const jarPath = path.join(versionDir, `${mcVersion}.jar`);
-  try {
-    await fs.access(jarPath);
-    return;
-  } catch {
-    /* not there yet */
-  }
-
-  log.info(`Downloading vanilla client jar ${mcVersion} for the installer...`);
-  // Streamed, not `arrayBuffer()`: this jar is around 26 MB and used to be
-  // fully resident in memory on its way to disk — the same waste `integrity.ts`
-  // removed from hashing and did not remove from here.
-  // Mojang serves this over https and its sha1 is checked just below; the flag
-  // refuses a redirect that would drop the jar the installer patches to http.
-  await downloadToFile(meta.downloads.client.url, jarPath, { signal, secure: true });
-
-  // Mojang's own sha1 is already in hand, and the normal launch path checks the
-  // very same file against it. This copy is the one a Java installer is about
-  // to patch and the game is then going to run, so there is no argument for
-  // being the one place that skips the check.
-  await verifyDownload(jarPath, { sha1: meta.downloads.client.sha1 }, `client jar ${mcVersion}`);
+  await ensureClientJar(versionsDir, mcVersion, meta.downloads.client, { signal });
 }
 
 /** What an install may be told beyond which build it is. */

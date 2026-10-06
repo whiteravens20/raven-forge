@@ -163,4 +163,17 @@ describe.skipIf(!posix)('installing Forge', () => {
 
     expect(await installerRuns()).toHaveLength(1);
   });
+
+  it('fetches the client jar again when the one on disk is not the real one', async () => {
+    // What a launcher closed mid-download used to leave, and every later
+    // install then patched: a file of the right name and the wrong content.
+    const javaPath = await writeFakeJava();
+    const jar = path.join(root, 'cache', 'versions', MC, `${MC}.jar`);
+    await fs.mkdir(path.dirname(jar), { recursive: true });
+    await fs.writeFile(jar, 'half a jar');
+
+    await install({ javaPath });
+
+    expect(await fs.readFile(jar)).toEqual(clientBytes);
+  });
 });
