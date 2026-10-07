@@ -13,6 +13,9 @@ export default defineConfig({
       // binding is built against Electron's ABI. Neither is needed by anything
       // under test — see test/stubs/electron.ts.
       electron: path.resolve(__dirname, 'test/stubs/electron.ts'),
+      // The real one writes a log file wherever the suite runs — into the
+      // launcher's own folder. See test/stubs/electron-log.ts.
+      'electron-log': path.resolve(__dirname, 'test/stubs/electron-log.ts'),
     },
   },
   test: {
