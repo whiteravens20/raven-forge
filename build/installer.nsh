@@ -268,14 +268,23 @@
       ; embedded browser's files.
       RMDir /r "$APPDATA\${APP_FILENAME}"
       RMDir /r "$APPDATA\${APP_PRODUCT_FILENAME}"
-      ; electron-updater's download cache — `updaterCacheDirName` in
-      ; app-update.yml, which electron-builder derives from package.json `name`.
-      ; Nothing else ever clears it and it holds a full installer of the version
-      ; being removed. Only on this branch: the other one has just promised to
-      ; keep the player's files, so it touches nothing at all.
-      RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}-updater"
 
     keepRavenForgeData:
+  ${EndIf}
+
+  ; electron-updater's download cache — `updaterCacheDirName` in app-update.yml,
+  ; which electron-builder derives from package.json `name`. The installer puts
+  ; a whole copy of itself there to work out later updates from, a hundred
+  ; megabytes of it, and nothing else ever clears it. It goes with the program
+  ; whatever was answered above: it is the installer's own and none of the
+  ; player's files, and it used to be what "keep my data" left behind on a
+  ; machine the launcher was no longer on.
+  ;
+  ; Not when this is an update. The old version's uninstaller is run for one as
+  ; well — by the updater, and by an installer started by hand over an existing
+  ; install — and the folder then holds the installer that is running.
+  ${IfNot} ${isUpdated}
+    RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}-updater"
   ${EndIf}
 
   ${if} $installMode == "all"
