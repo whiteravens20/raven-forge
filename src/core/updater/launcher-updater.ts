@@ -7,6 +7,7 @@ import { getMainWindow } from '../../main/window';
 import { abandonProgress, emitProgress } from '../util/progress';
 import type { UpdateCheck, UpdateInfo, UpdateUnsupportedReason } from '../../shared/ipc-types';
 import { errorText } from '../util/error-text';
+import { clearPendingUpdate } from './update-cache';
 
 /** The one bar the update download draws. */
 const UPDATE_OPERATION = 'launcher-update';
@@ -31,6 +32,15 @@ export function initUpdater(): void {
 
   autoUpdater.on('update-not-available', () => {
     pendingUpdate = null;
+    // Nothing newer than this build is published, so a download left over from
+    // before it was installed has no use left. Unless this very session fetched
+    // it: that one is installed when the launcher quits, whatever a later check
+    // has to say.
+    if (!downloadedUpdate) {
+      void clearPendingUpdate().catch((err: unknown) => {
+        log.warn(`Could not clear an old update download: ${errorText(err)}`);
+      });
+    }
   });
 
   autoUpdater.on('download-progress', (progress) => {

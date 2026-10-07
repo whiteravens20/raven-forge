@@ -1,7 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { app } from 'electron';
 import {
@@ -15,6 +14,7 @@ import {
 } from '../../shared/constants';
 import { countSecrets } from '../auth/secret-store';
 import { directorySize } from '../profiles/profile-manager';
+import { updaterCacheDir } from '../updater/update-cache';
 import { dataRootPointerFile } from './data-root';
 import { paths } from './paths';
 import type { StorageEntry, StorageId, StorageReport } from '../../shared/ipc-types';
@@ -32,19 +32,6 @@ import type { StorageEntry, StorageId, StorageReport } from '../../shared/ipc-ty
  * of the launcher writes through, and a place added there without being added
  * here is the kind of omission a reader can at least catch.
  */
-
-/** electron-updater's download cache, at the address it works out for itself. */
-function updaterCacheDir(): string {
-  const base =
-    process.platform === 'win32'
-      ? (process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local'))
-      : process.platform === 'darwin'
-        ? path.join(os.homedir(), 'Library', 'Caches')
-        : (process.env.XDG_CACHE_HOME ?? path.join(os.homedir(), '.cache'));
-  // `updaterCacheDirName` in app-update.yml, which electron-builder derives
-  // from the package name.
-  return path.join(base, 'raven-forge-launcher-updater');
-}
 
 /**
  * Where the program itself is. An AppImage is one file that mounts itself
