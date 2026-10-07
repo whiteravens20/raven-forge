@@ -201,7 +201,16 @@
     SetShellVarContext current
   ${endif}
 
+  ; Where the data went, in a variable of its own and not in the register the
+  ; macro hands it back in. electron-builder writes a test for each of its
+  ; command-line flags — `${isUpdated}` is one — and every one of them leaves
+  ; its answer in $R9: "true" or "false". The path used to be kept there across
+  ; `${isUpdated}` below, so from the first build that followed a move the
+  ; question named a folder called `false`, for everybody, and a folder the
+  ; data had been moved to was never deleted when the answer was "delete".
+  Var /GLOBAL ravenForgeDataRoot
   !insertmacro readRavenForgeDataRoot
+  StrCpy $ravenForgeDataRoot $R9
 
   ; `--delete-app-data` is what the docs give people for a silent uninstall that
   ; removes the data, and the stock template's own handling of it only knows
@@ -211,8 +220,8 @@
   ClearErrors
   ${GetOptions} $R7 "--delete-app-data" $R6
   ${IfNot} ${Errors}
-  ${AndIf} $R9 != ""
-    !insertmacro deleteRavenForgeData "$R9"
+  ${AndIf} $ravenForgeDataRoot != ""
+    !insertmacro deleteRavenForgeData "$ravenForgeDataRoot"
   ${EndIf}
 
   ; Two paths must never see a dialog. An auto-update runs this uninstaller as
@@ -224,8 +233,8 @@
   ${AndIfNot} ${isUpdated}
     ; The path the message quotes is the one the data is really in, so the
     ; sentence stays true after a move and the "delete" button keeps its word.
-    ${If} $R9 != ""
-      StrCpy $R3 "$R9"
+    ${If} $ravenForgeDataRoot != ""
+      StrCpy $R3 "$ravenForgeDataRoot"
     ${ElseIf} ${FileExists} "$APPDATA\${APP_FILENAME}\*.*"
       StrCpy $R3 "$APPDATA\${APP_FILENAME}"
     ${Else}
@@ -249,8 +258,8 @@
 
       ; The moved directory first: it holds everything the dialog just listed,
       ; and it is the one the block below would not reach.
-      ${If} $R9 != ""
-        !insertmacro deleteRavenForgeData "$R9"
+      ${If} $ravenForgeDataRoot != ""
+        !insertmacro deleteRavenForgeData "$ravenForgeDataRoot"
       ${EndIf}
 
       ; The launcher's own folder under %APPDATA%, by both the names it has
