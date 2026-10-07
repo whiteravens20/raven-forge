@@ -493,7 +493,7 @@ and when.
 ## Open implementation gaps
 
 Last checked against the code on **2026-08-20**, and the self-update entry on
-**2026-09-27**. Keep it that way — a stale gap list is worse than none, because
+**2026-10-07**. Keep it that way — a stale gap list is worse than none, because
 it sends people looking for problems that were fixed and hides the ones that
 were not.
 
@@ -515,10 +515,15 @@ were not.
   from a rejection, the renderer offered offline play, and accepting the offer
   took the `offline && type === 'microsoft'` branch and launched the game with
   the `0` token sentinel.
-- **Self-update is proven on Windows only.** An installed release has updated
-  itself to the next one through the published feed. The AppImage takes the same
-  path but nobody has exercised it yet, and a `.deb` install leaves updates to
-  the package manager on purpose.
+- **Self-update is proven on Windows and for the AppImage.** An installed
+  Windows release has updated itself to the next one through the published feed.
+  The 0.7.0 AppImage has done the same to 0.7.1: the old file is removed, the new
+  one is left beside where it was under the new version's name, and the profiles
+  and the account are as they were. A `.deb` install leaves updates to the
+  package manager on purpose. What an update leaves in the updater's cache is
+  cleared the first time a check finds nothing newer — a download that was
+  fetched and then never installed, because the new version arrived another way,
+  used to stay there until the release after it.
 - **Crash reports are now proven against a real exit.** A Windows 26.2/Fabric
   session produced one end to end: `readMinecraftCrash` found Mojang's own file,
   quoted it, and the redaction replaced the token, the account UUID, the player
