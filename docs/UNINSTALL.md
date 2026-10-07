@@ -69,9 +69,8 @@ to — the uninstaller reads `data-root.txt` before it asks.
 - **Yes** — the program is removed, the data is left exactly as it is. Install
   Raven Forge again later and every profile, world and setting is back where it
   was; a reinstall reads the same folder and does not reset it.
-- **No** — the data is deleted, along with the launcher folder in `%APPDATA%`
-  and the updater's download cache. There is no undo and it does not go through
-  the Recycle Bin.
+- **No** — the data is deleted, along with the launcher folder in `%APPDATA%`.
+  There is no undo and it does not go through the Recycle Bin.
 
   In a folder you moved the data to, the uninstaller deletes the launcher's own
   entries by name — `profiles`, `loaders`, `java`, `cache`, `logs`,
@@ -79,8 +78,16 @@ to — the uninstaller reads `data-root.txt` before it asks.
   the folder itself only if that left it empty. Anything else you keep there is
   not touched.
 
-Either way the program files, the Start menu and desktop shortcuts and the
-registry entries go.
+Either way the program files, the Start menu and desktop shortcuts, the registry
+entries and the updater's download cache go.
+
+The uninstaller of versions 0.6.0 to 0.7.1 gets two things wrong here. The
+question names the folder as `false`, whatever it is; and if you had moved your
+data, **No** deletes the launcher folder in `%APPDATA%` and leaves the folder
+you moved the data to as it was — delete that one by hand. It also leaves the
+updater's download cache behind when the answer is **Yes**. Updating the
+launcher first puts all three right, because the uninstaller is replaced with
+the program.
 
 Two cases skip the question deliberately:
 
