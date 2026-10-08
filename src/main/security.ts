@@ -15,7 +15,7 @@ import { getMainWindow } from './window';
  * The header is the one that matters: a `<meta>` policy only takes effect from
  * the point in the document where it is parsed, so anything that manages to get
  * markup in ahead of it is unconstrained. Confirmed to apply to `file://`
- * documents on Electron 41, which is how the packaged renderer is loaded.
+ * documents on Electron 44, which is how the packaged renderer is loaded.
  *
  * `style-src` needs `unsafe-inline` because React sets inline styles;
  * `script-src` deliberately does not, so there is no `eval` and no inline

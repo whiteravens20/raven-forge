@@ -185,7 +185,7 @@ const config = {
     // audit misses them.
     //
     // Deliberately *not* electron-builder's default list. That one carries libxss1,
-    // libxtst6 and libuuid1, which Electron 41 references nowhere, and omits
+    // libxtst6 and libuuid1, which Electron 44 references nowhere, and omits
     // libasound2, libgbm1 and libnss3's own libnspr4, which it does need.
     //
     // Names are the pre-t64 ones on purpose: Ubuntu 24.04's libgtk-3-0t64 and

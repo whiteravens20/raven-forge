@@ -8,8 +8,9 @@
  * rasteriser — an offscreen window renders the SVG once at 1024 and `nativeImage`
  * downscales from there, which is sharper than re-rendering per size.
  *
- * CommonJS on purpose: Electron 41 does not execute a `.mjs` entry point — the
- * module is silently never run, with no error and no output.
+ * CommonJS because the Electron it was written on, 41, did not execute a `.mjs`
+ * entry point — the module was silently never run, with no error and no
+ * output. Electron 44 does run one; nothing here would gain from the change.
  *
  * Outputs:
  *   assets/icons/icon.png          — 512×512, used by the Linux targets
