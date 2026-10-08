@@ -505,16 +505,26 @@ The `package.json` `main` field points at `dist/main/index.js`; the preload refe
 stub (`test/stubs/electron.ts`); everything below that seam is the real module,
 not a mock of one.
 
-| Layer                  | How it is tested                                                                                                                                                            |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pure logic             | Called directly — launch arguments, hash selection, canonicalization, version merging, loader compatibility, contrast ratios                                                |
-| State files            | Real files under a temporary root named by `RAVENFORGE_DATA_DIR` — `profiles.json`, `settings.json`, `auth.json`, `installed.lock`, the content indexes, icons, path guards |
-| Network                | A `node:http` server on an ephemeral port stands in for Mojang, Modrinth, Adoptium and a pack host                                                                          |
-| Keychain               | `secret-store` is substituted to model both a working keyring and a machine with none, which is the case that actually fails in the field                                   |
-| Subprocesses           | Real ones: `tar` unpacks a real archive, `unzip -t` reads back an export, and a shell script that prints a version banner stands in for a JVM                               |
-| Build tooling          | `inject-build-ids.mjs` is run over a staged `dist/`, because otherwise it runs for the first time during a release                                                          |
-| The IPC contract       | Preload and main are both loaded and their channel names compared, which is the one half of that contract the types cannot state                                            |
-| Renderer-facing checks | The CSP header, the IPC sender guard, the progress labels the overlay resolves, and the two dictionaries against each other                                                 |
+The suite is run on Linux and on Windows on every push (`build.yml`). Most of it
+is the same on both. What is not is staged the way each system comes by it: a
+file out of reach is one with every permission taken off on Linux, and one that
+another program is holding open on Windows (`test/helpers/unreadable.ts`); and
+where a shell script stands in for Java on Linux, a small program compiled on
+the spot does on Windows (`test/helpers/stand-in-java.ts`), which is what lets
+Windows' own `tar` and `taskkill` be run at all — wine, which stands in for
+Windows elsewhere, has no `tar`. The tests that start a whole stand-in game
+from a shell script are still Linux only.
+
+| Layer                  | How it is tested                                                                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pure logic             | Called directly — launch arguments, hash selection, canonicalization, version merging, loader compatibility, contrast ratios                                                                                                                                       |
+| State files            | Real files under a temporary root named by `RAVENFORGE_DATA_DIR` — `profiles.json`, `settings.json`, `auth.json`, `installed.lock`, the content indexes, icons, path guards                                                                                        |
+| Network                | A `node:http` server on an ephemeral port stands in for Mojang, Modrinth, Adoptium and a pack host                                                                                                                                                                 |
+| Keychain               | `secret-store` is substituted to model both a working keyring and a machine with none, which is the case that actually fails in the field                                                                                                                          |
+| Subprocesses           | Real ones: `tar` unpacks a real archive (on Windows, Windows' own, by its full path), `unzip -t` reads back an export, `taskkill` closes a stand-in game's window, and a shell script or a small compiled program that prints a version banner stands in for a JVM |
+| Build tooling          | `inject-build-ids.mjs` is run over a staged `dist/`, because otherwise it runs for the first time during a release                                                                                                                                                 |
+| The IPC contract       | Preload and main are both loaded and their channel names compared, which is the one half of that contract the types cannot state                                                                                                                                   |
+| Renderer-facing checks | The CSP header, the IPC sender guard, the progress labels the overlay resolves, and the two dictionaries against each other                                                                                                                                        |
 
 Three properties are asserted rather than assumed, because each of them failed
 silently before it was: **overlapping writes** — every serialized state file has

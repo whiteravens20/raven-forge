@@ -527,7 +527,7 @@ Raven Forge is built by one maintainer using AI coding tools. The tools write mo
 
 **What a change goes through**
 
-- Every push and pull request runs lint, type checking, a format check and the test suite, then builds the launcher for Linux and for Windows ([build.yml](.github/workflows/build.yml)). The parts where a mistake does real damage have tests of their own: the launch path, the hash check on downloads, manifest signature verification and the token store.
+- Every push and pull request runs lint, type checking, a format check and the test suite — the tests on Linux and on Windows — then builds the launcher for both ([build.yml](.github/workflows/build.yml)). The parts where a mistake does real damage have tests of their own: the launch path, the hash check on downloads, manifest signature verification and the token store.
 - CodeQL, `npm audit`, package signature checks and a Trivy scan for secrets and misconfiguration run on every push and pull request, and again every week ([codeql.yml](.github/workflows/codeql.yml), [security.yml](.github/workflows/security.yml)).
 - Commits are signed, and the [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/whiteravens20/raven-forge) results are public.
 
