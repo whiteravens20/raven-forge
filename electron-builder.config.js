@@ -66,6 +66,31 @@ const config = {
     'node_modules/keytar/**',
   ],
 
+  // ── What the packaged program refuses to be ──────────────
+  // Electron's binary comes with two ways to make any app built on it into
+  // something else: `ELECTRON_RUN_AS_NODE` turns it into a plain Node.js that
+  // runs whatever script it is handed, and `--inspect` opens a debugger on the
+  // main process, the one that holds the accounts and starts programs. Neither
+  // is anything the launcher uses, and both are switched off in the binary
+  // itself — as fuses, which no flag, variable or setting turns back on.
+  //
+  // The first is also a plain bug fixed: a terminal that sets
+  // `ELECTRON_RUN_AS_NODE` for its own purposes (the one in VS Code does)
+  // started the launcher as a Node prompt and not as the launcher.
+  //
+  // `NODE_OPTIONS` is left alone on purpose. A packaged Electron already takes
+  // nothing from it that could load code or open a debugger, and the fuse that
+  // would silence it silences `NODE_EXTRA_CA_CERTS` with it — the one way a
+  // player behind a proxy that re-signs HTTPS can tell the launcher about the
+  // proxy's certificate.
+  //
+  // `npm run dev` and the tests run the Electron in node_modules, which this
+  // does not touch.
+  electronFuses: {
+    runAsNode: false,
+    enableNodeCliInspectArguments: false,
+  },
+
   // ── Windows ──────────────────────────────────────────────
   win: {
     target: [
