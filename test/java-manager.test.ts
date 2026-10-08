@@ -8,9 +8,9 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { AddressInfo } from 'node:net';
-import { describe, it, expect, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterAll, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import type { ProgressEvent } from '../src/shared/ipc-types';
-import { standInJava } from './helpers/stand-in-java';
+import { STAND_IN_BUILD_MS, standInJava } from './helpers/stand-in-java';
 import { ZipWriter } from './helpers/zip';
 
 /**
@@ -474,9 +474,16 @@ describe('windowsJavaCandidates', () => {
  */
 describe.skipIf(posix)('ensureJavaVersion, on Windows', () => {
   const managed = (...parts: string[]) => path.join(root, 'java', 'jre-21', ...parts);
+  let standIn: string;
+
+  // Built here, with room of its own, and not by whichever test first asks
+  // for it out of its five seconds.
+  beforeAll(async () => {
+    standIn = await standInJava();
+  }, STAND_IN_BUILD_MS);
 
   afterAll(async () => {
-    await fs.rm(path.dirname(await standInJava()), { recursive: true, force: true });
+    if (standIn) await fs.rm(path.dirname(standIn), { recursive: true, force: true });
   });
 
   it('downloads the zip, checks it, unpacks it with Windows’ own tar and proves the runtime starts', async () => {

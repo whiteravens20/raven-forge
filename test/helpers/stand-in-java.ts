@@ -24,6 +24,17 @@ const run = promisify(execFile);
  */
 let built: Promise<string> | undefined;
 
+/**
+ * How long the building may take, for the hook that waits for it.
+ *
+ * It is a compiler started cold on a machine that is running a hundred other
+ * test files at the time: a second or two as a rule, and once more than the
+ * ten seconds a hook is given, which failed a run that had nothing wrong with
+ * it. So it is built in a hook with room of its own, and no test pays for it
+ * out of the few seconds it has.
+ */
+export const STAND_IN_BUILD_MS = 120_000;
+
 export function standInJava(): Promise<string> {
   built ??= (async () => {
     const windows = process.env.SystemRoot ?? 'C:\\Windows';
