@@ -19,6 +19,12 @@ import crypto from 'node:crypto';
  * of either. `options-file.ts` has always done this for the player's
  * `options.txt`; the launcher's own files deserve the same care.
  *
+ * The rename only orders names. A filesystem may write the new name down
+ * before the bytes it stands for, and a power cut between the two leaves that
+ * name on an empty file — which is the whole of what this is meant to rule out.
+ * So the bytes are sent to the disk before the file is given its name. If they
+ * cannot be, the write has failed, and the file that was there stays.
+ *
  * The temporary file is deleted on failure, so a full disk does not leave a
  * `.tmp` beside every state file.
  */
@@ -42,9 +48,15 @@ export async function writeFileAtomic(
   // sure that when they do not, the failure is a lost write and not a wiped one.
   const tmp = `${file}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
   try {
-    await fs.writeFile(tmp, contents, mode === undefined ? 'utf-8' : { encoding: 'utf-8', mode });
-    // `writeFile` applies `mode` only when it creates the file, and a leftover
-    // tmp from a previous run would keep its old permissions without this.
+    const handle = await fs.open(tmp, 'w', mode);
+    try {
+      await handle.writeFile(contents, 'utf-8');
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    // The mode is applied only when the file is created, and a leftover tmp
+    // from a previous run would keep its old permissions without this.
     if (mode !== undefined) await fs.chmod(tmp, mode);
     await fs.rename(tmp, file);
   } catch (err) {

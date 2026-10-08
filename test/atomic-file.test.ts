@@ -3,7 +3,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFileAtomic, writeJsonAtomic } from '../src/core/util/atomic-file';
 
 /**
@@ -75,6 +75,55 @@ describe('writeFileAtomic', () => {
     const stat = await fs.stat(file);
     expect(stat.mode & 0o777).toBe(0o600);
     expect(await fs.readFile(file, 'utf-8')).toBe('fresh');
+  });
+
+  it('has the bytes on the disk before the file is given its name', async () => {
+    // A rename is atomic about names and says nothing of contents: with the
+    // name recorded first, a power cut leaves it on an empty file, which every
+    // reader of a state file would then move aside and start without.
+    const probe = await fs.open(path.join(dir, 'probe'), 'w');
+    const handles = Object.getPrototypeOf(probe) as { sync: () => Promise<void> };
+    await probe.close();
+    const order: string[] = [];
+    const flushed = handles.sync;
+    const sync = vi.spyOn(handles, 'sync').mockImplementation(function (this: unknown) {
+      order.push('bytes sent to the disk');
+      return flushed.call(this);
+    });
+    const renamed = fs.rename;
+    const rename = vi.spyOn(fs, 'rename').mockImplementation((from, to) => {
+      order.push('file given its name');
+      return renamed(from, to);
+    });
+
+    try {
+      await writeFileAtomic(path.join(dir, 'state.json'), '{"a":1}');
+    } finally {
+      sync.mockRestore();
+      rename.mockRestore();
+    }
+
+    expect(order).toEqual(['bytes sent to the disk', 'file given its name']);
+    expect(await fs.readFile(path.join(dir, 'state.json'), 'utf-8')).toBe('{"a":1}');
+  });
+
+  it('leaves the file that was there when the bytes cannot be sent to the disk', async () => {
+    const file = path.join(dir, 'state.json');
+    await fs.writeFile(file, 'old');
+    const probe = await fs.open(path.join(dir, 'probe'), 'w');
+    const handles = Object.getPrototypeOf(probe) as { sync: () => Promise<void> };
+    await probe.close();
+    await fs.rm(path.join(dir, 'probe'));
+    const sync = vi.spyOn(handles, 'sync').mockRejectedValue(new Error('EIO: i/o error, fsync'));
+
+    try {
+      await expect(writeFileAtomic(file, 'new')).rejects.toThrow(/EIO/);
+    } finally {
+      sync.mockRestore();
+    }
+
+    expect(await fs.readFile(file, 'utf-8')).toBe('old');
+    expect(await fs.readdir(dir)).toEqual(['state.json']);
   });
 
   it('removes the temporary file when the write cannot be renamed into place', async () => {
