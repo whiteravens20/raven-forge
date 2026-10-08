@@ -113,6 +113,18 @@ export interface OrphanedProfile {
 }
 
 /**
+ * Entries of the profile list that are not profiles.
+ *
+ * A file edited by hand can hold one — a profile with no loader named, say. It
+ * is left in the file as it is and out of the list, and the count and the
+ * file's path are what the profiles page has to say so with.
+ */
+export interface UnreadableProfileEntries {
+  count: number;
+  file: string;
+}
+
+/**
  * A profile made from an exported profile file.
  *
  * `dropped` names the fields the file carried that an import never honours —

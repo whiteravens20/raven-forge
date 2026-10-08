@@ -30,6 +30,7 @@ import {
   summarizeProfileFiles,
   listOrphanedProfiles,
   adoptOrphanedProfile,
+  getUnreadableProfileEntries,
   discardOrphanedProfile,
 } from '../core/profiles/profile-manager';
 import {
@@ -606,6 +607,13 @@ export function registerAllIpcHandlers(): void {
       return ok(undefined);
     } catch (err) {
       return fail(`Failed to delete those files: ${reason(err)}`);
+    }
+  });
+  handle('profiles:unreadable-entries', async () => {
+    try {
+      return ok(await getUnreadableProfileEntries());
+    } catch (err) {
+      return fail(`Failed to read the profile list: ${reason(err)}`);
     }
   });
   handle('profiles:duplicate', async (_event, profileId: string, name?: string) => {

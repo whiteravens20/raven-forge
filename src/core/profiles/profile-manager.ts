@@ -8,17 +8,26 @@ import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
-import { profileSchema } from '../../shared/validators';
+import { profileSchema, storedProfileSchema } from '../../shared/validators';
 import type {
   OrphanedProfile,
   Profile,
   ProfileFileSummary,
   ProfileImport,
+  UnreadableProfileEntries,
 } from '../../shared/ipc-types';
 
 // ── Profiles index persistence ─────────────────────────────
 
 let cachedProfiles: Profile[] | null = null;
+
+/**
+ * What else the file's list held: entries that are not profiles, as they were
+ * read. They go back into the file with every write. Leaving them out would
+ * delete, at the first change to any profile, the one record of a profile
+ * whose folder and worlds are still on the disk.
+ */
+let unreadableEntries: unknown[] = [];
 
 /**
  * The profile list, from the cache once the file has been read.
@@ -49,6 +58,12 @@ async function readProfilesIndex(): Promise<Profile[]> {
  * over, so what it held can still be recovered by hand; if it cannot be moved
  * it is left alone and the read fails. Any other error is the caller's to see,
  * and is not remembered: the next call reads again.
+ *
+ * A list is taken an entry at a time. The whole of it used to be believed as
+ * it parsed, and one entry with no loader named — a file edited by hand — was
+ * handed to a window that then had nothing to draw but its error screen. An
+ * entry that is not a profile is now kept out of the list and in the file; so
+ * is the second of two that share an id, because the id is the folder.
  */
 async function loadProfilesIndex(): Promise<Profile[]> {
   const file = paths.profilesIndex;
@@ -67,18 +82,59 @@ async function loadProfilesIndex(): Promise<Profile[]> {
   } catch {
     parsed = null;
   }
-  if (Array.isArray(parsed)) return parsed as Profile[];
+  if (Array.isArray(parsed)) {
+    const profiles: Profile[] = [];
+    const unreadable: unknown[] = [];
+    for (const [index, entry] of parsed.entries()) {
+      const read = storedProfileSchema.safeParse(entry);
+      const why = !read.success
+        ? read.error.issues.map((i) => `${i.path.join('.') || 'root'}: ${i.message}`).join('; ')
+        : profiles.some((p) => p.id === read.data.id)
+          ? `a profile with the id ${read.data.id} is already on the list`
+          : null;
+      if (read.success && why === null) {
+        profiles.push(read.data);
+      } else {
+        unreadable.push(entry);
+        log.warn(`${file}: entry ${index + 1} is not a profile and is left as it is — ${why}`);
+      }
+    }
+    unreadableEntries = unreadable;
+    return profiles;
+  }
 
   const backup = `${file}.broken-${Date.now()}`;
   log.error(`${file} is not a profile list — keeping a copy at ${backup} and starting empty`);
   await fs.rename(file, backup);
+  unreadableEntries = [];
   return [];
 }
 
 /** The cache follows the file: a write that failed leaves both as they were. */
 async function writeProfilesIndex(profiles: Profile[]): Promise<void> {
-  await writeJsonAtomic(paths.profilesIndex, profiles);
+  await writeJsonAtomic(paths.profilesIndex, [...profiles, ...unreadableEntries]);
   cachedProfiles = profiles;
+}
+
+/** The ids the entries that are not profiles carry, where they carry one. */
+function unreadableIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const entry of unreadableEntries) {
+    const id = (entry as { id?: unknown } | null)?.id;
+    if (typeof id === 'string') ids.add(id);
+  }
+  return ids;
+}
+
+/**
+ * How many entries of `profiles.json` are not profiles, and which file that is.
+ *
+ * For the profiles page to say: a profile that is missing from the list
+ * without a word looks like a profile the launcher lost.
+ */
+export async function getUnreadableProfileEntries(): Promise<UnreadableProfileEntries> {
+  await readProfilesIndex();
+  return { count: unreadableEntries.length, file: paths.profilesIndex };
 }
 
 /** The tail of the chain of in-flight mutations. */
@@ -300,7 +356,9 @@ const keptFiles = new Map<string, ProfileFileSummary>();
  * since closed. Listing them is what makes keeping them a real offer.
  */
 export async function listOrphanedProfiles(): Promise<OrphanedProfile[]> {
-  const known = new Set((await readProfilesIndex()).map((p) => p.id));
+  // An entry that is not a profile still names its folder. Those files are not
+  // kept files: offered here, they could be deleted for good over a typo.
+  const known = new Set([...(await readProfilesIndex()).map((p) => p.id), ...unreadableIds()]);
   const orphans: OrphanedProfile[] = [];
 
   for (const entry of await listDir(paths.profilesDir)) {
@@ -340,7 +398,7 @@ export async function adoptOrphanedProfile(profileId: string): Promise<Profile> 
   };
 
   await mutateProfiles((profiles) => {
-    if (profiles.some((p) => p.id === profileId)) {
+    if (profiles.some((p) => p.id === profileId) || unreadableIds().has(profileId)) {
       throw new Error(`Profile ${profileId} is already on the list`);
     }
     profiles.push(restored);
@@ -354,7 +412,7 @@ export async function adoptOrphanedProfile(profileId: string): Promise<Profile> 
 /** Delete kept-behind data for good. */
 export async function discardOrphanedProfile(profileId: string): Promise<void> {
   const profiles = await readProfilesIndex();
-  if (profiles.some((p) => p.id === profileId)) {
+  if (profiles.some((p) => p.id === profileId) || unreadableIds().has(profileId)) {
     throw new Error(`${profileId} belongs to a live profile, not to kept files`);
   }
   await fs.rm(paths.profileDir(profileId), { recursive: true, force: true });

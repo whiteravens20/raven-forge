@@ -236,6 +236,193 @@ describe('reading profiles.json', () => {
   });
 });
 
+/**
+ * The list used to be believed whole, as it parsed. One entry with no loader
+ * named — a file somebody edited by hand — reached a window that then had
+ * nothing to draw but its error screen, and every profile was out of reach
+ * behind it.
+ */
+describe('an entry of profiles.json that is not a profile', () => {
+  const stored = (over: Record<string, unknown>) => ({
+    id: 'p1',
+    name: 'Ravens',
+    minecraftVersion: '1.21.4',
+    modLoader: 'fabric',
+    allocatedRamMb: 4096,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
+    ...over,
+  });
+
+  const withFile = async (entries: unknown[]): Promise<Manager> => {
+    await fs.writeFile(indexFile(), JSON.stringify(entries));
+    return loadModule();
+  };
+
+  const onDisk = async () => JSON.parse(await fs.readFile(indexFile(), 'utf-8')) as unknown[];
+
+  it('is left out of the list and counted, beside the profiles that are', async () => {
+    const noLoader = { id: 'p2', name: 'No loader', minecraftVersion: '1.21.4' };
+    const fresh = await withFile([stored({}), noLoader, null, 'a string', 7]);
+
+    expect((await fresh.getAllProfiles()).map((p) => p.id)).toEqual(['p1']);
+    expect(await fresh.getProfile('p2')).toBeNull();
+    expect(await fresh.getUnreadableProfileEntries()).toEqual({ count: 4, file: indexFile() });
+  });
+
+  it.each([
+    ['no id', { id: undefined }],
+    ['an id that is a path', { id: '../p1' }],
+    ['no Minecraft version', { minecraftVersion: undefined }],
+    ['a Minecraft version that is a path', { minecraftVersion: '1.21/../..' }],
+    ['a loader this launcher does not have', { modLoader: 'rift' }],
+  ])('is what an entry with %s is', async (_what, over) => {
+    const fresh = await withFile([stored(over)]);
+
+    expect(await fresh.getAllProfiles()).toEqual([]);
+    expect((await fresh.getUnreadableProfileEntries()).count).toBe(1);
+  });
+
+  it('stays in the file exactly as it was, through every later write', async () => {
+    const broken = { id: 'p2', name: 'No loader', minecraftVersion: '1.21.4', worlds: ['home'] };
+    const fresh = await withFile([broken, stored({})]);
+
+    const created = await fresh.createProfile(newProfile('New'));
+    await fresh.updateProfile('p1', { name: 'Renamed' });
+    await fresh.recordPlaySession('p1', 5);
+    await fresh.deleteProfile(created.id, true);
+
+    const entries = await onDisk();
+    expect(entries).toHaveLength(2);
+    expect(entries).toContainEqual(broken);
+    expect(entries).toContainEqual(expect.objectContaining({ id: 'p1', name: 'Renamed' }));
+    // And is still what the next start finds.
+    expect((await (await loadModule()).getUnreadableProfileEntries()).count).toBe(1);
+  });
+
+  it('is the second of two entries that share an id', async () => {
+    // The id is the folder: two profiles on one folder would each delete the
+    // other's worlds.
+    const fresh = await withFile([stored({ name: 'First' }), stored({ name: 'Second' })]);
+
+    expect((await fresh.getAllProfiles()).map((p) => p.name)).toEqual(['First']);
+    expect((await fresh.getUnreadableProfileEntries()).count).toBe(1);
+  });
+
+  it('is not offered as kept files, and cannot be deleted as them', async () => {
+    // Its folder is on the disk with no profile on the list pointing at it,
+    // which is what kept files look like — and those can be deleted for good.
+    const dir = path.join(root, 'profiles', 'p2');
+    await fs.mkdir(path.join(dir, '.minecraft', 'saves', 'home'), { recursive: true });
+    await fs.writeFile(path.join(dir, 'profile.json'), JSON.stringify(stored({ id: 'p2' })));
+    const fresh = await withFile([{ id: 'p2', name: 'No loader', minecraftVersion: '1.21.4' }]);
+
+    expect(await fresh.listOrphanedProfiles()).toEqual([]);
+    await expect(fresh.discardOrphanedProfile('p2')).rejects.toThrow(/live profile/);
+    await expect(fresh.adoptOrphanedProfile('p2')).rejects.toThrow(/already on the list/);
+    await expect(fs.stat(path.join(dir, '.minecraft', 'saves', 'home'))).resolves.toBeTruthy();
+  });
+});
+
+describe('a stored profile with something wrong in it', () => {
+  const withFile = async (entries: unknown[]): Promise<Manager> => {
+    await fs.writeFile(indexFile(), JSON.stringify(entries));
+    return loadModule();
+  };
+
+  it('is still a profile, without the fields that are not what they should be', async () => {
+    const fresh = await withFile([
+      {
+        id: 'p1',
+        minecraftVersion: '1.21.4',
+        modLoader: 'fabric',
+        modLoaderVersion: '../0.16.0',
+        allocatedRamMb: 'plenty',
+        serverIp: 25565,
+        serverPort: '25565',
+        notes: { text: 'hello' },
+        javaArgs: ['-Xss4M'],
+        totalPlayTimeMinutes: 'a while',
+      },
+    ]);
+
+    const [profile] = await fresh.getAllProfiles();
+    expect(profile).toMatchObject({
+      id: 'p1',
+      // Nobody named it; the id is what its folder is called.
+      name: 'p1',
+      minecraftVersion: '1.21.4',
+      modLoader: 'fabric',
+      allocatedRamMb: 4096,
+    });
+    for (const field of [
+      'modLoaderVersion',
+      'serverIp',
+      'serverPort',
+      'notes',
+      'javaArgs',
+      'totalPlayTimeMinutes',
+    ] as const) {
+      expect(profile[field], field).toBeUndefined();
+    }
+    expect(typeof profile.createdAt).toBe('string');
+    expect(typeof profile.updatedAt).toBe('string');
+    expect((await fresh.getUnreadableProfileEntries()).count).toBe(0);
+  });
+
+  it('keeps a value the editor would refuse, for the editor to show', async () => {
+    // A port out of range or an address that is not one harms nothing until it
+    // is used, and the form can only say what is wrong with a value it is given.
+    const fresh = await withFile([
+      {
+        id: 'p1',
+        name: 'Ravens',
+        minecraftVersion: '1.21.4',
+        modLoader: 'vanilla',
+        allocatedRamMb: 128,
+        manifestUrl: 'packs.example/manifest.json',
+        serverPort: 70000,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+
+    expect((await fresh.getAllProfiles())[0]).toMatchObject({
+      allocatedRamMb: 128,
+      manifestUrl: 'packs.example/manifest.json',
+      serverPort: 70000,
+    });
+    await expect(fresh.updateProfile('p1', { name: 'Renamed' })).rejects.toThrow();
+    await expect(
+      fresh.updateProfile('p1', {
+        allocatedRamMb: 2048,
+        manifestUrl: undefined,
+        serverPort: 25565,
+      }),
+    ).resolves.toMatchObject({ allocatedRamMb: 2048 });
+  });
+
+  it('keeps what a newer build wrote beside the fields this one knows', async () => {
+    const fromTheFuture = {
+      id: 'p1',
+      name: 'Ravens',
+      minecraftVersion: '1.21.4',
+      modLoader: 'fabric',
+      allocatedRamMb: 4096,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      shaderPreset: 'sunset',
+    };
+    const fresh = await withFile([fromTheFuture]);
+
+    // A change to some other profile writes the whole list back.
+    await fresh.createProfile(newProfile('Other'));
+
+    const entries = JSON.parse(await fs.readFile(indexFile(), 'utf-8')) as unknown[];
+    expect(entries).toContainEqual(fromTheFuture);
+  });
+});
+
 describe('recordPlaySession', () => {
   it('adds play time without claiming the profile was edited', async () => {
     // `updatedAt` is what the UI reads as "you changed this". Playing is not

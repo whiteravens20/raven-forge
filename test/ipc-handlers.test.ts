@@ -330,6 +330,24 @@ describe('loaders:build-starts', () => {
   });
 });
 
+describe('profiles:unreadable-entries', () => {
+  it('counts the entries the list was read without, and says which file they are in', async () => {
+    // What the page is given instead of an entry it could not draw: the list
+    // without it, and enough to say that something was left out.
+    const file = path.join(root, 'data', 'profiles.json');
+    await fs.writeFile(
+      file,
+      JSON.stringify([{ id: 'p1', name: 'No loader', minecraftVersion: '1.21.4' }]),
+    );
+
+    expect((await call<Profile[]>('profiles:get-all')).data).toEqual([]);
+    expect(await call('profiles:unreadable-entries')).toEqual({
+      success: true,
+      data: { count: 1, file },
+    });
+  });
+});
+
 describe('settings:update', () => {
   it('does not write down a proxy address that could never be used', async () => {
     // A URL as far as the schema can tell, and not one a proxy can be made

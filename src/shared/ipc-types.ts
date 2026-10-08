@@ -39,6 +39,7 @@ import type {
   ProfileFileSummary,
   ProfileImport,
   ProfileSyncStatus,
+  UnreadableProfileEntries,
 } from './ipc/profiles';
 import type {
   CataloguePack,
@@ -104,6 +105,8 @@ export interface InvokeChannels {
   'profiles:adopt-orphaned': (profileId: string) => Promise<IpcResult<Profile>>;
   /** Delete kept files for good. */
   'profiles:discard-orphaned': (profileId: string) => Promise<IpcResult<void>>;
+  /** Entries of the stored list that are not profiles, and so are not on it. */
+  'profiles:unreadable-entries': () => Promise<IpcResult<UnreadableProfileEntries>>;
   'profiles:duplicate': (profileId: string, name?: string) => Promise<IpcResult<Profile>>;
   'profiles:open-folder': (profileId: string) => Promise<IpcResult<void>>;
   'profiles:export': (profileId: string) => Promise<IpcResult<string>>; // returns JSON string
@@ -433,6 +436,7 @@ export interface RavenForgeAPI {
     listOrphaned: InvokeChannels['profiles:list-orphaned'];
     adoptOrphaned: InvokeChannels['profiles:adopt-orphaned'];
     discardOrphaned: InvokeChannels['profiles:discard-orphaned'];
+    unreadableEntries: InvokeChannels['profiles:unreadable-entries'];
     duplicate: InvokeChannels['profiles:duplicate'];
     openFolder: InvokeChannels['profiles:open-folder'];
     export: InvokeChannels['profiles:export'];

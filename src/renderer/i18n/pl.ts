@@ -402,6 +402,17 @@ export const pl: Translations = {
   'orphans.discardFailed': 'Nie udało się usunąć tych plików.',
   'orphans.restoreFailed': 'Nie udało się przywrócić tego profilu.',
 
+  // ── Wpisy listy profili, które nie są profilami ──────────
+  'unreadable.title': 'Wpisy nie do odczytania',
+  'unreadable.body.one':
+    'Jeden wpis na liście profili nie jest profilem, który ten launcher potrafi odczytać, więc go tu nie ma. Zostaje w pliku bez zmian, a jego folder jest nietknięty:',
+  'unreadable.body.few':
+    '{count} wpisy na liście profili nie są profilami, które ten launcher potrafi odczytać, więc ich tu nie ma. Zostają w pliku bez zmian, a ich foldery są nietknięte:',
+  'unreadable.body.many':
+    '{count} wpisów na liście profili nie jest profilami, które ten launcher potrafi odczytać, więc ich tu nie ma. Zostają w pliku bez zmian, a ich foldery są nietknięte:',
+  'unreadable.body.other':
+    '{count} wpisu na liście profili nie da się odczytać jako profili, więc ich tu nie ma. Zostają w pliku bez zmian, a ich foldery są nietknięte:',
+
   'profiles.fieldMinecraft': 'Minecraft',
   'profiles.fieldLoader': 'Loader',
   'profiles.fieldRam': 'RAM',

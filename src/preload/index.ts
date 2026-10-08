@@ -28,6 +28,7 @@ const api: RavenForgeAPI = {
     listOrphaned: () => ipcRenderer.invoke('profiles:list-orphaned'),
     adoptOrphaned: (profileId) => ipcRenderer.invoke('profiles:adopt-orphaned', profileId),
     discardOrphaned: (profileId) => ipcRenderer.invoke('profiles:discard-orphaned', profileId),
+    unreadableEntries: () => ipcRenderer.invoke('profiles:unreadable-entries'),
     duplicate: (profileId, name) => ipcRenderer.invoke('profiles:duplicate', profileId, name),
     openFolder: (profileId) => ipcRenderer.invoke('profiles:open-folder', profileId),
     export: (profileId) => ipcRenderer.invoke('profiles:export', profileId),

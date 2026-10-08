@@ -375,6 +375,13 @@ export const en = {
   'orphans.discardFailed': 'Could not delete those files.',
   'orphans.restoreFailed': 'Could not put that profile back.',
 
+  // ── Entries of the profile list that are not profiles ────
+  'unreadable.title': 'Entries that cannot be read',
+  'unreadable.body.one':
+    'One entry of the profile list is not a profile this launcher can read, so it is not here. It stays in the file as it is, and its folder is not touched:',
+  'unreadable.body.other':
+    '{count} entries of the profile list are not profiles this launcher can read, so they are not here. They stay in the file as they are, and their folders are not touched:',
+
   'profiles.fieldMinecraft': 'Minecraft',
   'profiles.fieldLoader': 'Loader',
   'profiles.fieldRam': 'RAM',

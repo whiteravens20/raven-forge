@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { DEFAULT_NEWS_FEED_URL, DEFAULT_ANNOUNCEMENT_FEED_URL } from './branding';
 import {
+  DEFAULT_RAM_MB,
   MAX_GAME_DIMENSION,
   MAX_RAM_MB,
   MIN_GAME_HEIGHT,
@@ -210,6 +211,64 @@ export const profileSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+
+/** A stored field that is simply left out when it is not what it should be. */
+const storedText = z.string().optional().catch(undefined);
+const storedNumber = z.number().optional().catch(undefined);
+/** What stands in for a stored date that is not there. It is never shown as one. */
+const NO_DATE = new Date(0).toISOString();
+
+/**
+ * A profile as `profiles.json` holds it, read back.
+ *
+ * Looser than `profileSchema`, which is the gate a profile passes on its way
+ * in. What is stored was accepted once, by this build or an older one, or was
+ * edited by hand — and refusing it over a detail would take a profile, and the
+ * worlds behind it, off the list. So only three things make an entry not a
+ * profile: an id, a Minecraft version or a loader that cannot be used. They
+ * name a folder, a path and a branch of the code, nothing sensible stands in
+ * for them, and guessing a version or a loader is how a world gets opened by
+ * the wrong game.
+ *
+ * Every other field is held to its type alone, and one of the wrong type is
+ * left out or given a value that harms nothing. A string that is not an
+ * address, a port out of range, RAM below the floor all stay as they are: the
+ * editor is where a bad value gets argued with, and it can only show what the
+ * value was while it is still there.
+ *
+ * Fields this build does not know are kept. A newer build wrote them, and the
+ * list is written back whole whenever any profile in it changes.
+ */
+export const storedProfileSchema = z
+  .looseObject({
+    id: z.string().refine(isSafeFileName),
+    name: z.string().min(1).optional().catch(undefined),
+    iconPath: storedText,
+    iconUrl: storedText,
+    iconPreset: storedText,
+    minecraftVersion: profileSchema.shape.minecraftVersion,
+    modLoader: profileSchema.shape.modLoader,
+    // No build named is something a launch already puts right, by pinning one.
+    modLoaderVersion: profileSchema.shape.modLoaderVersion.catch(undefined),
+    manifestUrl: storedText,
+    serverIp: storedText,
+    serverPort: storedNumber,
+    javaArgs: storedText,
+    allocatedRamMb: z.number().positive().catch(DEFAULT_RAM_MB),
+    customJavaPath: storedText,
+    windowWidth: profileSchema.shape.windowWidth,
+    windowHeight: profileSchema.shape.windowHeight,
+    fullscreen: profileSchema.shape.fullscreen,
+    gameLanguage: profileSchema.shape.gameLanguage,
+    notes: storedText,
+    lastPlayed: storedText,
+    totalPlayTimeMinutes: storedNumber,
+    createdAt: z.string().catch(NO_DATE),
+    updatedAt: z.string().catch(NO_DATE),
+  })
+  // A profile nobody named is still the one its folder belongs to, and the id
+  // is the one thing about it that is certain to be there.
+  .transform((stored) => ({ ...stored, name: stored.name ?? stored.id }));
 
 export const newsItemSchema = z.object({
   id: z.string(),

@@ -54,6 +54,7 @@ import type {
   LoaderVersion,
   JavaInstallation,
   JavaProbe,
+  UnreadableProfileEntries,
 } from '@shared/ipc-types';
 import { openProfileFolder } from '@renderer/open';
 
@@ -190,6 +191,8 @@ export function ProfilesPage() {
   const [choosingSource, setChoosingSource] = useState(false);
   /** Profile files left on disk by a "delete, keep files". */
   const [orphans, setOrphans] = useState<OrphanedProfile[]>([]);
+  /** Entries of the stored list that are not profiles, and so are not above. */
+  const [unreadable, setUnreadable] = useState<UnreadableProfileEntries | null>(null);
   /** The last pack export, so its result can be reported instead of vanishing. */
   const [exported, setExported] = useState<MrpackExport | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -210,6 +213,17 @@ export function ProfilesPage() {
   useEffect(() => {
     void refreshOrphans();
   }, [refreshOrphans, profiles.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.profiles.unreadableEntries().then((result) => {
+      if (!cancelled) setUnreadable(result.success && result.data ? result.data : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profiles.length]);
+  const unreadableCount = unreadable?.count ?? 0;
 
   /**
    * The kept profiles being put back or deleted right now. Deleting one removes
@@ -559,14 +573,17 @@ export function ProfilesPage() {
           {!profilesLoaded && (
             <p className="p-4 text-sm text-rf-text-muted">{t('profiles.loading')}</p>
           )}
-          {profilesLoaded && profiles.length === 0 && orphans.length === 0 && (
-            <EmptyState
-              kind="profiles"
-              title={t('profiles.empty')}
-              hint={t('profiles.emptyHint')}
-              className="p-4"
-            />
-          )}
+          {profilesLoaded &&
+            profiles.length === 0 &&
+            orphans.length === 0 &&
+            unreadableCount === 0 && (
+              <EmptyState
+                kind="profiles"
+                title={t('profiles.empty')}
+                hint={t('profiles.emptyHint')}
+                className="p-4"
+              />
+            )}
 
           {/* Files kept behind by a delete. Directories are keyed by id, so
               nothing else in the launcher would ever lead back to them — without
@@ -609,6 +626,20 @@ export function ProfilesPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* A profile that is in the file and not on this list, with nothing
+              said, reads as a profile the launcher lost. */}
+          {unreadable && unreadableCount > 0 && (
+            <div className="border-t border-rf-border p-3">
+              <h3 className="text-xs font-display font-semibold uppercase tracking-wider text-rf-text-secondary">
+                {t('unreadable.title')}
+              </h3>
+              <p className="mt-1 text-xs text-rf-text-muted">
+                {t.plural('unreadable.body', unreadableCount)}
+              </p>
+              <p className="mt-1 break-all text-xs text-rf-text select-text">{unreadable.file}</p>
             </div>
           )}
         </div>
