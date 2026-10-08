@@ -261,11 +261,30 @@ function Wait-Until {
 
 # ── The installer and the uninstaller ────────────────────────────────────────
 
+# Everything is started through this, with the module path every program on
+# the machine gets and not this script's own. An installer asks Windows' own
+# PowerShell which programs are running from its folder. Handed the module
+# path of the newer PowerShell this script runs in, that one finds none of its
+# commands, and the installer falls back to asking by the program's name —
+# which is not what it does on a player's machine, and closes a launcher that
+# the other way would not have found.
+function Start-Program {
+  param([hashtable] $As)
+  $mine = $env:PSModulePath
+  $env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine')
+  try {
+    $program = Start-Process @As -PassThru
+    # Asked for now, or the exit code is not there to be read afterwards.
+    if ($program) { $null = $program.Handle }
+    return $program
+  } finally {
+    $env:PSModulePath = $mine
+  }
+}
+
 function Invoke-Setup {
   param([string] $File, [string[]] $Switches, [int] $Seconds = 600)
-  $setup = Start-Process -FilePath $File -ArgumentList $Switches -PassThru
-  # Asked for now, or the exit code is not there to be read afterwards.
-  $null = $setup.Handle
+  $setup = Start-Program @{ FilePath = $File; ArgumentList = $Switches }
   if (-not $setup.WaitForExit($Seconds * 1000)) {
     Stop-Process -Id $setup.Id -Force
     throw "$(Split-Path -Leaf $File) $Switches was still running after $Seconds s"
@@ -281,7 +300,7 @@ function Invoke-Uninstall {
   param([string] $From, [string[]] $Switches = @(), [int] $Seconds = 180)
   $uninstaller = Join-Path $From $UninstallerName
   if (-not (Test-Path -LiteralPath $uninstaller)) { throw "no uninstaller in $From" }
-  $run = Start-Process -FilePath $uninstaller -ArgumentList (@('/currentuser', '/S') + $Switches) -PassThru
+  $run = Start-Program @{ FilePath = $uninstaller; ArgumentList = (@('/currentuser', '/S') + $Switches) }
   $null = $run.WaitForExit(60000)
   return (Wait-Until { -not (Test-Path -LiteralPath $From) -and @(Get-Listed).Count -eq 0 } $Seconds 500)
 }
@@ -391,15 +410,13 @@ function Get-LauncherFolder {
 # it runs, so every one of them is closed again before the scene is over.
 function Start-Launcher {
   param([string] $From, [string[]] $Switches = @(), [string] $Heard = '')
-  $start = @{ FilePath = (Join-Path $From $ExeName); WorkingDirectory = $From; PassThru = $true }
+  $start = @{ FilePath = (Join-Path $From $ExeName); WorkingDirectory = $From }
   if ($Switches.Count -gt 0) { $start.ArgumentList = $Switches }
   if ($Heard) {
     $start.RedirectStandardOutput = "$Heard.out.txt"
     $start.RedirectStandardError = "$Heard.err.txt"
   }
-  $launcher = Start-Process @start
-  $null = $launcher.Handle
-  return $launcher
+  return (Start-Program $start)
 }
 
 # The launcher's log, read while the launcher has it open.
@@ -702,6 +719,16 @@ try {
   foreach ($port in $InspectPort, $DevToolsPort) {
     if (Test-Listening $port) { throw "something already listens on port $port, so nothing could be told from it" }
   }
+  # The question an installer puts to Windows' own PowerShell before it relies
+  # on it, put the same way and to the same one: the 32-bit, which is the one
+  # a 32-bit installer finds.
+  $asked = Start-Program @{
+    FilePath     = (Join-Path $env:SystemRoot 'SysWOW64\WindowsPowerShell\v1.0\powershell.exe')
+    ArgumentList = '-NoProfile -Command "if (Get-Command Get-CimInstance -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"'
+    WindowStyle  = 'Hidden'
+  }
+  if (-not $asked.WaitForExit(120000)) { Stop-Process -Id $asked.Id -Force }
+  Expect ($asked.HasExited -and $asked.ExitCode -eq 0) "Windows' own PowerShell answers an installer here, as it does on a player's machine" "it left with $($asked.ExitCode)"
 
   # ── 1 ──
   Scene 'On a Windows that has never had the launcher'
@@ -710,7 +737,7 @@ try {
   Expect-Installed -In $Folder.Now -NotIn $Folder.Before
 
   $before = Get-Started $Data.Now
-  Start-Process -FilePath (Get-ShortcutPath 'Desktop')
+  $null = Start-Program @{ FilePath = (Get-ShortcutPath 'Desktop') }
   $up = Wait-Started $Data.Now $before
   Expect $up 'started from the shortcut on the desktop, the launcher comes up' 'its log never said that it was ready'
   if (-not $up) { throw 'the launcher does not start, and nothing more can be seen without it' }
@@ -922,8 +949,7 @@ try {
   Remove-Item -LiteralPath $Data.Now -Recurse -Force
   $older = Start-ReleaseBefore
   $before = Get-Started $Data.Before
-  $setup = Start-Process -FilePath $Installer -PassThru
-  $null = $setup.Handle
+  $setup = Start-Program @{ FilePath = $Installer }
   $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Reply.OK } -RunAfter $true -Pictures 'installer-over-the-release-before'
   Expect-Pages $met 'the licence', 'for whom', 'the folder', 'the end'
   Expect ($met.Folder -eq $Folder.Now) "the folder page names $($Folder.Now)" "it names '$($met.Folder)'"
@@ -943,8 +969,7 @@ try {
   Scene "The installer's pages gone through while the launcher is open"
   $launcher = Get-Launcher
   if ($null -eq $launcher) { throw 'the launcher that was just started is not running' }
-  $setup = Start-Process -FilePath $Installer -PassThru
-  $null = $setup.Handle
+  $setup = Start-Program @{ FilePath = $Installer }
   $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Reply.OK } -RunAfter $false -Pictures 'installer-over-the-open-launcher'
   Expect-Pages $met 'the licence', 'for whom', 'the folder', 'the end'
   Expect ($met.Folder -eq $Folder.Now) 'the folder page names the folder the launcher is in' "it names '$($met.Folder)'"
@@ -960,7 +985,7 @@ try {
 
   # ── 12 ──
   Scene "The uninstaller's pages gone through, the data kept"
-  $run = Start-Process -FilePath (Join-Path $Folder.Now $UninstallerName) -PassThru
+  $run = Start-Program @{ FilePath = (Join-Path $Folder.Now $UninstallerName) }
   $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers @{ $AsksToKeep = $Reply.Yes } -Pictures 'uninstaller-keeping'
   Expect-Pages $met 'the welcome', 'the end'
   Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
@@ -978,7 +1003,7 @@ try {
   $before = Get-Started $Data.Now
   $launcher = Start-Launcher $Folder.Now
   if (-not (Wait-Started $Data.Now $before)) { throw 'the launcher did not start again' }
-  $run = Start-Process -FilePath (Join-Path $Folder.Now $UninstallerName) -PassThru
+  $run = Start-Program @{ FilePath = (Join-Path $Folder.Now $UninstallerName) }
   $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers ([ordered]@{ $AsksToClose = $Reply.OK; $AsksToKeep = $Reply.No }) -Pictures 'uninstaller-deleting'
   Expect-Pages $met 'the welcome', 'the end'
   Expect ($met.Questions.Count -eq 2) 'it asks two things' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
