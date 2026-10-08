@@ -9,6 +9,7 @@ import { CancelledError, isCancellation, throwIfCancelled } from '../util/cancel
 import { RefusedError } from '../util/refusal';
 import { forEachConcurrently } from '../util/concurrency';
 import { serializeByKey } from '../util/serialize';
+import { containedPath } from '../util/safe-path';
 import { eachEntry, openEntry } from '../util/zip-read';
 import { downloadToFile } from '../net/download';
 import { MOJANG_LIBRARIES, MOJANG_RESOURCES } from '../../shared/constants';
@@ -428,6 +429,9 @@ export async function ensureLibraries(
   const classpath: string[] = [];
   const nativeJars: Array<{ jarPath: string; exclude: string[] }> = [];
 
+  // Every destination below is the profile's own word for where a file goes,
+  // and is held to the libraries folder before anything is asked for: see
+  // `containedPath`.
   for (const lib of meta.libraries) {
     if (!shouldIncludeLibrary(lib)) continue;
 
@@ -437,7 +441,7 @@ export async function ensureLibraries(
       // Netty each unpack their own into the natives directory the version's
       // arguments point them at, so a copy made here was never the one loaded.
       const artifact = lib.downloads.artifact;
-      const dest = path.join(librariesDir, artifact.path);
+      const dest = containedPath(librariesDir, artifact.path);
       const task = { url: artifact.url, dest, sha1: artifact.sha1, size: artifact.size };
       // No address means a loader's installer made the file on this machine:
       // there is nothing to fetch, only something to find.
@@ -455,7 +459,7 @@ export async function ensureLibraries(
       // classpath.
       const coords = parseMavenCoords(lib.name);
       if (coords) {
-        const dest = path.join(librariesDir, coords.path);
+        const dest = containedPath(librariesDir, coords.path);
         const repository = lib.url ?? MOJANG_LIBRARIES;
         const baseUrl = repository.endsWith('/') ? repository : `${repository}/`;
         tasks.push({
@@ -474,7 +478,7 @@ export async function ensureLibraries(
       const nativeKey = nativesClassifier(lib.natives);
       const classifier = nativeKey ? lib.downloads.classifiers[nativeKey] : undefined;
       if (classifier) {
-        const dest = path.join(librariesDir, classifier.path);
+        const dest = containedPath(librariesDir, classifier.path);
         tasks.push({ url: classifier.url, dest, sha1: classifier.sha1, size: classifier.size });
         nativeJars.push({ jarPath: dest, exclude: lib.extract?.exclude ?? [] });
       }
@@ -591,7 +595,9 @@ export async function ensureAssets(
   const objectsDir = path.join(assetsDir, 'objects');
   await fs.mkdir(indexDir, { recursive: true });
 
-  const indexFile = path.join(indexDir, `${meta.assetIndex.id}.json`);
+  // Named by the version profile, like a library's path, and held to its
+  // folder the same way.
+  const indexFile = containedPath(indexDir, `${meta.assetIndex.id}.json`);
 
   // Download asset index
   // Always by hash: it is one small file, and it decides what every other

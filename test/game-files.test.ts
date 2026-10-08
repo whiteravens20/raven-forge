@@ -312,6 +312,74 @@ describe('a library only a loader’s installer can make', () => {
   });
 });
 
+/**
+ * A version profile says where each of its files goes, as a path under a
+ * folder of the launcher's. Mojang's are checked against Mojang's own list; a
+ * loader's are whatever the loader's server sent, or whatever is in the file
+ * its install left. Neither may name a place that is not under that folder.
+ */
+describe('a file a version profile puts outside the folder it belongs in', () => {
+  const outside = () => path.join(dir, 'outside');
+  const bytes = 'not a library';
+
+  const refused = async (libraries: Library[]) => {
+    await expect(ensureLibraries(libs(), metaOf(libraries), natives())).rejects.toThrow(
+      /outside the target directory/,
+    );
+    await expect(fs.access(outside())).rejects.toThrow();
+    // Refused for where it would go, before anybody is asked for it.
+    expect(hits).toEqual([]);
+  };
+
+  it('is refused when it is a library given a path', async () => {
+    served['/evil.jar'] = Buffer.from(bytes);
+    await refused([
+      {
+        name: 'org.example:evil:1.0',
+        downloads: {
+          artifact: {
+            path: '../outside/evil.jar',
+            url: `${base}/evil.jar`,
+            sha1: sha1(bytes),
+            size: bytes.length,
+          },
+        },
+      },
+    ]);
+  });
+
+  it('is refused when it is a library named by coordinates', async () => {
+    await refused([{ name: 'org.example:../../../outside/evil:1.0', url: `${base}/repo/` }]);
+  });
+
+  it('is refused when it is a jar of natives', async () => {
+    const jar = await nativesJar('lwjgl', { 'liblwjgl.so': 'elf' });
+    jar.downloads!.classifiers!['natives-here'].path = '../outside/natives.jar';
+    await refused([jar]);
+  });
+
+  it('is refused when it is the asset index', async () => {
+    const index = '{"objects":{}}';
+    served['/index.json'] = Buffer.from(index);
+    const meta = {
+      id: '1.21.4',
+      assetIndex: {
+        id: '../../outside/index',
+        sha1: sha1(index),
+        size: index.length,
+        totalSize: 0,
+        url: `${base}/index.json`,
+      },
+    } as unknown as VersionMeta;
+
+    await expect(ensureAssets(path.join(dir, 'assets'), meta)).rejects.toThrow(
+      /outside the target directory/,
+    );
+    await expect(fs.access(outside())).rejects.toThrow();
+    expect(hits).toEqual([]);
+  });
+});
+
 describe('native libraries', () => {
   it('are unpacked loose for a version that lists them the old way', async () => {
     const jar = await nativesJar('lwjgl', {

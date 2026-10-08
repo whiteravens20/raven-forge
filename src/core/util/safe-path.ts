@@ -23,11 +23,7 @@ import path from 'node:path';
  * @returns the absolute destination, its parent created and proven contained
  */
 export async function resolveWithin(baseDir: string, relative: string): Promise<string> {
-  const dest = path.resolve(baseDir, relative);
-  const rel = path.relative(baseDir, dest);
-  if (rel === '' || leavesTheTree(rel)) {
-    throw new Error(`Refusing to write outside the target directory: ${relative}`);
-  }
+  const dest = containedPath(baseDir, relative);
 
   const parent = path.dirname(dest);
   await fs.mkdir(parent, { recursive: true });
@@ -36,6 +32,28 @@ export async function resolveWithin(baseDir: string, relative: string): Promise<
     throw new Error(`Refusing to follow a symlink out of the target directory: ${relative}`);
   }
 
+  return dest;
+}
+
+/**
+ * `relative` under `baseDir`, refused when it names a place that is not.
+ *
+ * The first of {@link resolveWithin}'s two checks, by itself, and touching
+ * nothing: no folder made, no link followed. It is for the trees the launcher
+ * keeps for itself — its libraries, its asset indexes — where nobody else has
+ * put a link, and where the path is one of several hundred asked about before
+ * every launch. Those paths come out of a version profile, and a loader's
+ * profile is whatever the loader's server sent: joined on as they came, a
+ * library "at" `../../x` was fetched to wherever that led.
+ *
+ * @returns the absolute destination
+ */
+export function containedPath(baseDir: string, relative: string): string {
+  const dest = path.resolve(baseDir, relative);
+  const rel = path.relative(baseDir, dest);
+  if (rel === '' || leavesTheTree(rel)) {
+    throw new Error(`Refusing to write outside the target directory: ${relative}`);
+  }
   return dest;
 }
 

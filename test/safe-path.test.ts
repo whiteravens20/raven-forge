@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { resolveWithin } from '../src/core/util/safe-path';
+import { containedPath, resolveWithin } from '../src/core/util/safe-path';
 
 /**
  * The rule that keeps an archive from writing outside the directory it is
@@ -96,4 +96,29 @@ describe('resolveWithin', () => {
     await fs.symlink(path.join(outside, 'target.txt'), path.join(base, 'file.txt'));
     await expect(resolveWithin(base, 'file.txt')).resolves.toBe(path.join(base, 'file.txt'));
   });
+});
+
+/**
+ * The same rule without the filesystem: for the launcher's own folders, where
+ * the name is the only thing that can lead out.
+ */
+describe('containedPath', () => {
+  it('gives the place a name stands for under the base, and makes nothing', async () => {
+    expect(containedPath(base, 'org/example/lib/1.0/lib-1.0.jar')).toBe(
+      path.join(base, 'org', 'example', 'lib', '1.0', 'lib-1.0.jar'),
+    );
+    expect(await fs.readdir(base)).toEqual([]);
+  });
+
+  it('allows a name that only begins with two dots, and one that goes down and back', () => {
+    expect(containedPath(base, '..cache/x.json')).toBe(path.join(base, '..cache', 'x.json'));
+    expect(containedPath(base, 'a/../b.jar')).toBe(path.join(base, 'b.jar'));
+  });
+
+  it.each(['../outside/evil.jar', 'a/b/../../../outside/evil.jar', '/etc/passwd', '.', ''])(
+    'refuses %j',
+    (name) => {
+      expect(() => containedPath(base, name)).toThrow(/outside the target directory/);
+    },
+  );
 });
