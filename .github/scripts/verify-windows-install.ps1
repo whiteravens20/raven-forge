@@ -470,7 +470,7 @@ function Stop-Launchers {
 # The buttons a question can be answered with, by the numbers Windows gives
 # them. In an installer's own window the one that leads on — Next, I Agree,
 # Install, Finish — is number 1 on every page.
-$Answer = @{ OK = 1; Cancel = 2; Yes = 6; No = 7 }
+$Reply = @{ OK = 1; Cancel = 2; Yes = 6; No = 7 }
 $LeadsOn = 1
 
 # The two things an installer or an uninstaller may ask, by a piece of their
@@ -861,10 +861,10 @@ try {
   # The other half of scene 2. That release opens a debugger when asked, and
   # here it is asked in the same words: an answer from it is what makes the
   # silence above mean something on this machine.
-  $script:answer = $null
-  $null = Wait-Until { $script:answer = Get-Debugger $DevToolsPort; $null -ne $script:answer } 20 500
-  Expect ($null -ne $script:answer) 'asked for a debugger in the same words, that release opens one'
-  if ($script:answer) { Note "it answers as $($script:answer.Browser)" }
+  $script:debugger = $null
+  $null = Wait-Until { $script:debugger = Get-Debugger $DevToolsPort; $null -ne $script:debugger } 20 500
+  Expect ($null -ne $script:debugger) 'asked for a debugger in the same words, that release opens one'
+  if ($script:debugger) { Note "it answers as $($script:debugger.Browser)" }
   Start-Sleep -Seconds 4
   Save-Screen 'release-before'
   Note "that release keeps in its folder: $(@(Get-ChildItem -LiteralPath $Data.Before -Force | ForEach-Object Name) -join ', ')"
@@ -924,7 +924,7 @@ try {
   $before = Get-Started $Data.Before
   $setup = Start-Process -FilePath $Installer -PassThru
   $null = $setup.Handle
-  $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Answer.OK } -RunAfter $true -Pictures 'installer-over-the-release-before'
+  $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Reply.OK } -RunAfter $true -Pictures 'installer-over-the-release-before'
   Expect-Pages $met 'the licence', 'for whom', 'the folder', 'the end'
   Expect ($met.Folder -eq $Folder.Now) "the folder page names $($Folder.Now)" "it names '$($met.Folder)'"
   foreach ($asked in $met.Questions) { Note "it asked: $asked" }
@@ -945,7 +945,7 @@ try {
   if ($null -eq $launcher) { throw 'the launcher that was just started is not running' }
   $setup = Start-Process -FilePath $Installer -PassThru
   $null = $setup.Handle
-  $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Answer.OK } -RunAfter $false -Pictures 'installer-over-the-open-launcher'
+  $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Reply.OK } -RunAfter $false -Pictures 'installer-over-the-open-launcher'
   Expect-Pages $met 'the licence', 'for whom', 'the folder', 'the end'
   Expect ($met.Folder -eq $Folder.Now) 'the folder page names the folder the launcher is in' "it names '$($met.Folder)'"
   Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
@@ -961,7 +961,7 @@ try {
   # ── 12 ──
   Scene "The uninstaller's pages gone through, the data kept"
   $run = Start-Process -FilePath (Join-Path $Folder.Now $UninstallerName) -PassThru
-  $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers @{ $AsksToKeep = $Answer.Yes } -Pictures 'uninstaller-keeping'
+  $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers @{ $AsksToKeep = $Reply.Yes } -Pictures 'uninstaller-keeping'
   Expect-Pages $met 'the welcome', 'the end'
   Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
   foreach ($asked in $met.Questions) {
@@ -979,7 +979,7 @@ try {
   $launcher = Start-Launcher $Folder.Now
   if (-not (Wait-Started $Data.Now $before)) { throw 'the launcher did not start again' }
   $run = Start-Process -FilePath (Join-Path $Folder.Now $UninstallerName) -PassThru
-  $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers ([ordered]@{ $AsksToClose = $Answer.OK; $AsksToKeep = $Answer.No }) -Pictures 'uninstaller-deleting'
+  $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers ([ordered]@{ $AsksToClose = $Reply.OK; $AsksToKeep = $Reply.No }) -Pictures 'uninstaller-deleting'
   Expect-Pages $met 'the welcome', 'the end'
   Expect ($met.Questions.Count -eq 2) 'it asks two things' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
   if ($met.Questions.Count -eq 2) {
