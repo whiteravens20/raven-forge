@@ -7,7 +7,13 @@ import { acceptedLoaders } from '../../shared/constants';
 import { getProfile } from '../profiles/profile-manager';
 import { hashFile } from './integrity';
 import { readLockFile, mutateLockFile, modFilePath } from './lock-file';
-import { getProjectTitle, getVersion, latestVersionsByHash, primaryFile } from './modrinth-api';
+import {
+  getProjectTitle,
+  getVersion,
+  latestVersionsByHash,
+  primaryFile,
+  versionsByHash,
+} from './modrinth-api';
 import { downloadFor, installResolvedMod, installRequiredDependencies } from './mod-sync';
 import type { InstalledMod, ModUpdateResult, ModUpdateSummary } from '../../shared/ipc-types';
 import { errorText } from '../util/error-text';
@@ -117,7 +123,17 @@ export async function checkModUpdates(profileId: string): Promise<ModUpdateSumma
     `Update check for profile ${profileId}: ${updates} of ${byHash.size} mods have a newer build`,
   );
 
-  return { checked: byHash.size, updates, unknown: byHash.size - latest.size };
+  // A file is missing from that answer for one of two reasons, and the answer
+  // does not say which: Modrinth has never seen it, or it knows it and the
+  // project has no build for this Minecraft version and loader. Both used to
+  // be reported as "not on Modrinth" — which a mod installed from Modrinth, in
+  // a profile whose version was then changed, is not. Asked what the missing
+  // files are, with no version or loader named, it answers for the second kind
+  // alone.
+  const missing = [...byHash.keys()].filter((hash) => !latest.has(hash));
+  const noBuild = missing.length > 0 ? (await versionsByHash(missing)).size : 0;
+
+  return { checked: byHash.size, updates, unknown: missing.length - noBuild, noBuild };
 }
 
 /**

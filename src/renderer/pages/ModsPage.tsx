@@ -478,6 +478,8 @@ export function ModsPage() {
                     : t('mods.upToDate')}
                 {updateCheck.unknown > 0 &&
                   ` ${t.plural('mods.unknownToModrinth', updateCheck.unknown)}`}
+                {updateCheck.noBuild > 0 &&
+                  ` ${t.plural('mods.noBuildForProfile', updateCheck.noBuild)}`}
               </p>
               {outdated.length > 1 && (
                 <Button

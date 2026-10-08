@@ -51,6 +51,12 @@ export interface ModUpdateSummary {
   updates: number;
   /** Files Modrinth has never seen: a private build, or a jar compiled locally. */
   unknown: number;
+  /**
+   * Files Modrinth knows, of a project with no build for this profile's
+   * Minecraft version and loader — a mod kept through a version change, or one
+   * added from a file made for another version.
+   */
+  noBuild: number;
 }
 
 /**

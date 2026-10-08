@@ -519,6 +519,10 @@ export const en = {
   'mods.noneToCheck': 'Nothing here to check — this profile’s mods come from its manifest.',
   'mods.unknownToModrinth.one': '{count} file is not on Modrinth and cannot be checked.',
   'mods.unknownToModrinth.other': '{count} files are not on Modrinth and cannot be checked.',
+  'mods.noBuildForProfile.one':
+    '{count} mod has no build for this profile’s Minecraft version and loader.',
+  'mods.noBuildForProfile.other':
+    '{count} mods have no build for this profile’s Minecraft version and loader.',
   'mods.updateAll': 'Update all',
   'mods.update': 'Update',
   'mods.updateTo': 'new: {version}',

@@ -556,6 +556,13 @@ export const pl: Translations = {
   'mods.unknownToModrinth.few': '{count} plików nie ma na Modrinth i nie da się ich sprawdzić.',
   'mods.unknownToModrinth.many': '{count} plików nie ma na Modrinth i nie da się ich sprawdzić.',
   'mods.unknownToModrinth.other': '{count} pliku nie ma na Modrinth i nie da się go sprawdzić.',
+  'mods.noBuildForProfile.one': '{count} mod nie ma wersji dla Minecrafta i loadera tego profilu.',
+  'mods.noBuildForProfile.few':
+    '{count} mody nie mają wersji dla Minecrafta i loadera tego profilu.',
+  'mods.noBuildForProfile.many':
+    '{count} modów nie ma wersji dla Minecrafta i loadera tego profilu.',
+  'mods.noBuildForProfile.other':
+    '{count} moda nie ma wersji dla Minecrafta i loadera tego profilu.',
   'mods.updateAll': 'Zaktualizuj wszystkie',
   'mods.update': 'Aktualizuj',
   'mods.updateTo': 'nowa: {version}',
