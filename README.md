@@ -516,6 +516,32 @@ Found a vulnerability? Do not open a public issue — use [private vulnerability
 
 ---
 
+## How the code is written and checked
+
+Raven Forge is built by one maintainer using AI coding tools. The tools write most of the code, tests and documentation; the maintainer decides what gets built and is responsible for everything that lands here. There is no second human reviewer, and the launcher is still in testing.
+
+**What a change goes through**
+
+- Every push and pull request runs lint, type checking, a format check and the test suite, then builds the launcher for Linux and for Windows ([build.yml](.github/workflows/build.yml)). The parts where a mistake does real damage have tests of their own: the launch path, the hash check on downloads, manifest signature verification and the token store.
+- CodeQL, `npm audit`, package signature checks and a Trivy scan for secrets and misconfiguration run on every push and pull request, and again every week ([codeql.yml](.github/workflows/codeql.yml), [security.yml](.github/workflows/security.yml)).
+- Commits are signed, and the [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/whiteravens20/raven-forge) results are public.
+
+**What the maintainer decided and read**
+
+- The architecture was decided by the maintainer: the stack, the IPC protocol between the window and the main process, and the sign-in chain.
+- White Ravens' own signing key is compiled into the launcher rather than fetched from where the manifests are, so a pack published by White Ravens is checked against a key that cannot be swapped along with the manifest ([docs/SIGNING.md](docs/SIGNING.md)).
+- Generated code is reviewed and tested by the maintainer in the session that produces it. Changes to the sign-in chain and the token store, manifest signature verification, the hash check on downloads and the launch path are read line by line.
+
+**Before a release**
+
+- The installers themselves are run, not only the tests: the Windows installer and uninstaller, the `.deb` on a clean Debian and the AppImage, including the update from the previous version.
+- A release is created as a draft, which the auto-updater ignores, and is published by hand once its signature, checksums and SBOM have been checked.
+- What was run and what is still open is tracked in [the road to 1.0.0](https://github.com/whiteravens20/raven-forge/issues/15). [SECURITY.md](SECURITY.md#security-model) describes the security model and its known gaps.
+
+If something looks wrong, open an issue. For a vulnerability, use [private vulnerability reporting](https://github.com/whiteravens20/raven-forge/security/advisories/new).
+
+---
+
 ## License
 
 [GNU Affero General Public License, version 3](LICENSE) (AGPL-3.0-only), with one additional term in [NOTICE](NOTICE).
@@ -523,24 +549,3 @@ Found a vulnerability? Do not open a public issue — use [private vulnerability
 You are free to use, modify, and share this software. Anyone who distributes it, or a version based on it, has to do so under the same licence with the source code available, and has to keep the attribution "Raven Forge by White Ravens" together with the address of this repository.
 
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
-
----
-
-## Built with AI — How We Fight AI Slop
-
-This project was built with the help of **AI coding assistants**. We believe in transparency about AI involvement and in keeping quality high despite using AI tools.
-
-### What "AI slop" is and how we fight it
-
-"AI slop" is low-quality, bloated, copy-paste code that AI generates when used carelessly — dead code, unnecessary abstractions, hallucinated APIs, cargo-culted patterns, and verbose boilerplate nobody asked for. It's the software equivalent of SEO spam articles.
-
-Here's how this project stays above that bar:
-
-1. **Human-driven architecture** — Every design decision (tech stack, folder structure, IPC protocol, auth chain) was made by a human. AI executed the plan, not the other way around.
-2. **Strict compilation gates** — Every generated file must pass `tsc --noEmit` (zero type errors) and `eslint` (zero lint errors) before being accepted. No "it looks right" — it compiles or it doesn't ship.
-3. **No dead code policy** — Unused imports, unreachable branches, and placeholder stubs are caught by linting rules (`no-unused-vars`, `no-explicit-any`) and removed immediately.
-4. **Minimal abstraction** — No premature DRY, no "just in case" wrappers, no 5-layer indirection for a simple function call. Code is as simple as the task requires.
-5. **Real implementations over stubs** — Where a feature is implemented, it's a real working implementation (OAuth chain, Adoptium JRE download, Modrinth search, Mojang asset pipeline). Where it's not ready, it's explicitly marked as a stub with a clear error message — never a silent no-op.
-6. **Iterative review** — AI output is reviewed, tested, and corrected in the same session. Bugs introduced by AI are fixed immediately, not left for "later."
-
-If you spot AI slop in this codebase — dead code, nonsensical comments, hallucinated APIs, over-engineered abstractions — please open an issue. Keeping code clean is a shared responsibility.
