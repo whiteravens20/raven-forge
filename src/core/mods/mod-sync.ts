@@ -23,7 +23,13 @@ import { writeJsonAtomic } from '../util/atomic-file';
 import { forEachConcurrently } from '../util/concurrency';
 import { emitProgress, withProgress } from '../util/progress';
 import { syncContentFromManifest } from './content-manager';
-import { fileMatches, verifyDownload, expectedHash, type HashedEntry } from './integrity';
+import {
+  fileMatches,
+  verifyDownload,
+  expectedHash,
+  pinnedHashes,
+  type HashedEntry,
+} from './integrity';
 import { configVersion, shouldApplyConfigOverride } from './config-overrides';
 import { pendingChanges } from './pack-diff';
 import { getMainWindow } from '../../main/window';
@@ -375,19 +381,6 @@ export async function resolveModEntry(
 }
 
 /**
- * The hash a manifest entry's file has to match.
- *
- * The manifest's own, whenever it states one: that is the publisher's claim and
- * can be covered by the manifest signature. What the source's API reports is
- * the fallback for an entry that states none — and only that. Merging the two
- * and taking the strongest algorithm, as this used to, let Modrinth's sha512
- * outrank a sha256 the manifest pinned, so the pin was never compared at all.
- */
-function pinnedHashes(entry: ModEntry, resolved: ResolvedDownload): HashedEntry {
-  return expectedHash(entry) ? entry : (resolved.hashes ?? {});
-}
-
-/**
  * Download (or copy) one entry into the profile, once its hash has been checked.
  *
  * Either way the file takes its place only when it is whole and correct, so an
@@ -399,7 +392,7 @@ async function fetchModEntry(
   destPath: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  const hashes = pinnedHashes(entry, resolved);
+  const hashes = pinnedHashes(entry, resolved.hashes);
 
   if (resolved.localPath) {
     const part = `${destPath}.part`;
@@ -693,7 +686,7 @@ async function runSync(profileId: string, supplied?: ModManifest): Promise<void>
       // very end, so a first install that failed at mod sixty had recorded
       // nothing, and the retry fetched the first fifty-nine again — on every
       // launch, for as long as that one URL stayed broken.
-      const present = await fileMatches(destPath, pinnedHashes(entry, resolved));
+      const present = await fileMatches(destPath, pinnedHashes(entry, resolved.hashes));
 
       plannedMods.push({ entry, resolved, destPath, previous, enabled, present });
       checked++;

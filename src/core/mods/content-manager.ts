@@ -11,7 +11,7 @@ import { getVersion, getModVersions, getProjectTitle, primaryFile } from './modr
 import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
-import { fileMatches, type HashedEntry } from './integrity';
+import { fileMatches, pinnedHashes, type HashedEntry } from './integrity';
 import { isSameModFile } from './lock-file';
 import type { ContentKind, InstalledMod } from '../../shared/ipc-types';
 import {
@@ -323,8 +323,8 @@ export async function syncContentFromManifest(
     let downloadUrl: string;
     let fileName: string;
     let version = entry.version ?? 'unknown';
-    // Modrinth's published hash for the resolved build, folded in below so a
-    // manifest entry that declared none is still verified against the API.
+    // Modrinth's published hash for the resolved build, which is what an entry
+    // that declared none of its own is held to.
     let apiHashes: HashedEntry | undefined;
 
     if (entry.url) {
@@ -362,8 +362,15 @@ export async function syncContentFromManifest(
     const dest = path.join(dir, fileName);
     if (previous && previous.fileName !== fileName) replaced.push(previous.fileName);
 
-    // Skip the download when the file on disk already matches the manifest.
-    if (previous && (await fileMatches(dest, entry))) {
+    // One answer to "what should this file hash to", for looking at the copy
+    // on disk and for checking what arrives. The two used to disagree: the copy
+    // was held to the manifest's hash alone, so an entry with none was fetched
+    // again at every sync, and the download to both at once — see
+    // `pinnedHashes`.
+    const hashes = pinnedHashes(entry, apiHashes);
+
+    // Skip the download when the file on disk is already that file.
+    if (previous && (await fileMatches(dest, hashes))) {
       fromManifest.push({
         ...previous,
         projectId: entry.projectId,
@@ -375,11 +382,9 @@ export async function syncContentFromManifest(
     }
 
     log.info(`Syncing ${kind.slice(0, -1)}: ${entry.name}`);
-    // The manifest's own hash wins where it has one; the API hash is the floor,
-    // so a modrinth entry that declared none is still checked against the build.
     await downloadToFile(downloadUrl, dest, {
       secure: true,
-      verify: { hashes: { ...apiHashes, ...entry }, label: entry.name },
+      verify: { hashes, label: entry.name },
     });
 
     fromManifest.push({

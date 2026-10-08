@@ -59,6 +59,10 @@ publish `sha512` never has to download a jar purely to hash it. That is what
 makes large packs cheap to build. `sha1` is the floor, and exists because a
 `.mrpack` publishes it for every file.
 
+A hash the manifest states is the one its file is held to, for a mod, a shader
+or a resource pack alike, and whatever Modrinth says about the same build: it is
+the publisher's claim, and the one the manifest's signature covers.
+
 What an entry with none of the three gets depends on where its file comes from.
 A `modrinth` entry with no `url` is checked against the hash Modrinth publishes
 for that build. A mod given by `url` **must** declare one, and a manifest that

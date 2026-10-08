@@ -53,6 +53,21 @@ export function expectedHash(
   return null;
 }
 
+/**
+ * The hash a manifest entry's file has to match.
+ *
+ * The manifest's own, whenever it states one: that is the publisher's claim and
+ * can be covered by the manifest signature. What the source's API reports is
+ * the fallback for an entry that states none — and only that. Merging the two
+ * and taking the strongest algorithm let Modrinth's sha512 outrank a sha256 the
+ * manifest pinned, so the pin was never compared at all: for mods first, and
+ * for shaders and resource packs for as long again after that was put right,
+ * since each had a copy of the rule.
+ */
+export function pinnedHashes(entry: HashedEntry, fromSource: HashedEntry | undefined): HashedEntry {
+  return expectedHash(entry) ? entry : (fromSource ?? {});
+}
+
 /** True when the file on disk already matches what the manifest expects. */
 export async function fileMatches(filePath: string, entry: HashedEntry): Promise<boolean> {
   const expected = expectedHash(entry);

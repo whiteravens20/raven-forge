@@ -615,6 +615,44 @@ describe('syncContentFromManifest', () => {
     await expect(fs.stat(path.join(packsDir(), 'server-pack.zip'))).rejects.toThrow();
   });
 
+  it('does not fetch again a pack named by its Modrinth project, with no hash of the manifest’s own', async () => {
+    // The file was looked for under the manifest's hash alone. An entry that
+    // gave none matched nothing, so the pack was fetched again at every sync —
+    // which a profile that follows a pack runs before every launch.
+    const entry = {
+      id: 'server-pack',
+      name: 'Server pack',
+      source: 'modrinth',
+      projectId: published('Server.zip', 'server-bytes'),
+    } as ResourcePackEntry;
+    await content.syncContentFromManifest('resourcepacks', PROFILE, [entry], '1.21.4');
+
+    // With nothing served, a second fetch would 404 and throw.
+    served = {};
+    await expect(
+      content.syncContentFromManifest('resourcepacks', PROFILE, [entry], '1.21.4'),
+    ).resolves.toBe(1);
+  });
+
+  it('holds such a pack to the hash the manifest pins, when it pins one', async () => {
+    // Modrinth's own hash for the build is the fallback, for an entry that
+    // states none. Merged with the manifest's and the strongest taken, its
+    // sha512 outranked the sha256 the publisher had signed, and the file was
+    // never compared with that at all.
+    const entry = {
+      id: 'server-pack',
+      name: 'Server pack',
+      source: 'modrinth',
+      projectId: published('Server.zip', 'what Modrinth serves now'),
+      sha256: sha256('what the publisher signed'),
+    } as ResourcePackEntry;
+
+    await expect(
+      content.syncContentFromManifest('resourcepacks', PROFILE, [entry], '1.21.4'),
+    ).rejects.toThrow(/sha256 mismatch/);
+    await expect(fs.stat(path.join(packsDir(), 'Server.zip'))).rejects.toThrow();
+  });
+
   it('drops what the manifest dropped and keeps what the player installed', async () => {
     const mine = await content.installContent(
       'resourcepacks',
