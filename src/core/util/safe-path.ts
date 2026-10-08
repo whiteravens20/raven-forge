@@ -58,6 +58,21 @@ export function containedPath(baseDir: string, relative: string): string {
 }
 
 /**
+ * Whether what sits at `file` is a link to somewhere else. Nothing there at
+ * all is not one.
+ *
+ * Asked wherever a file is about to be replaced and the open itself cannot be
+ * told to refuse a link: Windows has no `O_NOFOLLOW`.
+ */
+export async function isSymlink(file: string): Promise<boolean> {
+  try {
+    return (await fs.lstat(file)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Whether a relative path climbs out of where it starts.
  *
  * By its first component, not by its first two characters: `..cache/x.json` is

@@ -6,7 +6,7 @@ import { constants as fsConstants } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { z } from 'zod';
 import { log } from '../../main/logger';
-import { resolveWithin } from '../util/safe-path';
+import { isSymlink, resolveWithin } from '../util/safe-path';
 import { eachEntry, openEntry } from '../util/zip-read';
 import type { ModLoaderType } from '../../shared/ipc-types';
 
@@ -314,6 +314,12 @@ export async function applyOverrides(
     // itself goes. `fs.writeFile(dest)` followed either, so a link left in the
     // game dir by a previous pack could redirect a write out of the tree.
     const dest = await resolveWithin(gameDir, override.path);
+    // Windows has no such flag, and there the open went through the link: seen
+    // the first time this was run on one. So the link is looked for by name as
+    // well, which is all there is to do where the open cannot be told.
+    if (O_NOFOLLOW === 0 && (await isSymlink(dest))) {
+      throw new Error(`Refusing to write through a symlink: ${override.path}`);
+    }
     const handle = await fs.open(
       dest,
       fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC | O_NOFOLLOW,

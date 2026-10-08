@@ -8,6 +8,7 @@ import { assertSecureContentUrl, isSecureContentUrl } from '../../shared/validat
 import { expectedHash, type HashedEntry } from '../mods/integrity';
 import { serializeByKey } from '../util/serialize';
 import { flushToDisk, renameIntoPlace } from '../util/atomic-file';
+import { isSymlink } from '../util/safe-path';
 
 /** No data for this long means the transfer is dead, not merely slow. */
 const STALL_TIMEOUT_MS = 45_000;
@@ -109,14 +110,6 @@ export async function downloadToFile(
   // temporary name, and each would be hashing what it received while the disk
   // held a mixture of both — which would then be renamed into place as verified.
   return serializeByKey(dest, () => receive(url, dest, options));
-}
-
-async function isSymlink(file: string): Promise<boolean> {
-  try {
-    return (await fs.lstat(file)).isSymbolicLink();
-  } catch {
-    return false;
-  }
 }
 
 async function receive(url: string, dest: string, options: DownloadOptions): Promise<void> {
