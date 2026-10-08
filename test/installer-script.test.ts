@@ -71,6 +71,59 @@ describe('the uninstaller’s own script', () => {
 });
 
 /**
+ * The folder the uninstaller's question names, laid out so that it fits.
+ *
+ * Windows gives a question a narrow box and cuts a line that is too long for
+ * it wherever the room runs out — for a path, in the middle of a name. The
+ * script cuts the path itself first, after a backslash. That the lines it
+ * makes do fit is measured where the question is shown, on Windows, by the
+ * packaging job; what is held here is that the question quotes the path as it
+ * was laid out, and that laying it out disturbs nothing around it.
+ */
+describe('the folder in the uninstaller’s question', () => {
+  it('is laid out once it is known, and before the question is put together', async () => {
+    const lines = await macro('customUnInstall');
+    const laidOut = lines.indexOf('!insertmacro layOutRavenForgePath');
+    const chosen = lines.flatMap((line, at) => (line.startsWith('StrCpy $R3 ') ? [at] : []));
+    const worded = lines.flatMap((line, at) => (line.startsWith('StrCpy $R8 "') ? [at] : []));
+
+    // Three places it can be, one wording for each of two languages.
+    expect(chosen).toHaveLength(3);
+    expect(worded).toHaveLength(2);
+    expect(laidOut).toBeGreaterThan(Math.max(...chosen));
+    expect(laidOut).toBeLessThan(Math.min(...worded));
+  });
+
+  it('is quoted as it was laid out, in both languages', async () => {
+    const lines = await macro('customUnInstall');
+    for (const wording of lines.filter((line) => line.startsWith('StrCpy $R8 "'))) {
+      expect(wording).toContain('$R4');
+      expect(wording).not.toContain('$R3');
+    }
+  });
+
+  it('is laid out in registers nothing around it is using', async () => {
+    // $R0 to $R2 belong to the stock uninstall section either side of the
+    // macro, and $R9 to electron-builder's flag tests.
+    const lines = await macro('layOutRavenForgePath');
+    const used = new Set(lines.flatMap((line) => line.match(/\$R\d/g) ?? []));
+
+    expect([...used].sort()).toEqual(['$R3', '$R4', '$R5', '$R6', '$R7', '$R8']);
+    // And the path it was handed is still there afterwards.
+    expect(lines.filter((line) => /^(StrCpy|StrLen|IntOp) \$R3\b/.test(line))).toEqual([]);
+  });
+
+  it('is cut after a backslash, and never after the first of them', async () => {
+    const lines = await macro('layOutRavenForgePath');
+    // What is looked for, going back from the end of a line …
+    expect(lines).toContain('StrCmp $R7 "\\" 0 rfSeekBackslash');
+    // … and where the looking stops: a cut after `C:\` would leave three
+    // characters on a line by themselves.
+    expect(lines).toContain('IntCmp $R6 3 0 rfLastLine 0');
+  });
+});
+
+/**
  * The folder page of the installer, where an install made by an older build is
  * offered under its old name.
  *

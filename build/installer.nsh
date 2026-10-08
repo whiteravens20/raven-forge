@@ -227,6 +227,52 @@
   RMDir "${DIR}"
 !macroend
 
+; Lays a folder's path out for the question below: $R3 in, $R4 out.
+;
+; Windows gives a question a narrow box, a little over fifty letters to the
+; line whatever the screen, and a line that is too long for it is cut wherever
+; the room runs out. A path has no spaces to be cut at, so the data folder's
+; came out as "…\raven-forge-launch" with "er" under it for anybody whose user
+; name has more than a handful of letters. It is cut here instead, after a
+; backslash, into lines of at most RAVEN_FORGE_PATH_LINE characters — few
+; enough to fit when the letters are wide ones. The folder under %APPDATA%
+; comes out as "C:\Users\<name>\AppData\Roaming\" and its own name beneath.
+;
+; Not after the backslash of "C:\" or of "\\server", which would leave three
+; characters on a line by themselves; and a single name that is longer than a
+; line is left as it is, for Windows to cut.
+;
+; Registers $R4-$R8, all free where this is inserted: the flags have been read
+; by then, and the question's text is put together after it. Not $R9, which
+; every one of electron-builder's flag tests writes to.
+!define RAVEN_FORGE_PATH_LINE 46
+
+!macro layOutRavenForgePath
+  StrCpy $R4 ""
+  StrCpy $R5 $R3
+
+  rfNextLine:
+  StrLen $R8 $R5
+  IntCmp $R8 ${RAVEN_FORGE_PATH_LINE} rfLastLine rfLastLine 0
+
+  ; The last backslash that still leaves the line short enough.
+  StrCpy $R6 ${RAVEN_FORGE_PATH_LINE}
+  rfSeekBackslash:
+  IntOp $R6 $R6 - 1
+  IntCmp $R6 3 0 rfLastLine 0
+  StrCpy $R7 $R5 1 $R6
+  StrCmp $R7 "\" 0 rfSeekBackslash
+
+  IntOp $R6 $R6 + 1
+  StrCpy $R7 $R5 $R6
+  StrCpy $R4 "$R4$R7$\r$\n"
+  StrCpy $R5 $R5 "" $R6
+  Goto rfNextLine
+
+  rfLastLine:
+  StrCpy $R4 "$R4$R5"
+!macroend
+
 !macro customUnInstall
   ; Electron writes to the *user's* AppData even when the app was installed for
   ; all users, and for such an install the template has the shell context set
@@ -278,6 +324,7 @@
       ; under the old name.
       StrCpy $R3 "$APPDATA\${APP_PRODUCT_FILENAME}"
     ${EndIf}
+    !insertmacro layOutRavenForgePath
 
     ; NSIS resolves a LangString with no entry for the running language to an
     ; *empty* string, and electron-builder bundles 26 installer languages with
@@ -285,9 +332,9 @@
     ; somebody a blank dialog with two buttons. Choosing the text by hand
     ; cannot fail that way: anything that is not Polish gets English.
     ${If} $LANGUAGE == 1045
-      StrCpy $R8 "Zachować dane Raven Forge?$\r$\n$\r$\nProfile, mody, światy, pobrane pliki Minecrafta i środowiska Java znajdują się w:$\r$\n$R3$\r$\n$\r$\nPotrafią zajmować kilka gigabajtów, ale dzięki nim ponowna instalacja zastaje wszystko na swoim miejscu.$\r$\n$\r$\nTak — zachowaj je.$\r$\nNie — usuń bezpowrotnie."
+      StrCpy $R8 "Zachować dane Raven Forge?$\r$\n$\r$\nProfile, mody, światy, pobrane pliki Minecrafta i środowiska Java znajdują się w:$\r$\n$R4$\r$\n$\r$\nPotrafią zajmować kilka gigabajtów, ale dzięki nim ponowna instalacja zastaje wszystko na swoim miejscu.$\r$\n$\r$\nTak — zachowaj je.$\r$\nNie — usuń bezpowrotnie."
     ${Else}
-      StrCpy $R8 "Keep your Raven Forge data?$\r$\n$\r$\nProfiles, mods, worlds, downloaded Minecraft files and Java runtimes live in:$\r$\n$R3$\r$\n$\r$\nThat is often several gigabytes, and keeping it means a reinstall finds everything where you left it.$\r$\n$\r$\nYes — keep them.$\r$\nNo — delete them permanently."
+      StrCpy $R8 "Keep your Raven Forge data?$\r$\n$\r$\nProfiles, mods, worlds, downloaded Minecraft files and Java runtimes live in:$\r$\n$R4$\r$\n$\r$\nThat is often several gigabytes, and keeping it means a reinstall finds everything where you left it.$\r$\n$\r$\nYes — keep them.$\r$\nNo — delete them permanently."
     ${EndIf}
 
     MessageBox MB_YESNO|MB_ICONQUESTION $R8 IDYES keepRavenForgeData
