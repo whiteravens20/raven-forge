@@ -129,9 +129,14 @@ download.
   (`ELECTRON_RUN_AS_NODE`), and to open a debugger on the main process
   (`--inspect`); both are switched off in the binary itself, as fuses
   (`electronFuses` in `electron-builder.config.js`), and read back off it by the
-  packaging job and by every release. The embedded browser's own
-  `--remote-debugging-port` is not a fuse and still answers: what it reaches is
-  the window, which has no Node access and nothing but the IPC surface above.
+  packaging job and by every release. The embedded browser has a debugger of its
+  own, `--remote-debugging-port` or `--remote-debugging-pipe`, and no fuse for
+  it: the packaged launcher takes both off its command line as the first thing
+  it does, before the browser has read them (`refuseRemoteDebugging` in
+  `src/main/security.ts`), and the packaging job starts the installed program
+  with the switch to see that nothing answers. All of this limits what the
+  launcher can be started as; it is not a defence against a program that
+  already runs as the player.
 
 ### Supply chain
 
