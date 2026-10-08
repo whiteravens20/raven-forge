@@ -171,6 +171,28 @@ jobs:
               echo "::error::--inspect opens a debugger on the installed launcher"
               exit 1
             fi
+
+            # The browser inside has a debugger as well, and no fuse for it:
+            # the launcher takes that switch off its own command line as it
+            # starts. Asked while the launcher is up, since one that did not
+            # start has no debugger either: nothing may be listening on the
+            # port, and the browser may at no point have said that it does.
+            HOME=/root timeout 15 xvfb-run -a /usr/bin/raven-forge-launcher --no-sandbox --remote-debugging-port=9222 >/tmp/devtools.log 2>&1 &
+            launcher=$!
+            sleep 10
+            (exec 3<>/dev/tcp/127.0.0.1/9222) 2>/dev/null
+            answered=$?
+            wait "$launcher"
+            code=$?
+            if [ "$code" != 124 ]; then
+              echo "::error::started with --remote-debugging-port, the launcher exited with $code instead of staying up"
+              cat /tmp/devtools.log
+              exit 1
+            fi
+            if [ "$answered" = 0 ] || grep -q "DevTools listening" /tmp/devtools.log; then
+              echo "::error::--remote-debugging-port opens a debugger on the installed launcher"
+              exit 1
+            fi
           '
 
       - name: Verify Windows artifacts
