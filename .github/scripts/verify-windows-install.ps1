@@ -2,7 +2,8 @@
 
 # Installs the Windows build on the Windows this runs on and uses it the way a
 # player does: installed, started, installed over while it is open, updated
-# from the release before, uninstalled.
+# from the release before, uninstalled — without the installer's pages, as an
+# update runs it, and through them, as somebody at the machine does.
 #
 # The rest of what is known about the Windows build was seen on Linux, under
 # wine, and wine answers some of these questions in its own way or not at all:
@@ -70,33 +71,151 @@ $UpdaterCache = Join-Path $env:LOCALAPPDATA 'raven-forge-launcher-updater'
 # The name keytar files the launcher's secrets under, one entry an account.
 $Vault = 'com.ravenforge.launcher'
 
+# Something of the player's, put into the release before's data to be found
+# again after whatever replaces that release.
+$World = 'profiles\probe\.minecraft\saves\World\level.dat'
+
 # Where a debugger would listen, were one to open.
 $InspectPort = 9229
 $DevToolsPort = 9222
 
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-Add-Type -Namespace RavenForge -Name Windows -MemberDefinition @'
-[StructLayout(LayoutKind.Sequential)]
-public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
+Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
 
-[DllImport("user32.dll")]
-public static extern bool GetWindowRect(IntPtr window, out Rect rect);
+namespace RavenForge {
+  public static class Windows {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
 
-[DllImport("advapi32.dll", EntryPoint = "CredReadW", CharSet = CharSet.Unicode, SetLastError = true)]
-static extern bool CredRead(string target, int type, int flags, out IntPtr credential);
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr window, out Rect rect);
 
-[DllImport("advapi32.dll")]
-static extern void CredFree(IntPtr credential);
+    [DllImport("advapi32.dll", EntryPoint = "CredReadW", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool CredRead(string target, int type, int flags, out IntPtr credential);
 
-// How many bytes the secret kept under a name is, or -1 when none is kept.
-public static int SecretLength(string target) {
-  IntPtr credential;
-  if (!CredRead(target, 1, 0, out credential)) return -1;
-  try {
-    // CREDENTIALW: Flags and Type, two pointers, a FILETIME, and then the size.
-    return Marshal.ReadInt32(credential, 8 + 2 * IntPtr.Size + 8);
-  } finally {
-    CredFree(credential);
+    [DllImport("advapi32.dll")]
+    static extern void CredFree(IntPtr credential);
+
+    // How many bytes the secret kept under a name is, or -1 when none is kept.
+    public static int SecretLength(string target) {
+      IntPtr credential;
+      if (!CredRead(target, 1, 0, out credential)) return -1;
+      try {
+        // CREDENTIALW: Flags and Type, two pointers, a FILETIME, and then the size.
+        return Marshal.ReadInt32(credential, 8 + 2 * IntPtr.Size + 8);
+      } finally {
+        CredFree(credential);
+      }
+    }
+  }
+
+  // One thing in a dialog: a button, a line of text, a field.
+  public sealed class Control {
+    public IntPtr Handle;
+    public string Kind;
+    public int Id;
+    public string Text;
+    public bool Shown;
+    public bool Enabled;
+    public int Style;
+  }
+
+  // A dialog on the desktop: an installer's window, or a question it asks.
+  public sealed class Dialog {
+    public IntPtr Handle;
+    public int ProcessId;
+    public string Title;
+    public List<Control> Controls = new List<Control>();
+  }
+
+  public static class Dialogs {
+    delegate bool Each(IntPtr window, IntPtr unused);
+
+    [DllImport("user32.dll")] static extern bool EnumWindows(Each each, IntPtr unused);
+    [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, Each each, IntPtr unused);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr window);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr window);
+    [DllImport("user32.dll")] static extern int GetDlgCtrlID(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr GetDlgItem(IntPtr dialog, int id);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int GetWindowLong(IntPtr window, int index);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder name, int size);
+    [DllImport("user32.dll", EntryPoint = "PostMessageW")] static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode)]
+    static extern IntPtr GetText(IntPtr window, uint message, IntPtr size, StringBuilder text, uint flags, uint milliseconds, out IntPtr copied);
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW")]
+    static extern IntPtr Send(IntPtr window, uint message, IntPtr wParam, IntPtr lParam, uint flags, uint milliseconds, out IntPtr answer);
+
+    const uint WM_GETTEXT = 0x000D, WM_COMMAND = 0x0111, BM_SETCHECK = 0x00F1, BM_CLICK = 0x00F5, SMTO_ABORTIFHUNG = 0x0002;
+
+    static string KindOf(IntPtr window) {
+      var name = new StringBuilder(256);
+      GetClassName(window, name, name.Capacity);
+      return name.ToString();
+    }
+
+    // Asked of the window itself: across programs that is the only way to the
+    // text of a field, and the program may be one that is not answering.
+    static string TextOf(IntPtr window) {
+      var text = new StringBuilder(8192);
+      IntPtr copied;
+      GetText(window, WM_GETTEXT, (IntPtr)text.Capacity, text, SMTO_ABORTIFHUNG, 2000, out copied);
+      return text.ToString();
+    }
+
+    // Every dialog that is on the desktop now, with what is in it.
+    public static List<Dialog> All() {
+      var found = new List<Dialog>();
+      EnumWindows((window, unused) => {
+        if (!IsWindowVisible(window) || KindOf(window) != "#32770") return true;
+        uint owner;
+        GetWindowThreadProcessId(window, out owner);
+        var dialog = new Dialog { Handle = window, ProcessId = (int)owner, Title = TextOf(window) };
+        EnumChildWindows(window, (child, alsoUnused) => {
+          dialog.Controls.Add(new Control {
+            Handle = child,
+            Kind = KindOf(child),
+            Id = GetDlgCtrlID(child),
+            Text = TextOf(child),
+            Shown = IsWindowVisible(child),
+            Enabled = IsWindowEnabled(child),
+            Style = GetWindowLong(child, -16),
+          });
+          return true;
+        }, IntPtr.Zero);
+        found.Add(dialog);
+        return true;
+      }, IntPtr.Zero);
+      return found;
+    }
+
+    public static bool IsThere(IntPtr dialog) {
+      return IsWindow(dialog) && IsWindowVisible(dialog);
+    }
+
+    // A button pressed the way its dialog hears of a press: told so, with the
+    // button's number. No pointer is moved and no key is sent, so it does not
+    // matter what else is on the screen or which window is in front.
+    public static bool Press(IntPtr dialog, int button) {
+      return PostMessage(dialog, WM_COMMAND, (IntPtr)button, GetDlgItem(dialog, button));
+    }
+
+    // The same press made on the button itself, for a dialog that did not
+    // take the first.
+    public static void Click(IntPtr button) {
+      IntPtr answer;
+      Send(button, BM_CLICK, IntPtr.Zero, IntPtr.Zero, SMTO_ABORTIFHUNG, 2000, out answer);
+    }
+
+    public static void Tick(IntPtr box, bool ticked) {
+      IntPtr answer;
+      Send(box, BM_SETCHECK, (IntPtr)(ticked ? 1 : 0), IntPtr.Zero, SMTO_ABORTIFHUNG, 2000, out answer);
+    }
   }
 }
 '@
@@ -211,6 +330,22 @@ function Expect-Installed {
     $where = if ($place -eq 'Desktop') { 'on the desktop' } else { 'in the Start menu' }
     Expect ($target -eq (Join-Path $In $ExeName)) "the shortcut $where starts it" "it starts '$target'"
   }
+}
+
+# The release before as a player has it: installed, started, and with a world
+# in its data. Left open, because both ways of replacing it are tried on a
+# launcher that is open.
+function Start-ReleaseBefore {
+  param([string[]] $Switches = @(), [string] $Heard = '')
+  $code = Invoke-Setup $Previous @('/S')
+  Expect ($code -eq 0) 'its installer ends well' "it ended with $code"
+  Expect-Installed -In $Folder.Before -NotIn $Folder.Now
+  $before = Get-Started $Data.Before
+  $older = Start-Launcher $Folder.Before $Switches $Heard
+  if (-not (Wait-Started $Data.Before $before)) { throw 'the release before does not start, so there is nothing to replace' }
+  $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $Data.Before $World))
+  Set-Content -LiteralPath (Join-Path $Data.Before $World) -Value 'a world'
+  return $older
 }
 
 function Expect-Removed {
@@ -328,6 +463,173 @@ function Stop-Launchers {
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
   }
   $null = Wait-Until { @(Get-LauncherProcesses).Count -eq 0 } 20
+}
+
+# ── The pages ────────────────────────────────────────────────────────────────
+
+# The buttons a question can be answered with, by the numbers Windows gives
+# them. In an installer's own window the one that leads on — Next, I Agree,
+# Install, Finish — is number 1 on every page.
+$Answer = @{ OK = 1; Cancel = 2; Yes = 6; No = 7 }
+$LeadsOn = 1
+
+# The two things an installer or an uninstaller may ask, by a piece of their
+# wording, in English and in Polish: whether to close a launcher that is open,
+# and whether to keep the data.
+$AsksToClose = 'Raven Forge Launcher is running|Raven Forge Launcher jest uruchomiona'
+$AsksToKeep = 'Keep your Raven Forge data|Zachować dane Raven Forge'
+
+function Get-Dialogs([int[]] $Of) {
+  return @([RavenForge.Dialogs]::All() | Where-Object { $Of -contains $_.ProcessId })
+}
+
+function Push-Button($Dialog, [int] $Number) {
+  $null = [RavenForge.Dialogs]::Press($Dialog.Handle, $Number)
+}
+
+# The same press made on the button itself, for a page that did not take the
+# first.
+function Push-ButtonItself($Button) {
+  [RavenForge.Dialogs]::Click($Button.Handle)
+}
+
+function Set-Box($Box, [bool] $Ticked) {
+  [RavenForge.Dialogs]::Tick($Box.Handle, $Ticked)
+}
+
+function Test-Dialog($Dialog) {
+  return [RavenForge.Dialogs]::IsThere($Dialog.Handle)
+}
+
+# What a dialog is, told by what is in it and never by its wording, which is
+# in the language of the Windows it runs on. An installer's window keeps a
+# place for its pages, number 1018, whatever page is in it. A dialog without
+# one is a question when it has a button to answer with, and otherwise
+# something that only says it is busy. A page is known by the one thing only
+# it has.
+function Get-Page($Dialog) {
+  $shown = @($Dialog.Controls | Where-Object { $_.Shown })
+  if (@($Dialog.Controls | Where-Object { $_.Id -eq 1018 }).Count -eq 0) {
+    if (@($shown | Where-Object { $_.Kind -eq 'Button' }).Count -gt 0) { return 'a question' }
+    return 'a notice'
+  }
+  if (@($shown | Where-Object { $_.Kind -eq '#32770' }).Count -eq 0) { return 'between pages' }
+  if (@($shown | Where-Object { $_.Kind -like 'RichEdit*' }).Count -gt 0) { return 'the licence' }
+  if (@($shown | Where-Object { $_.Kind -eq 'Edit' -and $_.Id -eq 1019 }).Count -gt 0) { return 'the folder' }
+  if (@($shown | Where-Object { $_.Kind -eq 'msctls_progress32' }).Count -gt 0) { return 'the work' }
+  if (@($shown | Where-Object { $_.Kind -eq 'Button' -and ($_.Style -band 0xF) -eq 9 }).Count -ge 2) { return 'for whom' }
+  return 'words'
+}
+
+# Goes through the pages of an installer or an uninstaller as somebody at the
+# machine does: on to the next page from each, an answer to each question, and
+# at the end the box that offers to start the launcher ticked or not. Says
+# what it met.
+#
+# `-Whose` gives the processes whose dialogs these are, and none once the
+# program has left. `-Answers` holds, for a piece of a question's wording, the
+# button to answer it with; a question that nothing there fits stops the run,
+# which is better than answering what nobody has read.
+function Step-Through {
+  param(
+    [scriptblock] $Whose,
+    [System.Collections.IDictionary] $Answers = @{},
+    [bool] $RunAfter = $false,
+    [string] $Pictures = '',
+    [int] $Seconds = 600
+  )
+  $met = [pscustomobject]@{
+    Pages     = [System.Collections.Generic.List[string]]::new()
+    Folder    = ''
+    Questions = [System.Collections.Generic.List[string]]::new()
+  }
+  $pressed = @{}
+  $clicked = @{}
+  $worked = $false
+  $started = $false
+  $idleSince = $null
+  $until = [DateTime]::UtcNow.AddSeconds($Seconds)
+  while ([DateTime]::UtcNow -lt $until) {
+    $ids = @(& $Whose)
+    if ($ids.Count -eq 0) {
+      if ($started) { return $met }
+      Start-Sleep -Milliseconds 200
+      continue
+    }
+    $started = $true
+    $dialogs = @(Get-Dialogs $ids)
+
+    $question = @($dialogs | Where-Object { (Get-Page $_) -eq 'a question' }) | Select-Object -First 1
+    if ($question) {
+      $asked = (@($question.Controls | Where-Object { $_.Kind -eq 'Static' -and $_.Text } | ForEach-Object Text) -join ' ') -replace '\s+', ' '
+      $met.Questions.Add($asked)
+      if ($Pictures) { Save-Screen "$Pictures-question-$($met.Questions.Count)" }
+      $with = $null
+      foreach ($about in $Answers.Keys) {
+        if ($asked -match $about) { $with = $Answers[$about]; break }
+      }
+      if ($null -eq $with) { throw "asked something nobody expected: $asked" }
+      Push-Button $question $with
+      if (-not (Wait-Until { -not (Test-Dialog $question) } 20)) { throw "a question would not take its answer: $asked" }
+      continue
+    }
+
+    $window = @($dialogs | Where-Object { (Get-Page $_) -notin 'a question', 'a notice' }) | Select-Object -First 1
+    $page = if ($window) { Get-Page $window } else { 'between pages' }
+    if ($page -eq 'words') { $page = if ($worked) { 'the end' } else { 'the welcome' } }
+    $button = if ($window) { @($window.Controls | Where-Object { $_.Kind -eq 'Button' -and $_.Id -eq $LeadsOn }) | Select-Object -First 1 } else { $null }
+    $ready = $button -and $button.Shown -and $button.Enabled
+
+    if ($page -eq 'the work') {
+      $worked = $true
+      # An installer with a page after this one goes to it by itself when the
+      # work is done. One that waits here to be told is told.
+      if (-not $ready) { $idleSince = $null }
+      elseif ($null -eq $idleSince) { $idleSince = [DateTime]::UtcNow }
+      elseif (([DateTime]::UtcNow - $idleSince).TotalSeconds -gt 8) { Push-Button $window $LeadsOn; $idleSince = $null }
+    } elseif ($page -ne 'between pages' -and $ready) {
+      if (-not $pressed.ContainsKey($page)) {
+        $met.Pages.Add($page)
+        if ($page -eq 'the folder') {
+          $met.Folder = (@($window.Controls | Where-Object { $_.Kind -eq 'Edit' -and $_.Id -eq 1019 }) | Select-Object -First 1).Text
+        }
+        if ($page -eq 'the end') {
+          foreach ($box in @($window.Controls | Where-Object { $_.Kind -eq 'Button' -and $_.Shown -and (($_.Style -band 0xF) -in 2, 3) })) {
+            Set-Box $box $RunAfter
+          }
+        }
+        if ($Pictures) { Save-Screen "$Pictures-$($met.Pages.Count)-$($page -replace ' ', '-')" }
+        Push-Button $window $LeadsOn
+        $pressed[$page] = [DateTime]::UtcNow
+      } else {
+        $waited = ([DateTime]::UtcNow - $pressed[$page]).TotalSeconds
+        if ($waited -gt 10 -and -not $clicked.ContainsKey($page)) {
+          # Told once already and still here.
+          Push-ButtonItself $button
+          $clicked[$page] = $true
+        } elseif ($waited -gt 40) {
+          throw "$page does not lead on"
+        }
+      }
+    }
+    Start-Sleep -Milliseconds 200
+  }
+  throw "its pages were not over after $Seconds s, having met: $($met.Pages -join ', ')"
+}
+
+# An installer's pages are its own process. An uninstaller copies itself out
+# of the folder it is about to delete and shows its pages from the copy: a
+# process the one that was started leaves behind it, under a name NSIS gives.
+function Get-UninstallersAtWork($Started) {
+  $ids = @(Get-Process | Where-Object { $_.ProcessName -match '^(Un_[A-Z]|Au_)$' } | ForEach-Object Id)
+  $ids += @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($Started.Id)" | ForEach-Object ProcessId)
+  if (-not $Started.HasExited) { $ids += $Started.Id }
+  return @($ids | Sort-Object -Unique)
+}
+
+function Expect-Pages {
+  param($Met, [string[]] $Are)
+  Expect (($Met.Pages -join ', ') -eq ($Are -join ', ')) "its pages are $($Are -join ', ')" "they were $($Met.Pages -join ', ')"
 }
 
 # ── The machine ──────────────────────────────────────────────────────────────
@@ -555,13 +857,7 @@ try {
 
   # ── 7 ──
   Scene 'The release before, as a player has it'
-  $code = Invoke-Setup $Previous @('/S')
-  Expect ($code -eq 0) 'its installer ends well' "it ended with $code"
-  Expect-Installed -In $Folder.Before -NotIn $Folder.Now
-  $heard = Join-Path $Evidence 'release-before'
-  $before = Get-Started $Data.Before
-  $older = Start-Launcher $Folder.Before @("--remote-debugging-port=$DevToolsPort") $heard
-  if (-not (Wait-Started $Data.Before $before)) { throw 'the release before does not start, so there is nothing to update from' }
+  $older = Start-ReleaseBefore @("--remote-debugging-port=$DevToolsPort") (Join-Path $Evidence 'release-before')
   # The other half of scene 2. That release opens a debugger when asked, and
   # here it is asked in the same words: an answer from it is what makes the
   # silence above mean something on this machine.
@@ -571,11 +867,6 @@ try {
   if ($script:answer) { Note "it answers as $($script:answer.Browser)" }
   Start-Sleep -Seconds 4
   Save-Screen 'release-before'
-
-  # Something of the player's, to be found again afterwards.
-  $world = 'profiles\probe\.minecraft\saves\World\level.dat'
-  $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $Data.Before $world))
-  Set-Content -LiteralPath (Join-Path $Data.Before $world) -Value 'a world'
   Note "that release keeps in its folder: $(@(Get-ChildItem -LiteralPath $Data.Before -Force | ForEach-Object Name) -join ', ')"
 
   # ── 8 ──
@@ -601,7 +892,7 @@ try {
   Expect (@(Get-Said $Data.Now 'Renamed the home from').Count -eq 1) 'it says that it renamed its data folder'
   Expect (@(Get-Said $Data.Now 'is in use, so it is the home').Count -eq 0) 'and not that the folder was in use'
   Expect (-not (Test-Path -LiteralPath $Data.Before)) "$($Data.Before) is gone"
-  Expect (Test-Path -LiteralPath (Join-Path $Data.Now $world)) "and the world that was in it is in $($Data.Now)"
+  Expect (Test-Path -LiteralPath (Join-Path $Data.Now $World)) "and the world that was in it is in $($Data.Now)"
   Expect (Test-Path -LiteralPath (Join-Path $Data.Now 'settings.json')) 'with the settings'
   Start-Sleep -Seconds 4
   Save-Screen 'after-the-update'
@@ -622,12 +913,92 @@ try {
   Save-Log $Data.Now 'updated'
   Expect (Invoke-Uninstall $Folder.Before) 'the uninstaller finishes'
   Expect-Removed -From $Folder.Before
-  Expect (Test-Path -LiteralPath (Join-Path $Data.Now $world)) 'the world is still there'
+  Expect (Test-Path -LiteralPath (Join-Path $Data.Now $World)) 'the world is still there'
+
+  # ── 10 ──
+  Scene "The release before again, and the installer's pages gone through over it"
+  # From the beginning: with data under the new name already there, nothing
+  # would be renamed.
+  Remove-Item -LiteralPath $Data.Now -Recurse -Force
+  $older = Start-ReleaseBefore
+  $before = Get-Started $Data.Before
+  $setup = Start-Process -FilePath $Installer -PassThru
+  $null = $setup.Handle
+  $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Answer.OK } -RunAfter $true -Pictures 'installer-over-the-release-before'
+  Expect-Pages $met 'the licence', 'for whom', 'the folder', 'the end'
+  Expect ($met.Folder -eq $Folder.Now) "the folder page names $($Folder.Now)" "it names '$($met.Folder)'"
+  foreach ($asked in $met.Questions) { Note "it asked: $asked" }
+  Expect ($setup.ExitCode -eq 0) 'the installer ends well' "it ended with $($setup.ExitCode)"
+  Expect ($older.WaitForExit(5000)) 'the older launcher, which was open, has been closed'
+  Expect-Installed -In $Folder.Now -NotIn $Folder.Before
+  $up = Wait-Started $Data.Now $before
+  Expect $up 'left ticked, the box on the last page starts the launcher'
+  if (-not $up) { throw 'the launcher did not start from the last page' }
+  Expect ((Get-LauncherFolder) -eq $Folder.Now) 'from the folder the page named' "from '$(Get-LauncherFolder)'"
+  Expect (@(Get-Said $Data.Now 'Renamed the home from').Count -eq 1) 'which renames its data folder'
+  Expect (-not (Test-Path -LiteralPath $Data.Before)) "$($Data.Before) is gone"
+  Expect (Test-Path -LiteralPath (Join-Path $Data.Now $World)) "and the world that was in it is in $($Data.Now)"
+
+  # ── 11 ──
+  Scene "The installer's pages gone through while the launcher is open"
+  $launcher = Get-Launcher
+  if ($null -eq $launcher) { throw 'the launcher that was just started is not running' }
+  $setup = Start-Process -FilePath $Installer -PassThru
+  $null = $setup.Handle
+  $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Answer.OK } -RunAfter $false -Pictures 'installer-over-the-open-launcher'
+  Expect-Pages $met 'the licence', 'for whom', 'the folder', 'the end'
+  Expect ($met.Folder -eq $Folder.Now) 'the folder page names the folder the launcher is in' "it names '$($met.Folder)'"
+  Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
+  foreach ($asked in $met.Questions) {
+    Expect ($asked -match $AsksToClose) 'which is whether to close the launcher that is open' "it asked: $asked"
+  }
+  Expect ($setup.ExitCode -eq 0) 'the installer ends well' "it ended with $($setup.ExitCode)"
+  Expect ($launcher.WaitForExit(5000)) 'and the launcher was closed on the one OK'
+  Expect-Installed -In $Folder.Now -NotIn $Folder.Before
+  Start-Sleep -Seconds 3
+  Expect (@(Get-LauncherProcesses).Count -eq 0) 'unticked, the box on the last page starts nothing'
+
+  # ── 12 ──
+  Scene "The uninstaller's pages gone through, the data kept"
+  $run = Start-Process -FilePath (Join-Path $Folder.Now $UninstallerName) -PassThru
+  $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers @{ $AsksToKeep = $Answer.Yes } -Pictures 'uninstaller-keeping'
+  Expect-Pages $met 'the welcome', 'the end'
+  Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
+  foreach ($asked in $met.Questions) {
+    Expect ($asked.Contains($Data.Now)) "which names $($Data.Now) as where the data is" "it asked: $asked"
+  }
+  Expect (Wait-Until { -not (Test-Path -LiteralPath $Folder.Now) -and @(Get-Listed).Count -eq 0 } 60 500) 'the uninstaller finishes'
+  Expect-Removed -From $Folder.Now
+  Expect (Test-Path -LiteralPath (Join-Path $Data.Now $World)) 'answered yes, it leaves the world where it was'
+
+  # ── 13 ──
+  Scene "The uninstaller's pages gone through with the launcher open, the data deleted"
+  $code = Invoke-Setup $Installer @('/S')
+  Expect ($code -eq 0) 'the installer ends well' "it ended with $code"
+  $before = Get-Started $Data.Now
+  $launcher = Start-Launcher $Folder.Now
+  if (-not (Wait-Started $Data.Now $before)) { throw 'the launcher did not start again' }
+  $run = Start-Process -FilePath (Join-Path $Folder.Now $UninstallerName) -PassThru
+  $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers ([ordered]@{ $AsksToClose = $Answer.OK; $AsksToKeep = $Answer.No }) -Pictures 'uninstaller-deleting'
+  Expect-Pages $met 'the welcome', 'the end'
+  Expect ($met.Questions.Count -eq 2) 'it asks two things' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
+  if ($met.Questions.Count -eq 2) {
+    Expect ($met.Questions[0] -match $AsksToClose) 'first whether to close the launcher that is open' "it asked: $($met.Questions[0])"
+    Expect ($met.Questions[1].Contains($Data.Now)) "then about the data, naming $($Data.Now)" "it asked: $($met.Questions[1])"
+  }
+  Expect ($launcher.WaitForExit(5000)) 'the launcher was closed'
+  Expect (Wait-Until { -not (Test-Path -LiteralPath $Folder.Now) -and @(Get-Listed).Count -eq 0 } 60 500) 'the uninstaller finishes'
+  Expect-Removed -From $Folder.Now
+  Expect (-not (Test-Path -LiteralPath $Data.Now)) 'answered no, it deletes the data folder'
 } catch {
   $script:Failures.Add("the run stopped: $($_.Exception.Message)")
   Write-Host "::error::the run stopped: $($_.Exception.Message)"
   Write-Host $_.ScriptStackTrace
 } finally {
+  # A page nobody answered would sit there for as long as the machine lives.
+  foreach ($left in @(Get-Process | Where-Object { $_.ProcessName -match '^(Un_[A-Z]|Au_|Raven-Forge-Launcher-Setup-.*)$' })) {
+    Stop-Process -Id $left.Id -Force -ErrorAction SilentlyContinue
+  }
   Stop-Launchers
   Save-Log $Data.Now 'last'
   Save-Log $Data.Before 'last-release-before'
