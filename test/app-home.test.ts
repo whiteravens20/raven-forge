@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { heldByAnotherProgram } from './helpers/hold-file';
 import {
   carryDiagnostics,
   fileBrowserDataAway,
@@ -41,6 +42,23 @@ function seedLegacy(dir = legacy()): void {
   fs.mkdirSync(path.join(dir, 'Cache'));
   fs.writeFileSync(path.join(dir, 'Cookies'), 'sign-in');
   fs.writeFileSync(path.join(dir, 'Preferences'), '{}');
+}
+
+/**
+ * Make the old folder one that cannot be renamed, the way that comes about on
+ * the system this runs on.
+ *
+ * On Windows it is the real reason: something has a file open inside it, which
+ * is what an older build still running in there does. Elsewhere a folder can be
+ * renamed from under whatever has it open, so a file standing where the new
+ * folder would go stands in for the refusal.
+ *
+ * @returns the way to undo it, for the cleaning up afterwards
+ */
+async function madeUnrenamable(): Promise<() => Promise<void>> {
+  if (process.platform === 'win32') return heldByAnotherProgram(path.join(legacy(), 'Cookies'));
+  fs.writeFileSync(home(), 'in the way');
+  return async () => {};
 }
 
 const world = (dir: string) => path.join(dir, 'profiles', 'p1', '.minecraft', 'saves', 'World');
@@ -96,13 +114,12 @@ describe('resolveAppHome', () => {
     expect(fs.readFileSync(path.join(home(), 'settings.json'), 'utf-8')).toBe('{"theme":"light"}');
   });
 
-  it('uses the old folder exactly as it stands when it cannot be renamed', () => {
-    // A file where the new folder would go stands in for whatever makes the
-    // rename fail — on Windows, anything at all holding a file open inside.
+  it('uses the old folder exactly as it stands when it cannot be renamed', async () => {
     seedLegacy();
-    fs.writeFileSync(home(), 'in the way');
+    const renamable = await madeUnrenamable();
 
     const result = resolveAppHome(appData, undefined, process.platform);
+    await renamable();
 
     expect(result.dir).toBe(legacy());
     expect(result.legacyInUse).toBe(legacy());
@@ -110,7 +127,7 @@ describe('resolveAppHome', () => {
     // which may be the thing running in there — expects them.
     expect(result.browserDir).toBe(legacy());
     expect(fs.existsSync(world(legacy()))).toBe(true);
-  });
+  }, 30_000);
 
   it.skipIf(process.platform === 'win32')(
     'does not rename a folder another copy of the launcher is running in',
@@ -251,16 +268,17 @@ describe('fileBrowserDataAway', () => {
     expect(fs.existsSync(path.join(home(), 'lockfile'))).toBe(true);
   });
 
-  it('touches nothing in a folder being used as the older build left it', () => {
+  it('touches nothing in a folder being used as the older build left it', async () => {
     seedLegacy();
-    fs.writeFileSync(home(), 'in the way');
+    const renamable = await madeUnrenamable();
     const result = resolveAppHome(appData, undefined, process.platform);
 
     fileBrowserDataAway(result);
+    await renamable();
 
     expect(fs.existsSync(path.join(legacy(), 'Cookies'))).toBe(true);
     expect(fs.existsSync(path.join(legacy(), 'browser'))).toBe(false);
-  });
+  }, 30_000);
 
   it('just makes the folder on a fresh install', () => {
     fs.mkdirSync(home());

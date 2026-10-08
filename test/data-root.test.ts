@@ -442,13 +442,18 @@ describe('applying it', () => {
     });
   }
 
-  it('keeps the mode on auth.json when it has to copy', async () => {
-    const target = await plugIn();
-    await applyDataRoot(target);
+  // Windows has no mode to keep: there the file is the account's own by where
+  // it is, not by a bit on it.
+  it.skipIf(process.platform === 'win32')(
+    'keeps the mode on auth.json when it has to copy',
+    async () => {
+      const target = await plugIn();
+      await applyDataRoot(target);
 
-    const mode = (await realFs.stat(path.join(target, 'auth.json'))).mode & 0o777;
-    expect(mode).toBe(0o600);
-  });
+      const mode = (await realFs.stat(path.join(target, 'auth.json'))).mode & 0o777;
+      expect(mode).toBe(0o600);
+    },
+  );
 
   it('carries an empty folder and a link as what they are when it has to copy', async () => {
     // A profile that has never been launched is an empty directory, and it was

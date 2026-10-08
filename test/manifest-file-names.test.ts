@@ -43,10 +43,10 @@ describe('isSafeFileName', () => {
   });
 
   it('keeps every accepted name inside the directory it is joined to', () => {
-    const dir = '/home/u/.raven-forge/profiles/p/mods';
+    const dir = path.normalize('/home/u/.raven-forge/profiles/p/mods');
     for (const name of ['a.jar', '.x', '...jar', 'a b.jar', 'a..b.jar']) {
       expect(isSafeFileName(name)).toBe(true);
-      expect(path.join(dir, name).startsWith(`${dir}/`)).toBe(true);
+      expect(path.join(dir, name).startsWith(`${dir}${path.sep}`)).toBe(true);
     }
   });
 });

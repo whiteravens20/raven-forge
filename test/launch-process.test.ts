@@ -1123,6 +1123,9 @@ describe.skipIf(posix)('a game that is running, on Windows', () => {
   });
 
   it('is ended outright when it has no window to be asked through', async () => {
+    // `taskkill` reports nothing wrong about a program with no window: it has
+    // asked, and there was nobody to hear. So this is the long way round — the
+    // ten seconds a game is given to close, and then the end of it.
     await start('wait', /Staying, with no window/);
 
     await launcher.killGame('p1');
@@ -1131,5 +1134,5 @@ describe.skipIf(posix)('a game that is running, on Windows', () => {
     expect(ended.crashed).toBe(false);
     expect(ended.exitCode).not.toBe(0);
     expect(launcher.isGameRunning('p1')).toBe(false);
-  });
+  }, 40_000);
 });

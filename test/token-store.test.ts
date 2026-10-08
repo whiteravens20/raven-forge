@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { MinecraftAccount } from '../src/shared/ipc-types';
+import { REFUSED, madeUnreadable } from './helpers/unreadable';
 
 /**
  * Where a Microsoft login is kept.
@@ -132,11 +133,16 @@ describe('with no keychain', () => {
     expect(await store.getRefreshToken('a1')).toBe('refresh-token-value');
   });
 
-  it('does not leave the fallback file world-readable', async () => {
-    const store = await loadModule();
-    await store.saveAccount(account('a1'), 'refresh-token-value');
-    expect((await fs.stat(authFile())).mode & 0o777).toBe(0o600);
-  });
+  // A mode is how that is said where there is one. On Windows the file is out
+  // of other accounts' reach by where it is kept.
+  it.skipIf(process.platform === 'win32')(
+    'does not leave the fallback file world-readable',
+    async () => {
+      const store = await loadModule();
+      await store.saveAccount(account('a1'), 'refresh-token-value');
+      expect((await fs.stat(authFile())).mode & 0o777).toBe(0o600);
+    },
+  );
 
   it('tells the user their credentials are in plaintext, and where', async () => {
     const store = await loadModule();
@@ -300,23 +306,27 @@ describe('the account list', () => {
  * login left the list with it.
  */
 describe('reading auth.json', () => {
-  it.skipIf(asRoot)('fails rather than answer an unreadable file with no accounts', async () => {
-    const store = await loadModule();
-    await store.saveAccount(account('a1'), 'r1');
-    await store.saveAccount(account('a2'), 'r2');
-    await fs.chmod(authFile(), 0o000);
-    const fresh = await loadModule();
+  it.skipIf(asRoot)(
+    'fails rather than answer an unreadable file with no accounts',
+    async () => {
+      const store = await loadModule();
+      await store.saveAccount(account('a1'), 'r1');
+      await store.saveAccount(account('a2'), 'r2');
+      const readable = await madeUnreadable(authFile());
+      const fresh = await loadModule();
 
-    await expect(fresh.getAuthState()).rejects.toThrow(/EACCES/);
-    // The save that would have left `a3` as the only account there is.
-    await expect(fresh.saveAccount(account('a3'), 'r3')).rejects.toThrow(/EACCES/);
+      await expect(fresh.getAuthState()).rejects.toThrow(REFUSED);
+      // The save that would have left `a3` as the only account there is.
+      await expect(fresh.saveAccount(account('a3'), 'r3')).rejects.toThrow(REFUSED);
 
-    // And the failure is not remembered: every read waits on the migration, so
-    // one that failed and stayed failed would lock the session out for good.
-    await fs.chmod(authFile(), 0o600);
-    expect((await fresh.getAuthState()).accounts.map((a) => a.id)).toEqual(['a1', 'a2']);
-    expect((await readAuth()).accounts).toHaveLength(2);
-  });
+      // And the failure is not remembered: every read waits on the migration, so
+      // one that failed and stayed failed would lock the session out for good.
+      await readable();
+      expect((await fresh.getAuthState()).accounts.map((a) => a.id)).toEqual(['a1', 'a2']);
+      expect((await readAuth()).accounts).toHaveLength(2);
+    },
+    30_000,
+  );
 
   it('keeps a file it cannot parse beside the one that replaces it', async () => {
     const truncated = '{ "accounts": [{ "id": "a1" }], "refreshTokens": { "a1": "secr';
@@ -330,8 +340,11 @@ describe('reading auth.json', () => {
     const kept = await keptAside();
     expect(kept).toHaveLength(1);
     expect(await fs.readFile(path.join(root, kept[0]), 'utf-8')).toBe(truncated);
-    // It may hold tokens, so it gets the mode the live file always has.
-    expect((await fs.stat(path.join(root, kept[0]))).mode & 0o777).toBe(0o600);
+    // It may hold tokens, so it gets the mode the live file always has — where
+    // a file has a mode at all.
+    if (process.platform !== 'win32') {
+      expect((await fs.stat(path.join(root, kept[0]))).mode & 0o777).toBe(0o600);
+    }
     expect((await readAuth()).accounts.map((a: MinecraftAccount) => a.id)).toEqual(['a2']);
   });
 

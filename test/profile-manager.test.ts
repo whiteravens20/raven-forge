@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Profile } from '../src/shared/ipc-types';
+import { heldByAnotherProgram } from './helpers/hold-file';
+import { REFUSED, madeUnreadable } from './helpers/unreadable';
 
 /**
  * `profiles.json` and the directories it names, over a real filesystem.
@@ -166,21 +168,25 @@ describe('reading profiles.json', () => {
     expect(await mgr.getAllProfiles()).toEqual([]);
   });
 
-  it.skipIf(asRoot)('fails rather than answer an unreadable file with an empty list', async () => {
-    await mgr.createProfile(newProfile('A'));
-    await mgr.createProfile(newProfile('B'));
-    await fs.chmod(indexFile(), 0o000);
-    const fresh = await loadModule();
+  it.skipIf(asRoot)(
+    'fails rather than answer an unreadable file with an empty list',
+    async () => {
+      await mgr.createProfile(newProfile('A'));
+      await mgr.createProfile(newProfile('B'));
+      const readable = await madeUnreadable(indexFile());
+      const fresh = await loadModule();
 
-    await expect(fresh.getAllProfiles()).rejects.toThrow(/EACCES/);
-    // The write that would have made the empty answer permanent.
-    await expect(fresh.createProfile(newProfile('C'))).rejects.toThrow(/EACCES/);
+      await expect(fresh.getAllProfiles()).rejects.toThrow(REFUSED);
+      // The write that would have made the empty answer permanent.
+      await expect(fresh.createProfile(newProfile('C'))).rejects.toThrow(REFUSED);
 
-    // Not remembered either: once the file can be read, it is.
-    await fs.chmod(indexFile(), 0o600);
-    expect((await fresh.getAllProfiles()).map((p) => p.name)).toEqual(['A', 'B']);
-    expect(JSON.parse(await fs.readFile(indexFile(), 'utf-8'))).toHaveLength(2);
-  });
+      // Not remembered either: once the file can be read, it is.
+      await readable();
+      expect((await fresh.getAllProfiles()).map((p) => p.name)).toEqual(['A', 'B']);
+      expect(JSON.parse(await fs.readFile(indexFile(), 'utf-8'))).toHaveLength(2);
+    },
+    30_000,
+  );
 
   it('keeps a file it cannot parse beside the one that replaces it', async () => {
     const truncated = '[{ "id": "p1", "name": "Ravens"';
@@ -473,30 +479,38 @@ describe('deleteProfile', () => {
     await expect(mgr.deleteProfile('nope', true)).rejects.toThrow(/not found/);
   });
 
-  it.skipIf(asRoot)('says so when a file would not go, and lists what is left', async () => {
-    // A world the game still has open, on Windows; here, a folder nothing may
-    // be removed from. This used to be logged and answered as deleted, leaving
-    // a folder named by an id, worlds and all, that no screen showed.
-    const created = await mgr.createProfile(newProfile('Ravens'));
-    const saves = path.join(root, 'profiles', created.id, '.minecraft', 'saves', 'World');
-    await fs.mkdir(saves, { recursive: true });
-    await fs.writeFile(path.join(saves, 'level.dat'), 'world');
-    await fs.chmod(saves, 0o500);
+  it.skipIf(asRoot)(
+    'says so when a file would not go, and lists what is left',
+    async () => {
+      // A world the game still has open, on Windows; here, a folder nothing may
+      // be removed from. This used to be logged and answered as deleted, leaving
+      // a folder named by an id, worlds and all, that no screen showed.
+      const created = await mgr.createProfile(newProfile('Ravens'));
+      const saves = path.join(root, 'profiles', created.id, '.minecraft', 'saves', 'World');
+      await fs.mkdir(saves, { recursive: true });
+      await fs.writeFile(path.join(saves, 'level.dat'), 'world');
+      // On Windows, the thing itself: something has the world open.
+      const removable =
+        process.platform === 'win32'
+          ? await heldByAnotherProgram(path.join(saves, 'level.dat'))
+          : (await fs.chmod(saves, 0o500), () => fs.chmod(saves, 0o700));
 
-    try {
-      await expect(mgr.deleteProfile(created.id, true)).rejects.toThrow(/off the list/);
-    } finally {
-      await fs.chmod(saves, 0o700);
-    }
+      try {
+        await expect(mgr.deleteProfile(created.id, true)).rejects.toThrow(/off the list/);
+      } finally {
+        await removable();
+      }
 
-    expect(await mgr.getProfile(created.id)).toBeNull();
-    const orphans = await mgr.listOrphanedProfiles();
-    expect(orphans.map((o) => o.profile.name)).toEqual(['Ravens']);
-    expect(orphans[0].files.worlds).toBe(1);
-    // And from there it can be deleted for good.
-    await mgr.discardOrphanedProfile(created.id);
-    await expect(fs.stat(path.join(root, 'profiles', created.id))).rejects.toThrow();
-  });
+      expect(await mgr.getProfile(created.id)).toBeNull();
+      const orphans = await mgr.listOrphanedProfiles();
+      expect(orphans.map((o) => o.profile.name)).toEqual(['Ravens']);
+      expect(orphans[0].files.worlds).toBe(1);
+      // And from there it can be deleted for good.
+      await mgr.discardOrphanedProfile(created.id);
+      await expect(fs.stat(path.join(root, 'profiles', created.id))).rejects.toThrow();
+    },
+    30_000,
+  );
 });
 
 describe('orphaned profiles', () => {
@@ -664,19 +678,23 @@ describe('duplicateProfile', () => {
     });
   });
 
-  it.skipIf(asRoot)('leaves no half-made profile behind when the copy fails', async () => {
-    const created = await mgr.createProfile(newProfile('Ravens'));
-    await put(created.id, '.minecraft/mods/a.jar');
-    await put(created.id, '.minecraft/mods/unreadable.jar');
-    const unreadable = path.join(root, 'profiles', created.id, '.minecraft/mods/unreadable.jar');
-    await fs.chmod(unreadable, 0o000);
+  it.skipIf(asRoot)(
+    'leaves no half-made profile behind when the copy fails',
+    async () => {
+      const created = await mgr.createProfile(newProfile('Ravens'));
+      await put(created.id, '.minecraft/mods/a.jar');
+      await put(created.id, '.minecraft/mods/unreadable.jar');
+      const unreadable = path.join(root, 'profiles', created.id, '.minecraft/mods/unreadable.jar');
+      const readable = await madeUnreadable(unreadable);
 
-    await expect(mgr.duplicateProfile(created.id, 'Ravens (copy)')).rejects.toThrow();
+      await expect(mgr.duplicateProfile(created.id, 'Ravens (copy)')).rejects.toThrow();
 
-    await fs.chmod(unreadable, 0o600);
-    expect((await mgr.getAllProfiles()).map((p) => p.name)).toEqual(['Ravens']);
-    expect(await fs.readdir(path.join(root, 'profiles'))).toEqual([created.id]);
-  });
+      await readable();
+      expect((await mgr.getAllProfiles()).map((p) => p.name)).toEqual(['Ravens']);
+      expect(await fs.readdir(path.join(root, 'profiles'))).toEqual([created.id]);
+    },
+    30_000,
+  );
 });
 
 describe('exportProfile', () => {

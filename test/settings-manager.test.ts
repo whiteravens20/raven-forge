@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../src/core/config/defaults';
+import { REFUSED, madeUnreadable } from './helpers/unreadable';
 
 /**
  * `settings.json`, and what happens when it is not what was expected.
@@ -105,18 +106,22 @@ describe('loadSettings', () => {
     expect((await fs.readdir(root)).some((f) => f.includes('.broken-'))).toBe(false);
   });
 
-  it.skipIf(asRoot)('does not overwrite a file nobody could read', async () => {
-    // Unreadable is not the same as absent. A permissions problem answered by
-    // writing defaults is a permissions problem that eats the settings.
-    await fs.writeFile(settingsFile(), JSON.stringify({ ...DEFAULT_SETTINGS, theme: 'light' }));
-    await fs.chmod(settingsFile(), 0o000);
+  it.skipIf(asRoot)(
+    'does not overwrite a file nobody could read',
+    async () => {
+      // Unreadable is not the same as absent. A permissions problem answered by
+      // writing defaults is a permissions problem that eats the settings.
+      await fs.writeFile(settingsFile(), JSON.stringify({ ...DEFAULT_SETTINGS, theme: 'light' }));
+      const readable = await madeUnreadable(settingsFile());
 
-    const { loadSettings } = await loadModule();
-    expect(await loadSettings()).toEqual(DEFAULT_SETTINGS);
+      const { loadSettings } = await loadModule();
+      expect(await loadSettings()).toEqual(DEFAULT_SETTINGS);
 
-    await fs.chmod(settingsFile(), 0o600);
-    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8')).theme).toBe('light');
-  });
+      await readable();
+      expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8')).theme).toBe('light');
+    },
+    30_000,
+  );
 });
 
 describe('updateSettings', () => {
@@ -181,35 +186,36 @@ describe.skipIf(asRoot)('after a start that could not read the file', () => {
     ],
   };
 
+  /** A start with the file out of reach, and the way to put it back in reach. */
   async function startUnreadable() {
     await fs.writeFile(settingsFile(), JSON.stringify(real));
-    await fs.chmod(settingsFile(), 0o000);
+    const readable = await madeUnreadable(settingsFile());
     const mod = await loadModule();
     expect(await mod.loadSettings()).toEqual(DEFAULT_SETTINGS);
-    return mod;
+    return { ...mod, readable };
   }
 
   it('refuses a change instead of saving the defaults over the file', async () => {
-    const { updateSettings } = await startUnreadable();
+    const { updateSettings, readable } = await startUnreadable();
 
-    await expect(updateSettings({ showLiveConsole: true })).rejects.toThrow(/EACCES/);
+    await expect(updateSettings({ showLiveConsole: true })).rejects.toThrow(REFUSED);
 
-    await fs.chmod(settingsFile(), 0o600);
+    await readable();
     expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(real);
-  });
+  }, 30_000);
 
   it('refuses a reset for the same reason', async () => {
-    const { resetSettings } = await startUnreadable();
+    const { resetSettings, readable } = await startUnreadable();
 
-    await expect(resetSettings()).rejects.toThrow(/EACCES/);
+    await expect(resetSettings()).rejects.toThrow(REFUSED);
 
-    await fs.chmod(settingsFile(), 0o600);
+    await readable();
     expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(real);
-  });
+  }, 30_000);
 
   it('builds the change on what the file holds once it can be read', async () => {
-    const { updateSettings, getSettings } = await startUnreadable();
-    await fs.chmod(settingsFile(), 0o600);
+    const { updateSettings, getSettings, readable } = await startUnreadable();
+    await readable();
 
     const updated = await updateSettings({ showLiveConsole: true });
 
