@@ -346,10 +346,11 @@ export async function setActiveAccountId(accountId: string): Promise<void> {
 }
 
 export async function getRefreshToken(accountId: string): Promise<string | undefined> {
-  const fromKeychain = await getSecret(refreshKey(accountId));
-  if (fromKeychain) return fromKeychain;
+  // The file first, as for a session below. Reading it is what lifts a token an
+  // older build left there into the keychain; asked the other way round, the
+  // token had moved between the two looks and was found in neither.
   const store = await readStore();
-  return store.refreshTokens[accountId];
+  return (await getSecret(refreshKey(accountId))) || store.refreshTokens[accountId];
 }
 
 export async function getAccount(accountId: string): Promise<MinecraftAccount | undefined> {

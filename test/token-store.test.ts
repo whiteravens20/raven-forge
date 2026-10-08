@@ -179,6 +179,25 @@ describe('migrating a pre-keychain login', () => {
     expect(await store.getRefreshToken('a1')).toBe('old-refresh');
   });
 
+  it('hands back a refresh token that is still in the file the first time it is asked for', async () => {
+    // Asked of the keychain first and of the file second, the token was in
+    // neither: reading the file is what moves it, and it moved between the two
+    // looks. Nothing asks in that order today — an account is read before its
+    // token is — which is the only reason nobody was told to sign in again.
+    await fs.writeFile(
+      authFile(),
+      JSON.stringify({
+        accounts: [account('a1')],
+        activeAccountId: 'a1',
+        refreshTokens: { a1: 'old-refresh' },
+      }),
+    );
+
+    const store = await loadModule();
+
+    expect(await store.getRefreshToken('a1')).toBe('old-refresh');
+  });
+
   it('leaves a secret exactly where it is when the keychain refuses it', async () => {
     keychain = null;
     await fs.writeFile(
