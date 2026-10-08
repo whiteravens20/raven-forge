@@ -480,8 +480,9 @@ try {
   # A sign-in cannot be made here, and what it would leave can: secrets in the
   # account file, which is where an older build kept them and where the
   # launcher lifts them from at its next start. Of several lengths, because
-  # Windows takes a secret only up to a size and no token says how long it
-  # will be. No account is listed with them: nothing is to be signed in.
+  # Windows takes a secret only up to a size, and how long a token is is for
+  # whoever issues it to say. No account is listed with them: nothing is to
+  # be signed in.
   $lengths = 512, 1024, 2048, 2560, 2561, 4096
   $session = 1536
   $store = [ordered]@{
@@ -519,7 +520,8 @@ try {
       Expect $false "a secret of $length characters is in one place, whole" "$inVault bytes of it in the Credential Manager, in the file: $inFile"
     }
   }
-  Expect ($fits -ge 2048) 'a secret of two thousand characters fits, which is several times a token' "the longest that fitted was $fits"
+  Note "the longest secret Windows took was $fits characters"
+  Expect ($fits -ge 2048) 'a secret of two thousand characters fits' "the longest that fitted was $fits"
   $inVault = [RavenForge.Windows]::SecretLength("$Vault/mcAccess:probe-session")
   $sessionKept = $kept.mcSessions.'probe-session'
   Expect ($inVault -eq $session -and -not $sessionKept.PSObject.Properties['accessToken']) 'a game session is moved the same way' "$inVault bytes of it in the Credential Manager"
