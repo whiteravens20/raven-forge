@@ -61,6 +61,19 @@ jobs:
       - name: Package
         run: npm run ${{ matrix.script }} -- --publish never
 
+      # electron-builder switches off, in the binary, the two ways an Electron
+      # program can be made into something else (`electronFuses` in its config).
+      # A binary where that did not happen looks no different from outside, so
+      # the one that went into the installers is read back.
+      - name: Verify the fuses of the packaged binary
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            node .github/scripts/verify-fuses.mjs 'out/win-unpacked/Raven Forge Launcher.exe'
+          else
+            node .github/scripts/verify-fuses.mjs out/linux-unpacked/raven-forge-launcher
+          fi
+
       # electron-builder exits 0 for some partial outcomes, so check that the
       # files that are supposed to exist actually do.
       - name: Verify Linux artifacts
@@ -141,6 +154,21 @@ jobs:
             if [ "$code" != 124 ]; then
               echo "::error::the launcher exited with $code instead of staying up"
               cat /tmp/run.log
+              exit 1
+            fi
+
+            # And it is nothing but the launcher — the fuses again, this time
+            # by what the installed program does. Told to be Node, Electron
+            # runs the script it is handed and leaves with its 42; told to
+            # open a debugger on the main process, it says where it listens.
+            ELECTRON_RUN_AS_NODE=1 timeout 20 /usr/bin/raven-forge-launcher -e "process.exit(42)" >/dev/null 2>&1
+            if [ "$?" = 42 ]; then
+              echo "::error::ELECTRON_RUN_AS_NODE turns the installed launcher into Node.js"
+              exit 1
+            fi
+            HOME=/root timeout 15 xvfb-run -a /usr/bin/raven-forge-launcher --no-sandbox --inspect=127.0.0.1:9229 >/tmp/inspect.log 2>&1
+            if grep -q "Debugger listening" /tmp/inspect.log; then
+              echo "::error::--inspect opens a debugger on the installed launcher"
               exit 1
             fi
           '

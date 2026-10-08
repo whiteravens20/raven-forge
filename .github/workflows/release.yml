@@ -166,6 +166,17 @@ jobs:
           GH_TOKEN: ''
         run: npm run dist:${{ matrix.target }} -- --publish never
 
+      # The same reading the packaging job makes, of the binary this release
+      # ships: see .github/scripts/verify-fuses.mjs.
+      - name: Verify the fuses of the packaged binary
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = win ]; then
+            node .github/scripts/verify-fuses.mjs 'out/win-unpacked/Raven Forge Launcher.exe'
+          else
+            node .github/scripts/verify-fuses.mjs out/linux-unpacked/raven-forge-launcher
+          fi
+
       - name: Verify the client ID was baked in
         shell: bash
         run: |
