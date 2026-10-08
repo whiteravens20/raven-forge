@@ -518,6 +518,29 @@ function Test-Dialog($Dialog) {
   return [RavenForge.Dialogs]::IsThere($Dialog.Handle)
 }
 
+# How wide something in a dialog is, in the dots of the screen.
+function Get-Width($Control) {
+  $rect = [RavenForge.Windows+Rect]::new()
+  $null = [RavenForge.Windows]::GetWindowRect($Control.Handle, [ref] $rect)
+  return ($rect.Right - $rect.Left)
+}
+
+# How wide a line comes out in a question: in the font Windows writes its
+# questions in, measured the way they are drawn.
+function Get-TextWidth([string] $Line) {
+  $measured = [System.Windows.Forms.TextRenderer]::MeasureText(
+    $Line,
+    [System.Drawing.SystemFonts]::MessageBoxFont,
+    [System.Drawing.Size]::new(100000, 1000),
+    [System.Windows.Forms.TextFormatFlags]'NoPadding, NoPrefix, SingleLine')
+  return $measured.Width
+}
+
+# A question on one line, for saying what it was.
+function Format-Question([string] $Asked) {
+  return ($Asked -replace '\s*\r?\n\s*', ' / ')
+}
+
 # What a dialog is, told by what is in it and never by its wording, which is
 # in the language of the Windows it runs on. An installer's window keeps a
 # place for its pages, number 1018, whatever page is in it. A dialog without
@@ -555,10 +578,13 @@ function Step-Through {
     [string] $Pictures = '',
     [int] $Seconds = 600
   )
+  # A question is kept as it was worded, line for line, with the room its
+  # box had for a line beside it.
   $met = [pscustomobject]@{
     Pages     = [System.Collections.Generic.List[string]]::new()
     Folder    = ''
     Questions = [System.Collections.Generic.List[string]]::new()
+    Rooms     = [System.Collections.Generic.List[int]]::new()
   }
   $pressed = @{}
   $clicked = @{}
@@ -578,16 +604,18 @@ function Step-Through {
 
     $question = @($dialogs | Where-Object { (Get-Page $_) -eq 'a question' }) | Select-Object -First 1
     if ($question) {
-      $asked = (@($question.Controls | Where-Object { $_.Kind -eq 'Static' -and $_.Text } | ForEach-Object Text) -join ' ') -replace '\s+', ' '
+      $worded = @($question.Controls | Where-Object { $_.Kind -eq 'Static' -and $_.Text }) | Select-Object -First 1
+      $asked = if ($worded) { $worded.Text } else { '' }
       $met.Questions.Add($asked)
+      $met.Rooms.Add($(if ($worded) { Get-Width $worded } else { 0 }))
       if ($Pictures) { Save-Screen "$Pictures-question-$($met.Questions.Count)" }
       $with = $null
       foreach ($about in $Answers.Keys) {
         if ($asked -match $about) { $with = $Answers[$about]; break }
       }
-      if ($null -eq $with) { throw "asked something nobody expected: $asked" }
+      if ($null -eq $with) { throw "asked something nobody expected: $(Format-Question $asked)" }
       Push-Button $question $with
-      if (-not (Wait-Until { -not (Test-Dialog $question) } 20)) { throw "a question would not take its answer: $asked" }
+      if (-not (Wait-Until { -not (Test-Dialog $question) } 20)) { throw "a question would not take its answer: $(Format-Question $asked)" }
       continue
     }
 
@@ -647,6 +675,25 @@ function Get-UninstallersAtWork($Started) {
 function Expect-Pages {
   param($Met, [string[]] $Are)
   Expect (($Met.Pages -join ', ') -eq ($Are -join ', ')) "its pages are $($Are -join ', ')" "they were $($Met.Pages -join ', ')"
+}
+
+# A question that says where the data is: that it names the folder, and that
+# no line of the folder's path is wider than the question's box has room for.
+# Windows cuts a line that is, wherever the room runs out, and a path has no
+# spaces to be cut at — it came out as "…\raven-forge-launch" with "er"
+# beneath. The uninstaller lays the path out itself, cut after a backslash, so
+# the path is put together again here before it is looked for.
+function Expect-FolderNamed {
+  param([string] $Asked, [int] $Room, [string] $Is)
+  $lines = @($Asked -split '\r?\n')
+  $whole = ($lines -join "`n") -replace '\\\n', '\'
+  Expect ($whole.Contains($Is)) "it names $Is as where the data is" "it asked: $(Format-Question $Asked)"
+  $ofThePath = @($lines | Where-Object { $_ -and $Is.Contains($_) -and ($_.EndsWith('\') -or $Is.EndsWith($_)) })
+  foreach ($line in $ofThePath) {
+    $wide = Get-TextWidth $line
+    # Two dots over is the same line measured twice, not a line too long.
+    Expect ($wide -le $Room + 2) "and '$line' fits on a line of it" "it is $wide wide and a line has room for $Room"
+  }
 }
 
 # ── The machine ──────────────────────────────────────────────────────────────
@@ -963,7 +1010,7 @@ try {
   # is about to install into, where the older one is not; the older release's
   # uninstaller, which it runs without pages, is what finds and closes it.
   if ($met.Questions.Count -eq 0) { Note 'it asked nothing' }
-  foreach ($asked in $met.Questions) { Note "it asked: $asked" }
+  foreach ($asked in $met.Questions) { Note "it asked: $(Format-Question $asked)" }
   Expect ($setup.ExitCode -eq 0) 'the installer ends well' "it ended with $($setup.ExitCode)"
   Expect ($older.WaitForExit(5000)) 'the older launcher, which was open, has been closed'
   Expect-Installed -In $Folder.Now -NotIn $Folder.Before
@@ -983,9 +1030,9 @@ try {
   $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Reply.OK } -RunAfter $false -Pictures 'installer-over-the-open-launcher'
   Expect-Pages $met 'the licence', 'for whom', 'the folder', 'the end'
   Expect ($met.Folder -eq $Folder.Now) 'the folder page names the folder the launcher is in' "it names '$($met.Folder)'"
-  Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
+  Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count)"
   foreach ($asked in $met.Questions) {
-    Expect ($asked -match $AsksToClose) 'which is whether to close the launcher that is open' "it asked: $asked"
+    Expect ($asked -match $AsksToClose) 'which is whether to close the launcher that is open' "it asked: $(Format-Question $asked)"
   }
   Expect ($setup.ExitCode -eq 0) 'the installer ends well' "it ended with $($setup.ExitCode)"
   Expect ($launcher.WaitForExit(5000)) 'and the launcher was closed on the one OK'
@@ -998,10 +1045,8 @@ try {
   $run = Start-Program @{ FilePath = (Join-Path $Folder.Now $UninstallerName) }
   $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers @{ $AsksToKeep = $Reply.Yes } -Pictures 'uninstaller-keeping'
   Expect-Pages $met 'the welcome', 'the end'
-  Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
-  foreach ($asked in $met.Questions) {
-    Expect ($asked.Contains($Data.Now)) "which names $($Data.Now) as where the data is" "it asked: $asked"
-  }
+  Expect ($met.Questions.Count -eq 1) 'it asks one thing' "it asked $($met.Questions.Count)"
+  if ($met.Questions.Count -eq 1) { Expect-FolderNamed $met.Questions[0] $met.Rooms[0] $Data.Now }
   Expect (Wait-Until { -not (Test-Path -LiteralPath $Folder.Now) -and @(Get-Listed).Count -eq 0 } 60 500) 'the uninstaller finishes'
   Expect-Removed -From $Folder.Now
   Expect (Test-Path -LiteralPath (Join-Path $Data.Now $World)) 'answered yes, it leaves the world where it was'
@@ -1016,10 +1061,11 @@ try {
   $run = Start-Program @{ FilePath = (Join-Path $Folder.Now $UninstallerName) }
   $met = Step-Through -Whose { Get-UninstallersAtWork $run } -Answers ([ordered]@{ $AsksToClose = $Reply.OK; $AsksToKeep = $Reply.No }) -Pictures 'uninstaller-deleting'
   Expect-Pages $met 'the welcome', 'the end'
-  Expect ($met.Questions.Count -eq 2) 'it asks two things' "it asked $($met.Questions.Count): $($met.Questions -join ' | ')"
+  Expect ($met.Questions.Count -eq 2) 'it asks two things' "it asked $($met.Questions.Count)"
   if ($met.Questions.Count -eq 2) {
-    Expect ($met.Questions[0] -match $AsksToClose) 'first whether to close the launcher that is open' "it asked: $($met.Questions[0])"
-    Expect ($met.Questions[1].Contains($Data.Now)) "then about the data, naming $($Data.Now)" "it asked: $($met.Questions[1])"
+    Expect ($met.Questions[0] -match $AsksToClose) 'first whether to close the launcher that is open' "it asked: $(Format-Question $met.Questions[0])"
+    Expect ($met.Questions[1] -match $AsksToKeep) 'then about the data' "it asked: $(Format-Question $met.Questions[1])"
+    Expect-FolderNamed $met.Questions[1] $met.Rooms[1] $Data.Now
   }
   Expect ($launcher.WaitForExit(5000)) 'the launcher was closed'
   Expect (Wait-Until { -not (Test-Path -LiteralPath $Folder.Now) -and @(Get-Listed).Count -eq 0 } 60 500) 'the uninstaller finishes'
