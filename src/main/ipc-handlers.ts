@@ -6,6 +6,7 @@ import path from 'node:path';
 import { log, LOG_FILE } from './logger';
 import { getMainWindow } from './window';
 import { assertTrustedSender } from './security';
+import { relaunchLauncher } from './relaunch';
 import { getSettings, updateSettings, resetSettings } from '../core/config/settings-manager';
 import { applyProxySettings, assertProxyUsable } from '../core/net/proxy';
 import { paths } from '../core/config/paths';
@@ -248,14 +249,7 @@ export function registerAllIpcHandlers(): void {
     }
   });
   handle('system:relaunch', () => {
-    // An AppImage is one file that mounts itself for the length of a run, and
-    // the program Electron would start again is the copy inside that mount —
-    // gone by the time this process has left, which is what a relaunch waits
-    // for. The launcher closed and did not come back, after a move of the data
-    // above all. `APPIMAGE` names the file itself, and that is what is started.
-    const image = process.env.APPIMAGE;
-    app.relaunch(image ? { execPath: image } : undefined);
-    app.quit();
+    relaunchLauncher();
   });
   handle('system:open-url', async (_event, url: string) => {
     // Only allow https:// and http:// URLs for security

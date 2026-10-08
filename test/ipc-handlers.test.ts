@@ -27,11 +27,9 @@ import { ZipWriter } from './helpers/zip';
 
 type Listener = (event: unknown, ...args: unknown[]) => unknown;
 
-const { handlers, mainFrame, running, picked, relaunched } = vi.hoisted(() => ({
+const { handlers, mainFrame, running, picked } = vi.hoisted(() => ({
   handlers: new Map<string, Listener>(),
   mainFrame: {},
-  /** What each restart was asked to start, and whether the launcher then left. */
-  relaunched: { with: [] as unknown[], quits: 0 },
   /** Profiles this suite says have a game up; nothing is ever spawned. */
   running: new Set<string>(),
   /** What the next "choose a file" dialog answers; nothing is a closed dialog. */
@@ -45,10 +43,6 @@ vi.mock('electron', () => ({
     getPath: () => path.join(root, 'userData'),
     getVersion: () => '0.0.0-test',
     isPackaged: false,
-    relaunch: (options?: unknown) => relaunched.with.push(options),
-    quit: () => {
-      relaunched.quits += 1;
-    },
   },
   ipcMain: {
     handle: (channel: string, listener: Listener) => handlers.set(channel, listener),
@@ -99,8 +93,6 @@ beforeEach(async () => {
   running.clear();
   picked.files = [];
   picked.asked = 0;
-  relaunched.with = [];
-  relaunched.quits = 0;
   const { reloadDataRoot } = await import('../src/core/config/data-root');
   reloadDataRoot();
   const { registerAllIpcHandlers } = await import('../src/main/ipc-handlers');
@@ -335,32 +327,6 @@ describe('loaders:build-starts', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Failed to check the loader build');
-  });
-});
-
-describe('system:relaunch', () => {
-  afterEach(() => {
-    delete process.env.APPIMAGE;
-  });
-
-  it('starts the launcher again as it was started, and leaves', async () => {
-    await call('system:relaunch');
-
-    expect(relaunched.with).toEqual([undefined]);
-    expect(relaunched.quits).toBe(1);
-  });
-
-  it('starts the AppImage file, not the copy of the program inside its mount', async () => {
-    // The mount is gone once this process is, and the relaunch waits for that:
-    // the launcher used to close after a move of the data and stay closed.
-    process.env.APPIMAGE = '/home/player/Raven-Forge-Launcher-1.0.0.AppImage';
-
-    await call('system:relaunch');
-
-    expect(relaunched.with).toEqual([
-      { execPath: '/home/player/Raven-Forge-Launcher-1.0.0.AppImage' },
-    ]);
-    expect(relaunched.quits).toBe(1);
   });
 });
 
