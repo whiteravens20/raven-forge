@@ -72,9 +72,8 @@ describe('writeFileAtomic', () => {
 
     await writeFileAtomic(file, 'fresh', 0o600);
 
-    const stat = await fs.stat(file);
-    expect(stat.mode & 0o777).toBe(0o600);
     expect(await fs.readFile(file, 'utf-8')).toBe('fresh');
+    expect((await fs.stat(file)).mode & 0o777).toBe(0o600);
   });
 
   it('has the bytes on the disk before the file is given its name', async () => {
