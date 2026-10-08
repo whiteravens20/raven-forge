@@ -544,7 +544,13 @@ were not.
   the refresh failed at `login.microsoftonline.com`, `isNetworkFailure` sorted it
   from a rejection, the renderer offered offline play, and accepting the offer
   took the `offline && type === 'microsoft'` branch and launched the game with
-  the `0` token sentinel.
+  the `0` token sentinel. A service that answers and cannot serve — a 429 from
+  Mojang's sign-in, which limits how often it is asked, or a 5xx from Xbox Live
+  — is sorted the same way since (`isAuthOutage`): nothing is wrong with the
+  account, and signing in again would meet the same answer. That half is held by
+  `test/sign-in-refresh.test.ts` with stand-in answers and has not been seen
+  against the real services. Only a refusal of the account itself is told as an
+  expired session, and that one in the player's language.
 - **Self-update is proven on Windows and for the AppImage.** An installed
   Windows release has updated itself to the next one through the published feed.
   The 0.7.0 AppImage has done the same to 0.7.1: the old file is removed, the new

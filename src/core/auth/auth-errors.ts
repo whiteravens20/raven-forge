@@ -20,6 +20,53 @@ export class AuthServersUnreachableError extends Error {
 }
 
 /**
+ * One of the sign-in services answered, and the answer was not a yes.
+ *
+ * It carries the status because the status is what says which kind of no. A
+ * 400 from Microsoft is a refresh token that has died, and only signing in
+ * again helps. A 429 from Mojang or a 503 from Xbox Live is a service that is
+ * busy or broken: nothing about the account is wrong, and signing in again
+ * meets the same answer. See {@link isAuthOutage}.
+ */
+export class AuthAnswerError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'AuthAnswerError';
+  }
+}
+
+/** Asked too often, taking too long, or failing on its own side. */
+function isServiceTrouble(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+/**
+ * Whether signing in failed for a reason that is not the account's: nothing
+ * answered, or what answered said it could not serve anyone just now.
+ *
+ * The second half was missing. Mojang's sign-in limits how often it may be
+ * asked, and Xbox Live has its bad hours; either one was reported as a session
+ * that had expired, to be put right by signing in again — which then failed in
+ * the same way, while the offer that would have worked, playing offline, was
+ * not made.
+ */
+export function isAuthOutage(err: unknown): boolean {
+  if (isNetworkFailure(err)) return true;
+
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (current instanceof AuthAnswerError && isServiceTrouble(current.status)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
  * Node's fetch reports every transport failure as a `TypeError: fetch failed`
  * with the real reason on `cause`, so the DNS/connection/TLS codes have to be
  * dug out rather than matched on the message.

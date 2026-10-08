@@ -3,7 +3,12 @@
 import { describe, it, expect } from 'vitest';
 import net from 'node:net';
 import { fetch as fetchThrough } from 'undici';
-import { AuthServersUnreachableError, isNetworkFailure } from '../src/core/auth/auth-errors';
+import {
+  AuthAnswerError,
+  AuthServersUnreachableError,
+  isAuthOutage,
+  isNetworkFailure,
+} from '../src/core/auth/auth-errors';
 import { createSocksDispatcher } from '../src/core/net/socks-dispatcher';
 
 /**
@@ -100,5 +105,46 @@ describe('isNetworkFailure', () => {
     a.cause = b;
     b.cause = a;
     expect(isNetworkFailure(a)).toBe(false);
+  });
+});
+
+/**
+ * The wider question the launch asks: was it the account that was refused, or
+ * was nobody being served? A sign-in service that answers "too many requests"
+ * or "unavailable" has refused nobody, and is as far out of reach as one that
+ * gave no answer.
+ */
+describe('isAuthOutage', () => {
+  it('is everything that is a network failure', () => {
+    expect(isAuthOutage(new AuthServersUnreachableError())).toBe(true);
+    expect(isAuthOutage(new TypeError('fetch failed', { cause: { code: 'ECONNREFUSED' } }))).toBe(
+      true,
+    );
+  });
+
+  it('is a service that is busy, slow or failing', () => {
+    for (const status of [408, 429, 500, 502, 503, 504]) {
+      expect(isAuthOutage(new AuthAnswerError(`answered ${status}`, status))).toBe(true);
+    }
+  });
+
+  it('is not an account that was refused', () => {
+    // Offering to play offline here would be an answer to a question nobody
+    // has: the refresh token is dead, and only signing in again replaces it.
+    for (const status of [400, 401, 403, 404]) {
+      expect(isAuthOutage(new AuthAnswerError(`answered ${status}`, status))).toBe(false);
+    }
+    expect(isAuthOutage(new Error('No refresh token available'))).toBe(false);
+  });
+
+  it('finds the answer behind what wrapped it, and stops on a chain that loops', () => {
+    const busy = new AuthAnswerError('Minecraft auth failed (429)', 429);
+    expect(isAuthOutage(new Error('wrapped', { cause: busy }))).toBe(true);
+
+    const a = new Error('a') as Error & { cause?: unknown };
+    const b = new Error('b') as Error & { cause?: unknown };
+    a.cause = b;
+    b.cause = a;
+    expect(isAuthOutage(a)).toBe(false);
   });
 });

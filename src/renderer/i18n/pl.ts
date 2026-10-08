@@ -130,7 +130,7 @@ export const pl: Translations = {
   'home.stopping': 'Zatrzymywanie…',
   'home.stopFailed': 'Nie udało się zatrzymać gry.',
   'home.authUnreachable':
-    'Nie udało się połączyć z serwerami logowania Microsoft. Możesz zagrać offline — tylko singleplayer i LAN, serwery w trybie online odrzucą połączenie.',
+    'Serwery logowania Microsoft są nieosiągalne albo chwilowo nie odpowiadają. Możesz zagrać offline — tylko singleplayer i LAN, serwery w trybie online odrzucą połączenie.',
   'home.launchOffline': 'Graj offline',
   'home.updatingLauncher': 'Aktualizowanie launchera…',
   'home.updateBeforePlay':
@@ -143,6 +143,8 @@ export const pl: Translations = {
   'launchError.alreadyPreparing': 'Ten profil jest już przygotowywany do uruchomienia.',
   'launchError.noAccount':
     'Nie wybrano konta. Dodaj je albo wybierz na stronie Konta i naciśnij Graj jeszcze raz.',
+  'launchError.sessionExpired':
+    'Logowanie tego konta Microsoft wygasło. Zaloguj się ponownie na stronie Konta i naciśnij Graj jeszcze raz.',
   'launchError.ramTooBig':
     'Ten profil ma przydzielone {allocated} RAM, a ten komputer ma {total}. Minecraft nie wystartuje z większą ilością pamięci, niż fizycznie jest — zmniejsz ją w edytorze profilu, gdzie {recommended} pasuje do tej maszyny.',
   'launchError.loaderVersionUnknown':

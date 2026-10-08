@@ -23,8 +23,9 @@ export interface IpcResult<T> {
 
 /**
  * `AUTH_UNREACHABLE` — Microsoft's or Mojang's auth endpoints could not be
- * reached, as opposed to rejecting us. The distinction matters: unreachable is
- * recoverable by launching offline, rejected is not.
+ * reached, or answered that they are busy or failing, as opposed to rejecting
+ * us. The distinction matters: neither is anything wrong with the account, and
+ * both are recoverable by launching offline; a rejection is not.
  *
  * `CANCELLED` — the player called it off themselves, by closing the window it
  * was happening in. Nothing went wrong and nothing is to be reported.
@@ -49,6 +50,7 @@ export type ErrorKey =
   | 'launchError.alreadyRunning'
   | 'launchError.alreadyPreparing'
   | 'launchError.noAccount'
+  | 'launchError.sessionExpired'
   | 'launchError.ramTooBig'
   | 'launchError.loaderVersionUnknown'
   | 'launchError.loaderFileMissing'

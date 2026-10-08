@@ -142,7 +142,7 @@ export const en = {
   'home.stopping': 'Stopping…',
   'home.stopFailed': 'Could not stop the game.',
   'home.authUnreachable':
-    'Could not reach the Microsoft sign-in servers. You can play offline — singleplayer and LAN only, and online-mode servers will refuse the connection.',
+    'The Microsoft sign-in servers could not be reached, or are not answering just now. You can play offline — singleplayer and LAN only, and online-mode servers will refuse the connection.',
   'home.launchOffline': 'Play offline',
   'home.updatingLauncher': 'Updating launcher…',
   'home.updateBeforePlay':
@@ -155,6 +155,8 @@ export const en = {
   'launchError.alreadyPreparing': 'This profile is already being prepared for launch.',
   'launchError.noAccount':
     'No account is selected. Add one or pick one on the Accounts page, then press Play again.',
+  'launchError.sessionExpired':
+    'The sign-in of this Microsoft account has expired. Sign in again on the Accounts page, then press Play again.',
   'launchError.ramTooBig':
     'This profile allocates {allocated} of RAM and this machine has {total}. Minecraft cannot start with more memory than the machine has — lower it in the profile editor, where {recommended} suits this one.',
   'launchError.loaderVersionUnknown':
