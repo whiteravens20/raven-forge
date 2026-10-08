@@ -430,6 +430,29 @@ not be removed from the old place is reported by name rather than left behind
 unsaid. `core/config/storage-map.ts` measures every one of these places for the
 Settings and Privacy pages.
 
+### What is believed of a stored file
+
+None of the three state files is believed as it parses. One that is there and
+cannot be read is never taken for an empty one, so nothing is saved over it.
+One that is not JSON, or not the kind of document it should be, is moved aside
+as `<name>.broken-<time>` and the launcher starts without it.
+
+`settings.json` is held to its schema whole: a file with one value the schema
+refuses is moved aside like any other, and the defaults take its place.
+
+`profiles.json` and `auth.json` hold lists, and there each entry answers for
+itself. A profile needs an id, a Minecraft version and a loader that can be
+used — they name a folder, a path and a branch of the code, and guessing a
+version or a loader is how a world gets opened by the wrong game. Every other
+field is held to its type alone: left out when the type is wrong, and left as it
+is otherwise, for the editor to argue with (`storedProfileSchema` in
+`shared/validators.ts`). An entry that is not a profile stays in the file, goes
+back into it with every write and is counted on the Profiles page, because it is
+the one record of a folder that may hold worlds; that folder is not offered as
+leftover files. An entry of the account list that is not an account is left out
+and not written back, since signing in again restores everything it held
+(`readStored` in `core/auth/token-store.ts`).
+
 ## Security posture
 
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` — on the main window and on the Microsoft sign-in window, which is the only one that loads someone else's page.
