@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect } from 'vitest';
 import { parseArticle, parseSpans } from '../src/shared/article';
 
@@ -128,5 +130,32 @@ describe('parseArticle', () => {
         ],
       },
     ]);
+  });
+});
+
+/**
+ * A feed is a document from an address somebody pasted, and the reader parses
+ * it in the page.
+ */
+describe('a body written to be slow to read', () => {
+  it('is read in time proportional to its length', () => {
+    // Every `[` that is never closed used to send the search to the end of the
+    // line and back: forty thousand of them took over a second, and five times
+    // as many would have taken half a minute.
+    const started = performance.now();
+    const blocks = parseArticle('['.repeat(200_000));
+
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(blocks).toHaveLength(1);
+  });
+
+  it('still reads a link whose address is long', () => {
+    const href = `https://example.net/${'a'.repeat(1500)}`;
+    expect(parseSpans(`[notes](${href})`)).toEqual([{ kind: 'link', text: 'notes', href }]);
+  });
+
+  it('leaves a span longer than any real one as the text it is', () => {
+    const run = 'x'.repeat(400);
+    expect(parseSpans(`**${run}**`)).toEqual([{ kind: 'text', text: `**${run}**` }]);
   });
 });

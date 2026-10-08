@@ -1,21 +1,24 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { useSettingsStore } from '@stores/settings-store';
+import { useNoticeStore } from '@stores/notice-store';
 import { useNewsStore } from '@stores/news-store';
+import { useUpdaterStore } from '@stores/updater-store';
 import { Select } from '@components/ui/Select';
 import { Input } from '@components/ui/Input';
 import { Button } from '@components/ui/Button';
+import { ConfirmButton } from '@components/ui/ConfirmButton';
 import { LogViewer } from '@components/LogViewer';
 import { DataFolderCard } from '@components/DataFolderCard';
+import { StorageMap } from '@components/StorageMap';
 import { Spinner } from '@components/ui/Spinner';
 import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
-import { isBuiltInKey, trustedKeyRing } from '@shared/branding';
-import type {
-  ThemeMode,
-  LauncherBehaviorOnLaunch,
-  TrustedKey,
-  UpdateCheck,
-} from '@shared/ipc-types';
+import { RELEASES_URL, isBuiltInKey, releaseNotesUrl, trustedKeyRing } from '@shared/branding';
+import { EXAMPLE_PUBLIC_KEY, isEd25519PublicKey } from '@shared/trusted-key';
+import type { ThemeMode, LauncherBehaviorOnLaunch, UpdateCheck } from '@shared/ipc-types';
+import { openLink } from '@renderer/open';
 
 const api = window.ravenforge;
 
@@ -39,12 +42,32 @@ export function SettingsPage() {
     { value: 'close', label: t('settings.onLaunch.close') },
     { value: 'keep-open', label: t('settings.onLaunch.keepOpen') },
   ];
-  const update = useSettingsStore((s) => s.update);
-  const reset = useSettingsStore((s) => s.reset);
+  const save = useSettingsStore((s) => s.update);
+  const resetSettings = useSettingsStore((s) => s.reset);
+  const notify = useNoticeStore((s) => s.show);
+  /**
+   * For the switches, the dropdowns and Reset. One that is refused goes back to
+   * where it was, and without a word that reads as a control that does not
+   * work. Said in the window's own line, which shows wherever this page is
+   * scrolled to; the text fields say their refusals underneath themselves.
+   */
+  const reportRefusal = (saved: boolean) => {
+    if (!saved) notify(t('settings.saveFailed'));
+  };
+  const update = async (updates: Parameters<typeof save>[0]) => reportRefusal(await save(updates));
+  const reset = async () => reportRefusal(await resetSettings());
+  const addTrustedKey = useSettingsStore((s) => s.addTrustedKey);
+  const removeTrustedKey = useSettingsStore((s) => s.removeTrustedKey);
   const refreshFeeds = useNewsStore((s) => s.refresh);
+  const newsFailed = useNewsStore((s) => s.newsFailed);
+  const announcementsFailed = useNewsStore((s) => s.announcementsFailed);
 
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyValue, setNewKeyValue] = useState('');
+  /** Why the key in the form was not added. */
+  const [keyError, setKeyError] = useState<string | null>(null);
+  /** Why a key on the list is still there. */
+  const [keyListError, setKeyListError] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
 
   if (!settings) {
@@ -55,28 +78,33 @@ export function SettingsPage() {
     );
   }
 
-  const addTrustedKey = async () => {
-    if (!newKeyName.trim() || !newKeyValue.trim()) return;
-    const key: TrustedKey = {
-      name: newKeyName.trim(),
-      publicKey: newKeyValue.trim(),
-      addedAt: new Date().toISOString(),
-    };
-    const result = await api.settings.addTrustedKey(key);
-    if (result.success) {
-      await update({ trustedPublicKeys: [...settings.trustedPublicKeys, key] });
-      setNewKeyName('');
-      setNewKeyValue('');
-    } else {
-      alert(result.error ?? t('settings.trustedKeyFailed'));
+  const handleAddKey = async () => {
+    const name = newKeyName.trim();
+    const publicKey = newKeyValue.trim();
+    if (!name || !publicKey) return;
+    // Both refused here first, in the player's language. The main process
+    // checks the same two things and can only say so in English.
+    if (!isEd25519PublicKey(publicKey)) {
+      setKeyError(t('settings.trustedKeyInvalid'));
+      return;
     }
+    if (trustedKeyRing(settings.trustedPublicKeys).some((k) => k.publicKey === publicKey)) {
+      setKeyError(t('settings.trustedKeyDuplicate'));
+      return;
+    }
+    const failure = await addTrustedKey({ name, publicKey, addedAt: new Date().toISOString() });
+    if (failure !== null) {
+      setKeyError(failure || t('settings.trustedKeyFailed'));
+      return;
+    }
+    setKeyError(null);
+    setNewKeyName('');
+    setNewKeyValue('');
   };
 
-  const removeTrustedKey = async (publicKey: string) => {
-    await api.settings.removeTrustedKey(publicKey);
-    await update({
-      trustedPublicKeys: settings.trustedPublicKeys.filter((k) => k.publicKey !== publicKey),
-    });
+  const handleRemoveKey = async (publicKey: string) => {
+    const failure = await removeTrustedKey(publicKey);
+    setKeyListError(failure === null ? null : failure || t('settings.trustedKeyRemoveFailed'));
   };
 
   return (
@@ -107,15 +135,14 @@ export function SettingsPage() {
             update({ launcherBehaviorOnLaunch: e.target.value as LauncherBehaviorOnLaunch })
           }
         />
+        {/* The one option of the three with more to it than its name. */}
+        {settings.launcherBehaviorOnLaunch === 'close' && (
+          <p className="text-xs text-rf-text-muted">{t('settings.onLaunchCloseHint')}</p>
+        )}
         <CheckboxRow
           checked={settings.showLiveConsole}
           onChange={(v) => update({ showLiveConsole: v })}
           label={t('settings.showConsole')}
-        />
-        <CheckboxRow
-          checked={settings.autoRemoveOrphanedMods}
-          onChange={(v) => update({ autoRemoveOrphanedMods: v })}
-          label={t('settings.autoRemoveOrphans')}
         />
         <CheckboxRow
           checked={settings.discordRichPresence}
@@ -139,16 +166,25 @@ export function SettingsPage() {
           max={8}
           value={String(settings.downloadConcurrency)}
           invalidMessage={t('settings.concurrencyInvalid')}
-          onCommit={(v) => update({ downloadConcurrency: Number(v) })}
+          onCommit={(v) => save({ downloadConcurrency: Number(v) })}
         />
         <TextSetting
           label={t('settings.proxy')}
           value={settings.proxyUrl ?? ''}
           placeholder={t('settings.proxyPlaceholder')}
           invalidMessage={t('settings.proxyInvalid')}
-          onCommit={(v) => update({ proxyUrl: v || undefined })}
+          onCommit={(v) => save({ proxyUrl: v || undefined })}
         />
         <p className="text-xs text-rf-text-muted">{t('settings.proxyHint')}</p>
+
+        {/* Here, with the other things that decide what is fetched and run —
+            it has nothing to do with the manifest keys it used to sit among. */}
+        <CheckboxRow
+          checked={settings.allowUnverifiedLoaderInstaller}
+          onChange={(v) => update({ allowUnverifiedLoaderInstaller: v })}
+          label={t('settings.allowUnverifiedInstaller')}
+        />
+        <p className="text-xs text-rf-text-muted">{t('settings.allowUnverifiedInstallerHint')}</p>
       </Section>
 
       <Section title={t('settings.section.sources')}>
@@ -157,8 +193,11 @@ export function SettingsPage() {
           value={settings.newsFeedUrl ?? ''}
           placeholder={t('settings.feedPlaceholder', { feed: 'news' })}
           invalidMessage={t('settings.feedInvalid')}
+          // An address can be a perfectly good one and still lead nowhere. That
+          // was only ever said on the Home page, a screen away from the field.
+          warning={newsFailed && settings.newsFeedUrl ? t('settings.feedUnreadable') : undefined}
           onCommit={async (v) => {
-            const saved = await update({ newsFeedUrl: v });
+            const saved = await save({ newsFeedUrl: v });
             if (saved) await refreshFeeds();
             return saved;
           }}
@@ -168,8 +207,13 @@ export function SettingsPage() {
           value={settings.announcementFeedUrl ?? ''}
           placeholder={t('settings.feedPlaceholder', { feed: 'announcements' })}
           invalidMessage={t('settings.feedInvalid')}
+          warning={
+            announcementsFailed && settings.announcementFeedUrl
+              ? t('settings.feedUnreadable')
+              : undefined
+          }
           onCommit={async (v) => {
-            const saved = await update({ announcementFeedUrl: v });
+            const saved = await save({ announcementFeedUrl: v });
             if (saved) await refreshFeeds();
             return saved;
           }}
@@ -185,6 +229,10 @@ export function SettingsPage() {
         <div className="space-y-2">
           {trustedKeyRing(settings.trustedPublicKeys).map((key) => {
             const builtIn = isBuiltInKey(key.publicKey);
+            // Only a key stored before the form checked them can be one of
+            // these, and it is kept until the player removes it — see
+            // `trustedKeySchema`.
+            const unusable = !isEd25519PublicKey(key.publicKey);
             return (
               <div
                 key={key.publicKey}
@@ -202,44 +250,59 @@ export function SettingsPage() {
                           date: new Date(key.addedAt).toLocaleDateString(locale),
                         })}
                   </p>
+                  {unusable && (
+                    <p className="mt-1 text-xs text-rf-danger">
+                      {t('settings.trustedKeyUnusable')}
+                    </p>
+                  )}
                 </div>
                 {!builtIn && (
-                  <Button
-                    variant="danger"
-                    size="sm"
+                  <ConfirmButton
                     icon={<Trash2 size={12} />}
-                    onClick={() => removeTrustedKey(key.publicKey)}
+                    title={t('common.remove')}
+                    question={
+                      settings.trustedPublicKeys.length === 1
+                        ? t('settings.trustedKeyConfirmLast')
+                        : t('settings.trustedKeyConfirm')
+                    }
+                    confirmLabel={t('common.remove')}
+                    onConfirm={() => void handleRemoveKey(key.publicKey)}
                   />
                 )}
               </div>
             );
           })}
+          {keyListError && (
+            <p role="alert" className="text-xs text-rf-danger">
+              {keyListError}
+            </p>
+          )}
         </div>
-
-        <CheckboxRow
-          checked={settings.allowUnverifiedLoaderInstaller}
-          onChange={(v) => update({ allowUnverifiedLoaderInstaller: v })}
-          label={t('settings.allowUnverifiedInstaller')}
-        />
-        <p className="text-xs text-rf-text-muted">{t('settings.allowUnverifiedInstallerHint')}</p>
 
         <div className="grid grid-cols-2 gap-2 rounded-lg border border-rf-border bg-rf-surface p-3">
           <Input
             label={t('settings.trustedKeyName')}
             value={newKeyName}
-            onChange={(e) => setNewKeyName(e.target.value)}
+            onChange={(e) => {
+              setNewKeyName(e.target.value);
+              setKeyError(null);
+            }}
             placeholder={t('settings.trustedKeyNamePlaceholder')}
           />
           <Input
             label={t('settings.trustedKeyValue')}
             value={newKeyValue}
-            onChange={(e) => setNewKeyValue(e.target.value)}
-            placeholder="MCowBQYDK2VwAyEA..."
+            onChange={(e) => {
+              setNewKeyValue(e.target.value);
+              setKeyError(null);
+            }}
+            placeholder={EXAMPLE_PUBLIC_KEY}
+            error={keyError ?? undefined}
           />
           <div className="col-span-2">
             <Button
               icon={<Plus size={14} />}
-              onClick={addTrustedKey}
+              onClick={() => void handleAddKey()}
               disabled={!newKeyName.trim() || !newKeyValue.trim()}
             >
               {t('settings.trustedKeyAdd')}
@@ -254,15 +317,6 @@ export function SettingsPage() {
 
       <Section title={t('settings.section.data')}>
         <DataFolderCard />
-        <PathRow
-          label={t('settings.crashReportsFolder')}
-          onOpen={async () => {
-            const result = await api.system.getInfo();
-            if (result.success && result.data) {
-              await api.system.openPath(result.data.crashReportsDirectory);
-            }
-          }}
-        />
         <div className="flex items-center gap-2">
           <span className="text-sm text-rf-text-secondary">{t('settings.logs')}:</span>
           <button
@@ -271,34 +325,29 @@ export function SettingsPage() {
           >
             {t('settings.showLogs')}
           </button>
-          <span className="text-rf-text-muted">•</span>
-          <button
-            onClick={async () => {
-              const result = await api.system.getLogsPath();
-              if (result.success && result.data) {
-                await api.system.openPath(result.data);
-              }
-            }}
-            className="text-sm text-rf-accent-text hover:underline"
-          >
-            {t('common.openFolder')}
-          </button>
         </div>
+        {/* Every folder the launcher writes to, each with its own way in. The
+            three separate "open folder" links this replaces pointed at two
+            different places once the data had moved, and said so nowhere. */}
+        <StorageMap />
       </Section>
 
       {showLogs && <LogViewer onClose={() => setShowLogs(false)} />}
 
       <div className="pt-4 border-t border-rf-border">
-        <Button
-          variant="danger"
-          onClick={() => {
-            if (confirm(t('settings.confirmReset'))) {
-              void reset();
-            }
-          }}
+        <ConfirmButton
+          // The keys are settings too, and go back to none: said here as it is
+          // said when the last of them is removed by hand.
+          question={
+            settings.trustedPublicKeys.length > 0
+              ? t('settings.confirmResetKeys')
+              : t('settings.confirmReset')
+          }
+          confirmLabel={t('settings.reset')}
+          onConfirm={() => void reset()}
         >
           {t('settings.reset')}
-        </Button>
+        </ConfirmButton>
       </div>
     </div>
   );
@@ -335,6 +384,7 @@ function TextSetting({
   label,
   value,
   invalidMessage,
+  warning,
   onCommit,
   ...inputProps
 }: {
@@ -342,6 +392,8 @@ function TextSetting({
   value: string;
   /** Shown when the main process refuses the value. */
   invalidMessage: string;
+  /** Something about the stored value worth knowing, which is not a refusal. */
+  warning?: string;
   /** `false` if the value was rejected. */
   onCommit: (value: string) => Promise<boolean>;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
@@ -357,24 +409,33 @@ function TextSetting({
   }, [value]);
 
   const commit = async () => {
-    if (draft === value) return;
+    // Back to what is stored is not a refusal any more, whatever was said about
+    // the text that was there a moment ago.
+    if (draft === value) {
+      setError(null);
+      return;
+    }
     setError((await onCommit(draft)) ? null : invalidMessage);
   };
 
   return (
-    <Input
-      label={label}
-      value={draft}
-      error={error ?? undefined}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => void commit()}
-      // Enter is how people finish typing into a single field; without this it
-      // does nothing at all and the value looks unsaved.
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-      }}
-      {...inputProps}
-    />
+    <div className="space-y-1">
+      <Input
+        label={label}
+        value={draft}
+        error={error ?? undefined}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void commit()}
+        // Enter is how people finish typing into a single field; without this
+        // it does nothing at all and the value looks unsaved.
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
+        {...inputProps}
+      />
+      {/* About what is stored, so not while the field holds something else. */}
+      {warning && !error && draft === value && <p className="text-xs text-rf-warning">{warning}</p>}
+    </div>
   );
 }
 
@@ -400,19 +461,6 @@ function CheckboxRow({
   );
 }
 
-function PathRow({ label, onOpen }: { label: string; onOpen: () => void }) {
-  const t = useT();
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-rf-text-secondary">{label}:</span>
-      <button onClick={onOpen} className="text-sm text-rf-accent-text hover:underline">
-        {t('common.openFolder')}
-      </button>
-    </div>
-  );
-}
-
 /**
  * Installed version, latest version, and a way to ask.
  *
@@ -425,9 +473,15 @@ function UpdateRow() {
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<UpdateCheck | null>(null);
   const [version, setVersion] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What is known about the update itself is the store's, shared with the
+  // notification and the Play button — this row used to keep its own, and
+  // offered to download a file that was already there.
+  const available = useUpdaterStore((s) => s.available);
+  const stage = useUpdaterStore((s) => s.stage);
+  const updateError = useUpdaterStore((s) => s.error);
+  const downloadUpdate = useUpdaterStore((s) => s.download);
+  const installUpdate = useUpdaterStore((s) => s.install);
 
   useEffect(() => {
     void api.system.getInfo().then((r) => {
@@ -451,18 +505,6 @@ function UpdateRow() {
     }
   };
 
-  const download = async () => {
-    setDownloading(true);
-    setError(null);
-    try {
-      const r = await api.updater.download();
-      if (r.success) setDownloaded(true);
-      else setError(r.error ?? t('settings.updateDownloadFailed'));
-    } finally {
-      setDownloading(false);
-    }
-  };
-
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm text-rf-text-secondary">
@@ -474,17 +516,24 @@ function UpdateRow() {
           {t('settings.checkUpdates')}
         </Button>
 
-        {result?.status === 'available' && !downloaded && (
-          <Button size="sm" loading={downloading} onClick={() => void download()}>
+        {available && stage !== 'ready' && (
+          <Button size="sm" loading={stage === 'downloading'} onClick={() => void downloadUpdate()}>
             {t('settings.downloadUpdate')}
           </Button>
         )}
-        {downloaded && (
-          <Button size="sm" onClick={() => void api.updater.install()}>
+        {stage === 'ready' && (
+          <Button size="sm" onClick={() => void installUpdate()}>
             {t('settings.restartToUpdate')}
           </Button>
         )}
       </div>
+
+      {(stage === 'failed' || updateError) && (
+        <p className="select-text text-xs text-rf-danger">
+          {stage === 'ready' ? t('update.installFailed') : t('update.downloadFailed')}
+          {updateError ? `: ${updateError}` : ''}
+        </p>
+      )}
 
       {/* Four outcomes, four different sentences. Collapsing "could not check"
           into "you are up to date" is how someone stays on a build with a
@@ -494,7 +543,13 @@ function UpdateRow() {
       )}
       {result?.status === 'available' && (
         <p className="text-xs text-rf-accent-text">
-          {t('settings.updateAvailable', { version: result.update.version })}
+          {t('settings.updateAvailable', { version: result.update.version })}{' '}
+          <button
+            onClick={() => void openLink(releaseNotesUrl(result.update.version))}
+            className="underline hover:text-rf-text"
+          >
+            {t('update.whatsNew')}
+          </button>
         </p>
       )}
       {result?.status === 'unsupported' && (
@@ -504,6 +559,18 @@ function UpdateRow() {
             : result.reason === 'system-package'
               ? t('settings.updateSystemPackage')
               : t('settings.updateUnsignedPlatform')}
+          {/* "Download it from GitHub", with nothing to click, is a search. */}
+          {result.reason === 'unsigned-platform' && (
+            <>
+              {' '}
+              <button
+                onClick={() => void openLink(RELEASES_URL)}
+                className="underline hover:text-rf-text"
+              >
+                {t('settings.openReleases')}
+              </button>
+            </>
+          )}
         </p>
       )}
       {result?.status === 'failed' && (

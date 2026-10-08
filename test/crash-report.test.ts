@@ -1,7 +1,10 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import os from 'node:os';
 import { describe, it, expect } from 'vitest';
 import {
   redactSecrets,
+  redactTokens,
   buildCrashReport,
   isShutdownWatchdogCrash,
 } from '../src/core/diagnostics/crash-report';
@@ -51,10 +54,67 @@ describe('redactSecrets', () => {
     expect(out).toContain('~/.config/Raven Forge Launcher');
   });
 
+  it('removes an account UUID in the spelling the launcher does not hold', () => {
+    // A Microsoft account's comes without dashes; the game prints it with them.
+    const bare = '069a79f444e94726a5befca90e38aaf5';
+    const dashed = '069a79f4-44e9-4726-a5be-fca90e38aaf5';
+    expect(redactSecrets(`Setting user: Raven (${dashed})`, [bare])).not.toContain(dashed);
+    expect(redactSecrets(`--uuid=${bare}`, [dashed])).not.toContain(bare);
+  });
+
+  it('removes a Windows home directory written with either kind of slash', () => {
+    const home = 'C:\\Users\\Jan Kowalski';
+    const text =
+      'gameDir C:\\Users\\Jan Kowalski\\AppData\\Roaming\\raven-forge-launcher\n' +
+      'jar file:/C:/Users/Jan Kowalski/AppData/Roaming/raven-forge-launcher/cache/a.jar';
+
+    const out = redactSecrets(text, [], home);
+
+    expect(out).not.toContain('Jan Kowalski');
+    expect(out).toContain('~\\AppData\\Roaming');
+    expect(out).toContain('file:/~/AppData/Roaming');
+  });
+
   it('ignores secrets too short to redact without shredding the text', () => {
     // `0` is the access token an offline launch uses. Redacting it would blank
     // out every version number, port and timestamp in the file.
     expect(redactSecrets('Exit code 0 after 10 min', ['0'])).toBe('Exit code 0 after 10 min');
+  });
+});
+
+/**
+ * The same promise for what the launcher keeps while the game runs: its own
+ * log, the live console, the tail on the exit card. Those are the player's own
+ * to read, so only the credential goes.
+ */
+describe('redactTokens', () => {
+  it('takes the token out of the line Minecraft 1.8.9 prints at every start', () => {
+    const line = `[12:00:00] [Client thread/INFO]: (Session ID is token:${TOKEN}:069a79f444e94726a5befca90e38aaf5)`;
+    expect(redactTokens(line, TOKEN)).toBe(
+      '[12:00:00] [Client thread/INFO]: (Session ID is token:<redacted>:069a79f444e94726a5befca90e38aaf5)',
+    );
+  });
+
+  it('takes out a JWT that is not this launch’s own', () => {
+    const other = 'eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJvdGhlciJ9.b3RoZXItc2lnbmF0dXJl';
+    expect(redactTokens(`[main/INFO]: auth=${other}`, TOKEN)).toBe('[main/INFO]: auth=<redacted>');
+  });
+
+  it('takes out this launch’s token whatever it looks like', () => {
+    const opaque = '5d41402abc4b2a76b9719d911017c592';
+    expect(redactTokens(`--accessToken ${opaque} --version 1.8.9`, opaque)).toBe(
+      '--accessToken <redacted> --version 1.8.9',
+    );
+  });
+
+  it('leaves the player’s own name and paths in their own log', () => {
+    const line = `[main/INFO]: Setting user: RavenPlayer, saving to ${os.homedir()}/worlds`;
+    expect(redactTokens(line, TOKEN)).toBe(line);
+  });
+
+  it('does not shred the output over the "0" an offline launch uses for a token', () => {
+    const line = '[12:00:00] [main/INFO]: Loaded 0 advancements in 10 ms';
+    expect(redactTokens(line, '0')).toBe(line);
   });
 });
 
@@ -73,7 +133,6 @@ const input: CrashReportInput = {
   profile,
   exitCode: 1,
   playTimeMinutes: 3,
-  startedAt: Date.now(),
   logTail: [`[main/INFO]: --accessToken ${TOKEN}`, '[main/ERROR]: java.lang.NullPointerException'],
   gameDir: '/data/profiles/p1/.minecraft',
   java: { path: '/data/java/21/bin/java', version: 21, vendor: 'Adoptium Temurin' },
@@ -94,18 +153,51 @@ describe('buildCrashReport', () => {
   });
 
   it('carries no token, in the quoted output or anywhere else', () => {
-    const report = buildCrashReport(input, [], {
+    const minecraftCrash = {
       file: 'crash-2026-08-07_15.46.31-client.txt',
       content: `-- Head --\nUser: RavenPlayer\nToken: ${TOKEN}`,
-    });
+    };
+    const report = buildCrashReport({ ...input, minecraftCrash }, []);
     expect(report).not.toContain(TOKEN);
     expect(report).not.toContain('RavenPlayer');
     expect(report).toContain('crash-2026-08-07_15.46.31-client.txt');
   });
 
+  it('says when the loader build is one the launcher does not offer', () => {
+    // The first thing to know about a game that would not start, and the one
+    // thing in the report that nothing else in it would have said.
+    const report = buildCrashReport({ ...input, loaderBuildOffered: false }, []);
+    expect(report).toContain(
+      'Mod loader: fabric 0.16.9 — not a build the launcher offers for this Minecraft version',
+    );
+  });
+
+  it('adds nothing about a build that is offered, or one it could not tell about', () => {
+    for (const loaderBuildOffered of [true, undefined]) {
+      const report = buildCrashReport({ ...input, loaderBuildOffered }, []);
+      expect(report).toContain('Mod loader: fabric 0.16.9\n');
+      expect(report).not.toContain('not a build the launcher offers');
+    }
+  });
+
   it('says the process never started, when that is what happened', () => {
     const report = buildCrashReport({ ...input, spawnError: 'spawn java ENOENT' }, []);
     expect(report).toContain('spawn java ENOENT');
+  });
+
+  it('names the signal that killed the game, and claims no exit code for it', () => {
+    // A process that dies of a signal has no exit code; the -1 here is only the
+    // placeholder the exit card is given, and printing it would be inventing one.
+    const report = buildCrashReport({ ...input, exitCode: -1, signal: 'SIGKILL' }, []);
+    expect(report).toContain('Killed by signal: SIGKILL');
+    expect(report).toContain('Exit code: —');
+    expect(report).not.toContain('Exit code: -1');
+  });
+
+  it('says nothing about signals for a game that simply exited', () => {
+    const report = buildCrashReport({ ...input, signal: null }, []);
+    expect(report).toContain('Exit code: 1');
+    expect(report).not.toContain('Killed by signal');
   });
 });
 

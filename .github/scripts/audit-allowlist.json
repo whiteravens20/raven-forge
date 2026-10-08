@@ -14,5 +14,34 @@
     "`reason` is an array of lines purely so long justifications stay readable in",
     "JSON."
   ],
-  "allow": []
+  "allow": [
+    {
+      "ghsa": "GHSA-ch52-4w7c-c8xp",
+      "package": "http-cache-semantics",
+      "severity": "high",
+      "title": "http-cache-semantics max-stale handling can disclose cross-user cached responses",
+      "reason": [
+        "Build tooling only. The package arrives through electron-builder ->",
+        "app-builder-lib -> @electron/get 3 -> got 11 -> cacheable-request 7, and",
+        "nothing under `dependencies` reaches it, so it is not in the packaged app.",
+        "",
+        "The advisory describes a shared cache that serves several users and honours a",
+        "client's `Cache-Control: max-stale`. got only routes a request through",
+        "cacheable-request when it is handed a `cache` store. @electron/get calls",
+        "got.stream() with the download options it is given, app-builder-lib passes",
+        "only a timeout, an agent and a progress callback, and",
+        "electron-builder.config.js sets no `electronDownload` options. No cache policy",
+        "is ever constructed, and the only requests are the build's own downloads of",
+        "Electron archives and electron-builder's helper binaries.",
+        "",
+        "No fix is installable: the advisory names no patched version. 4.3.0 is outside",
+        "its `<= 4.2.0` range but leaves the max-stale code unchanged, and the report",
+        "was closed upstream as not planned (kornelski/http-cache-semantics#56).",
+        "",
+        "Revisit when the advisory is revised or withdrawn, or when electron-builder",
+        "stops depending on @electron/get 3 - whichever removes this entry first."
+      ],
+      "expires": "2026-11-04"
+    }
+  ]
 }

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect, afterEach } from 'vitest';
 import path from 'node:path';
 import { encodeFrame, socketCandidates } from '../src/core/discord/rich-presence';
@@ -53,7 +55,12 @@ describe('encodeFrame', () => {
 
 describe('socketCandidates', () => {
   const platform = process.platform;
-  const env = { XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR, TMPDIR: process.env.TMPDIR };
+  const env = {
+    XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR,
+    TMPDIR: process.env.TMPDIR,
+    TMP: process.env.TMP,
+    TEMP: process.env.TEMP,
+  };
 
   afterEach(() => {
     Object.defineProperty(process, 'platform', { value: platform });
@@ -74,7 +81,9 @@ describe('socketCandidates', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' });
     process.env.XDG_RUNTIME_DIR = '/run/user/1000';
 
-    const plain = socketCandidates().filter((p) => path.dirname(p) === '/run/user/1000');
+    const plain = socketCandidates().filter(
+      (p) => path.dirname(p) === path.normalize('/run/user/1000'),
+    );
     expect(plain).toHaveLength(10);
     expect(plain.at(-1)).toBe(path.join('/run/user/1000', 'discord-ipc-9'));
   });
@@ -87,14 +96,19 @@ describe('socketCandidates', () => {
     process.env.XDG_RUNTIME_DIR = '/run/user/1000';
     const candidates = socketCandidates();
 
-    expect(candidates).toContain('/run/user/1000/app/com.discordapp.Discord/discord-ipc-0');
-    expect(candidates).toContain('/run/user/1000/snap.discord/discord-ipc-0');
+    expect(candidates).toContain(
+      path.join('/run/user/1000', 'app', 'com.discordapp.Discord', 'discord-ipc-0'),
+    );
+    expect(candidates).toContain(path.join('/run/user/1000', 'snap.discord', 'discord-ipc-0'));
   });
 
   it('falls back to /tmp when no runtime directory is set', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' });
     delete process.env.XDG_RUNTIME_DIR;
     delete process.env.TMPDIR;
+    // The two a Windows sets, which is where this test may be running.
+    delete process.env.TMP;
+    delete process.env.TEMP;
 
     expect(socketCandidates()[0]).toBe(path.join('/tmp', 'discord-ipc-0'));
   });

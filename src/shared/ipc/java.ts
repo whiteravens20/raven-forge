@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // Java runtimes the launcher knows about.
 // Part of the IPC contract — see `../ipc-types.ts`.
 
@@ -5,7 +7,6 @@ export interface JavaInstallation {
   version: number;
   path: string;
   vendor: string;
-  managed: boolean;
 }
 
 /** What a binary a profile was pointed at turned out to be. */

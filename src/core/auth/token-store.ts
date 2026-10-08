@@ -1,5 +1,8 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { z } from 'zod';
 import { paths } from '../config/paths';
 import { FILE_AUTH } from '../../shared/constants';
 import { writeJsonAtomic } from '../util/atomic-file';
@@ -63,27 +66,131 @@ function warnFallback(): void {
   );
 }
 
-async function readRaw(): Promise<AuthStoreData> {
-  try {
-    const raw = await fs.readFile(getAuthPath(), 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<AuthStoreData>;
-    return {
-      accounts: parsed.accounts ?? [],
-      activeAccountId: parsed.activeAccountId ?? null,
-      refreshTokens: parsed.refreshTokens ?? {},
-      mcSessions: parsed.mcSessions,
-    };
-  } catch {
-    return { accounts: [], activeAccountId: null, refreshTokens: {} };
+/**
+ * Read `auth.json` from disk.
+ *
+ * Only a file that is not there reads as "nobody signed in". Every failure used
+ * to, and every writer here starts from what this returns — so one read that
+ * failed on a locked file was followed by a save of the one account being
+ * changed, and every other login was gone from the list, fallback tokens
+ * included.
+ *
+ * A file that is there and will not parse is moved aside rather than saved
+ * over, and its mode re-applied: it may hold tokens, and it is the one copy an
+ * older build could have left readable by others. Any other error is thrown.
+ *
+ * Reads take turns, in a queue of their own because a mutation reads from
+ * inside its turn. Two readers finding the file broken at once would both move
+ * it aside, and the second would move whatever a save had put there since.
+ */
+/**
+ * An account as it is kept: these fields, and nothing else the file may hold.
+ *
+ * The file used to date each sign-in as well. Nothing ever read that, so it is
+ * no longer written — and taking only what is named here is what makes the next
+ * write leave it out of a file that still has it.
+ */
+const storedAccountSchema = z.object({
+  id: z.string().min(1),
+  uuid: z.string().min(1),
+  username: z.string().min(1),
+  type: z.enum(['microsoft', 'offline']),
+  skinUrl: z.string().optional().catch(undefined),
+});
+
+const storedSessionSchema = z.object({
+  expiresAt: z.number(),
+  accessToken: z.string().optional().catch(undefined),
+});
+
+let warnedAboutEntries = false;
+
+/** The entries of a stored map, or none when what is stored is not a map. */
+function entriesOf(value: unknown): [string, unknown][] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return [];
+  return Object.entries(value);
+}
+
+/**
+ * What a parsed `auth.json` holds, taken a part at a time.
+ *
+ * The whole of it used to be believed as it parsed. An account with no name —
+ * a file edited by hand — was handed to the Accounts page, which had nothing to
+ * draw then but the error screen; an entry that was not an object at all made
+ * the store unreadable, and with it every account beside it. What is not an
+ * account, a token or a session is now left out and named in the log.
+ *
+ * Left out and not kept, unlike an entry of the profile list: nothing hangs on
+ * an account's record that signing in again does not put back, and a Microsoft
+ * account comes back under the id its secrets are already stored by.
+ */
+function readStored(parsed: Record<string, unknown>, file: string): AuthStoreData {
+  const accounts: MinecraftAccount[] = [];
+  const leftOut: number[] = [];
+  const listed = Array.isArray(parsed.accounts) ? parsed.accounts : [];
+  for (const [index, entry] of listed.entries()) {
+    const read = storedAccountSchema.safeParse(entry);
+    if (read.success) accounts.push(read.data);
+    else leftOut.push(index + 1);
   }
+  // Once, because every use of the store reads the file again; and by position,
+  // never by content, because this is the one file that may hold a token.
+  if (leftOut.length > 0 && !warnedAboutEntries) {
+    warnedAboutEntries = true;
+    log.warn(`${file}: not an account, and left out of the list — entry ${leftOut.join(', ')}`);
+  }
+
+  const refreshTokens: Record<string, string> = {};
+  for (const [accountId, token] of entriesOf(parsed.refreshTokens)) {
+    if (typeof token === 'string') refreshTokens[accountId] = token;
+  }
+
+  let mcSessions: Record<string, StoredMcSession> | undefined;
+  for (const [accountId, session] of entriesOf(parsed.mcSessions)) {
+    const read = storedSessionSchema.safeParse(session);
+    if (read.success) mcSessions = { ...mcSessions, [accountId]: read.data };
+  }
+
+  // An active account that is not on the list is nobody signed in, with
+  // accounts sitting right there: the first one is, as when one is removed.
+  const active = accounts.find((account) => account.id === parsed.activeAccountId) ?? accounts[0];
+  return { accounts, activeAccountId: active?.id ?? null, refreshTokens, mcSessions };
+}
+
+function readRaw(): Promise<AuthStoreData> {
+  const file = getAuthPath();
+  return serializeByKey(`${file}:read`, async () => {
+    let raw: string;
+    try {
+      raw = await fs.readFile(file, 'utf-8');
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      return { accounts: [], activeAccountId: null, refreshTokens: {} };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      const backup = `${file}.broken-${Date.now()}`;
+      log.error(`${file} is not an account store — keeping a copy at ${backup} and starting empty`);
+      await fs.rename(file, backup);
+      await fs.chmod(backup, AUTH_FILE_MODE).catch(() => undefined);
+      return { accounts: [], activeAccountId: null, refreshTokens: {} };
+    }
+
+    return readStored(parsed as Record<string, unknown>, file);
+  });
 }
 
 async function writeStore(data: AuthStoreData): Promise<void> {
   const file = getAuthPath();
+  // Written beside the file with this mode and renamed onto it, so the mode an
+  // older build left on the file goes with the file it replaces.
   await writeJsonAtomic(file, data, AUTH_FILE_MODE);
-  // The rename preserves the temporary file's mode, but an auth.json written by
-  // an older build keeps its own until something re-applies it.
-  await fs.chmod(file, AUTH_FILE_MODE).catch(() => undefined);
 }
 
 let migration: Promise<void> | undefined;
@@ -92,6 +199,11 @@ let migration: Promise<void> | undefined;
  * Lift plaintext secrets left by pre-keychain builds into the keychain and drop
  * them from the file. Runs at most once per process; anything the keychain
  * rejects stays exactly where it is, so a failed migration is not a lost login.
+ *
+ * Once it has worked, that is. Every read waits on this promise, so one that
+ * failed — the file could not be read just then — is forgotten rather than
+ * kept: remembered, it would answer every later read of the session with the
+ * same failure, long after the file was readable again.
  */
 function migrateOnce(): Promise<void> {
   migration ??= (async () => {
@@ -117,7 +229,10 @@ function migrateOnce(): Promise<void> {
       await writeStore(store);
       log.info(`Moved ${moved} stored credential(s) from auth.json into the OS keychain`);
     }
-  })();
+  })().catch((err: unknown) => {
+    migration = undefined;
+    throw err;
+  });
   return migration;
 }
 
@@ -161,7 +276,6 @@ export async function getAuthState(): Promise<AuthState> {
   return {
     accounts: store.accounts,
     activeAccountId: store.activeAccountId,
-    isAuthenticating: false,
     // Surfaced, not only logged. The fallback is the right behaviour — better
     // than refusing to log in on a machine with no keyring daemon — but the
     // person whose Microsoft refresh token is in a plaintext file is the one
@@ -232,10 +346,11 @@ export async function setActiveAccountId(accountId: string): Promise<void> {
 }
 
 export async function getRefreshToken(accountId: string): Promise<string | undefined> {
-  const fromKeychain = await getSecret(refreshKey(accountId));
-  if (fromKeychain) return fromKeychain;
+  // The file first, as for a session below. Reading it is what lifts a token an
+  // older build left there into the keychain; asked the other way round, the
+  // token had moved between the two looks and was found in neither.
   const store = await readStore();
-  return store.refreshTokens[accountId];
+  return (await getSecret(refreshKey(accountId))) || store.refreshTokens[accountId];
 }
 
 export async function getAccount(accountId: string): Promise<MinecraftAccount | undefined> {

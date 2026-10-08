@@ -1,12 +1,18 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useState } from 'react';
-import { X, Server, Hammer, Package, ArrowLeft, Download } from 'lucide-react';
+import { X, Server, Hammer, Package, ArrowLeft, Download, Search } from 'lucide-react';
+import { ModrinthPackSearch } from '@components/ModrinthPackSearch';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { localized, useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
-import type { CataloguePack } from '@shared/ipc-types';
+import { formatRamGb, ramAdvice, safeMaxRamMb } from '@shared/memory';
+import type { CataloguePack, IpcResult, PackInstall, Profile } from '@shared/ipc-types';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
+import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 
 const api = window.ravenforge;
 
@@ -14,26 +20,36 @@ interface Props {
   onCancel: () => void;
   /** Build a profile by hand — hands back to the ordinary create form. */
   onScratch: () => void;
-  /** A profile arrived; `profileId` is the one to select. */
-  onCreated: (profileId: string) => void;
+  /**
+   * A profile arrived, and is the one to select. Two things may need saying
+   * about it, and the page says them where the profile is on screen: `dropped`
+   * names what a profile file carried that an import leaves out, and
+   * `unfinished` is why a pack's files did not all arrive.
+   */
+  onCreated: (profile: Profile, said?: { dropped?: string[]; unfinished?: string }) => void;
 }
 
-type Route = 'choose' | 'white-ravens' | 'import';
+type Route = 'choose' | 'white-ravens' | 'modrinth' | 'import';
 
 /**
  * Where a new profile comes from.
  *
- * Three routes, because "new profile" means three genuinely different things: a
- * pack somebody else maintains and keeps updating, an empty profile to build up
- * by hand, and a pack file you already have. Presenting only the third of those
- * — an empty form — is what the button used to do, and it made the common case
- * (play on the server) the one nobody could find.
+ * Four routes, because "new profile" means four genuinely different things: a
+ * pack somebody else maintains and keeps updating, a public pack to go and
+ * find, an empty profile to build up by hand, and a file you already have.
+ * Presenting only the third of those — an empty form — is what the button used
+ * to do, and it made the common case (play on the server) the one nobody could
+ * find.
  */
 export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const locale = useLocale();
+  const machineMemoryMb = useMachineMemoryMb();
   const [route, setRoute] = useState<Route>('choose');
   const [packs, setPacks] = useState<CataloguePack[] | null>(null);
+  /** True when the catalogue could not be fetched — which is not "no packs". */
+  const [listFailed, setListFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [packUrl, setPackUrl] = useState('');
@@ -46,31 +62,48 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, busy]);
 
-  // Fetched when that route is opened, not on mount: two of the three routes
-  // never need it, and a network round trip to draw a menu is a menu that lags.
+  // Fetched when that route is opened, not on mount: the other routes never
+  // need it, and a network round trip to draw a menu is a menu that lags.
+  //
+  // A fetch that failed leaves the list unknown, not empty. It used to be
+  // recorded as an empty list: going back and in again then said "no packs are
+  // published yet", with the error gone and nothing left to try again with.
   useEffect(() => {
-    if (route !== 'white-ravens' || packs) return;
+    if (route !== 'white-ravens' || packs || listFailed) return;
     let cancelled = false;
     void api.packs.listCatalogue().then((r) => {
       if (cancelled) return;
       if (r.success && r.data) setPacks(r.data);
       else {
-        setPacks([]);
+        setListFailed(true);
         setError(r.error ?? t('packs.listFailed'));
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [route, packs, t]);
+  }, [route, packs, listFailed, t]);
+
+  /**
+   * Hand a pack install's outcome on.
+   *
+   * A failure here means no profile was made, and is said in this dialog. An
+   * install that made one and then stopped short is not that: the profile
+   * exists and can be synced again, so it goes to the page like any other —
+   * staying here to offer "Install" again is how each retry used to leave
+   * another half-filled profile of the same name behind.
+   */
+  const installed = (result: IpcResult<PackInstall>, fallback: string) => {
+    if (!result.success || !result.data) setError(result.error ?? fallback);
+    else onCreated(result.data.profile, { unfinished: result.data.failure });
+  };
 
   const installPack = async (pack: CataloguePack) => {
     setBusy(pack.slug);
     setError(null);
     const result = await api.packs.createFromManifest(pack.manifestUrl);
     setBusy(null);
-    if (result.success && result.data) onCreated(result.data.id);
-    else setError(result.error ?? t('packs.installFailed', { name: pack.name }));
+    installed(result, t('packs.installFailed', { name: pack.name }));
   };
 
   const importFile = async () => {
@@ -81,8 +114,19 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     setError(null);
     const result = await api.packs.importMrpack(picked.data);
     setBusy(null);
-    if (result.success && result.data) onCreated(result.data.id);
-    else setError(result.error ?? t('packs.importFailed'));
+    installed(result, t('packs.importFailed'));
+  };
+
+  // The settings of one profile, as this launcher's own Export wrote them. It
+  // lives here, beside the pack file, because both are "I have a file" — it
+  // used to be an unlabelled icon above the profile list that nobody found.
+  const importProfileFile = async () => {
+    setBusy('profile');
+    setError(null);
+    const result = await api.profiles.import();
+    setBusy(null);
+    if (!result.success) setError(result.error ?? t('packs.profileFileFailed'));
+    else if (result.data) onCreated(result.data.profile, { dropped: result.data.dropped });
   };
 
   // One field for both kinds of link. Which one it is gets decided in the main
@@ -95,8 +139,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     setError(null);
     const result = await api.packs.createFromUrl(url);
     setBusy(null);
-    if (result.success && result.data) onCreated(result.data.id);
-    else setError(result.error ?? t('packs.manifestFailed'));
+    installed(result, t('packs.manifestFailed'));
   };
 
   return (
@@ -105,7 +148,9 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
       role="presentation"
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="source-title"
@@ -116,6 +161,8 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
               onClick={() => {
                 setRoute('choose');
                 setError(null);
+                // Coming back in asks again.
+                setListFailed(false);
               }}
               disabled={Boolean(busy)}
               aria-label={t('common.back')}
@@ -129,7 +176,9 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
               ? t('packs.title')
               : route === 'white-ravens'
                 ? t('packs.wrTitle')
-                : t('packs.importTitle')}
+                : route === 'modrinth'
+                  ? t('packs.modrinthTitle')
+                  : t('packs.importTitle')}
           </h2>
           <button
             onClick={onCancel}
@@ -152,6 +201,12 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                 badge={t('packs.whitelist')}
                 body={t('packs.wrBody')}
                 onClick={() => setRoute('white-ravens')}
+              />
+              <SourceCard
+                icon={<Search size={18} />}
+                title={t('packs.modrinthTitle')}
+                body={t('packs.modrinthBody')}
+                onClick={() => setRoute('modrinth')}
               />
               <SourceCard
                 icon={<Hammer size={18} />}
@@ -177,8 +232,23 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                 <WhitelistBadge label={t('packs.whitelist')} />
                 {t('packs.whitelistNote')}
               </p>
-              {packs === null && <p className="text-sm text-rf-text-muted">{t('packs.loading')}</p>}
-              {packs?.length === 0 && !error && (
+              {packs === null && !listFailed && (
+                <p className="text-sm text-rf-text-muted">{t('packs.loading')}</p>
+              )}
+              {listFailed && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="self-start"
+                  onClick={() => {
+                    setError(null);
+                    setListFailed(false);
+                  }}
+                >
+                  {t('packs.listRetry')}
+                </Button>
+              )}
+              {packs?.length === 0 && (
                 <p className="text-sm text-rf-text-muted">{t('packs.none')}</p>
               )}
               {packs?.map((pack) => (
@@ -198,7 +268,21 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                       MC {pack.minecraftVersion} • {loaderLabel(pack.modLoader)} •{' '}
                       {t.plural('packs.mods', pack.modCount)}
                       {pack.totalDownloadBytes > 0 && ` • ${formatBytes(pack.totalDownloadBytes)}`}
+                      {pack.recommendedRamMb !== undefined &&
+                        ` • ${t('packs.ram', { ram: formatRamGb(pack.recommendedRamMb) })}`}
                     </p>
+                    {/* Before the download, which is the moment it can still
+                        change somebody's mind. The install gives the profile
+                        what the machine can spare either way. */}
+                    {pack.recommendedRamMb !== undefined &&
+                      ramAdvice(pack.recommendedRamMb, machineMemoryMb) !== 'ok' && (
+                        <p className="mt-0.5 text-xs text-rf-warning">
+                          {t('packs.ramShort', {
+                            wanted: formatRamGb(pack.recommendedRamMb),
+                            spare: formatRamGb(safeMaxRamMb(machineMemoryMb)),
+                          })}
+                        </p>
+                      )}
                   </div>
                   <Button
                     size="sm"
@@ -218,6 +302,13 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                 <p className="text-xs text-rf-text-muted">{t('packs.wrSyncNote')}</p>
               )}
             </>
+          )}
+
+          {route === 'modrinth' && (
+            <ModrinthPackSearch
+              onBusy={(installing) => setBusy(installing ? 'modrinth' : null)}
+              onInstalled={(install) => onCreated(install.profile, { unfinished: install.failure })}
+            />
           )}
 
           {route === 'import' && (
@@ -264,6 +355,21 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
                     {t('common.add')}
                   </Button>
                 </form>
+              </div>
+
+              <div className="rounded-lg border border-rf-border p-3">
+                <p className="text-sm font-medium text-rf-text">{t('packs.profileFileTitle')}</p>
+                <p className="mt-0.5 text-xs text-rf-text-muted">{t('packs.profileFileBody')}</p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="mt-2"
+                  loading={busy === 'profile'}
+                  disabled={Boolean(busy)}
+                  onClick={() => void importProfileFile()}
+                >
+                  {t('packs.chooseFile')}
+                </Button>
               </div>
             </>
           )}

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ModrinthVersion } from '../src/core/mods/modrinth-api';
 import type { InstalledMod } from '../src/shared/ipc-types';
@@ -207,7 +209,7 @@ describe('planModInstall', () => {
     // Not an issue — it is going to be handled — but it must be said. Files
     // appearing in a profile nobody asked for is how a profile stops making sense.
     expect(plan.issues).toEqual([]);
-    expect(plan.dependencies).toEqual([{ id: 'fapi', name: 'Fabric API', version: '0.115.0' }]);
+    expect(plan.dependencies).toEqual(['Fabric API']);
   });
 
   it('does not re-list a dependency the profile already has', async () => {
@@ -243,6 +245,70 @@ describe('planModInstall', () => {
     // This is the one that turns into a startup crash: the mod installs, the
     // thing it needs cannot, and the game dies naming a class nobody recognises.
     expect(plan.issues).toEqual([{ kind: 'dependency-no-build', names: ['Fabric API'] }]);
+  });
+
+  it('follows a dependency to what it needs in turn', async () => {
+    // Applied Mekanistics needs AE2, and AE2 needs GuideME, which the addon
+    // never mentions. Stopping at AE2 installed a profile that crashed on the
+    // third mod's absence.
+    const requires = (projectId: string) => [
+      { version_id: null, project_id: projectId, dependency_type: 'required' as const },
+    ];
+    const builds: Record<string, ModrinthVersion> = {
+      p1: build({ dependencies: requires('ae2') }),
+      ae2: build({
+        id: 'ae2-v',
+        project_id: 'ae2',
+        version_number: '19.0.1',
+        dependencies: requires('guideme'),
+      }),
+      guideme: build({ id: 'guide-v', project_id: 'guideme', version_number: '21.1.0' }),
+    };
+    getModVersions.mockImplementation((id: string): ModrinthVersion[] => [builds[id]]);
+    getProjectTitle.mockImplementation(
+      async (id: string) => ({ ae2: 'AE2', guideme: 'GuideME' })[id],
+    );
+
+    const plan = await planModInstall(FABRIC_1214, MOD, []);
+
+    expect(plan.dependencies).toEqual(['AE2', 'GuideME']);
+    expect(plan.issues).toEqual([]);
+  });
+
+  it('does not go round for ever when two mods require each other', async () => {
+    const requires = (projectId: string) => [
+      { version_id: null, project_id: projectId, dependency_type: 'required' as const },
+    ];
+    const builds: Record<string, ModrinthVersion> = {
+      p1: build({ dependencies: requires('other') }),
+      other: build({ id: 'other-v', project_id: 'other', dependencies: requires('p1') }),
+    };
+    getModVersions.mockImplementation((id: string): ModrinthVersion[] => [builds[id]]);
+    getProjectTitle.mockResolvedValue('The Other Half');
+
+    const plan = await planModInstall(FABRIC_1214, MOD, []);
+
+    // Once each: the mod being installed is not its own dependency.
+    expect(plan.dependencies).toEqual(['The Other Half']);
+  });
+
+  it('names a missing build two levels down as plainly as one level down', async () => {
+    const requires = (projectId: string) => [
+      { version_id: null, project_id: projectId, dependency_type: 'required' as const },
+    ];
+    const builds: Record<string, ModrinthVersion[]> = {
+      p1: [build({ dependencies: requires('ae2') })],
+      ae2: [build({ id: 'ae2-v', project_id: 'ae2', dependencies: requires('guideme') })],
+      guideme: [],
+    };
+    getModVersions.mockImplementation((id: string): ModrinthVersion[] => builds[id]);
+    getProjectTitle.mockImplementation(
+      async (id: string) => ({ ae2: 'AE2', guideme: 'GuideME' })[id],
+    );
+
+    const plan = await planModInstall(FABRIC_1214, MOD, []);
+
+    expect(plan.issues).toEqual([{ kind: 'dependency-no-build', names: ['GuideME'] }]);
   });
 
   it('ignores optional and embedded dependencies', async () => {
@@ -310,5 +376,33 @@ describe('requiredDependencies', () => {
       dependencies: [{ version_id: 'v9', project_id: 'p2', dependency_type: 'required' }],
     });
     expect(requiredDependencies(version, [])).toEqual([{ projectId: 'p2', versionId: 'v9' }]);
+  });
+
+  it('sees a mod a pack ships under its own name as the project it is', () => {
+    // A manifest calls it `fabric-api` and says which project that is beside
+    // it; Modrinth names the dependency by project id. Only the entry's own id
+    // used to be compared, so a pack profile got a second Fabric API installed
+    // beside the pack's.
+    const version = build({
+      dependencies: [{ version_id: null, project_id: 'P7dR8mSH', dependency_type: 'required' }],
+    });
+    expect(requiredDependencies(version, [{ id: 'fabric-api', projectId: 'P7dR8mSH' }])).toEqual(
+      [],
+    );
+    // And one under a name of its own with no project beside it is still asked for.
+    expect(requiredDependencies(version, [{ id: 'fabric-api' }])).toEqual([
+      { projectId: 'P7dR8mSH', versionId: null },
+    ]);
+  });
+
+  it('sees a jar dropped in by hand once an update check has said what it is', () => {
+    const version = build({
+      dependencies: [{ version_id: null, project_id: 'P7dR8mSH', dependency_type: 'required' }],
+    });
+    const byHand = {
+      id: 'local-1',
+      updateAvailable: { versionId: 'v2', versionNumber: '2', projectId: 'P7dR8mSH' },
+    };
+    expect(requiredDependencies(version, [byHand])).toEqual([]);
   });
 });

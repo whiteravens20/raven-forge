@@ -1,23 +1,42 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
-import yauzl from 'yauzl';
 import { log } from '../../main/logger';
 import { CancelledError, isCancellation, throwIfCancelled } from '../util/cancellation';
+import { RefusedError } from '../util/refusal';
+import { forEachConcurrently } from '../util/concurrency';
+import { serializeByKey } from '../util/serialize';
+import { containedPath } from '../util/safe-path';
+import { eachEntry, openEntry } from '../util/zip-read';
 import { downloadToFile } from '../net/download';
-import { MOJANG_RESOURCES } from '../../shared/constants';
+import { MOJANG_LIBRARIES, MOJANG_RESOURCES } from '../../shared/constants';
 import { hashFile } from '../mods/integrity';
 import { getSettings } from '../config/settings-manager';
-import { getMainWindow } from '../../main/window';
-import { getMojangOsName } from './launch-args';
+import { emitProgress } from '../util/progress';
+import { getMojangOsName, rulesAllow } from './launch-args';
 import type { AssetIndex, DownloadInfo, Library, VersionMeta } from './types';
 import type { ProgressEvent, ProgressMessage } from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 // ── Hash verification ──────────────────────────────────────
 
-async function sha1File(filePath: string): Promise<string> {
-  return hashFile(filePath, 'sha1');
+/** How the files a launch needs are checked, and whether the check can be called off. */
+export interface GameFileOptions {
+  signal?: AbortSignal;
+  /**
+   * Hash every file, instead of taking one of the right size as the right file.
+   *
+   * Off for an ordinary launch. Nothing reaches its final name here except by a
+   * rename after its hash was checked, so a file of the declared size is the
+   * file that was verified when it arrived — and reading all of it again came
+   * to 400 MB of SHA-1 over four thousand assets on every Play, seconds on a
+   * warm disk and far longer on a cold one. What size cannot see is a file that
+   * rotted in place, so the launch that follows a crash asks for this.
+   */
+  thorough?: boolean;
 }
 
 /**
@@ -26,86 +45,135 @@ async function sha1File(filePath: string): Promise<string> {
  * With no published sha1 or size — which is the case for a library named only
  * by Maven coordinates — this can do no better than "a file exists". That is
  * sound only because `downloadFile` never puts a partial file at this path: it
- * receives into a `.part` beside it and renames on success, so anything sitting
- * here arrived complete. Before that, a download killed halfway left a truncated
- * jar which this then accepted for good, and the profile went on failing to
- * launch with a corrupt loader library that nothing would replace.
+ * is received beside it and renamed on success, so anything sitting here arrived
+ * complete. Before that, a download killed halfway left a truncated jar which
+ * this then accepted for good, and the profile went on failing to launch with a
+ * corrupt loader library that nothing would replace.
  */
 async function fileExistsAndValid(
   filePath: string,
-  expectedSha1?: string,
-  expectedSize?: number,
+  expectedSha1: ExpectedSha1,
+  expectedSize: number | undefined,
+  thorough: boolean,
 ): Promise<boolean> {
   try {
     const stat = await fs.stat(filePath);
-    if (expectedSize !== undefined && stat.size !== expectedSize) return false;
-    if (expectedSha1) {
-      const hash = await sha1File(filePath);
-      return hash === expectedSha1;
+    if (expectedSize !== undefined) {
+      if (stat.size !== expectedSize) return false;
+      if (!thorough) return true;
     }
+    const accepted = acceptedSha1(expectedSha1);
+    if (accepted.length > 0) return accepted.includes(await hashFile(filePath, 'sha1'));
     return true;
   } catch {
     return false;
   }
 }
 
+/**
+ * What a file's SHA-1 has to be: one value, or any one of several.
+ *
+ * Several is how Forge's profiles up to 1.12.2 describe a library — a list of
+ * `checksums`, because the same jar was also served packed, and came out of
+ * that with different bytes. Either was the library.
+ */
+type ExpectedSha1 = string | readonly string[] | undefined;
+
+function acceptedSha1(expected: ExpectedSha1): readonly string[] {
+  if (expected === undefined) return [];
+  return typeof expected === 'string' ? [expected] : expected;
+}
+
 // ── Download with retry ────────────────────────────────────
+
+const DOWNLOAD_ATTEMPTS = 3;
 
 /**
  * Fetch one game file, retrying, and never leave a partial one behind.
  *
  * The transfer itself is `downloadToFile`, which is the launcher's one download
  * policy: a stall timeout that resets on every chunk, backpressure by awaiting
- * each write, and the destination removed on any failure at all. This used to be
- * a second implementation with an absolute `AbortSignal.timeout(60_000)`, and
- * that is the mistake `download.ts` already documents at length — the signal
- * governs the body stream, so the 26 MB client jar was simply unfetchable below
- * about 3.5 Mbit/s, three identical times in a row.
- *
- * The cleanup matters as much. The old final attempt threw without deleting, so
- * a truncated file stayed on disk; the next launch saw a library with no
- * published sha1 or size, found *a* file there, and called it installed for
- * good.
+ * each write, the body received beside the destination and hashed as it is
+ * written, and the destination given its name only once that hash is right.
+ * This used to be a second implementation with an absolute
+ * `AbortSignal.timeout(60_000)`, and that is the mistake `download.ts` already
+ * documents at length — the signal governs the body stream, so the 26 MB client
+ * jar was simply unfetchable below about 3.5 Mbit/s, three identical times in a
+ * row.
  */
 async function downloadFile(
   url: string,
   dest: string,
-  sha1?: string,
-  retries = 3,
-  signal?: AbortSignal,
+  sha1: ExpectedSha1,
+  signal: AbortSignal | undefined,
+  size?: number,
 ): Promise<void> {
-  // Received beside the target and renamed onto it, so the destination only ever
-  // exists complete. `rename` within a directory is atomic, and a process killed
-  // mid-transfer leaves a `.part` that the next run overwrites rather than a
-  // short file that `fileExistsAndValid` would accept as installed.
-  const part = `${dest}.part`;
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  const accepted = acceptedSha1(sha1);
+  // With a size or a hash to hold it to, `fileExistsAndValid` looks at this
+  // file again before every launch, so it is not also sent to the disk here:
+  // see `checkedAgain`. A library with neither is taken on sight from then on,
+  // and is.
+  const checkedAgain = size !== undefined || accepted.length > 0;
+  for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt++) {
     throwIfCancelled(signal, 'Download');
     try {
-      // Libraries and natives are loaded straight into the JVM, so the bytes
-      // come down https; the published sha1 (when there is one) is checked next.
-      await downloadToFile(url, part, { signal, secure: true });
-
-      if (sha1) {
-        const hash = await sha1File(part);
-        if (hash !== sha1) throw new Error(`SHA1 mismatch: expected ${sha1}, got ${hash}`);
+      if (accepted.length > 1) {
+        await downloadAnyOf(url, dest, accepted, signal);
+        return;
       }
-
-      await fs.rename(part, dest);
-      return; // success
+      // Libraries and natives are loaded straight into the JVM, so the bytes
+      // come down https and are held to the published sha1 when there is one.
+      await downloadToFile(url, dest, {
+        signal,
+        secure: true,
+        checkedAgain,
+        verify:
+          accepted.length === 1
+            ? { hashes: { sha1: accepted[0] }, label: path.basename(dest) }
+            : undefined,
+      });
+      return;
     } catch (err) {
-      // Whatever went wrong, nothing half-written survives this function.
-      await fs.rm(part, { force: true });
       // A cancelled job must not be retried — that would keep downloading for
       // another three rounds after the user asked us to stop.
       if (signal?.aborted || isCancellation(err)) throw new CancelledError('Download');
-      if (attempt === retries)
-        throw new Error(`Failed to download ${url} after ${retries} attempts: ${err}`, {
+      if (attempt === DOWNLOAD_ATTEMPTS)
+        throw new Error(`Failed to download ${url} after ${DOWNLOAD_ATTEMPTS} attempts: ${err}`, {
           cause: err,
         });
-      log.warn(`Download attempt ${attempt} failed for ${url}: ${err}`);
+      log.warn(`Download attempt ${attempt} failed for ${url}: ${errorText(err)}`);
     }
+  }
+}
+
+/**
+ * Fetch a file that any one of several hashes vouches for.
+ *
+ * The downloader checks against one hash, so this receives the file under a
+ * name of its own and gives it the real one only when it has matched — the same
+ * promise as everywhere else here, that nothing sits at its final name
+ * unchecked.
+ */
+async function downloadAnyOf(
+  url: string,
+  dest: string,
+  accepted: readonly string[],
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  const unchecked = `${dest}.unchecked`;
+  try {
+    // Hashed below and again before every launch: see `checkedAgain`.
+    await downloadToFile(url, unchecked, { signal, secure: true, checkedAgain: true });
+    const actual = await hashFile(unchecked, 'sha1');
+    if (!accepted.includes(actual)) {
+      throw new Error(
+        `sha1 mismatch for ${path.basename(dest)}: expected one of ${accepted.join(', ')}, got ${actual}`,
+      );
+    }
+    await fs.rename(unchecked, dest);
+  } catch (err) {
+    await fs.rm(unchecked, { force: true });
+    throw err;
   }
 }
 
@@ -114,50 +182,27 @@ async function downloadFile(
 interface DownloadTask {
   url: string;
   dest: string;
-  sha1?: string;
+  sha1?: ExpectedSha1;
   size?: number;
-}
-
-/**
- * Run `work` over every item, with at most `concurrency` in flight.
- *
- * The first failure stops the rest. `Promise.all` rejects on it either way, but
- * the other workers went on draining the queue regardless — so a launch that had
- * already failed carried on pulling the remaining few thousand assets in the
- * background, for nobody.
- */
-async function forEachConcurrently<T>(
-  items: T[],
-  concurrency: number,
-  work: (item: T) => Promise<void>,
-): Promise<void> {
-  const queue = [...items];
-  let failed = false;
-  const workers: Promise<void>[] = [];
-  for (let i = 0; i < Math.max(1, concurrency); i++) {
-    workers.push(
-      (async () => {
-        while (queue.length > 0 && !failed) {
-          try {
-            await work(queue.shift()!);
-          } catch (err) {
-            failed = true;
-            throw err;
-          }
-        }
-      })(),
-    );
-  }
-  // `allSettled` first, so every worker has finished before this returns: with
-  // `all` the losers stayed in flight past the rejection, writing into a
-  // directory the caller believes it is done with.
-  const results = await Promise.allSettled(workers);
-  const firstRejection = results.find((r) => r.status === 'rejected');
-  if (firstRejection) throw (firstRejection as PromiseRejectedResult).reason;
 }
 
 /** How often the checking pass is allowed to say where it has got to. */
 const CHECK_EMIT_INTERVAL_MS = 100;
+
+/**
+ * One task per destination, the first one named.
+ *
+ * Mojang's lists repeat themselves. A version from 1.13 to 1.18.2 names each
+ * LWJGL jar once per rule set, an asset index gives one object to every name
+ * that shares its content — 524 of the legacy index's 1,120 entries are a file
+ * already listed — and each repeat used to be checked and, when missing,
+ * fetched again: twice the requests of a first install, and two downloads
+ * taking turns at one file.
+ */
+function uniqueByDestination(tasks: DownloadTask[]): DownloadTask[] {
+  const seen = new Set<string>();
+  return tasks.filter((task) => !seen.has(task.dest) && seen.add(task.dest));
+}
 
 /**
  * Fetch whatever is missing or wrong, and leave the rest alone.
@@ -170,38 +215,36 @@ const CHECK_EMIT_INTERVAL_MS = 100;
  * run at the download concurrency now rather than one file at a time.
  *
  * Both passes report, and each says what it is. Checking is the *whole* of a
- * launch with nothing to fetch — several seconds of SHA-1 over every asset —
- * and it used to run behind a bar frozen at zero, under the words "Downloading
- * game assets", which was the one thing that was certainly not happening. The
- * same correction the pack sync already got.
+ * launch with nothing to fetch, and it used to run behind a bar frozen at zero,
+ * under the words "Downloading game assets", which was the one thing that was
+ * certainly not happening. The same correction the pack sync already got.
  */
 async function downloadBatch(
-  tasks: DownloadTask[],
+  listed: DownloadTask[],
   concurrency: number,
-  opts?: {
+  opts: GameFileOptions & {
     operationId: string;
     /** Said while the files already on disk are being checked. */
-    checkLabel?: ProgressMessage;
+    checkLabel: ProgressMessage;
     /** Said while the ones that failed that check are being fetched. */
-    downloadLabel?: ProgressMessage;
-    signal?: AbortSignal;
+    downloadLabel: ProgressMessage;
   },
 ): Promise<void> {
+  const tasks = uniqueByDestination(listed);
   const total = tasks.length;
 
-  const emit = (progress: number, message: ProgressMessage, done: number) => {
-    if (!opts) return;
+  const emit = (progress: number, message: ProgressMessage, done: number, installing = false) => {
     emitAssetProgress({
       operationId: opts.operationId,
       progress,
       message,
       filesCompleted: done,
       filesTotal: total,
+      installing,
     });
   };
 
-  const checkLabel: ProgressMessage = opts?.checkLabel ?? { key: 'progress.msg.checkingFiles' };
-  const downloadLabel: ProgressMessage = opts?.downloadLabel ?? { key: 'progress.msg.downloading' };
+  const { checkLabel, downloadLabel, signal, thorough = false } = opts;
 
   // ── Pass one: which of these are already here and correct ──
 
@@ -211,7 +254,7 @@ async function downloadBatch(
 
   const pending: DownloadTask[] = [];
   await forEachConcurrently(tasks, concurrency, async (task) => {
-    throwIfCancelled(opts?.signal, 'Download');
+    throwIfCancelled(signal, 'Download');
     // Counted on entry rather than on completion, so this pass can never report
     // a full bar: the renderer clears an operation that says it has finished,
     // and the downloads this pass exists to find are still to come.
@@ -226,13 +269,14 @@ async function downloadBatch(
       emit(total > 0 ? checked / total : 0, checkLabel, checked);
     }
     checked++;
-    if (!(await fileExistsAndValid(task.dest, task.sha1, task.size))) pending.push(task);
+    if (!(await fileExistsAndValid(task.dest, task.sha1, task.size, thorough))) pending.push(task);
   });
 
   // ── Pass two: fetch what pass one turned down ──
 
   let completed = total - pending.length;
-  const reportDownload = () => emit(total > 0 ? completed / total : 1, downloadLabel, completed);
+  const reportDownload = () =>
+    emit(total > 0 ? completed / total : 1, downloadLabel, completed, true);
 
   // Announced only when there is something to announce. Seeding the counter
   // unconditionally put the download line on screen — at 100%, on a launch with
@@ -240,7 +284,7 @@ async function downloadBatch(
   if (pending.length > 0) reportDownload();
 
   await forEachConcurrently(pending, concurrency, async (task) => {
-    await downloadFile(task.url, task.dest, task.sha1, 3, opts?.signal);
+    await downloadFile(task.url, task.dest, task.sha1, signal, task.size);
     completed++;
     reportDownload();
   });
@@ -261,33 +305,27 @@ export async function ensureClientJar(
   versionsDir: string,
   versionId: string,
   clientDl: DownloadInfo,
-  signal?: AbortSignal,
+  { signal, thorough = false }: GameFileOptions = {},
 ): Promise<string> {
   const jarPath = path.join(versionsDir, versionId, `${versionId}.jar`);
-  if (await fileExistsAndValid(jarPath, clientDl.sha1, clientDl.size)) {
+  if (await fileExistsAndValid(jarPath, clientDl.sha1, clientDl.size, thorough)) {
     return jarPath;
   }
 
   log.info(`Downloading client jar for ${versionId}...`);
-  await downloadFile(clientDl.url, jarPath, clientDl.sha1, 3, signal);
+  await downloadFile(clientDl.url, jarPath, clientDl.sha1, signal, clientDl.size);
   return jarPath;
 }
 
 // ── Download libraries ─────────────────────────────────────
 
+/** A library with no rules is for everyone; with rules, they decide. */
 function shouldIncludeLibrary(lib: Library): boolean {
-  if (!lib.rules) return true;
-  let allowed = false;
-  for (const rule of lib.rules) {
-    const osMatch = !rule.os || rule.os.name === getMojangOsName();
-    if (rule.action === 'allow' && osMatch) allowed = true;
-    if (rule.action === 'disallow' && osMatch) allowed = false;
-  }
-  return allowed;
+  return !lib.rules || rulesAllow(lib.rules);
 }
 
 function emitAssetProgress(event: ProgressEvent): void {
-  getMainWindow()?.webContents.send('progress:game-assets', event);
+  emitProgress('progress:game-assets', event);
 }
 
 // ── Maven coordinates ──────────────────────────────────────
@@ -298,10 +336,9 @@ function emitAssetProgress(event: ProgressEvent): void {
 interface MavenCoords {
   /** Repo-relative path, e.g. `org/ow2/asm/asm/9.10.1/asm-9.10.1.jar` */
   path: string;
-  classifier?: string;
 }
 
-function parseMavenCoords(name: string): MavenCoords | null {
+export function parseMavenCoords(name: string): MavenCoords | null {
   // group:artifact:version[:classifier][@ext]
   const [coords, extFromAt] = name.split('@');
   const parts = coords.split(':');
@@ -311,15 +348,7 @@ function parseMavenCoords(name: string): MavenCoords | null {
   const ext = extFromAt ?? 'jar';
   const fileName = `${artifact}-${version}${classifier ? `-${classifier}` : ''}.${ext}`;
 
-  return {
-    path: [...group.split('.'), artifact, version, fileName].join('/'),
-    classifier,
-  };
-}
-
-/** The `natives-<os>` classifier marks a library whose payload must be unpacked. */
-function isNativeClassifier(classifier: string | undefined): boolean {
-  return classifier?.startsWith('natives-') ?? false;
+  return { path: [...group.split('.'), artifact, version, fileName].join('/') };
 }
 
 // ── Native library extraction ──────────────────────────────
@@ -332,12 +361,42 @@ function isNativeBinary(entryName: string): boolean {
 }
 
 /**
+ * The classifier a legacy `natives` map names for this machine.
+ *
+ * The oldest versions write the Windows one as `natives-windows-${arch}` and
+ * expect the launcher to say which. Left as written it matched no classifier,
+ * and those jars were skipped without a word.
+ */
+export function nativesClassifier(
+  natives: Record<string, string>,
+  osName: string = getMojangOsName(),
+  arch: string = process.arch,
+): string | undefined {
+  return natives[osName]?.replace('${arch}', arch === 'ia32' ? '32' : '64');
+}
+
+async function hasSize(file: string, size: number): Promise<boolean> {
+  try {
+    return (await fs.stat(file)).size === size;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Unpack the native binaries out of a jar into `nativesDir`.
  *
- * Minecraft passes `-Djava.library.path=<nativesDir>` and expects the platform
- * `.so`/`.dll`/`.dylib` files to be sitting there loose. Downloading the native
- * jars is not enough — without this step the game dies on LWJGL init with
- * UnsatisfiedLinkError.
+ * Up to 1.18.2 Minecraft passes `-Djava.library.path=<nativesDir>` and expects
+ * the platform `.so`/`.dll`/`.dylib` files to be sitting there loose. Downloading
+ * the native jars is not enough — without this step the game dies on LWJGL init
+ * with UnsatisfiedLinkError.
+ *
+ * The directory is shared by every profile on one Minecraft version, and one of
+ * them may be running. So a file that is already there at the right size is left
+ * alone, and one that is not is written beside its name and renamed onto it.
+ * Writing in place — which this did, for every file, at every launch — truncates
+ * a library the other game has mapped: starting a second profile on the same
+ * version killed the first with SIGBUS, with identical bytes on their way in.
  */
 async function extractNatives(
   jarPath: string,
@@ -346,55 +405,22 @@ async function extractNatives(
 ): Promise<void> {
   const excludes = [...DEFAULT_NATIVE_EXCLUDES, ...exclude];
 
-  const zipFile = await new Promise<yauzl.ZipFile>((resolve, reject) => {
-    yauzl.open(jarPath, { lazyEntries: true }, (err, zip) => {
-      if (err || !zip) reject(err ?? new Error(`Could not open ${jarPath}`));
-      else resolve(zip);
-    });
-  });
+  await eachEntry(jarPath, async (zip, entry) => {
+    const name = entry.fileName;
+    if (excludes.some((p) => name.startsWith(p)) || !isNativeBinary(name)) return;
 
-  // `finally`, because every path out of the promise below other than the happy
-  // one used to leave the archive open: an unreadable entry rejected and the
-  // descriptor stayed held for as long as the launcher ran.
-  try {
-    await extractNativeEntries(zipFile, jarPath, nativesDir, excludes);
-  } finally {
-    zipFile.close();
-  }
-}
+    // Flatten: java.library.path is not searched recursively.
+    const dest = path.join(nativesDir, path.basename(name));
+    if (await hasSize(dest, entry.uncompressedSize)) return;
 
-function extractNativeEntries(
-  zipFile: yauzl.ZipFile,
-  jarPath: string,
-  nativesDir: string,
-  excludes: string[],
-): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    zipFile.on('entry', (entry: yauzl.Entry) => {
-      const name = entry.fileName;
-
-      if (name.endsWith('/') || excludes.some((p) => name.startsWith(p)) || !isNativeBinary(name)) {
-        zipFile.readEntry();
-        return;
-      }
-
-      // Flatten: java.library.path is not searched recursively.
-      const dest = path.join(nativesDir, path.basename(name));
-
-      zipFile.openReadStream(entry, (err, readStream) => {
-        if (err || !readStream) {
-          reject(err ?? new Error(`Could not read ${name} from ${jarPath}`));
-          return;
-        }
-        pipeline(readStream, createWriteStream(dest))
-          .then(() => zipFile.readEntry())
-          .catch(reject);
-      });
-    });
-
-    zipFile.on('end', resolve);
-    zipFile.on('error', reject);
-    zipFile.readEntry();
+    const part = `${dest}.part`;
+    try {
+      await pipeline(await openEntry(zip, entry), createWriteStream(part));
+      await fs.rename(part, dest);
+    } catch (err) {
+      await fs.rm(part, { force: true });
+      throw err;
+    }
   });
 }
 
@@ -402,101 +428,201 @@ export async function ensureLibraries(
   librariesDir: string,
   meta: VersionMeta,
   nativesDir?: string,
-  signal?: AbortSignal,
+  options: GameFileOptions = {},
 ): Promise<string[]> {
   const settings = await getSettings();
   const concurrency = settings.downloadConcurrency;
   const tasks: DownloadTask[] = [];
+  const installerMade: DownloadTask[] = [];
   const classpath: string[] = [];
   const nativeJars: Array<{ jarPath: string; exclude: string[] }> = [];
 
+  // Every destination below is the profile's own word for where a file goes,
+  // and is held to the libraries folder before anything is asked for: see
+  // `containedPath`.
   for (const lib of meta.libraries) {
     if (!shouldIncludeLibrary(lib)) continue;
 
-    const coords = parseMavenCoords(lib.name);
-
     if (lib.downloads?.artifact) {
+      // From 1.19 the natives are among these too, as ordinary artifacts with a
+      // `natives-<os>` classifier. They only go on the classpath: LWJGL, JNA and
+      // Netty each unpack their own into the natives directory the version's
+      // arguments point them at, so a copy made here was never the one loaded.
       const artifact = lib.downloads.artifact;
-      const dest = path.join(librariesDir, artifact.path);
-      tasks.push({ url: artifact.url, dest, sha1: artifact.sha1, size: artifact.size });
-
-      // Modern versions (1.19+) ship natives as ordinary artifacts tagged with a
-      // `natives-<os>` classifier. They belong on the classpath *and* unpacked.
-      if (isNativeClassifier(coords?.classifier)) {
-        nativeJars.push({ jarPath: dest, exclude: lib.extract?.exclude ?? [] });
+      const dest = containedPath(librariesDir, artifact.path);
+      const task = { url: artifact.url, dest, sha1: artifact.sha1, size: artifact.size };
+      // No address means a loader's installer made the file on this machine:
+      // there is nothing to fetch, only something to find.
+      (artifact.url === '' ? installerMade : tasks).push(task);
+      classpath.push(dest);
+    } else if (lib.url || !lib.natives) {
+      // Maven-style entry from a loader profile: coordinates, and the repository
+      // they are in unless that is Mojang's. No hashes are guaranteed — Fabric
+      // publishes a sha1 beside the coordinates when it has one, an old Forge
+      // profile a list of them, Quilt nothing.
+      //
+      // An entry with neither `downloads` nor `url` used to be skipped without a
+      // word, and the game then started without that library. One that names
+      // only natives still is: those are unpacked below, never put on the
+      // classpath.
+      const coords = parseMavenCoords(lib.name);
+      if (coords) {
+        const dest = containedPath(librariesDir, coords.path);
+        const repository = lib.url ?? MOJANG_LIBRARIES;
+        const baseUrl = repository.endsWith('/') ? repository : `${repository}/`;
+        tasks.push({
+          url: `${baseUrl}${coords.path}`,
+          dest,
+          sha1: lib.sha1 ?? lib.checksums,
+          size: lib.size,
+        });
+        classpath.push(dest);
       }
-      classpath.push(dest);
-    } else if (lib.url && coords) {
-      // Maven-style entry from a loader profile — no hashes are guaranteed, but
-      // Fabric does publish sha1 alongside the coordinates when it has one.
-      const dest = path.join(librariesDir, coords.path);
-      const baseUrl = lib.url.endsWith('/') ? lib.url : `${lib.url}/`;
-      tasks.push({ url: `${baseUrl}${coords.path}`, dest, sha1: lib.sha1, size: lib.size });
-      classpath.push(dest);
     }
 
-    // Legacy versions (≤1.18) declare a `natives` map pointing into `classifiers`.
+    // Versions up to 1.18.2 declare a `natives` map pointing into `classifiers`.
     // These are extraction-only — never on the classpath.
     if (lib.natives && lib.downloads?.classifiers) {
-      const nativeKey = lib.natives[getMojangOsName()];
-      if (nativeKey) {
-        const classifier = lib.downloads.classifiers[nativeKey];
-        if (classifier) {
-          const dest = path.join(librariesDir, classifier.path);
-          tasks.push({ url: classifier.url, dest, sha1: classifier.sha1, size: classifier.size });
-          nativeJars.push({ jarPath: dest, exclude: lib.extract?.exclude ?? [] });
-        }
+      const nativeKey = nativesClassifier(lib.natives);
+      const classifier = nativeKey ? lib.downloads.classifiers[nativeKey] : undefined;
+      if (classifier) {
+        const dest = containedPath(librariesDir, classifier.path);
+        tasks.push({ url: classifier.url, dest, sha1: classifier.sha1, size: classifier.size });
+        nativeJars.push({ jarPath: dest, exclude: lib.extract?.exclude ?? [] });
       }
     }
   }
 
-  log.info(`Ensuring ${tasks.length} libraries...`);
+  // Before anything is fetched: a launch that cannot be started is better
+  // refused now than after its downloads. Asked to download one of these, the
+  // launcher tried an empty address three times and reported what the
+  // downloader says about addresses that are not https.
+  const thorough = options.thorough ?? false;
+  for (const { dest, sha1, size } of installerMade) {
+    if (await fileExistsAndValid(dest, sha1, size, thorough)) continue;
+    throw new RefusedError(
+      { key: 'launchError.loaderFileMissing', vars: { file: path.basename(dest) } },
+      `${dest} is made by the loader's installer and is missing or damaged`,
+    );
+  }
+
+  log.info(`Ensuring ${tasks.length + installerMade.length} libraries...`);
   await downloadBatch(tasks, concurrency, {
+    ...options,
     operationId: `libraries-${meta.id}`,
     checkLabel: { key: 'progress.msg.checkingLibraries', vars: { version: meta.id } },
     downloadLabel: { key: 'progress.msg.libraries', vars: { version: meta.id } },
-    signal,
   });
 
   if (nativesDir && nativeJars.length > 0) {
-    await fs.mkdir(nativesDir, { recursive: true });
-    log.info(`Extracting ${nativeJars.length} native libraries to ${nativesDir}...`);
-    for (const { jarPath, exclude } of nativeJars) {
-      try {
-        await extractNatives(jarPath, nativesDir, exclude);
-      } catch (err) {
-        log.warn(`Failed to extract natives from ${path.basename(jarPath)}: ${err}`);
+    // One at a time per directory: two profiles on one version are got ready at
+    // once often enough, and both would be writing the same `.part` names.
+    await serializeByKey(`natives:${nativesDir}`, async () => {
+      await fs.mkdir(nativesDir, { recursive: true });
+      log.info(`Extracting ${nativeJars.length} native libraries to ${nativesDir}...`);
+      for (const { jarPath, exclude } of uniqueJars(nativeJars)) {
+        try {
+          await extractNatives(jarPath, nativesDir, exclude);
+        } catch (err) {
+          log.warn(`Failed to extract natives from ${path.basename(jarPath)}: ${err}`);
+        }
       }
-    }
+    });
   }
 
   return classpath;
 }
 
+/** A native jar is named once per rule set that includes it; unpack it once. */
+function uniqueJars<T extends { jarPath: string }>(jars: T[]): T[] {
+  const seen = new Set<string>();
+  return jars.filter((jar) => !seen.has(jar.jarPath) && seen.add(jar.jarPath));
+}
+
 // ── Download assets ────────────────────────────────────────
 
+/**
+ * Where a version expects to find its assets by name, when it does.
+ *
+ * Everything since 1.7.10 reads `objects/` through the index and wants nothing
+ * else. The versions before it cannot: 1.6 to 1.7.2 look in one folder of real
+ * file names — the index calls that `virtual` — and everything older reads
+ * `resources/` inside its own game directory. Returns null for a modern index.
+ */
+function namedAssetsDir(
+  index: AssetIndex,
+  indexId: string,
+  assetsDir: string,
+  gameDir: string | undefined,
+): string | null {
+  if (index.map_to_resources && gameDir) return path.join(gameDir, 'resources');
+  if (index.virtual || index.map_to_resources) return path.join(assetsDir, 'virtual', indexId);
+  return null;
+}
+
+/**
+ * Lay the objects out under the names the index gives them.
+ *
+ * Copies, because the game opens them as ordinary files; made once, since a
+ * copy that is already there at the right size is left alone. Without this the
+ * oldest twenty releases started with every asset downloaded and none of them
+ * found: no sounds, no language files, and in the very oldest no icon.
+ */
+async function materialiseAssets(
+  index: AssetIndex,
+  objectsDir: string,
+  namedDir: string,
+): Promise<void> {
+  const root = path.resolve(namedDir);
+  for (const [name, obj] of Object.entries(index.objects)) {
+    const dest = path.resolve(root, name);
+    // The names are Mojang's, and are still not allowed to choose a place
+    // outside the folder they are being laid out in.
+    if (!dest.startsWith(root + path.sep)) {
+      throw new Error(`The asset index names a file outside its folder: ${name}`);
+    }
+    if (await hasSize(dest, obj.size)) continue;
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.copyFile(path.join(objectsDir, obj.hash.substring(0, 2), obj.hash), dest);
+  }
+}
+
+/**
+ * Make sure every asset the version needs is on disk.
+ *
+ * @returns the folder to hand the game as `${game_assets}`: the assets root,
+ *          or for the versions that read assets by name, the folder of names
+ */
 export async function ensureAssets(
   assetsDir: string,
   meta: VersionMeta,
-  signal?: AbortSignal,
-): Promise<void> {
+  options: GameFileOptions & { gameDir?: string } = {},
+): Promise<string> {
   const settings = await getSettings();
   const indexDir = path.join(assetsDir, 'indexes');
   const objectsDir = path.join(assetsDir, 'objects');
   await fs.mkdir(indexDir, { recursive: true });
 
-  const indexFile = path.join(indexDir, `${meta.assetIndex.id}.json`);
+  // Named by the version profile, like a library's path, and held to its
+  // folder the same way.
+  const indexFile = containedPath(indexDir, `${meta.assetIndex.id}.json`);
 
   // Download asset index
-  if (!(await fileExistsAndValid(indexFile, meta.assetIndex.sha1))) {
-    await downloadFile(meta.assetIndex.url, indexFile, meta.assetIndex.sha1, 3, signal);
+  // Always by hash: it is one small file, and it decides what every other
+  // asset is supposed to be.
+  if (!(await fileExistsAndValid(indexFile, meta.assetIndex.sha1, undefined, true))) {
+    await downloadFile(meta.assetIndex.url, indexFile, meta.assetIndex.sha1, options.signal);
   }
 
   const indexRaw = await fs.readFile(indexFile, 'utf-8');
   const assetIndex = JSON.parse(indexRaw) as AssetIndex;
 
   const tasks: DownloadTask[] = [];
-  for (const [, obj] of Object.entries(assetIndex.objects)) {
+  for (const [name, obj] of Object.entries(assetIndex.objects)) {
+    // It becomes a file name and a URL, so it has to be what it says it is.
+    if (!/^[0-9a-f]{40}$/.test(obj.hash)) {
+      throw new Error(`The asset index gives ${name} a hash that is not one`);
+    }
     const prefix = obj.hash.substring(0, 2);
     const dest = path.join(objectsDir, prefix, obj.hash);
     const url = `${MOJANG_RESOURCES}/${prefix}/${obj.hash}`;
@@ -505,9 +631,15 @@ export async function ensureAssets(
 
   log.info(`Ensuring ${tasks.length} assets...`);
   await downloadBatch(tasks, settings.downloadConcurrency, {
+    ...options,
     operationId: `assets-${meta.id}`,
     checkLabel: { key: 'progress.msg.checkingAssets' },
     downloadLabel: { key: 'progress.msg.assets' },
-    signal,
   });
+
+  const namedDir = namedAssetsDir(assetIndex, meta.assetIndex.id, assetsDir, options.gameDir);
+  if (!namedDir) return assetsDir;
+  throwIfCancelled(options.signal, 'Download');
+  await materialiseAssets(assetIndex, objectsDir, namedDir);
+  return namedDir;
 }

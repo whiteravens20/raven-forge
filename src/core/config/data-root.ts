@@ -1,7 +1,15 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { app } from 'electron';
+import {
+  DIR_PROFILES,
+  FILE_DATA_ROOT_POINTER,
+  FILE_PROFILES,
+  FILE_SETTINGS,
+} from '../../shared/constants';
 import type { DataRootSource } from '../../shared/ipc/settings';
 
 /**
@@ -12,25 +20,31 @@ import type { DataRootSource } from '../../shared/ipc/settings';
  * managed JREs and the loader installers are several gigabytes and used to land
  * on the system drive with no way out.
  *
- * The pointer cannot live in the directory it points at, so it stays in
- * Electron's own `userData` — the one location that is always known without
- * having read anything. It is the only launcher file there once the root has
- * moved, apart from the diagnostics `paths.ts` deliberately pins (see the note
- * on `logsDir` there).
+ * The pointer cannot live in the directory it points at, so it stays in the
+ * launcher's home — Electron's `userData`, the one location that is always
+ * known without having read anything (see `app-home.ts` for where that is).
+ * Once the data has moved, the pointer and the embedded browser's own files are
+ * all that is left there.
  *
  * One line of plain text, not JSON, and that is a deliberate choice about a
  * *second* reader: Windows' uninstaller has to follow this file to make good on
  * "delete my data", and reading a path out of JSON in NSIS means hunting for a
  * key with `StrLoc` and then undoing the backslash escaping by hand. A single
- * line is three instructions there and `readFileSync().trim()` here, and a
- * person who finds the file can read it too.
+ * line is three instructions there and one `trim()` here, and a person who
+ * finds the file can read it too.
+ *
+ * It is written as UTF-16 with a byte-order mark for the same reader. NSIS
+ * reads a file in the system's ANSI code page unless told otherwise, so a
+ * UTF-8 pointer to `D:\Gry\Świat` reached the uninstaller as a path that does
+ * not exist — it then named the wrong folder in its question and deleted
+ * nothing. `FileReadUTF16LE` has no such dependency on the machine's locale.
+ * A pointer written by an older build is UTF-8; both are read.
  *
  * `RAVENFORGE_DATA_DIR` outranks the pointer and is not written by the UI: it
  * exists so a portable install can carry its data on the same stick as the
- * binary, where nothing may be written to the host machine at all.
+ * binary. With it set the home is that directory as well, so nothing at all is
+ * written to the host machine.
  */
-
-const POINTER_FILE = 'data-root.txt';
 
 export const DATA_DIR_ENV = 'RAVENFORGE_DATA_DIR';
 
@@ -49,28 +63,77 @@ interface Resolved {
 
 let resolved: Resolved | null = null;
 
-/** Electron's own per-user directory — the root when nothing says otherwise. */
+/** The launcher's home — the root when nothing says otherwise. */
 export function defaultDataRoot(): string {
   return app.getPath('userData');
 }
 
-/** Always in `userData`, never in the root it names. */
+/** Always in the home, never in the root it names. */
 export function dataRootPointerFile(): string {
-  return path.join(app.getPath('userData'), POINTER_FILE);
+  return path.join(app.getPath('userData'), FILE_DATA_ROOT_POINTER);
+}
+
+const UTF16LE_BOM = Buffer.from([0xff, 0xfe]);
+
+/** The pointer's text, whichever of the two encodings it was written in. */
+export function decodePointer(raw: Buffer): string {
+  const text = raw.subarray(0, 2).equals(UTF16LE_BOM)
+    ? raw.subarray(2).toString('utf16le')
+    : raw.toString('utf-8');
+  return text.trim();
+}
+
+/** The pointer as the uninstaller reads it: UTF-16LE, marked, one line. */
+export function encodePointer(dir: string): Buffer {
+  return Buffer.concat([UTF16LE_BOM, Buffer.from(`${dir}\r\n`, 'utf16le')]);
 }
 
 function readPointer(): string | null {
-  let raw: string;
+  const file = dataRootPointerFile();
+  let raw: Buffer;
   try {
-    raw = fs.readFileSync(dataRootPointerFile(), 'utf-8');
+    raw = fs.readFileSync(file);
   } catch {
     return null;
   }
-  const dir = raw.trim();
-  return dir !== '' && path.isAbsolute(dir) ? path.resolve(dir) : null;
+  const dir = decodePointer(raw);
+  if (dir === '' || !path.isAbsolute(dir)) return null;
+
+  // A pointer an older build wrote is put into the form the uninstaller reads,
+  // the first time it is read: otherwise an install whose data moved before
+  // this build would go on carrying a pointer the uninstaller cannot follow.
+  if (!raw.subarray(0, 2).equals(UTF16LE_BOM)) {
+    try {
+      fs.writeFileSync(file, encodePointer(dir));
+    } catch {
+      /* read-only home: it still reads, and the next start tries again */
+    }
+  }
+  return path.resolve(dir);
 }
 
+/** What marks a directory as somewhere the launcher has lived. */
+const ROOT_MARKERS = [FILE_SETTINGS, FILE_PROFILES, DIR_PROFILES];
+
+/**
+ * Whether a configured root is really there.
+ *
+ * Being a directory is not enough. A drive that is not plugged in often leaves
+ * its mount point behind as an empty folder, and taking that for the root
+ * meant starting with no profiles and then writing a fresh, empty set of
+ * launcher files onto the wrong disk. A root the launcher has used holds at
+ * least its settings, so the absence of all of them means the data is not here.
+ */
 function usable(dir: string): boolean {
+  try {
+    if (!fs.statSync(dir).isDirectory()) return false;
+  } catch {
+    return false;
+  }
+  return ROOT_MARKERS.some((marker) => fs.existsSync(path.join(dir, marker)));
+}
+
+function isDirectory(dir: string): boolean {
   try {
     return fs.statSync(dir).isDirectory();
   } catch {
@@ -91,7 +154,8 @@ function resolve(): Resolved {
     } catch {
       /* reported below, by way of the fallback */
     }
-    resolved = usable(dir)
+    // Only that it exists: an env root starts out empty by design.
+    resolved = isDirectory(dir)
       ? { path: dir, source: 'env' }
       : { path: defaultDataRoot(), source: 'default', unavailable: dir };
     return resolved;
@@ -139,7 +203,7 @@ export async function writeDataRootPointer(dir: string | null): Promise<void> {
   if (dir === null || path.resolve(dir) === path.resolve(defaultDataRoot())) {
     await fsp.rm(file, { force: true });
   } else {
-    await fsp.writeFile(file, `${path.resolve(dir)}\n`, 'utf-8');
+    await fsp.writeFile(file, encodePointer(path.resolve(dir)));
   }
   reloadDataRoot();
 }

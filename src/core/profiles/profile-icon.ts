@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { log } from '../../main/logger';
@@ -35,6 +37,24 @@ function iconPathFor(profileId: string, ext: string): string {
 }
 
 /**
+ * Where the image a profile names is: in the profile's own directory, always.
+ *
+ * `iconPath` holds the file's name and no more. It used to hold the whole path,
+ * and a whole path is true of one place: moving the data folder left every
+ * avatar pointing into the folder that had just been emptied, and a copy of a
+ * profile showed the original's file until the original was deleted. Only the
+ * name of whatever is stored is used, so a profile written by an older build
+ * reads the same as one written now.
+ */
+function storedIconPath(profile: Profile): string | null {
+  if (!profile.iconPath) return null;
+  // `basename` on its own would leave a path written on Windows whole when it
+  // is read anywhere else, and such a file may have been carried over.
+  const name = profile.iconPath.split(/[\\/]/).pop() ?? '';
+  return name ? path.join(paths.profileDir(profile.id), name) : null;
+}
+
+/**
  * Copy `sourcePath` in as the profile's icon, replacing any previous one.
  * Returns the updated profile.
  */
@@ -67,7 +87,7 @@ export async function setProfileIcon(profileId: string, sourcePath: string): Pro
   await fs.copyFile(sourcePath, dest);
 
   log.info(`Set icon for profile ${profileId}: ${path.basename(sourcePath)}`);
-  return updateProfile(profileId, { iconPath: dest });
+  return updateProfile(profileId, { iconPath: path.basename(dest) });
 }
 
 /** Drop the custom icon and fall back to whatever the UI shows by default. */
@@ -89,13 +109,14 @@ async function clearIconFiles(profileId: string): Promise<void> {
  */
 export async function getProfileIconDataUrl(profileId: string): Promise<string | null> {
   const profile = await getProfile(profileId);
-  if (!profile?.iconPath) return null;
+  const file = profile ? storedIconPath(profile) : null;
+  if (!file) return null;
 
-  const mime = ALLOWED_TYPES[path.extname(profile.iconPath).toLowerCase()];
+  const mime = ALLOWED_TYPES[path.extname(file).toLowerCase()];
   if (!mime) return null;
 
   try {
-    const bytes = await fs.readFile(profile.iconPath);
+    const bytes = await fs.readFile(file);
     return `data:${mime};base64,${bytes.toString('base64')}`;
   } catch (err) {
     log.warn(`Profile ${profileId} icon unreadable, ignoring: ${err}`);

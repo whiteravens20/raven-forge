@@ -1,9 +1,14 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useRef, useState } from 'react';
 import { Terminal, X } from 'lucide-react';
 import { useLocale, useT } from '@renderer/i18n';
 import type { GameLogLine } from '@shared/ipc-types';
 
 const api = window.ravenforge;
+
+/** How many lines the console shows; older ones scroll off the top. */
+const MAX_LINES = 200;
 
 interface LiveConsoleProps {
   profileId: string;
@@ -32,15 +37,7 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
     void api.game.getLogTail(profileId).then((result) => {
       if (cancelled || !result.success || !result.data) return;
       const buffered = result.data;
-      setLines((prev) =>
-        prev.length > 0
-          ? prev
-          : buffered.map((message) => ({
-              timestamp: new Date().toISOString(),
-              level: 'info' as const,
-              message,
-            })),
-      );
+      setLines((prev) => (prev.length > 0 ? prev : buffered.slice(-MAX_LINES)));
     });
     return () => {
       cancelled = true;
@@ -48,16 +45,10 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
   }, [profileId]);
 
   useEffect(() => {
-    const handleLog = (_pid: string, line: GameLogLine) => {
-      if (_pid !== profileId) return;
-      setLines((prev) => {
-        const next = [...prev, line];
-        if (next.length > 200) next.shift();
-        return next;
-      });
-    };
-
-    return api.on('game:log', handleLog);
+    return api.on('game:log', (pid, arrived) => {
+      if (pid !== profileId) return;
+      setLines((prev) => [...prev, ...arrived].slice(-MAX_LINES));
+    });
   }, [profileId]);
 
   // The console survives the game exiting, so a second launch would otherwise
@@ -79,9 +70,9 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
   };
 
   useEffect(() => {
-    if (autoScroll.current && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    // Straight there: lines arrive in batches, and easing towards a bottom that
+    // moves again before the easing ends never reaches it.
+    if (autoScroll.current) bottomRef.current?.scrollIntoView();
   }, [lines]);
 
   return (
@@ -107,6 +98,7 @@ export function LiveConsole({ profileId, onClose }: LiveConsoleProps) {
 
       <div
         ref={containerRef}
+        role="log"
         className="flex-1 overflow-y-auto p-2 font-mono text-[11px] leading-relaxed"
         onScroll={handleScroll}
       >

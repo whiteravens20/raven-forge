@@ -8,14 +8,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": ["src/shared/*"]
-    }
+    "resolveJsonModule": true
   },
   "references": [{ "path": "./tsconfig.main.json" }, { "path": "./tsconfig.renderer.json" }],
   "include": [],

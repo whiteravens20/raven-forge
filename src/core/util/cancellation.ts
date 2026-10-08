@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 /**
  * Cancellation for the long-running per-profile jobs: the launch prepare phase
  * and manifest sync.
@@ -7,8 +9,10 @@
  * half-written files behind. A job registers a controller under its profile id;
  * the UI aborts it by id over IPC.
  *
- * One job per profile at a time, which is already enforced upstream: the launch
- * button locks out while preparing and `launchGame` refuses a second run.
+ * One job per profile is registered at a time, and a second one replaces the
+ * first by aborting it. That makes the registration something a job can lose
+ * while it is still running, which is why a job ends itself by the signal it
+ * was given — see `endJob`.
  */
 import { log } from '../../main/logger';
 
@@ -41,8 +45,25 @@ export function beginJob(profileId: string): AbortSignal {
   return controller.signal;
 }
 
-export function endJob(profileId: string): void {
-  controllers.delete(profileId);
+/**
+ * Stop tracking a job — the caller's own, named by the signal `beginJob` gave it.
+ *
+ * By signal and not by profile alone. A job that was replaced still reaches its
+ * `finally`, and ending "whatever is registered for this profile" there took
+ * away the job that had replaced it: a sync aborted by a launch unregistered the
+ * launch, which then went on for minutes with Cancel answering that nothing was
+ * running.
+ */
+export function endJob(profileId: string, signal: AbortSignal): void {
+  if (controllers.get(profileId)?.signal === signal) controllers.delete(profileId);
+}
+
+/**
+ * Whether any long download is under way, for anything that must not start
+ * while one is — moving the data directory out from under it, above all.
+ */
+export function hasActiveJobs(): boolean {
+  return controllers.size > 0;
 }
 
 /** Returns false when there was nothing running for that profile. */

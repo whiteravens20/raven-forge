@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import path from 'node:path';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
@@ -5,24 +7,35 @@ import { acceptedLoaders } from '../../shared/constants';
 import { getProfile } from '../profiles/profile-manager';
 import { hashFile } from './integrity';
 import { readLockFile, mutateLockFile, modFilePath } from './lock-file';
-import { getProjectTitle, getVersion, latestVersionsByHash, primaryFile } from './modrinth-api';
+import {
+  getProjectTitle,
+  getVersion,
+  latestVersionsByHash,
+  primaryFile,
+  versionsByHash,
+} from './modrinth-api';
 import { downloadFor, installResolvedMod, installRequiredDependencies } from './mod-sync';
 import type { InstalledMod, ModUpdateResult, ModUpdateSummary } from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 /**
  * Keeping hand-installed mods current.
  *
  * A profile that follows a manifest has this already — the sync is the update
- * mechanism. A mod picked out of the Modrinth browser, or a jar dropped into
- * `mods/` by hand, had nothing: it stayed at the build it arrived as until
- * somebody noticed and reinstalled it.
+ * mechanism. A mod picked out of the Modrinth browser, a jar added from a file
+ * or one an imported pack carried inside itself had nothing: it stayed at the
+ * build it arrived as until somebody noticed and reinstalled it.
  *
  * Mods are identified by hashing the jar rather than by what `installed.lock`
  * says they are. That costs a read of every file, and buys two things worth
- * more than the read: a hand-dropped jar with no project id is recognised all
- * the same, and "is there something newer" is answered by comparing bytes
- * instead of version strings, which are a publisher's free text and agree on
- * nothing across projects.
+ * more than the read: a bundled jar with no project id is recognised all the
+ * same, and "is there something newer" is answered by comparing bytes instead
+ * of version strings, which are a publisher's free text and agree on nothing
+ * across projects.
+ *
+ * Only what the lock file lists is looked at. A jar dropped into `mods/` by
+ * hand is in no list the launcher keeps until it is added from the Mods page,
+ * and until then stays the player's own business.
  */
 
 /**
@@ -110,7 +123,17 @@ export async function checkModUpdates(profileId: string): Promise<ModUpdateSumma
     `Update check for profile ${profileId}: ${updates} of ${byHash.size} mods have a newer build`,
   );
 
-  return { checked: byHash.size, updates, unknown: byHash.size - latest.size };
+  // A file is missing from that answer for one of two reasons, and the answer
+  // does not say which: Modrinth has never seen it, or it knows it and the
+  // project has no build for this Minecraft version and loader. Both used to
+  // be reported as "not on Modrinth" — which a mod installed from Modrinth, in
+  // a profile whose version was then changed, is not. Asked what the missing
+  // files are, with no version or loader named, it answers for the second kind
+  // alone.
+  const missing = [...byHash.keys()].filter((hash) => !latest.has(hash));
+  const noBuild = missing.length > 0 ? (await versionsByHash(missing)).size : 0;
+
+  return { checked: byHash.size, updates, unknown: missing.length - noBuild, noBuild };
 }
 
 /**
@@ -163,7 +186,7 @@ export async function updateMods(profileId: string, modIds: string[]): Promise<M
       log.info(`Updated ${name} to ${update.versionNumber} in profile ${profileId}`);
     } catch (err) {
       failed.push({ name: mod.name, error: err instanceof Error ? err.message : String(err) });
-      log.warn(`Failed to update ${mod.name} in profile ${profileId}: ${err}`);
+      log.warn(`Failed to update ${mod.name} in profile ${profileId}: ${errorText(err)}`);
     }
   }
 

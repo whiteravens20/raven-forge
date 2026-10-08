@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { z } from 'zod';
 
 // ── Mod Manifest JSON Schema (Zod) ───────────────────────
@@ -98,7 +100,6 @@ export const modEntrySchema = z.object({
   localPath: z.string().optional(),
   fileName: fileNameField,
   ...integrityFields,
-  required: z.boolean().default(true),
   side: z.enum(['client', 'server', 'both']).default('client'),
 });
 
@@ -139,8 +140,8 @@ export const modManifestSchema = z.object({
   }),
   modLoader: z.enum(['vanilla', 'forge', 'neoforge', 'fabric', 'quilt']),
   // And so does this one, which the line above it had and this one had not:
-  // `loaderInstallDir`, the Fabric and Quilt cache directories and
-  // `getLoaderProfilePath` all build a path out of it, and the last of those is
+  // `loaderCacheDir`, the Fabric and Quilt cache directories and
+  // `loaderProfilePath` all build a path out of it, and the last of those is
   // then read back and parsed as version metadata — which is what supplies
   // `mainClass` and the JVM arguments.
   modLoaderVersion: z

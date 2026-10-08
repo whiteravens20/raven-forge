@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -6,8 +8,10 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { AddressInfo } from 'node:net';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type { ProgressEvent } from '../src/shared/ipc-types';
+import { standInJava } from './helpers/stand-in-java';
+import { ZipWriter } from './helpers/zip';
 
 /**
  * The managed Java runtime: found, judged, installed.
@@ -24,9 +28,11 @@ import type { ProgressEvent } from '../src/shared/ipc-types';
  * step nothing else was checking — that the archive is verified *before* it is
  * unpacked and run, and that a mismatch leaves nothing behind.
  *
- * POSIX only: the fixtures are shell scripts, and the Windows branch downloads
- * a `.zip` it unpacks with bsdtar. Both are the platform's business rather than
- * this module's, and neither can be staged from here.
+ * Most of it is POSIX only: the fixtures are shell scripts. The install path is
+ * run on Windows as well, because it is a different one there — a `.zip`, which
+ * Windows' own `tar` unpacks — and nothing but a Windows can show that it
+ * works. The stand-in for Java there is a small program: see
+ * `helpers/stand-in-java.ts`.
  */
 
 const posix = process.platform !== 'win32';
@@ -52,7 +58,7 @@ type Manager = typeof import('../src/core/java/java-manager');
 
 let root: string;
 /** What the stubbed Adoptium endpoint answers with, set per test. */
-let adoptium: () => Response;
+let adoptium: (url: string) => Response;
 /** Requests the archive server actually received. */
 let archiveHits: string[];
 let server: http.Server;
@@ -69,13 +75,13 @@ async function loadModule(): Promise<Manager> {
 /**
  * The sayable form of a refusal, read the way the IPC layer reads it.
  *
- * Imported after `loadModule()` on purpose: `launchRefusal` is an `instanceof`
+ * Imported after `loadModule()` on purpose: `refusalOf` is an `instanceof`
  * check, and a module registry reset between the throw and the check would give
- * two different `LaunchRefusedError` classes and a silent `undefined`.
+ * two different `RefusedError` classes and a silent `undefined`.
  */
 async function refusalOf(err: unknown) {
-  const { launchRefusal } = await import('../src/core/minecraft/launch-errors');
-  return launchRefusal(err);
+  const refusal = await import('../src/core/util/refusal');
+  return refusal.refusalOf(err);
 }
 
 /**
@@ -109,6 +115,17 @@ async function buildJreArchive(version: string): Promise<Buffer> {
   return bytes;
 }
 
+/**
+ * The same for Windows: a `.zip`, as Adoptium serves one there, with a program
+ * for `bin\java.exe`.
+ */
+async function buildJreZip(): Promise<Buffer> {
+  const zip = new ZipWriter();
+  zip.add('jdk-21.0.3+9-jre/bin/java.exe', await fs.readFile(await standInJava()));
+  zip.add('jdk-21.0.3+9-jre/release', 'JAVA_VERSION="21.0.3"\n');
+  return zip.toBuffer();
+}
+
 function sha256(data: Buffer): string {
   return crypto.createHash('sha256').update(data).digest('hex');
 }
@@ -128,26 +145,25 @@ beforeEach(async () => {
   events.length = 0;
   archiveHits = [];
 
-  if (!posix) return;
-
-  archiveBytes = await buildJreArchive('21.0.3');
+  archiveBytes = posix ? await buildJreArchive('21.0.3') : await buildJreZip();
   server = http.createServer((req, res) => {
     archiveHits.push(req.url ?? '');
     res.writeHead(200, {
-      'content-type': 'application/gzip',
+      'content-type': posix ? 'application/gzip' : 'application/zip',
       'content-length': String(archiveBytes.length),
     });
     res.end(archiveBytes);
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  archiveUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/OpenJDK21U-jre.tar.gz`;
+  archiveUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/OpenJDK21U-jre.${posix ? 'tar.gz' : 'zip'}`;
   adoptium = () => assetsFor(archiveUrl, sha256(archiveBytes));
 
   const realFetch = globalThis.fetch;
   vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
     // Only Adoptium's index is invented. The archive comes down the real
     // downloader, over a real socket, into a real file.
-    if (String(input).startsWith('https://api.adoptium.net')) return Promise.resolve(adoptium());
+    const url = String(input);
+    if (new URL(url).origin === 'https://api.adoptium.net') return Promise.resolve(adoptium(url));
     return realFetch(input, init);
   });
 });
@@ -203,7 +219,6 @@ describe.skipIf(!posix)('resolveChosenJava', () => {
       version: 21,
       path: bin,
       vendor: 'chosen in the profile',
-      managed: false,
     });
   });
 
@@ -266,7 +281,6 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
       version: 21,
       path: managedJava(),
       vendor: 'Adoptium Temurin',
-      managed: true,
     });
     expect(archiveHits).toEqual([]);
   });
@@ -282,7 +296,7 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
 
     const result = await ensureJavaVersion(21);
     expect(archiveHits).toHaveLength(1);
-    expect(result.managed).toBe(true);
+    expect(result.path).toBe(managedJava());
     expect(await execFileAsync(result.path, ['-version']).then(({ stderr }) => stderr)).toContain(
       '21.0.3',
     );
@@ -342,7 +356,55 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
     const { ensureJavaVersion } = await loadModule();
     adoptium = () => new Response('[]', { status: 200 });
 
-    await expect(ensureJavaVersion(21)).rejects.toThrow(/listed no JRE 21 binary/);
+    await expect(ensureJavaVersion(21)).rejects.toThrow(/listed no Java 21 runtime/);
+  });
+
+  it('takes the JDK when Adoptium has no JRE of that version', async () => {
+    // Java 16, which is what Minecraft 1.17 and 1.17.1 ask for: Temurin
+    // published it as a JDK and nothing else, so asking only for a JRE left
+    // both versions unable to start.
+    const { ensureJavaVersion } = await loadModule();
+    const asked: string[] = [];
+    adoptium = (url) => {
+      const imageType = new URL(url).searchParams.get('image_type') ?? '';
+      asked.push(imageType);
+      return imageType === 'jdk'
+        ? assetsFor(archiveUrl, sha256(archiveBytes))
+        : new Response('[]', { status: 200 });
+    };
+
+    const result = await ensureJavaVersion(21);
+
+    expect(asked).toEqual(['jre', 'jdk']);
+    expect((await fs.stat(result.path)).isFile()).toBe(true);
+  });
+
+  it('installs a runtime once when two launches ask for it together', async () => {
+    // Two profiles on one Java, Play pressed on both. The second used to find
+    // the runtime missing while the first was unpacking it, fetch the archive
+    // again and replace the directory under the first.
+    const { ensureJavaVersion } = await loadModule();
+
+    const [one, two] = await Promise.all([ensureJavaVersion(21), ensureJavaVersion(21)]);
+
+    expect(archiveHits).toHaveLength(1);
+    expect(one.path).toBe(two.path);
+  });
+
+  it('leaves the runtime that was there when the new one cannot be unpacked', async () => {
+    // Unpacked beside it and swapped in: deleting first left `bin/java` with
+    // half a runtime behind it whenever the unpacking was cut short.
+    const { ensureJavaVersion } = await loadModule();
+    await fs.mkdir(path.dirname(managedJava()), { recursive: true });
+    await fs.writeFile(managedJava(), 'not a program', { mode: 0o755 });
+    const notAnArchive = Buffer.from('this is not a tar archive');
+    archiveBytes = notAnArchive;
+    adoptium = () => assetsFor(archiveUrl, sha256(notAnArchive));
+
+    await expect(ensureJavaVersion(21)).rejects.toThrow();
+
+    expect(await fs.readFile(managedJava(), 'utf-8')).toBe('not a program');
+    await expect(fs.access(path.join(root, 'java', 'jre-21.new'))).rejects.toThrow();
   });
 
   it('fails when Adoptium cannot be reached', async () => {
@@ -366,6 +428,90 @@ describe.skipIf(!posix)('ensureJavaVersion', () => {
   it('stops on a signal that is already aborted', async () => {
     const { ensureJavaVersion } = await loadModule();
     await expect(ensureJavaVersion(21, AbortSignal.abort())).rejects.toThrow(/cancel/i);
+    expect(archiveHits).toEqual([]);
+  });
+});
+
+describe('windowsJavaCandidates', () => {
+  it('looks one level into the folders the vendors install under', async () => {
+    const { windowsJavaCandidates } = await loadModule();
+    const programFiles = path.join(root, 'Program Files');
+    for (const dir of [
+      'Java/jdk-21',
+      'Eclipse Adoptium/jdk-17.0.9.9-hotspot',
+      'Zulu/zulu-8',
+      'jdk-25',
+      'Notepad++/plugins',
+    ]) {
+      await fs.mkdir(path.join(programFiles, ...dir.split('/')), { recursive: true });
+    }
+
+    const found = await windowsJavaCandidates(programFiles);
+    const under = (...parts: string[]) => path.join(programFiles, ...parts, 'bin', 'java.exe');
+
+    expect(found).toEqual(
+      expect.arrayContaining([
+        under('Java', 'jdk-21'),
+        under('Eclipse Adoptium', 'jdk-17.0.9.9-hotspot'),
+        under('Zulu', 'zulu-8'),
+        under('jdk-25'),
+      ]),
+    );
+    expect(found.some((candidate) => candidate.includes('Notepad'))).toBe(false);
+  });
+
+  it('answers with nothing for a folder that is not there', async () => {
+    const { windowsJavaCandidates } = await loadModule();
+    expect(await windowsJavaCandidates(path.join(root, 'absent'))).toEqual([]);
+  });
+});
+
+/**
+ * The install on Windows, where it is another archive and another program that
+ * unpacks it: `tar.exe` from System32, started by that path. Under wine there
+ * is no such program, so this is the only place the Windows half of the
+ * install has ever been run.
+ */
+describe.skipIf(posix)('ensureJavaVersion, on Windows', () => {
+  const managed = (...parts: string[]) => path.join(root, 'java', 'jre-21', ...parts);
+
+  afterAll(async () => {
+    await fs.rm(path.dirname(await standInJava()), { recursive: true, force: true });
+  });
+
+  it('downloads the zip, checks it, unpacks it with Windows’ own tar and proves the runtime starts', async () => {
+    const { ensureJavaVersion } = await loadModule();
+
+    const result = await ensureJavaVersion(21);
+
+    expect(archiveHits).toHaveLength(1);
+    expect(result).toEqual({
+      version: 21,
+      path: managed('bin', 'java.exe'),
+      vendor: 'Adoptium Temurin',
+    });
+    // Without its top folder, which is what `--strip-components=1` is for.
+    expect((await fs.stat(managed('bin', 'java.exe'))).isFile()).toBe(true);
+    expect(await fs.readFile(managed('release'), 'utf-8')).toContain('21.0.3');
+    // And it is a program that starts, which is the one thing that counts.
+    const { stderr } = await execFileAsync(result.path, ['-version']);
+    expect(stderr).toContain('21.0.3');
+  });
+
+  it('unpacks nothing from a zip that is not the one Adoptium described', async () => {
+    const { ensureJavaVersion } = await loadModule();
+    adoptium = () => assetsFor(archiveUrl, sha256(Buffer.from('some other archive')));
+
+    await expect(ensureJavaVersion(21)).rejects.toThrow(/sha256 mismatch/);
+    await expect(fs.stat(managed())).rejects.toThrow();
+  });
+
+  it('uses a runtime that is already there without asking anybody', async () => {
+    const { ensureJavaVersion } = await loadModule();
+    await fs.mkdir(managed('bin'), { recursive: true });
+    await fs.copyFile(await standInJava(), managed('bin', 'java.exe'));
+
+    expect((await ensureJavaVersion(21)).path).toBe(managed('bin', 'java.exe'));
     expect(archiveHits).toEqual([]);
   });
 });
@@ -407,7 +553,6 @@ describe.skipIf(!posix)('detectSystemJava', () => {
         version: 21,
         path: path.join(home, 'bin', 'java'),
         vendor: 'system',
-        managed: false,
       });
     },
     WHATEVER_IS_INSTALLED,

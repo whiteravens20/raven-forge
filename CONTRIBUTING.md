@@ -27,7 +27,7 @@ before opening a pull request.
 - For anything larger than a bug fix, open an issue first and agree on the approach. The roadmap is not published, so a feature that cuts across it is better discussed than discovered in review.
 - By contributing you agree to the [License](LICENSE) and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-> **Note on the licence.** Raven Forge ships under **PolyForm Noncommercial 1.0.0** — free for any noncommercial use, not an OSI open-source licence. Contributions are accepted under the same terms.
+> **Note on the licence.** Raven Forge ships under the **GNU Affero General Public License, version 3** (AGPL-3.0-only), with the attribution term in [NOTICE](NOTICE). Contributions are accepted under the same terms.
 
 ---
 
@@ -105,7 +105,7 @@ src/
   preload/       # the ONLY bridge between main and renderer
   renderer/      # React UI — pages/, components/, stores/ (zustand), i18n/, styles/
   shared/        # types and Zod schemas used on both sides of the bridge
-test/            # Vitest suites + Electron/keytar stubs (linted and typechecked like src/)
+test/            # Vitest suites + an Electron stub (linted and typechecked like src/)
 ```
 
 Two boundaries worth respecting:
@@ -162,7 +162,7 @@ topic, no body. Do not mix a refactor into a feature commit.
 
 ### Translations
 
-UI strings live in `src/renderer/i18n/`. Polish (`pl.ts`) is the reference locale and English (`en.ts`) is the fallback; both carry the same keys, and the type system enforces that.
+UI strings live in `src/renderer/i18n/`. Polish (`pl.ts`) is the language the interface opens in; English (`en.ts`) is the one that defines the keys — `pl.ts` is typed against it — and what a missing entry falls back to. Both carry the same keys, and the type system enforces that.
 
 - **Never hardcode a user-facing string in a component.** Add the key to both dictionaries and use the `t()` helper.
 - To add a language, copy `en.ts`, translate the values, and register it in `src/renderer/i18n/index.ts`. TypeScript will name any key you missed.
@@ -183,9 +183,10 @@ npm run build        # must produce a clean dist/
 ```
 
 Tests live in `test/` and run under Vitest in a plain Node environment. Electron
-and `keytar` are aliased to stubs (`test/stubs/electron.ts`), so anything needing
-a window or a keyring daemon is faked at that seam — and everything below the
-seam is the real code. The suite is held to the same standard as what it checks:
+is aliased to a stub (`test/stubs/electron.ts`), so anything needing a window is
+faked at that seam — and everything below the seam is the real code. Nothing
+under test reaches the keyring: the module that does is loaded only when a
+credential is read or written. The suite is held to the same standard as what it checks:
 `eslint` and `tsc` (`tsconfig.test.json`) both cover `test/`, and a `.only` left
 in a file fails the lint rather than quietly switching off everything around it.
 Five kinds of suite:
@@ -240,7 +241,7 @@ State in the PR description what you actually ran. "Typechecks" is not a test re
 ### Credentials and tokens
 
 - **Never commit secrets** — no tokens, no client ids, no private keys, not even in a test fixture.
-- Tokens belong in the OS keychain (`src/core/auth/secret-store.ts`), never in a plaintext config file, and never in a log line. `--accessToken` must not reach `launcher.log`.
+- Tokens belong in the OS keychain (`src/core/auth/secret-store.ts`), never in a plaintext config file, and never in a log line. `--accessToken` must not reach `logs/main.log`.
 - If you commit a secret by accident, treat it as compromised, rotate it, and report it privately.
 
 ### Integrity
@@ -257,7 +258,7 @@ State in the PR description what you actually ran. "Typechecks" is not a test re
 
 ### AI-assisted code
 
-This project has been built with AI assistance, and the same rule applies to contributions:
+Most of this project is written with AI coding tools, as the [README](README.md#how-the-code-is-written-and-checked) describes, and the same rule applies to contributions:
 
 - AI-generated code **must be reviewed line by line** before you submit it.
 - Do not submit code you cannot explain and defend in review.

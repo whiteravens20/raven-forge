@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // ============================================================================
 // Raven Forge Launcher — IPC Channel Type Definitions
 // All communication between main ↔ renderer goes through these typed channels.
@@ -28,33 +30,47 @@ import type {
   LoaderVersion,
   ModLoaderType,
   MrpackExport,
+  MrpackExportOptions,
   OrphanedProfile,
+  PackInstall,
   WorldBackup,
   WorldBackupReason,
   Profile,
   ProfileFileSummary,
+  ProfileImport,
   ProfileSyncStatus,
+  UnreadableProfileEntries,
 } from './ipc/profiles';
 import type {
   CataloguePack,
+  ContentKind,
   ContentProjectType,
   FacetGroups,
   InstallPlan,
   InstalledMod,
+  ModAddition,
   ModInstallResult,
   ModSearchFilters,
+  ModSearchPage,
   ModSearchResult,
   ModUpdateResult,
   ModUpdateSummary,
+  ProjectDetails,
   ShaderLoaderResult,
   ShaderLoaderState,
 } from './ipc/mods';
 import type { JavaInstallation, JavaProbe } from './ipc/java';
-import type { GlobalSettings, TrustedKey, DataRootInfo, DataRootPlan } from './ipc/settings';
+import type {
+  GlobalSettings,
+  TrustedKey,
+  DataRootInfo,
+  DataRootMoveResult,
+  DataRootPlan,
+} from './ipc/settings';
 import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
 import type { ManifestVerification, UpdateCheck, UpdateInfo } from './ipc/updater';
-import type { LogTail, SystemInfo } from './ipc/system';
+import type { LogTail, StorageReport, SystemInfo } from './ipc/system';
 
 // Naming convention: "domain:action"
 // Invoke channels: renderer calls, main responds (ipcMain.handle)
@@ -72,7 +88,6 @@ export interface InvokeChannels {
   'auth:logout': (accountId: string) => Promise<IpcResult<void>>;
   'auth:get-state': () => Promise<IpcResult<AuthState>>;
   'auth:set-active': (accountId: string) => Promise<IpcResult<void>>;
-  'auth:refresh': (accountId: string) => Promise<IpcResult<MinecraftAccount>>;
 
   // -- Profiles --
   'profiles:get-all': () => Promise<IpcResult<Profile[]>>;
@@ -90,6 +105,8 @@ export interface InvokeChannels {
   'profiles:adopt-orphaned': (profileId: string) => Promise<IpcResult<Profile>>;
   /** Delete kept files for good. */
   'profiles:discard-orphaned': (profileId: string) => Promise<IpcResult<void>>;
+  /** Entries of the stored list that are not profiles, and so are not on it. */
+  'profiles:unreadable-entries': () => Promise<IpcResult<UnreadableProfileEntries>>;
   'profiles:duplicate': (profileId: string, name?: string) => Promise<IpcResult<Profile>>;
   'profiles:open-folder': (profileId: string) => Promise<IpcResult<void>>;
   'profiles:export': (profileId: string) => Promise<IpcResult<string>>; // returns JSON string
@@ -97,8 +114,15 @@ export interface InvokeChannels {
    * Write the profile out as a Modrinth modpack — the mods, not just the
    * settings. Asks where to put it; `null` means the player closed the dialog.
    */
-  'profiles:export-pack': (profileId: string) => Promise<IpcResult<MrpackExport | null>>;
-  'profiles:import': (json: string) => Promise<IpcResult<Profile>>;
+  'profiles:export-pack': (
+    profileId: string,
+    options: MrpackExportOptions,
+  ) => Promise<IpcResult<MrpackExport | null>>;
+  /**
+   * Make a profile from an exported profile file. Asks which file; `null` means
+   * the player closed the dialog.
+   */
+  'profiles:import': () => Promise<IpcResult<ProfileImport | null>>;
   'profiles:get-sync-status': (profileId: string) => Promise<IpcResult<ProfileSyncStatus>>;
   /** Copy an image in as the profile's icon; `null` source clears it. */
   'profiles:set-icon': (
@@ -135,12 +159,23 @@ export interface InvokeChannels {
   // -- Packs --
   /** The White Ravens catalogue, from the address compiled into the launcher. */
   'packs:list-catalogue': () => Promise<IpcResult<CataloguePack[]>>;
+  // The four below fail outright only while there is still no profile. Once
+  // one has been created the answer is a success that carries it, with
+  // `failure` set if its files did not all arrive — see `PackInstall`.
   /** Create a profile that follows a manifest URL and keeps updating from it. */
-  'packs:create-from-manifest': (url: string) => Promise<IpcResult<Profile>>;
+  'packs:create-from-manifest': (url: string) => Promise<IpcResult<PackInstall>>;
   /** Create a profile from a link to either a `.mrpack` or a manifest, sniffed apart. */
-  'packs:create-from-url': (url: string) => Promise<IpcResult<Profile>>;
+  'packs:create-from-url': (url: string) => Promise<IpcResult<PackInstall>>;
   /** Import a Modrinth `.mrpack` as a new profile — a snapshot, not a subscription. */
-  'packs:import-mrpack': (filePath: string) => Promise<IpcResult<Profile>>;
+  'packs:import-mrpack': (filePath: string) => Promise<IpcResult<PackInstall>>;
+  /**
+   * Install a modpack found by searching Modrinth: the newest version that fits
+   * the Minecraft version and loader given, or simply the newest.
+   */
+  'packs:install-modrinth': (
+    pack: ModSearchResult,
+    wanted: { gameVersion?: string; loader?: string },
+  ) => Promise<IpcResult<PackInstall>>;
 
   // -- Mods --
   'mods:get-installed': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
@@ -151,6 +186,11 @@ export interface InvokeChannels {
     mod: ModSearchResult,
     version?: string,
   ) => Promise<IpcResult<ModInstallResult>>;
+  /**
+   * Add a mod from a jar on this computer. Which file is asked in the main
+   * process; `null` is the player closing that dialog.
+   */
+  'mods:add-from-file': (profileId: string) => Promise<IpcResult<ModAddition | null>>;
   /** What installing this mod would do to the profile, before anything is downloaded. */
   'mods:check-install': (
     profileId: string,
@@ -169,17 +209,25 @@ export interface InvokeChannels {
   'mods:check-updates': (profileId: string) => Promise<IpcResult<ModUpdateSummary>>;
   /** Install the builds the last check found, for the mods named. */
   'mods:update': (profileId: string, modIds: string[]) => Promise<IpcResult<ModUpdateResult>>;
-  'mods:search': (filters: ModSearchFilters) => Promise<IpcResult<ModSearchResult[]>>;
+  'mods:search': (filters: ModSearchFilters) => Promise<IpcResult<ModSearchPage>>;
+  /**
+   * Descriptions, icons and page addresses for installed content, keyed by the
+   * id or slug asked about. Names Modrinth does not know are simply absent.
+   */
+  'mods:get-details': (ids: string[]) => Promise<IpcResult<Record<string, ProjectDetails>>>;
   /** Modrinth's live facet list for a project type, grouped as Modrinth groups it. */
   'mods:get-facets': (projectType: ContentProjectType) => Promise<IpcResult<FacetGroups>>;
 
   // -- Shaders & Resource Packs --
   'content:get-shaders': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
   'content:get-resourcepacks': (profileId: string) => Promise<IpcResult<InstalledMod[]>>;
-  /** `version` pins a build; omitted, the newest one for the profile's MC version wins. */
+  /**
+   * Install a Modrinth project. `version` pins a build; omitted, the newest one
+   * for the profile's Minecraft version wins.
+   */
   'content:install-shader': (
     profileId: string,
-    source: string,
+    projectId: string,
     version?: string,
   ) => Promise<IpcResult<void>>;
   'content:get-shader-loader-state': (profileId: string) => Promise<IpcResult<ShaderLoaderState>>;
@@ -189,7 +237,7 @@ export interface InvokeChannels {
   ) => Promise<IpcResult<ShaderLoaderResult>>;
   'content:install-resourcepack': (
     profileId: string,
-    source: string,
+    projectId: string,
     version?: string,
   ) => Promise<IpcResult<void>>;
   /**
@@ -208,6 +256,16 @@ export interface InvokeChannels {
     profileId: string,
     orderedIds: string[],
   ) => Promise<IpcResult<void>>;
+  /**
+   * Add a shader or a resource pack from a file on this computer.
+   *
+   * Which file is asked in the main process, so the page never names a path.
+   * `null` is the player closing that dialog, which is not a failure.
+   */
+  'content:add-from-file': (
+    profileId: string,
+    kind: ContentKind,
+  ) => Promise<IpcResult<InstalledMod | null>>;
 
   // -- Java --
   'java:detect-system': () => Promise<IpcResult<JavaInstallation[]>>;
@@ -218,12 +276,28 @@ export interface InvokeChannels {
     loader: ModLoaderType,
     mcVersion: string,
   ) => Promise<IpcResult<LoaderVersion[]>>;
+  /**
+   * Whether a build is one the list above would offer for that Minecraft
+   * version. Answered from what is on the machine: it is asked about a profile
+   * whose launch has just failed, and must not need the network to say why.
+   */
+  'loaders:build-starts': (
+    loader: ModLoaderType,
+    loaderVersion: string,
+    mcVersion: string,
+  ) => Promise<IpcResult<boolean>>;
 
   // -- Game Launch --
   'game:launch': (options: LaunchOptions) => Promise<IpcResult<void>>;
   'game:kill': (profileId: string) => Promise<IpcResult<void>>;
+  /**
+   * The profiles with a game up right now. The renderer keeps count of these
+   * itself, from the two events — this is for the moment it has just been
+   * reloaded and has forgotten.
+   */
+  'game:get-running': () => Promise<IpcResult<string[]>>;
   /** Recent stdout already buffered in main, so a console opened mid-game is not blank. */
-  'game:get-log-tail': (profileId: string, lines?: number) => Promise<IpcResult<string[]>>;
+  'game:get-log-tail': (profileId: string) => Promise<IpcResult<GameLogLine[]>>;
   /** Minecraft version ids from Mojang, newest first. Releases only unless asked. */
   'game:get-versions': (includeSnapshots?: boolean) => Promise<IpcResult<string[]>>;
   /**
@@ -236,14 +310,27 @@ export interface InvokeChannels {
   'settings:get': () => Promise<IpcResult<GlobalSettings>>;
   'settings:update': (updates: Partial<GlobalSettings>) => Promise<IpcResult<GlobalSettings>>;
   'settings:reset': () => Promise<IpcResult<GlobalSettings>>;
-  'settings:add-trusted-key': (key: TrustedKey) => Promise<IpcResult<void>>;
-  'settings:remove-trusted-key': (publicKey: string) => Promise<IpcResult<void>>;
+  /**
+   * Both answer with the settings as they now stand, so the renderer has
+   * nothing left to save: it used to write the same list back a second time.
+   */
+  'settings:add-trusted-key': (key: TrustedKey) => Promise<IpcResult<GlobalSettings>>;
+  'settings:remove-trusted-key': (publicKey: string) => Promise<IpcResult<GlobalSettings>>;
   'settings:get-data-root': () => Promise<IpcResult<DataRootInfo>>;
   /** Opens a directory picker; `null` when it was dismissed. */
   'settings:choose-data-root': () => Promise<IpcResult<DataRootPlan | null>>;
   'settings:plan-data-root': (target: string) => Promise<IpcResult<DataRootPlan>>;
-  /** Moves the data and restarts the launcher into the new location. */
-  'settings:apply-data-root': (target: string) => Promise<IpcResult<void>>;
+  /**
+   * Moves the data and points the launcher at it. The launcher has to restart
+   * to use it — `system:relaunch` — and the result says whether anything was
+   * left behind that the player should know about first.
+   */
+  'settings:apply-data-root': (target: string) => Promise<IpcResult<DataRootMoveResult>>;
+  /**
+   * Stop pointing at a data folder that cannot be reached, and use the home.
+   * Nothing is moved or deleted; what is in the unreachable folder stays there.
+   */
+  'settings:forget-data-root': () => Promise<IpcResult<void>>;
 
   // -- News & Announcements --
   'news:get': () => Promise<IpcResult<FeedResult<NewsItem>>>;
@@ -261,6 +348,10 @@ export interface InvokeChannels {
 
   // -- System --
   'system:get-info': () => Promise<IpcResult<SystemInfo>>;
+  /** Every place the launcher writes to on this computer, with sizes. */
+  'system:get-storage': () => Promise<IpcResult<StorageReport>>;
+  /** Quit and start again — after the data folder has changed. */
+  'system:relaunch': () => Promise<void>;
   'system:open-path': (path: string) => Promise<IpcResult<void>>;
   'system:open-url': (url: string) => Promise<IpcResult<void>>;
   'system:select-file': (
@@ -290,9 +381,16 @@ export interface EventChannels {
   'progress:game-assets': (event: ProgressEvent) => void;
   'progress:launcher-update': (event: ProgressEvent) => void;
   'progress:data-root': (event: ProgressEvent) => void;
+  /**
+   * An operation is over without having finished — it failed or was cancelled —
+   * and whatever bar it had goes. One that finishes says so itself, with
+   * `progress: 1`.
+   */
+  'progress:abandoned': (operationId: string) => void;
 
   // -- Game Events --
-  'game:log': (profileId: string, line: GameLogLine) => void;
+  /** What the game has printed since the last one — sent only while the console is switched on. */
+  'game:log': (profileId: string, lines: GameLogLine[]) => void;
   'game:started': (profileId: string) => void;
   'game:exited': (info: GameExitInfo) => void;
 
@@ -305,8 +403,6 @@ export interface EventChannels {
   // -- Updater Events --
   'updater:update-available': (info: UpdateInfo) => void;
   'updater:update-downloaded': (info: UpdateInfo) => void;
-  // -- Announcement Events --
-
   // -- Window Events --
   'window:maximized-changed': (isMaximized: boolean) => void;
 }
@@ -321,7 +417,7 @@ export interface EventChannels {
  *
  * Example usage in React:
  *   const profiles = await window.ravenforge.profiles.getAll();
- *   window.ravenforge.on('game:log', (profileId, line) => { ... });
+ *   window.ravenforge.on('game:log', (profileId, lines) => { ... });
  */
 export interface RavenForgeAPI {
   auth: {
@@ -330,7 +426,6 @@ export interface RavenForgeAPI {
     logout: InvokeChannels['auth:logout'];
     getState: InvokeChannels['auth:get-state'];
     setActive: InvokeChannels['auth:set-active'];
-    refresh: InvokeChannels['auth:refresh'];
   };
   profiles: {
     getAll: InvokeChannels['profiles:get-all'];
@@ -341,6 +436,7 @@ export interface RavenForgeAPI {
     listOrphaned: InvokeChannels['profiles:list-orphaned'];
     adoptOrphaned: InvokeChannels['profiles:adopt-orphaned'];
     discardOrphaned: InvokeChannels['profiles:discard-orphaned'];
+    unreadableEntries: InvokeChannels['profiles:unreadable-entries'];
     duplicate: InvokeChannels['profiles:duplicate'];
     openFolder: InvokeChannels['profiles:open-folder'];
     export: InvokeChannels['profiles:export'];
@@ -360,17 +456,20 @@ export interface RavenForgeAPI {
     createFromManifest: InvokeChannels['packs:create-from-manifest'];
     createFromUrl: InvokeChannels['packs:create-from-url'];
     importMrpack: InvokeChannels['packs:import-mrpack'];
+    installModrinth: InvokeChannels['packs:install-modrinth'];
   };
   mods: {
     getInstalled: InvokeChannels['mods:get-installed'];
     syncManifest: InvokeChannels['mods:sync-manifest'];
     installFromSearch: InvokeChannels['mods:install-from-search'];
+    addFromFile: InvokeChannels['mods:add-from-file'];
     checkInstall: InvokeChannels['mods:check-install'];
     uninstall: InvokeChannels['mods:uninstall'];
     toggleEnabled: InvokeChannels['mods:toggle-enabled'];
     checkUpdates: InvokeChannels['mods:check-updates'];
     update: InvokeChannels['mods:update'];
     search: InvokeChannels['mods:search'];
+    getDetails: InvokeChannels['mods:get-details'];
     getFacets: InvokeChannels['mods:get-facets'];
   };
   content: {
@@ -384,6 +483,7 @@ export interface RavenForgeAPI {
     removeShader: InvokeChannels['content:remove-shader'];
     removeResourcePack: InvokeChannels['content:remove-resourcepack'];
     reorderResourcePacks: InvokeChannels['content:reorder-resourcepacks'];
+    addFromFile: InvokeChannels['content:add-from-file'];
   };
   java: {
     detectSystem: InvokeChannels['java:detect-system'];
@@ -391,10 +491,12 @@ export interface RavenForgeAPI {
   };
   loaders: {
     getVersions: InvokeChannels['loaders:get-versions'];
+    buildStarts: InvokeChannels['loaders:build-starts'];
   };
   game: {
     launch: InvokeChannels['game:launch'];
     kill: InvokeChannels['game:kill'];
+    getRunning: InvokeChannels['game:get-running'];
     getLogTail: InvokeChannels['game:get-log-tail'];
     getVersions: InvokeChannels['game:get-versions'];
     cancel: InvokeChannels['game:cancel'];
@@ -409,6 +511,7 @@ export interface RavenForgeAPI {
     chooseDataRoot: InvokeChannels['settings:choose-data-root'];
     planDataRoot: InvokeChannels['settings:plan-data-root'];
     applyDataRoot: InvokeChannels['settings:apply-data-root'];
+    forgetDataRoot: InvokeChannels['settings:forget-data-root'];
   };
   news: {
     get: InvokeChannels['news:get'];
@@ -428,6 +531,8 @@ export interface RavenForgeAPI {
   };
   system: {
     getInfo: InvokeChannels['system:get-info'];
+    getStorage: InvokeChannels['system:get-storage'];
+    relaunch: InvokeChannels['system:relaunch'];
     openPath: InvokeChannels['system:open-path'];
     openUrl: InvokeChannels['system:open-url'];
     selectFile: InvokeChannels['system:select-file'];

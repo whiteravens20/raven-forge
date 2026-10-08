@@ -1,15 +1,23 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { getProfile } from '../profiles/profile-manager';
-import { getLoaderVersions } from '../modloader/loader-manager';
+import { resolveDefaultLoaderVersion } from '../modloader/loader-manager';
 import { hashFile } from '../mods/integrity';
 import { readLockFile } from '../mods/lock-file';
 import { listContent } from '../mods/content-manager';
-import { versionsByHash, primaryFile, type ModrinthVersion } from '../mods/modrinth-api';
+import { versionsByHash, primaryFile, type ModrinthFile } from '../mods/modrinth-api';
 import { ZipWriter } from './zip-writer';
-import type { InstalledMod, ModLoaderType, MrpackExport } from '../../shared/ipc-types';
+import type {
+  InstalledMod,
+  ModLoaderType,
+  MrpackExport,
+  MrpackExportOptions,
+} from '../../shared/ipc-types';
+import { errorText } from '../util/error-text';
 
 /**
  * Writing a profile out as a Modrinth modpack.
@@ -43,18 +51,26 @@ const MAX_PACK_BYTES = 1024 * 1024 * 1024;
 
 /** Where each kind of content lives, in the profile and in the pack. */
 const KINDS = [
-  { kind: 'mods' as const, dir: paths.profileModsDir, packDir: 'mods', clientOnly: false },
+  {
+    kind: 'mods' as const,
+    dir: paths.profileModsDir,
+    packDir: 'mods',
+    clientOnly: false,
+    extension: '.jar',
+  },
   {
     kind: 'shaders' as const,
     dir: paths.profileShadersDir,
     packDir: 'shaderpacks',
     clientOnly: true,
+    extension: '.zip',
   },
   {
     kind: 'resourcepacks' as const,
     dir: paths.profileResourcePacksDir,
     packDir: 'resourcepacks',
     clientOnly: true,
+    extension: '.zip',
   },
 ];
 
@@ -69,18 +85,46 @@ interface Candidate {
   clientOnly: boolean;
 }
 
+/** A file found in a content folder that no list names. */
+function unlisted(fileName: string, extension: string): InstalledMod {
+  return {
+    id: `unlisted-${fileName}`,
+    name: fileName.slice(0, -extension.length),
+    version: 'local',
+    source: 'local',
+    fileName,
+    enabled: true,
+    fromManifest: false,
+  };
+}
+
+async function filesIn(dir: string): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Everything the profile has installed and switched on.
  *
  * Disabled entries are left out on purpose. A pack is what someone else is
  * meant to play; a mod the author turned off is not part of it, and shipping it
  * as an inert `.jar.disabled` only makes the download bigger.
+ *
+ * What is in the folders counts as well as what is in the lists. A jar dropped
+ * into `mods/` by hand, or a resource pack that came in as a file inside a pack,
+ * is something the game loads and no list names — and a pack that left those
+ * out was not the profile it was exported from.
  */
 async function collect(profileId: string): Promise<{ items: Candidate[]; disabled: number }> {
   const items: Candidate[] = [];
   let disabled = 0;
 
-  for (const { kind, dir, packDir, clientOnly } of KINDS) {
+  for (const { kind, dir, packDir, clientOnly, extension } of KINDS) {
+    const folder = dir(profileId);
     const installed =
       kind === 'mods' ? await readLockFile(profileId) : await listContent(kind, profileId);
     for (const item of installed) {
@@ -88,7 +132,19 @@ async function collect(profileId: string): Promise<{ items: Candidate[]; disable
         disabled++;
         continue;
       }
-      items.push({ item, source: path.join(dir(profileId), item.fileName), packDir, clientOnly });
+      items.push({ item, source: path.join(folder, item.fileName), packDir, clientOnly });
+    }
+
+    const listed = new Set(installed.map((item) => item.fileName.toLowerCase()));
+    for (const fileName of await filesIn(folder)) {
+      const lower = fileName.toLowerCase();
+      if (!lower.endsWith(extension) || listed.has(lower)) continue;
+      items.push({
+        item: unlisted(fileName, extension),
+        source: path.join(folder, fileName),
+        packDir,
+        clientOnly,
+      });
     }
   }
 
@@ -98,12 +154,18 @@ async function collect(profileId: string): Promise<{ items: Candidate[]; disable
 /**
  * Ask Modrinth which of these files it can serve, keyed by candidate index.
  *
+ * The answer for each is the very file that was asked about. A version can hold
+ * several — a Fabric build and a Forge one, a jar and its sources — and Modrinth
+ * answers a hash with the version, so taking that version's primary file named
+ * a different jar from the one installed whenever the installed one was not the
+ * primary.
+ *
  * A failure here is not a failure of the export: with no answer at all every
  * file is bundled instead, which is a much larger pack that still installs. An
  * export that refused to run because Modrinth was down would be strictly worse
  * than one that got big.
  */
-async function resolveDownloads(items: Candidate[]): Promise<Map<number, ModrinthVersion>> {
+async function resolveDownloads(items: Candidate[]): Promise<Map<number, ModrinthFile>> {
   const hashes = new Map<string, number[]>();
   for (const [index, candidate] of items.entries()) {
     try {
@@ -115,17 +177,48 @@ async function resolveDownloads(items: Candidate[]): Promise<Map<number, Modrint
     }
   }
 
-  const resolved = new Map<number, ModrinthVersion>();
+  const resolved = new Map<number, ModrinthFile>();
   try {
     const found = await versionsByHash([...hashes.keys()]);
     for (const [hash, version] of found) {
-      for (const index of hashes.get(hash) ?? []) resolved.set(index, version);
+      const file = version.files.find((f) => f.hashes.sha512 === hash) ?? primaryFile(version);
+      for (const index of hashes.get(hash) ?? []) resolved.set(index, file);
     }
   } catch (err) {
-    log.warn(`Could not reach Modrinth while exporting; bundling every file instead: ${err}`);
+    log.warn(
+      `Could not reach Modrinth while exporting; bundling every file instead: ${errorText(err)}`,
+    );
   }
 
   return resolved;
+}
+
+/**
+ * A file's contents, or null when it is larger than `limit`.
+ *
+ * Asked and read through the one handle: sized by name and then read by name,
+ * the file read is whatever is at that name by then.
+ */
+async function readUpTo(file: string, limit: number): Promise<Buffer | null> {
+  const handle = await fs.open(file, 'r');
+  try {
+    return (await handle.stat()).size > limit ? null : await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * The player's `options.txt` as it may leave the machine: every setting but the
+ * one that says where they play. `lastServer` is the address of the server they
+ * last joined, written there by the game, and a pack handed to somebody else is
+ * no place for it.
+ */
+function shareableOptions(file: Buffer): Buffer {
+  const text = file.toString('utf-8');
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const kept = text.split(/\r?\n/).filter((line) => !line.startsWith('lastServer:'));
+  return Buffer.from(kept.join(eol), 'utf-8');
 }
 
 /** Files under `config/`, plus `options.txt`, relative to the game directory. */
@@ -170,6 +263,7 @@ async function configOverrides(gameDir: string): Promise<string[]> {
 export async function exportProfileAsMrpack(
   profileId: string,
   destPath: string,
+  { settings = true }: MrpackExportOptions = {},
 ): Promise<MrpackExport> {
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
@@ -182,9 +276,9 @@ export async function exportProfileAsMrpack(
   if (loaderKey) {
     const version =
       profile.modLoaderVersion ??
-      (await getLoaderVersions(profile.modLoader, profile.minecraftVersion).catch(() => [])).find(
-        (v) => v.stable,
-      )?.version;
+      (await resolveDefaultLoaderVersion(profile.modLoader, profile.minecraftVersion).catch(
+        () => undefined,
+      ));
     if (!version) {
       throw new Error(
         `This profile does not pin a ${profile.modLoader} version, and no build could be looked ` +
@@ -202,8 +296,8 @@ export async function exportProfileAsMrpack(
   let bundledBytes = 0;
 
   for (const [index, candidate] of items.entries()) {
-    const version = resolved.get(index);
-    if (!version) {
+    const file = resolved.get(index);
+    if (!file) {
       // Nothing to point at, so the bytes travel with the pack. A file that has
       // gone missing from disk was already dropped during resolution and would
       // fail here, so its absence is checked rather than assumed.
@@ -216,7 +310,6 @@ export async function exportProfileAsMrpack(
       continue;
     }
 
-    const file = primaryFile(version);
     files.push({
       path: `${candidate.packDir}/${file.filename}`,
       hashes: { sha1: file.hashes.sha1, sha512: file.hashes.sha512 },
@@ -229,7 +322,7 @@ export async function exportProfileAsMrpack(
   }
 
   const gameDir = paths.profileGameDir(profile.id);
-  const overrides = await configOverrides(gameDir);
+  const overrides = settings ? await configOverrides(gameDir) : [];
 
   const index = {
     formatVersion: 1,
@@ -269,11 +362,23 @@ export async function exportProfileAsMrpack(
       const source = path.join(gameDir, relative);
       // A mod that keeps a database under `config/` should not turn a 20 KB pack
       // into a 300 MB one. Configuration is text and is never this big.
-      if ((await fs.stat(source)).size > MAX_CONFIG_FILE_BYTES) {
+      const tooLarge = () =>
         log.warn(`Leaving ${relative} out of the pack: too large to be configuration`);
-        continue;
+
+      if (relative === 'options.txt') {
+        const settings = await readUpTo(source, MAX_CONFIG_FILE_BYTES);
+        if (!settings) {
+          tooLarge();
+          continue;
+        }
+        await zip.addBuffer('overrides/options.txt', shareableOptions(settings));
+      } else {
+        if ((await fs.stat(source)).size > MAX_CONFIG_FILE_BYTES) {
+          tooLarge();
+          continue;
+        }
+        await zip.addFile(`overrides/${relative}`, source);
       }
-      await zip.addFile(`overrides/${relative}`, source);
       written++;
     }
 
@@ -294,7 +399,7 @@ export async function exportProfileAsMrpack(
     files: files.length,
     bundled: bundle.length,
     bundledBytes,
-    overrides: written,
+    settingsFiles: written,
     skippedDisabled: disabled,
   };
 }

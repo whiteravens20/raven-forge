@@ -1,5 +1,9 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { create } from 'zustand';
 import type { AuthState } from '@shared/ipc-types';
+import { t } from '../i18n';
+import { useNoticeStore } from './notice-store';
 
 const api = window.ravenforge;
 
@@ -12,35 +16,51 @@ const api = window.ravenforge;
 type AuthResult = Promise<string | null>;
 
 interface AuthStore extends AuthState {
+  /**
+   * False until the accounts have been asked for and answered once. Before
+   * that there is no telling whether anyone is signed in, and "not signed in"
+   * is the wrong thing to say about an answer that has not arrived.
+   */
+  loaded: boolean;
+  /** A sign-in started from this window has not come back yet. */
+  isAuthenticating: boolean;
   load: () => Promise<void>;
   loginMicrosoft: () => AuthResult;
   loginOffline: (username: string) => AuthResult;
-  logout: (accountId: string) => Promise<void>;
-  setActive: (accountId: string) => Promise<void>;
-  refresh: (accountId: string) => AuthResult;
+  logout: (accountId: string) => AuthResult;
+  setActive: (accountId: string) => AuthResult;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
   accounts: [],
   activeAccountId: null,
+  loaded: false,
   isAuthenticating: false,
 
   load: async () => {
     const result = await api.auth.getState();
-    if (result.success && result.data) {
-      set({
-        accounts: result.data.accounts,
-        activeAccountId: result.data.activeAccountId,
-        credentialsInPlaintext: result.data.credentialsInPlaintext,
-        credentialsFile: result.data.credentialsFile,
-      });
+    if (!result.success || !result.data) {
+      // Said, and the list left as it was: accounts that could not be read are
+      // not accounts that were signed out.
+      set({ loaded: true });
+      useNoticeStore.getState().show(result.error ?? t('accounts.loadFailed'));
+      return;
     }
+    set({
+      accounts: result.data.accounts,
+      activeAccountId: result.data.activeAccountId,
+      credentialsInPlaintext: result.data.credentialsInPlaintext,
+      credentialsFile: result.data.credentialsFile,
+      loaded: true,
+    });
   },
 
   loginMicrosoft: async () => {
     set({ isAuthenticating: true });
     try {
       const result = await api.auth.loginMicrosoft();
+      // Closing the sign-in window is not a failure to report.
+      if (result.code === 'CANCELLED') return null;
       if (!result.success) return result.error ?? '';
       await get().load();
       return null;
@@ -62,19 +82,20 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: async (accountId: string) => {
-    await api.auth.logout(accountId);
+    const result = await api.auth.logout(accountId);
+    // Read back either way: a sign-out that failed half-way has still changed
+    // something, and the list has to show what is actually there.
     await get().load();
+    return result.success ? null : (result.error ?? '');
   },
 
   setActive: async (accountId: string) => {
-    await api.auth.setActive(accountId);
-    set({ activeAccountId: accountId });
-  },
-
-  refresh: async (accountId: string) => {
-    const result = await api.auth.refresh(accountId);
+    const result = await api.auth.setActive(accountId);
+    // Only once main has agreed. It used to be marked active here whatever the
+    // answer, so a refusal left the page showing an account the launcher was
+    // not going to play as.
     if (!result.success) return result.error ?? '';
-    await get().load();
+    set({ activeAccountId: accountId });
     return null;
   },
 }));
@@ -86,5 +107,6 @@ api.on('auth:state-changed', (state) => {
   useAuthStore.setState({
     accounts: state.accounts,
     activeAccountId: state.activeAccountId,
+    loaded: true,
   });
 });

@@ -1,9 +1,12 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { defaultLoaderVersion } from '../src/shared/loader-version';
 import type { InstalledMod, Profile } from '../src/shared/ipc-types';
 
 /**
@@ -56,7 +59,7 @@ vi.mock('../src/core/mods/content-manager', () => ({
   listContent: async (kind: string) => (kind === 'shaders' ? shaders : resourcePacks),
 }));
 vi.mock('../src/core/modloader/loader-manager', () => ({
-  getLoaderVersions: async () => loaderVersions,
+  resolveDefaultLoaderVersion: async () => defaultLoaderVersion(loaderVersions),
 }));
 vi.mock('../src/core/mods/modrinth-api', () => ({
   versionsByHash: async (hashes: string[]) =>
@@ -65,7 +68,23 @@ vi.mock('../src/core/mods/modrinth-api', () => ({
 }));
 
 const { exportProfileAsMrpack } = await import('../src/core/packs/mrpack-export');
-const { readMrpack } = await import('../src/core/packs/mrpack');
+const { readMrpack, applyOverrides } = await import('../src/core/packs/mrpack');
+
+/** What a pack would put in a game directory: each override's path and what it holds. */
+async function overridesOf(packFile: string): Promise<Record<string, string>> {
+  const pack = await readMrpack(packFile);
+  const into = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-export-read-'));
+  try {
+    await applyOverrides(into, packFile, pack.overrides);
+    const found: Record<string, string> = {};
+    for (const override of pack.overrides) {
+      found[override.path] = await fs.readFile(path.join(into, override.path), 'utf-8');
+    }
+    return found;
+  } finally {
+    await fs.rm(into, { recursive: true, force: true });
+  }
+}
 
 const run = promisify(execFile);
 
@@ -82,8 +101,6 @@ function mod(over: Partial<InstalledMod> & { id: string; fileName: string }): In
     name: over.id,
     version: '1.0.0',
     source: 'modrinth',
-    required: false,
-    side: 'both',
     enabled: true,
     fromManifest: false,
     ...over,
@@ -190,7 +207,7 @@ describe('exportProfileAsMrpack', () => {
 
     const pack = await readMrpack(dest());
     expect(pack.files).toHaveLength(0);
-    expect(pack.overrides.get('mods/private.jar')?.toString()).toBe('a jar nobody publishes');
+    expect(await overridesOf(dest())).toEqual({ 'mods/private.jar': 'a jar nobody publishes' });
   });
 
   it('carries config and options.txt so the pack is reproducible', async () => {
@@ -200,17 +217,17 @@ describe('exportProfileAsMrpack', () => {
     await write('saves/MyWorld/level.dat', 'not configuration');
 
     const summary = await exportProfileAsMrpack('p1', dest());
-    expect(summary.overrides).toBe(3);
+    expect(summary.settingsFiles).toBe(3);
 
-    const pack = await readMrpack(dest());
-    expect([...pack.overrides.keys()].sort()).toEqual([
+    const carried = Object.keys(await overridesOf(dest()));
+    expect(carried.sort()).toEqual([
       'config/nested/deep.toml',
       'config/sodium-options.json',
       'options.txt',
     ]);
     // A world is not configuration, and a pack handed to a friend must not
     // carry the author's saves.
-    expect([...pack.overrides.keys()].some((k) => k.startsWith('saves/'))).toBe(false);
+    expect(carried.some((k) => k.startsWith('saves/'))).toBe(false);
   });
 
   it('files shaders and resource packs where the game keeps them', async () => {
@@ -236,6 +253,71 @@ describe('exportProfileAsMrpack', () => {
     expect(pack.files.every((f) => f.env?.server === 'unsupported')).toBe(true);
   });
 
+  it('names the file that is installed, not another one of the same version', async () => {
+    // One Modrinth version, two jars in it. The installed one is not the
+    // primary — and the pack used to point at the primary all the same.
+    await write('mods/listed-fabric.jar', 'the fabric build');
+    await lock([mod({ id: 'listed', fileName: 'listed-fabric.jar' })]);
+    const hash = await hashOf('mods/listed-fabric.jar');
+    const version = build('listed-forge.jar', 'https://cdn/forge.jar');
+    version.files.push({
+      filename: 'listed-fabric.jar',
+      url: 'https://cdn/fabric.jar',
+      size: 16,
+      primary: false,
+      hashes: { sha1: 'c'.repeat(40), sha512: hash },
+    });
+    known.set(hash, version);
+
+    await exportProfileAsMrpack('p1', dest());
+
+    const pack = await readMrpack(dest());
+    expect(pack.files.map((f) => [f.path, f.downloads[0]])).toEqual([
+      ['mods/listed-fabric.jar', 'https://cdn/fabric.jar'],
+    ]);
+  });
+
+  it('carries what is in the folders and in no list', async () => {
+    // A jar dropped into `mods/` by hand, a resource pack a pack shipped as a
+    // file: the game loads them, and a pack without them is not this profile.
+    await write('mods/dropped-in.jar', 'by hand');
+    await write('mods/notes.txt', 'not a mod');
+    await write('resourcepacks/Bundled.zip', 'a pack');
+    await write('resourcepacks/Unzipped/pack.mcmeta', '{}');
+    await lock([]);
+
+    const summary = await exportProfileAsMrpack('p1', dest());
+
+    expect(summary.bundled).toBe(2);
+    expect(await overridesOf(dest())).toEqual({
+      'mods/dropped-in.jar': 'by hand',
+      'resourcepacks/Bundled.zip': 'a pack',
+    });
+  });
+
+  it('leaves the server the player last joined out of the settings it carries', async () => {
+    await write('options.txt', 'fov:90\nlastServer:play.example.net:25565\nlang:pl_pl\n');
+
+    await exportProfileAsMrpack('p1', dest());
+
+    expect((await overridesOf(dest()))['options.txt']).toBe('fov:90\nlang:pl_pl\n');
+    // The player's own file is as it was.
+    expect(await fs.readFile(path.join(gameDir, 'options.txt'), 'utf-8')).toContain('lastServer:');
+  });
+
+  it('carries no settings at all when asked not to', async () => {
+    await write('mods/private.jar', 'a jar nobody publishes');
+    await write('config/sodium-options.json', '{"quality":"fast"}');
+    await write('options.txt', 'fov:90');
+    await lock([mod({ id: 'local-1', fileName: 'private.jar', source: 'local' })]);
+
+    const summary = await exportProfileAsMrpack('p1', dest(), { settings: false });
+
+    expect(summary.settingsFiles).toBe(0);
+    // The mods are the pack; only the settings were the question.
+    expect(Object.keys(await overridesOf(dest()))).toEqual(['mods/private.jar']);
+  });
+
   it('leaves out content that is switched off', async () => {
     await write('mods/on.jar', 'on');
     await write('mods/off.jar.disabled', 'off');
@@ -249,7 +331,7 @@ describe('exportProfileAsMrpack', () => {
     expect(summary.skippedDisabled).toBe(1);
     expect(summary.bundled).toBe(1);
     const pack = await readMrpack(dest());
-    expect([...pack.overrides.keys()]).toEqual(['mods/on.jar']);
+    expect(pack.overrides.map((override) => override.path)).toEqual(['mods/on.jar']);
   });
 
   it('names the loader build when the profile never pinned one', async () => {

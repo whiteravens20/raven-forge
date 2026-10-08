@@ -1,8 +1,11 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { MinecraftAccount } from '../src/shared/ipc-types';
+import { REFUSED, madeUnreadable } from './helpers/unreadable';
 
 /**
  * Where a Microsoft login is kept.
@@ -50,6 +53,11 @@ async function loadModule(): Promise<Store> {
 
 const authFile = () => path.join(root, 'auth.json');
 const readAuth = async () => JSON.parse(await fs.readFile(authFile(), 'utf-8'));
+const keptAside = async () =>
+  (await fs.readdir(root)).filter((f) => f.startsWith('auth.json.broken-'));
+
+/** Root ignores the mode bits, so the unreadable-file case cannot be staged. */
+const asRoot = typeof process.getuid === 'function' && process.getuid() === 0;
 
 const account = (id: string, name = id): MinecraftAccount => ({
   id,
@@ -125,11 +133,16 @@ describe('with no keychain', () => {
     expect(await store.getRefreshToken('a1')).toBe('refresh-token-value');
   });
 
-  it('does not leave the fallback file world-readable', async () => {
-    const store = await loadModule();
-    await store.saveAccount(account('a1'), 'refresh-token-value');
-    expect((await fs.stat(authFile())).mode & 0o777).toBe(0o600);
-  });
+  // A mode is how that is said where there is one. On Windows the file is out
+  // of other accounts' reach by where it is kept.
+  it.skipIf(process.platform === 'win32')(
+    'does not leave the fallback file world-readable',
+    async () => {
+      const store = await loadModule();
+      await store.saveAccount(account('a1'), 'refresh-token-value');
+      expect((await fs.stat(authFile())).mode & 0o777).toBe(0o600);
+    },
+  );
 
   it('tells the user their credentials are in plaintext, and where', async () => {
     const store = await loadModule();
@@ -172,6 +185,25 @@ describe('migrating a pre-keychain login', () => {
     expect(await store.getRefreshToken('a1')).toBe('old-refresh');
   });
 
+  it('hands back a refresh token that is still in the file the first time it is asked for', async () => {
+    // Asked of the keychain first and of the file second, the token was in
+    // neither: reading the file is what moves it, and it moved between the two
+    // looks. Nothing asks in that order today — an account is read before its
+    // token is — which is the only reason nobody was told to sign in again.
+    await fs.writeFile(
+      authFile(),
+      JSON.stringify({
+        accounts: [account('a1')],
+        activeAccountId: 'a1',
+        refreshTokens: { a1: 'old-refresh' },
+      }),
+    );
+
+    const store = await loadModule();
+
+    expect(await store.getRefreshToken('a1')).toBe('old-refresh');
+  });
+
   it('leaves a secret exactly where it is when the keychain refuses it', async () => {
     keychain = null;
     await fs.writeFile(
@@ -196,6 +228,24 @@ describe('the account list', () => {
     await store.saveAccount(account('a1'));
     await store.saveAccount(account('a2'));
     expect((await store.getAuthState()).activeAccountId).toBe('a1');
+  });
+
+  it('stops keeping the date of the last sign-in, which an older file still has', async () => {
+    // Nothing ever read it. The privacy policy lists what this file holds, and
+    // a file that goes on holding more than that makes the list wrong.
+    await fs.writeFile(
+      authFile(),
+      JSON.stringify({
+        accounts: [{ ...account('a1'), lastAuthenticated: '2026-08-01T10:00:00.000Z' }],
+        activeAccountId: 'a1',
+        refreshTokens: {},
+      }),
+    );
+    const store = await loadModule();
+
+    expect((await store.getAuthState()).accounts).toEqual([account('a1')]);
+    await store.saveAccount(account('a2'));
+    expect(JSON.stringify(await readAuth())).not.toContain('lastAuthenticated');
   });
 
   it('updates an account in place rather than adding it twice', async () => {
@@ -243,6 +293,173 @@ describe('the account list', () => {
     await store.saveAccount(account('a1'));
     await expect(store.setActiveAccountId('a2')).rejects.toThrow(/not found/);
     expect((await store.getAuthState()).activeAccountId).toBe('a1');
+  });
+});
+
+/**
+ * Absent, unreadable and unparsable are three different things, and only the
+ * first is "nobody signed in".
+ *
+ * Every writer starts from what the read returns, and every failure to read
+ * used to return an empty store — so one read that failed on a locked file was
+ * followed by a save of whichever account was being changed, and every other
+ * login left the list with it.
+ */
+describe('reading auth.json', () => {
+  it.skipIf(asRoot)(
+    'fails rather than answer an unreadable file with no accounts',
+    async () => {
+      const store = await loadModule();
+      await store.saveAccount(account('a1'), 'r1');
+      await store.saveAccount(account('a2'), 'r2');
+      const readable = await madeUnreadable(authFile());
+      const fresh = await loadModule();
+
+      await expect(fresh.getAuthState()).rejects.toThrow(REFUSED);
+      // The save that would have left `a3` as the only account there is.
+      await expect(fresh.saveAccount(account('a3'), 'r3')).rejects.toThrow(REFUSED);
+
+      // And the failure is not remembered: every read waits on the migration, so
+      // one that failed and stayed failed would lock the session out for good.
+      await readable();
+      expect((await fresh.getAuthState()).accounts.map((a) => a.id)).toEqual(['a1', 'a2']);
+      expect((await readAuth()).accounts).toHaveLength(2);
+    },
+    30_000,
+  );
+
+  it('keeps a file it cannot parse beside the one that replaces it', async () => {
+    const truncated = '{ "accounts": [{ "id": "a1" }], "refreshTokens": { "a1": "secr';
+    // As an older build could have left it: readable by everybody.
+    await fs.writeFile(authFile(), truncated, { mode: 0o644 });
+    const store = await loadModule();
+
+    expect((await store.getAuthState()).accounts).toEqual([]);
+    await store.saveAccount(account('a2'));
+
+    const kept = await keptAside();
+    expect(kept).toHaveLength(1);
+    expect(await fs.readFile(path.join(root, kept[0]), 'utf-8')).toBe(truncated);
+    // It may hold tokens, so it gets the mode the live file always has — where
+    // a file has a mode at all.
+    if (process.platform !== 'win32') {
+      expect((await fs.stat(path.join(root, kept[0]))).mode & 0o777).toBe(0o600);
+    }
+    expect((await readAuth()).accounts.map((a: MinecraftAccount) => a.id)).toEqual(['a2']);
+  });
+
+  it('does the same for a file that parses but is not an account store', async () => {
+    await fs.writeFile(authFile(), '[]');
+    const store = await loadModule();
+
+    expect((await store.getAuthState()).accounts).toEqual([]);
+    expect(await keptAside()).toHaveLength(1);
+  });
+
+  it('moves a broken file aside once, however many callers find it together', async () => {
+    await fs.writeFile(authFile(), '{ not json');
+    const store = await loadModule();
+
+    const [state, missing, token] = await Promise.all([
+      store.getAuthState(),
+      store.getAccount('a1'),
+      store.getRefreshToken('a1'),
+    ]);
+
+    expect(state.accounts).toEqual([]);
+    expect(missing).toBeUndefined();
+    expect(token).toBeUndefined();
+    expect(await keptAside()).toHaveLength(1);
+  });
+});
+
+/**
+ * The store used to be believed whole, as it parsed. An account with no name —
+ * a file somebody edited by hand — reached the Accounts page, which then had
+ * nothing to draw but the error screen; an entry that was not an object made
+ * the store unreadable, and every account in it with it.
+ */
+describe('a part of auth.json that is not what it should be', () => {
+  const withFile = async (stored: unknown): Promise<Store> => {
+    await fs.writeFile(authFile(), JSON.stringify(stored), { mode: 0o600 });
+    return loadModule();
+  };
+
+  it('leaves out what is not an account and reads the accounts beside it', async () => {
+    const store = await withFile({
+      accounts: [
+        { id: 'a1', uuid: 'a1', type: 'offline' },
+        null,
+        'a string',
+        { id: 'a2', uuid: 'a2', username: 'Raven', type: 'somebody' },
+        account('a3', 'Gracz'),
+      ],
+      activeAccountId: 'a1',
+      refreshTokens: {},
+    });
+
+    const state = await store.getAuthState();
+    expect(state.accounts).toEqual([account('a3', 'Gracz')]);
+    // The account that was active is not one; the one that is there is.
+    expect(state.activeAccountId).toBe('a3');
+    expect(await store.getAccount('a1')).toBeUndefined();
+  });
+
+  it('reads a list that is not a list as nobody signed in, and can be signed into', async () => {
+    const store = await withFile({ accounts: { a1: account('a1') }, activeAccountId: 7 });
+
+    expect(await store.getAuthState()).toMatchObject({ accounts: [], activeAccountId: null });
+    await store.saveAccount(account('a2'), 'r2');
+    expect((await store.getAuthState()).accounts).toEqual([account('a2')]);
+    expect(await keptAside()).toEqual([]);
+  });
+
+  it('writes none of it back', async () => {
+    const store = await withFile({
+      accounts: [{ id: 'a1', type: 'offline' }, account('a2')],
+      activeAccountId: 'a2',
+      refreshTokens: {},
+    });
+
+    await store.saveAccount(account('a3'));
+
+    expect((await readAuth()).accounts).toEqual([account('a2'), account('a3')]);
+  });
+
+  it('takes no token or session that is not one', async () => {
+    // With no keychain these are read straight from the file, and with one
+    // they are what the first read moves into it.
+    const store = await withFile({
+      accounts: [account('a1'), account('a2')],
+      activeAccountId: 'a1',
+      refreshTokens: { a1: 'r1', a2: 42 },
+      mcSessions: {
+        a1: { expiresAt: 1_900_000_000_000, accessToken: 'mc1' },
+        a2: null,
+      },
+    });
+
+    expect((await store.getAuthState()).accounts).toHaveLength(2);
+    expect(await store.getRefreshToken('a1')).toBe('r1');
+    expect(await store.getRefreshToken('a2')).toBeUndefined();
+    expect(await store.getMcSession('a1')).toEqual({
+      accessToken: 'mc1',
+      expiresAt: 1_900_000_000_000,
+    });
+    expect(await store.getMcSession('a2')).toBeUndefined();
+    expect([...keychain!.keys()].sort()).toEqual(['mcAccess:a1', 'msRefresh:a1']);
+  });
+
+  it('puts nothing in the keychain from maps that are not maps', async () => {
+    const store = await withFile({
+      accounts: [account('a1')],
+      activeAccountId: 'a1',
+      refreshTokens: ['r0'],
+      mcSessions: 'none',
+    });
+
+    expect((await store.getAuthState()).accounts).toEqual([account('a1')]);
+    expect(keychain!.size).toBe(0);
   });
 });
 

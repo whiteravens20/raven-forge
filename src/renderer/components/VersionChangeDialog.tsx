@@ -1,8 +1,11 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useT } from '@renderer/i18n';
 import type { ProfileFileSummary } from '@shared/ipc-types';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 interface Props {
   from: string;
@@ -27,6 +30,7 @@ interface Props {
  */
 export function VersionChangeDialog({ from, to, summary, onCancel, onConfirm }: Props) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   // Ticked wherever there is something to lose, which is the answer almost
   // everybody wants and nobody thinks of in time.
   const [backupFirst, setBackupFirst] = useState(summary.worlds > 0);
@@ -45,7 +49,9 @@ export function VersionChangeDialog({ from, to, summary, onCancel, onConfirm }: 
       role="presentation"
     >
       <div
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="version-change-title"

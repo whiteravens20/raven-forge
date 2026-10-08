@@ -1,12 +1,19 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown } from 'lucide-react';
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Search, Download, Sparkles, Image, ChevronUp, ChevronDown, FilePlus } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
+import { useGameStore } from '@stores/game-store';
+import { usePagedSearch } from '@hooks/use-paged-search';
+import { InstalledEntryInfo, SearchPager, SearchResultRow } from '@components/SearchResults';
+import { projectKey, useProjectDetails } from '@hooks/use-project-details';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
-import { useLocale, useT } from '@renderer/i18n';
+import { useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
+import { isProject } from '@shared/mod-identity';
 import {
   SearchFilters,
   EMPTY_FILTERS,
@@ -18,6 +25,7 @@ import { CompatibilityBadge } from '@components/CompatibilityBadge';
 import { CompatibilityDialog } from '@components/CompatibilityDialog';
 import { InstalledMark } from '@components/InstalledMark';
 import type {
+  ContentKind,
   FacetGroups,
   InstallPlan,
   ModSearchResult,
@@ -31,8 +39,6 @@ const api = window.ravenforge;
 
 const NO_FACETS: FacetGroups = { loaders: [], groups: [], gameVersions: [] };
 
-type Kind = 'shaders' | 'resourcepacks';
-
 /**
  * Shaders and resource packs.
  *
@@ -44,16 +50,16 @@ type Kind = 'shaders' | 'resourcepacks';
  */
 export function ContentPage() {
   const profiles = useProfileStore((s) => s.profiles);
+  const profilesLoaded = useProfileStore((s) => s.loaded);
   const selectedId = useProfileStore((s) => s.selectedProfileId);
 
   const t = useT();
-  const locale = useLocale();
-  const [kind, setKind] = useState<Kind>('shaders');
+  const [kind, setKind] = useState<ContentKind>('shaders');
   const [tab, setTab] = useState<'installed' | 'browse'>('installed');
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ModSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
+  const search = usePagedSearch();
+  const { results, searching, searched, reset: resetSearch } = search;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [facets, setFacets] = useState<FacetGroups>(NO_FACETS);
@@ -63,18 +69,32 @@ export function ContentPage() {
   /** Non-null while the "which shader loader?" dialog is open. */
   const [choosingLoader, setChoosingLoader] = useState<ShaderLoaderOption[] | null>(null);
   const [installingLoader, setInstallingLoader] = useState(false);
+  /** A file is being asked for, checked and copied in. */
+  const [addingFile, setAddingFile] = useState(false);
   /** Non-null while a compatibility warning is waiting on a decision. */
   const [plan, setPlan] = useState<{ item: ModSearchResult; plan: InstallPlan } | null>(null);
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
+  // The game has these folders open, and rewrites `options.txt` when it closes.
+  const gameBusy = useGameStore((s) =>
+    selectedId ? s.running.has(selectedId) || s.preparing.has(selectedId) : false,
+  );
   // What a browse row is matched against. Installed entries are keyed by
   // whatever named them: a project id when the launcher installed them, a slug
   // when a pack manifest did — and a search result carries both. Switching kind
   // reloads the list, so shaders are never matched against resource packs.
-  const installedIds = new Set(installed.map((item) => item.id));
+  const details = useProjectDetails(installed);
+  // By any of the names an entry can go by — a pack's own id for a mod is not
+  // the one the search speaks.
   const isInstalled = (item: ModSearchResult) =>
-    installedIds.has(item.id) || installedIds.has(item.slug);
+    installed.some((entry) => isProject(entry, item.id) || entry.id === item.slug);
+
+  // Which list is on screen, for an answer that arrives after it has changed.
+  const shown = useRef({ selectedId, kind });
+  useEffect(() => {
+    shown.current = { selectedId, kind };
+  }, [selectedId, kind]);
 
   const loadInstalled = useCallback(async () => {
     if (!selectedId) return;
@@ -82,9 +102,15 @@ export function ContentPage() {
       kind === 'shaders'
         ? await api.content.getShaders(selectedId)
         : await api.content.getResourcePacks(selectedId);
+    // An install started under Shaders finishes whenever it finishes, and then
+    // reloads the list it was started from. By then the page may be showing
+    // resource packs — which used to get the shaders written over them.
+    if (shown.current.selectedId !== selectedId || shown.current.kind !== kind) return;
     if (result.success && result.data) setInstalled(result.data);
-    else setInstalled([]);
-  }, [selectedId, kind]);
+    // A list that could not be read is not an empty one: "nothing installed"
+    // over a folder full of packs is the wrong thing to be told.
+    else setError(result.error ?? t('content.listFailed'));
+  }, [selectedId, kind, t]);
 
   useEffect(() => {
     void loadInstalled();
@@ -94,7 +120,7 @@ export function ContentPage() {
   // screen — neither carries over. A shader loader means nothing for a resource
   // pack, and `32x` returns nothing for a shader.
   useEffect(() => {
-    setResults([]);
+    resetSearch();
     setError(null);
     // The version pin survives a kind switch — it is a property of the profile
     // you are dressing up, not of what you are dressing it in. The rest does
@@ -112,7 +138,7 @@ export function ContentPage() {
     return () => {
       cancelled = true;
     };
-  }, [kind]);
+  }, [kind, resetSearch]);
 
   // Start pinned to the profile, which is the answer nine times out of ten —
   // but as a visible, changeable control rather than an invisible rule.
@@ -120,28 +146,20 @@ export function ContentPage() {
     setFilters((prev) => ({ ...prev, gameVersion: profileVersion ?? '' }));
   }, [profileVersion]);
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     // No early return on an empty query: Modrinth searches happily without one,
     // and "every 32x vanilla-like pack for my version" is a question worth
     // being able to ask without inventing a word to type.
-    setSearching(true);
     setError(null);
-    try {
-      const result = await api.mods.search({
-        query: query.trim(),
-        projectType: kind === 'shaders' ? 'shader' : 'resourcepack',
-        // One value per axis, each its own facet group. Modrinth ORs within a
-        // group and ANDs across them, so this reads as "iris AND realistic AND
-        // potato" — narrowing, which is what a filter row is expected to do.
-        categories: filterCategories(filters),
-        gameVersion: filters.gameVersion || undefined,
-        limit: 20,
-      });
-      if (result.success && result.data) setResults(result.data);
-      else setError(result.error ?? t('content.searchFailed'));
-    } finally {
-      setSearching(false);
-    }
+    void search.search({
+      query: query.trim(),
+      projectType: kind === 'shaders' ? 'shader' : 'resourcepack',
+      // One value per axis, each its own facet group. Modrinth ORs within a
+      // group and ANDs across them, so this reads as "iris AND realistic AND
+      // potato" — narrowing, which is what a filter row is expected to do.
+      categories: filterCategories(filters),
+      gameVersion: filters.gameVersion || undefined,
+    });
   };
 
   /**
@@ -175,11 +193,10 @@ export function ContentPage() {
 
   const install = async (item: ModSearchResult, versionId?: string) => {
     if (!selectedId) return;
-    const source = `modrinth:${item.id}`;
     const result =
       kind === 'shaders'
-        ? await api.content.installShader(selectedId, source, versionId)
-        : await api.content.installResourcePack(selectedId, source, versionId);
+        ? await api.content.installShader(selectedId, item.id, versionId)
+        : await api.content.installResourcePack(selectedId, item.id, versionId);
     if (!result.success) {
       setError(result.error ?? t('content.installFailed', { name: item.name }));
       return;
@@ -192,6 +209,40 @@ export function ContentPage() {
   };
 
   /**
+   * Add a pack the player already has as a file.
+   *
+   * Which file is asked by the main process, so all this hears back is what
+   * was added — or nothing, when the dialog was closed, which says nothing.
+   */
+  const handleAddFile = async () => {
+    if (!selectedId || addingFile) return;
+    const profileId = selectedId;
+    setError(null);
+    setLoaderNote(null);
+    setAddingFile(true);
+    try {
+      const result = await api.content.addFromFile(profileId, kind);
+      if (!result.success) {
+        // A refusal is about the file that was picked, and comes with words
+        // for it: what is wrong with it, and what to pick instead.
+        setError(
+          result.errorMessage
+            ? t(result.errorMessage.key, result.errorMessage.vars)
+            : (result.error ?? t('content.addFileFailed')),
+        );
+        return;
+      }
+      if (!result.data) return;
+      // Where it has just appeared.
+      setTab('installed');
+      await loadInstalled();
+      if (kind === 'shaders') await checkShaderLoader(profileId);
+    } finally {
+      setAddingFile(false);
+    }
+  };
+
+  /**
    * Does this profile have something that can *read* a shader pack?
    *
    * A pack with no loader behind it is a zip in a folder nothing opens, and the
@@ -200,7 +251,12 @@ export function ContentPage() {
    */
   const checkShaderLoader = async (profileId: string) => {
     const state = await api.content.getShaderLoaderState(profileId);
-    if (!state.success || !state.data) return;
+    if (!state.success || !state.data) {
+      // The pack is in; whether anything can read it is what could not be found
+      // out, and that is worth knowing about a shader that then does nothing.
+      setError(state.error ?? t('content.loaderCheckFailed'));
+      return;
+    }
     if (state.data.status === 'choose') setChoosingLoader(state.data.options);
     // `already-installed` says nothing: it is the expected case, and a banner
     // confirming that nothing happened is a banner people learn to ignore.
@@ -264,7 +320,7 @@ export function ContentPage() {
   if (!selectedProfile) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-rf-text-muted">
-        {t('content.pickProfile')}
+        {t(profilesLoaded ? 'content.pickProfile' : 'profiles.loading')}
       </div>
     );
   }
@@ -281,6 +337,7 @@ export function ContentPage() {
           {(['installed', 'browse'] as const).map((value) => (
             <button
               key={value}
+              aria-pressed={tab === value}
               onClick={() => {
                 setTab(value);
                 if (value === 'installed') void loadInstalled();
@@ -297,26 +354,41 @@ export function ContentPage() {
         </div>
       </div>
 
-      <div
-        className="flex gap-1 self-start rounded-lg border border-rf-border bg-rf-surface p-0.5"
-        role="tablist"
-        aria-label={t('content.kindLabel')}
-      >
-        {(['shaders', 'resourcepacks'] as const).map((value) => (
-          <button
-            key={value}
-            role="tab"
-            aria-selected={kind === value}
-            onClick={() => setKind(value)}
-            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-              kind === value
-                ? 'bg-rf-accent text-white'
-                : 'text-rf-text-secondary hover:text-rf-text'
-            }`}
-          >
-            {value === 'shaders' ? t('content.shaders') : t('content.resourcePacks')}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-3">
+        <div
+          className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5"
+          role="tablist"
+          aria-label={t('content.kindLabel')}
+        >
+          {(['shaders', 'resourcepacks'] as const).map((value) => (
+            <button
+              key={value}
+              role="tab"
+              aria-selected={kind === value}
+              onClick={() => setKind(value)}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                kind === value
+                  ? 'bg-rf-accent text-white'
+                  : 'text-rf-text-secondary hover:text-rf-text'
+              }`}
+            >
+              {value === 'shaders' ? t('content.shaders') : t('content.resourcePacks')}
+            </button>
+          ))}
+        </div>
+        {/* For the packs Modrinth does not have: an author's own site, a pack
+            made to order. Whichever kind is showing is the kind it is added as. */}
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<FilePlus size={14} />}
+          loading={addingFile}
+          disabled={gameBusy}
+          title={gameBusy ? t('mods.gameBusy') : undefined}
+          onClick={() => void handleAddFile()}
+        >
+          {t('content.addFile')}
+        </Button>
       </div>
 
       {error && <Banner type="urgent">{error}</Banner>}
@@ -334,7 +406,6 @@ export function ContentPage() {
       {plan && (
         <CompatibilityDialog
           plan={plan.plan}
-          busy={busyId === plan.item.id}
           onCancel={() => setPlan(null)}
           onInstall={() => {
             const pending = plan;
@@ -350,7 +421,7 @@ export function ContentPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void handleSearch();
+              handleSearch();
             }}
             className="flex gap-2"
           >
@@ -380,50 +451,55 @@ export function ContentPage() {
 
           {kind === 'shaders' && <Banner type="info">{t('content.shadersNeedIris')}</Banner>}
 
+          {search.error !== null && (
+            <Banner type="urgent">{search.error || t('content.searchFailed')}</Banner>
+          )}
+
           {results.length === 0 && !searching && (
-            <p className="py-8 text-center text-sm text-rf-text-muted">{t('content.browseHint')}</p>
+            <p className="py-8 text-center text-sm text-rf-text-muted">
+              {!searched
+                ? t('content.browseHint')
+                : filters.gameVersion
+                  ? t('search.noResultsFiltered', { version: filters.gameVersion })
+                  : t('search.noResults')}
+            </p>
           )}
 
           {results.map((item) => (
-            <div
+            <SearchResultRow
               key={item.id}
-              className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"
+              item={item}
+              fallbackIcon={<Icon size={18} className="text-rf-text-muted" />}
+              action={
+                isInstalled(item) ? (
+                  <InstalledMark />
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Download size={14} />}
+                    loading={busyId === item.id}
+                    disabled={gameBusy}
+                    title={gameBusy ? t('mods.gameBusy') : undefined}
+                    onClick={() => void handleInstall(item)}
+                  >
+                    {t('common.install')}
+                  </Button>
+                )
+              }
             >
-              {item.iconUrl ? (
-                <img src={item.iconUrl} alt="" className="h-10 w-10 rounded shrink-0" />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded bg-rf-bg-tertiary shrink-0">
-                  <Icon size={18} className="text-rf-text-muted" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-rf-text">{item.name}</p>
-                <p className="text-xs text-rf-text-muted truncate">{item.description}</p>
-                <p className="text-xs text-rf-text-muted">
-                  {item.author} •{' '}
-                  {t.plural('mods.downloads', item.downloads, {
-                    count: item.downloads.toLocaleString(locale),
-                  })}
-                </p>
-                {/* No loader: a resource pack has none, and a shader's loader is
-                    Iris or OptiFine, which the shader loader picker handles. */}
-                <CompatibilityBadge item={item} gameVersion={profileVersion} />
-              </div>
-              {isInstalled(item) ? (
-                <InstalledMark />
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<Download size={14} />}
-                  loading={busyId === item.id}
-                  onClick={() => void handleInstall(item)}
-                >
-                  {t('common.install')}
-                </Button>
-              )}
-            </div>
+              {/* No loader: a resource pack has none, and a shader's loader is
+                  Iris or OptiFine, which the shader loader picker handles. */}
+              <CompatibilityBadge item={item} gameVersion={profileVersion} />
+            </SearchResultRow>
           ))}
+          <SearchPager
+            shown={results.length}
+            total={search.total}
+            hasMore={search.hasMore}
+            loading={search.loadingMore}
+            onMore={() => void search.loadMore()}
+          />
         </div>
       ) : (
         <div className="space-y-2">
@@ -447,7 +523,7 @@ export function ContentPage() {
                   <div className="flex flex-col">
                     <button
                       onClick={() => void handleMove(index, -1)}
-                      disabled={index === 0}
+                      disabled={gameBusy || index === 0}
                       aria-label={t('content.moveUp', { name: item.name })}
                       className="text-rf-text-muted hover:text-rf-text disabled:opacity-30 disabled:cursor-not-allowed"
                     >
@@ -455,7 +531,7 @@ export function ContentPage() {
                     </button>
                     <button
                       onClick={() => void handleMove(index, 1)}
-                      disabled={index === installed.length - 1}
+                      disabled={gameBusy || index === installed.length - 1}
                       aria-label={t('content.moveDown', { name: item.name })}
                       className="text-rf-text-muted hover:text-rf-text disabled:opacity-30 disabled:cursor-not-allowed"
                     >
@@ -463,14 +539,17 @@ export function ContentPage() {
                     </button>
                   </div>
                 )}
-                <Icon size={18} className="shrink-0 text-rf-text-muted" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-rf-text truncate">{item.name}</p>
-                  <p className="text-xs text-rf-text-muted">
-                    {item.version} • {item.source}
-                    {item.fromManifest && ` • ${t('mods.fromManifest')}`}
-                  </p>
-                </div>
+                <InstalledEntryInfo
+                  entry={item}
+                  details={details[projectKey(item)]}
+                  fallbackIcon={<Icon size={18} className="shrink-0 text-rf-text-muted" />}
+                >
+                  {/* A file off the disk has no version anybody recorded. */}
+                  {item.source === 'local'
+                    ? t('mods.source.local')
+                    : `${item.version} • ${t(`mods.source.${item.source}`)}`}
+                  {item.fromManifest && ` • ${t('mods.fromManifest')}`}
+                </InstalledEntryInfo>
                 {/* Manifest-managed entries are re-added by the next sync, so
                     removing one here would only look like it worked. */}
                 {!item.fromManifest && (
@@ -478,6 +557,8 @@ export function ContentPage() {
                     variant="danger"
                     size="sm"
                     loading={busyId === item.id}
+                    disabled={gameBusy}
+                    title={gameBusy ? t('mods.gameBusy') : undefined}
                     onClick={() => void handleRemove(item.id)}
                   >
                     {t('common.remove')}

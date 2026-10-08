@@ -39,9 +39,9 @@ jobs:
             script: dist:win
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
@@ -60,6 +60,19 @@ jobs:
       # that has no business doing so.
       - name: Package
         run: npm run ${{ matrix.script }} -- --publish never
+
+      # electron-builder switches off, in the binary, the two ways an Electron
+      # program can be made into something else (`electronFuses` in its config).
+      # A binary where that did not happen looks no different from outside, so
+      # the one that went into the installers is read back.
+      - name: Verify the fuses of the packaged binary
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            node .github/scripts/verify-fuses.mjs 'out/win-unpacked/Raven Forge Launcher.exe'
+          else
+            node .github/scripts/verify-fuses.mjs out/linux-unpacked/raven-forge-launcher
+          fi
 
       # electron-builder exits 0 for some partial outcomes, so check that the
       # files that are supposed to exist actually do.
@@ -89,6 +102,27 @@ jobs:
           grep -q '^StartupWMClass=' /tmp/entry.desktop \
             || { echo "::error::.desktop entry lost StartupWMClass — check linux.syncDesktopName"; exit 1; }
 
+          # The program lives in a folder named like the package. electron-builder
+          # names it after the product, and with the product's display name that
+          # was `/opt/Raven Forge Launcher`: a path every script has to quote, and
+          # the one place left on Linux where the launcher's name had spaces in it.
+          # The AppArmor profile and the desktop entry are written from the same
+          # name, so they are held to it here as well.
+          dpkg-deb --fsys-tarfile "${deb[0]}" | tar -t > /tmp/files.txt
+          grep -qx './opt/raven-forge-launcher/raven-forge-launcher' /tmp/files.txt \
+            || { echo "::error::the binary is not at /opt/raven-forge-launcher/raven-forge-launcher"; exit 1; }
+          if grep -q ' ' /tmp/files.txt; then
+            echo "::error::the package installs a path with a space in it:"; grep ' ' /tmp/files.txt | head; exit 1
+          fi
+          dpkg-deb --fsys-tarfile "${deb[0]}" | tar -xO ./opt/raven-forge-launcher/resources/apparmor-profile \
+            | grep -q '"/opt/raven-forge-launcher/raven-forge-launcher"' \
+            || { echo "::error::the AppArmor profile does not name /opt/raven-forge-launcher/raven-forge-launcher"; exit 1; }
+          grep -q '^Exec=/opt/raven-forge-launcher/raven-forge-launcher' /tmp/entry.desktop \
+            || { echo "::error::the desktop entry does not start /opt/raven-forge-launcher/raven-forge-launcher"; exit 1; }
+          # What the player reads is still the product's own name.
+          grep -qx 'Name=Raven Forge Launcher' /tmp/entry.desktop \
+            || { echo "::error::the desktop entry is no longer called Raven Forge Launcher"; exit 1; }
+
           ls -lh out/*.deb out/*.AppImage
 
       # `fpm` does not run dpkg-shlibdeps, so the dependency list in
@@ -110,7 +144,7 @@ jobs:
             set -e
             apt-get update -qq >/dev/null
             apt-get install -y -qq --no-install-recommends /pkg/*.deb xvfb xauth >/dev/null
-            if ldd "/opt/Raven Forge Launcher/raven-forge-launcher" | grep "not found"; then
+            if ldd /opt/raven-forge-launcher/raven-forge-launcher | grep "not found"; then
               echo "::error::the package does not declare every library the binary links"
               exit 1
             fi
@@ -120,6 +154,43 @@ jobs:
             if [ "$code" != 124 ]; then
               echo "::error::the launcher exited with $code instead of staying up"
               cat /tmp/run.log
+              exit 1
+            fi
+
+            # And it is nothing but the launcher — the fuses again, this time
+            # by what the installed program does. Told to be Node, Electron
+            # runs the script it is handed and leaves with its 42; told to
+            # open a debugger on the main process, it says where it listens.
+            ELECTRON_RUN_AS_NODE=1 timeout 20 /usr/bin/raven-forge-launcher -e "process.exit(42)" >/dev/null 2>&1
+            if [ "$?" = 42 ]; then
+              echo "::error::ELECTRON_RUN_AS_NODE turns the installed launcher into Node.js"
+              exit 1
+            fi
+            HOME=/root timeout 15 xvfb-run -a /usr/bin/raven-forge-launcher --no-sandbox --inspect=127.0.0.1:9229 >/tmp/inspect.log 2>&1
+            if grep -q "Debugger listening" /tmp/inspect.log; then
+              echo "::error::--inspect opens a debugger on the installed launcher"
+              exit 1
+            fi
+
+            # The browser inside has a debugger as well, and no fuse for it:
+            # the launcher takes that switch off its own command line as it
+            # starts. Asked while the launcher is up, since one that did not
+            # start has no debugger either: nothing may be listening on the
+            # port, and the browser may at no point have said that it does.
+            HOME=/root timeout 15 xvfb-run -a /usr/bin/raven-forge-launcher --no-sandbox --remote-debugging-port=9222 >/tmp/devtools.log 2>&1 &
+            launcher=$!
+            sleep 10
+            (exec 3<>/dev/tcp/127.0.0.1/9222) 2>/dev/null
+            answered=$?
+            wait "$launcher"
+            code=$?
+            if [ "$code" != 124 ]; then
+              echo "::error::started with --remote-debugging-port, the launcher exited with $code instead of staying up"
+              cat /tmp/devtools.log
+              exit 1
+            fi
+            if [ "$answered" = 0 ] || grep -q "DevTools listening" /tmp/devtools.log; then
+              echo "::error::--remote-debugging-port opens a debugger on the installed launcher"
               exit 1
             fi
           '
@@ -136,11 +207,64 @@ jobs:
           $installers | Format-Table Name, Length
 
       - name: Upload packages
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-${{ runner.os }}
           path: |
             out/*.deb
             out/*.AppImage
             out/*.exe
+          retention-days: 7
+
+      # The Linux half is started on a clean Ubuntu above. Windows has no such
+      # box to borrow, and the runner is one: the installer that was just built
+      # is run on it and the launcher used as a player uses it — installed,
+      # started, installed over while it is open, updated from the release
+      # before, uninstalled, without the installer's pages and through them.
+      # The rest of what is known about the Windows build was seen under wine,
+      # which answers some of this in its own way: what becomes of a file that
+      # is in use, whether an installer can close a launcher that is open, how
+      # long a secret the Credential Manager takes.
+      #
+      # It is the machine that built the installer, so a library the launcher
+      # needs and does not bring would not be missed here as it would on the
+      # clean Ubuntu.
+      #
+      # v0.7.1 by name and by digest. It is the last release that kept the
+      # program and its data in folders named after the product, spaces and
+      # all, so it is the one an update has to bring a player over from; the
+      # digest is the one that release publishes in its SHA256SUMS.txt.
+      - name: Fetch the release an update comes from
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.7.1 --pattern Raven-Forge-Launcher-Setup-0.7.1.exe --dir previous
+          $digest = (Get-FileHash previous/Raven-Forge-Launcher-Setup-0.7.1.exe -Algorithm SHA256).Hash
+          if ($digest -ne '896a441052df7d88d295dbf3a492051769f3e0c4d00f4d082eb27d9d235d662c') {
+            Write-Output "::error::the installer that was fetched is not the 0.7.1 that was released ($digest)"
+            exit 1
+          }
+
+      - name: Install and use the launcher on Windows
+        if: runner.os == 'Windows'
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          $built = @(Get-ChildItem out/Raven-Forge-Launcher-Setup-*.exe)
+          if ($built.Count -ne 1) {
+            Write-Output "::error::expected one installer, found $($built.Count)"
+            exit 2
+          }
+          ./.github/scripts/verify-windows-install.ps1 -Installer $built[0].FullName -Previous previous/Raven-Forge-Launcher-Setup-0.7.1.exe -Evidence evidence
+
+      # The launcher's logs and the screen as it was, for whoever reads a miss.
+      - name: Upload what was seen on Windows
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seen-on-Windows
+          path: evidence/
+          if-no-files-found: ignore
           retention-days: 7

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import noProfiles from '@assets/empty-states/no-profiles.svg?raw';
 import noMods from '@assets/empty-states/no-mods.svg?raw';
 import { InlineSvg } from '@components/ui/InlineSvg';

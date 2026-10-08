@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { contextBridge, ipcRenderer } from 'electron';
 import type { RavenForgeAPI, EventChannels } from '../shared/ipc-types';
 
@@ -15,7 +17,6 @@ const api: RavenForgeAPI = {
     logout: (accountId) => ipcRenderer.invoke('auth:logout', accountId),
     getState: () => ipcRenderer.invoke('auth:get-state'),
     setActive: (accountId) => ipcRenderer.invoke('auth:set-active', accountId),
-    refresh: (accountId) => ipcRenderer.invoke('auth:refresh', accountId),
   },
   profiles: {
     getAll: () => ipcRenderer.invoke('profiles:get-all'),
@@ -27,11 +28,13 @@ const api: RavenForgeAPI = {
     listOrphaned: () => ipcRenderer.invoke('profiles:list-orphaned'),
     adoptOrphaned: (profileId) => ipcRenderer.invoke('profiles:adopt-orphaned', profileId),
     discardOrphaned: (profileId) => ipcRenderer.invoke('profiles:discard-orphaned', profileId),
+    unreadableEntries: () => ipcRenderer.invoke('profiles:unreadable-entries'),
     duplicate: (profileId, name) => ipcRenderer.invoke('profiles:duplicate', profileId, name),
     openFolder: (profileId) => ipcRenderer.invoke('profiles:open-folder', profileId),
     export: (profileId) => ipcRenderer.invoke('profiles:export', profileId),
-    exportPack: (profileId) => ipcRenderer.invoke('profiles:export-pack', profileId),
-    import: (json) => ipcRenderer.invoke('profiles:import', json),
+    exportPack: (profileId, options) =>
+      ipcRenderer.invoke('profiles:export-pack', profileId, options),
+    import: () => ipcRenderer.invoke('profiles:import'),
     getSyncStatus: (profileId) => ipcRenderer.invoke('profiles:get-sync-status', profileId),
     setIcon: (profileId, sourcePath) =>
       ipcRenderer.invoke('profiles:set-icon', profileId, sourcePath),
@@ -50,12 +53,14 @@ const api: RavenForgeAPI = {
     createFromManifest: (url) => ipcRenderer.invoke('packs:create-from-manifest', url),
     createFromUrl: (url) => ipcRenderer.invoke('packs:create-from-url', url),
     importMrpack: (filePath) => ipcRenderer.invoke('packs:import-mrpack', filePath),
+    installModrinth: (pack, wanted) => ipcRenderer.invoke('packs:install-modrinth', pack, wanted),
   },
   mods: {
     getInstalled: (profileId) => ipcRenderer.invoke('mods:get-installed', profileId),
     syncManifest: (profileId) => ipcRenderer.invoke('mods:sync-manifest', profileId),
     installFromSearch: (profileId, mod, version) =>
       ipcRenderer.invoke('mods:install-from-search', profileId, mod, version),
+    addFromFile: (profileId) => ipcRenderer.invoke('mods:add-from-file', profileId),
     checkInstall: (profileId, mod) => ipcRenderer.invoke('mods:check-install', profileId, mod),
     uninstall: (profileId, modId) => ipcRenderer.invoke('mods:uninstall', profileId, modId),
     toggleEnabled: (profileId, modId, enabled) =>
@@ -63,23 +68,25 @@ const api: RavenForgeAPI = {
     checkUpdates: (profileId) => ipcRenderer.invoke('mods:check-updates', profileId),
     update: (profileId, modIds) => ipcRenderer.invoke('mods:update', profileId, modIds),
     search: (filters) => ipcRenderer.invoke('mods:search', filters),
+    getDetails: (ids) => ipcRenderer.invoke('mods:get-details', ids),
     getFacets: (projectType) => ipcRenderer.invoke('mods:get-facets', projectType),
   },
   content: {
     getShaders: (profileId) => ipcRenderer.invoke('content:get-shaders', profileId),
     getResourcePacks: (profileId) => ipcRenderer.invoke('content:get-resourcepacks', profileId),
-    installShader: (profileId, source, version) =>
-      ipcRenderer.invoke('content:install-shader', profileId, source, version),
+    installShader: (profileId, projectId, version) =>
+      ipcRenderer.invoke('content:install-shader', profileId, projectId, version),
     checkInstall: (profileId, item) => ipcRenderer.invoke('content:check-install', profileId, item),
     getShaderLoaderState: (profileId) =>
       ipcRenderer.invoke('content:get-shader-loader-state', profileId),
     installShaderLoader: (profileId, projectId) =>
       ipcRenderer.invoke('content:install-shader-loader', profileId, projectId),
-    installResourcePack: (profileId, source, version) =>
-      ipcRenderer.invoke('content:install-resourcepack', profileId, source, version),
+    installResourcePack: (profileId, projectId, version) =>
+      ipcRenderer.invoke('content:install-resourcepack', profileId, projectId, version),
     removeShader: (profileId, id) => ipcRenderer.invoke('content:remove-shader', profileId, id),
     removeResourcePack: (profileId, id) =>
       ipcRenderer.invoke('content:remove-resourcepack', profileId, id),
+    addFromFile: (profileId, kind) => ipcRenderer.invoke('content:add-from-file', profileId, kind),
     reorderResourcePacks: (profileId, orderedIds) =>
       ipcRenderer.invoke('content:reorder-resourcepacks', profileId, orderedIds),
   },
@@ -91,11 +98,14 @@ const api: RavenForgeAPI = {
   loaders: {
     getVersions: (loader, mcVersion) =>
       ipcRenderer.invoke('loaders:get-versions', loader, mcVersion),
+    buildStarts: (loader, loaderVersion, mcVersion) =>
+      ipcRenderer.invoke('loaders:build-starts', loader, loaderVersion, mcVersion),
   },
   game: {
     launch: (options) => ipcRenderer.invoke('game:launch', options),
     kill: (profileId) => ipcRenderer.invoke('game:kill', profileId),
-    getLogTail: (profileId, lines) => ipcRenderer.invoke('game:get-log-tail', profileId, lines),
+    getRunning: () => ipcRenderer.invoke('game:get-running'),
+    getLogTail: (profileId) => ipcRenderer.invoke('game:get-log-tail', profileId),
     getVersions: (includeSnapshots) => ipcRenderer.invoke('game:get-versions', includeSnapshots),
     cancel: (profileId) => ipcRenderer.invoke('game:cancel', profileId),
   },
@@ -109,6 +119,7 @@ const api: RavenForgeAPI = {
     chooseDataRoot: () => ipcRenderer.invoke('settings:choose-data-root'),
     planDataRoot: (target) => ipcRenderer.invoke('settings:plan-data-root', target),
     applyDataRoot: (target) => ipcRenderer.invoke('settings:apply-data-root', target),
+    forgetDataRoot: () => ipcRenderer.invoke('settings:forget-data-root'),
   },
   news: {
     get: () => ipcRenderer.invoke('news:get'),
@@ -128,6 +139,8 @@ const api: RavenForgeAPI = {
   },
   system: {
     getInfo: () => ipcRenderer.invoke('system:get-info'),
+    getStorage: () => ipcRenderer.invoke('system:get-storage'),
+    relaunch: () => ipcRenderer.invoke('system:relaunch'),
     openPath: (p) => ipcRenderer.invoke('system:open-path', p),
     openUrl: (url) => ipcRenderer.invoke('system:open-url', url),
     selectFile: (filters) => ipcRenderer.invoke('system:select-file', filters),

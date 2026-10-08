@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // Accounts and how the launcher holds their credentials.
 // Part of the IPC contract — see `../ipc-types.ts`.
 
@@ -7,14 +9,11 @@ export interface MinecraftAccount {
   username: string;
   type: 'microsoft' | 'offline';
   skinUrl?: string;
-  /** ISO 8601 timestamp of last successful auth */
-  lastAuthenticated?: string;
 }
 
 export interface AuthState {
   accounts: MinecraftAccount[];
   activeAccountId: string | null;
-  isAuthenticating: boolean;
   /**
    * The OS keychain was unusable, so credentials are in a 0600 file instead.
    * Shown on the Accounts page — it is a real reduction in protection and the

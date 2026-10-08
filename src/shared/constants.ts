@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // Raven Forge Launcher — application-wide constants
 
 export const APP_NAME = 'Raven Forge Launcher';
@@ -10,14 +12,40 @@ export const DIR_JAVA = 'java';
 export const DIR_CACHE = 'cache';
 export const DIR_LOGS = 'logs';
 export const DIR_CRASH_REPORTS = 'crash-reports';
+/** Where the embedded browser keeps its own files, inside the launcher's home. */
+export const DIR_BROWSER = 'browser';
+
+/**
+ * The name of the launcher's home directory under the per-user application
+ * data folder. Deliberately the package name and not the product name: no
+ * spaces, and the same on every platform.
+ */
+export const HOME_DIR_NAME = 'raven-forge-launcher';
+/** What that directory was called through 0.7.1, when Electron named it. */
+export const LEGACY_HOME_DIR_NAME = 'Raven Forge Launcher';
 
 // ── File names ────────────────────────────────────────────
 export const FILE_SETTINGS = 'settings.json';
 export const FILE_PROFILES = 'profiles.json';
 export const FILE_AUTH = 'auth.json';
+/** Names the data directory when it is not the home; see `data-root.ts`. */
+export const FILE_DATA_ROOT_POINTER = 'data-root.txt';
 
 // ── Modrinth API ──────────────────────────────────────────
 export const MODRINTH_API_BASE = 'https://api.modrinth.com/v2';
+/** Where the files and icons Modrinth's API points at are served from. */
+export const MODRINTH_CDN_HOST = 'cdn.modrinth.com';
+
+/**
+ * A project's page on Modrinth, from its id or its slug.
+ *
+ * The `/project/` form answers for either and redirects to the address for
+ * whatever the project is — mod, shader, resource pack, modpack — so a caller
+ * holding only an id does not have to know which.
+ */
+export function modrinthProjectUrl(idOrSlug: string): string {
+  return `https://modrinth.com/project/${encodeURIComponent(idOrSlug)}`;
+}
 
 // ── Mod loaders ───────────────────────────────────────────
 /**
@@ -72,6 +100,13 @@ export function acceptedLoaders(modLoader: string): ClientModLoader[] {
 export const MOJANG_VERSION_MANIFEST =
   'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
 export const MOJANG_RESOURCES = 'https://resources.download.minecraft.net';
+/**
+ * Where a library named with no repository of its own is fetched from. That is
+ * the rule the version format has always had, and the one a Forge profile up to
+ * 1.12.2 leans on: `net.minecraft:launchwrapper:1.12` is all it says about the
+ * class the game is started through.
+ */
+export const MOJANG_LIBRARIES = 'https://libraries.minecraft.net';
 export const MC_SERVICES_API = 'https://api.minecraftservices.com';
 
 // ── Auth endpoints ────────────────────────────────────────
@@ -100,30 +135,6 @@ export const FORGE_PROMOTIONS_URL =
 
 // ── Adoptium JRE ──────────────────────────────────────────
 export const ADOPTIUM_API = 'https://api.adoptium.net/v3';
-
-// ── Java version mapping ──────────────────────────────────
-export const JAVA_VERSION_MAP: Record<string, number> = {
-  // Versions ≤ 1.16.5 need Java 8
-  '1.7': 8,
-  '1.8': 8,
-  '1.9': 8,
-  '1.10': 8,
-  '1.11': 8,
-  '1.12': 8,
-  '1.13': 8,
-  '1.14': 8,
-  '1.15': 8,
-  '1.16': 8,
-  // 1.17 – 1.20.4 need Java 17
-  '1.17': 17,
-  '1.18': 17,
-  '1.19': 17,
-  '1.20': 17,
-  // 1.21+ needs Java 21
-  '1.21': 21,
-  '1.22': 21,
-  '1.23': 21,
-};
 
 // ── Launcher window ───────────────────────────────────────
 // The launcher's own window, not the game's — see the block below for that.

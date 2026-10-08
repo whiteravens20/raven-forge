@@ -1,8 +1,16 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import os from 'node:os';
 import { describe, it, expect } from 'vitest';
 import { machineMemoryMb } from '../src/core/util/machine-memory';
 import { DEFAULT_RAM_MB, MAX_RAM_MB, MIN_RAM_MB, RAM_STEP_MB } from '../src/shared/constants';
-import { formatRamGb, ramAdvice, recommendedRamMb, safeMaxRamMb } from '../src/shared/memory';
+import {
+  formatRamGb,
+  isPlausiblePackRam,
+  ramAdvice,
+  recommendedRamMb,
+  safeMaxRamMb,
+} from '../src/shared/memory';
 
 /**
  * What a machine can spare, and what it should be offered.
@@ -103,6 +111,20 @@ describe('ramAdvice', () => {
 
   it('says nothing when the machine could not be measured', () => {
     expect(ramAdvice(32 * GB, undefined)).toBe('ok');
+  });
+});
+
+describe('isPlausiblePackRam', () => {
+  it('takes a whole number of megabytes a machine could give', () => {
+    expect(isPlausiblePackRam(512)).toBe(true);
+    expect(isPlausiblePackRam(6 * GB)).toBe(true);
+    expect(isPlausiblePackRam(64 * GB)).toBe(true);
+  });
+
+  it("takes nothing else, since it is somebody else's number on its way to -Xmx", () => {
+    for (const value of [0, 511, 64 * GB + 1, 2 * GB * GB, 4096.5, -4096, NaN, '4096', null]) {
+      expect(isPlausiblePackRam(value)).toBe(false);
+    }
   });
 });
 

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { LogOut, UserPlus, Shield, ShieldAlert, ExternalLink } from 'lucide-react';
@@ -5,8 +7,8 @@ import { useAuthStore } from '@stores/auth-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { useT } from '@renderer/i18n';
-
-const api = window.ravenforge;
+import { ConfirmButton } from '@components/ui/ConfirmButton';
+import { openLink } from '@renderer/open';
 
 /**
  * Where a Microsoft account is actually managed — skin, cape and username.
@@ -35,7 +37,9 @@ const MC_ACCOUNT_URL = 'https://www.minecraft.net/msaprofile/mygames/editprofile
  * avatar, keeps the player's UUID from being handed to a third party for a
  * picture we already have the pixels for.
  */
-function SkinHead({ url, size = 40 }: { url: string; size?: number }) {
+function SkinHead({ url }: { url: string }) {
+  /** The side of the square, in pixels: one skin pixel is drawn five across. */
+  const size = 40;
   const layer: CSSProperties = {
     position: 'absolute',
     inset: 0,
@@ -57,6 +61,7 @@ function SkinHead({ url, size = 40 }: { url: string; size?: number }) {
 
 export function AccountsPage() {
   const accounts = useAuthStore((s) => s.accounts);
+  const accountsLoaded = useAuthStore((s) => s.loaded);
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
   const isAuthenticating = useAuthStore((s) => s.isAuthenticating);
   const loginMicrosoft = useAuthStore((s) => s.loginMicrosoft);
@@ -72,8 +77,8 @@ export function AccountsPage() {
   const [error, setError] = useState<string | null>(null);
 
   /** `null` is success; an empty message means main failed without saying why. */
-  const show = (failure: string | null) =>
-    setError(failure === null ? null : failure || t('accounts.loginFailed'));
+  const show = (failure: string | null, fallback = t('accounts.loginFailed')) =>
+    setError(failure === null ? null : failure || fallback);
 
   const handleMicrosoftLogin = async () => {
     show(await loginMicrosoft());
@@ -159,14 +164,20 @@ export function AccountsPage() {
               autoFocus
             />
           </div>
-          <Button type="submit">{t('common.add')}</Button>
+          {/* Off until there is a name: pressed on an empty field it did
+              nothing, and did not say that it had done nothing. */}
+          <Button type="submit" disabled={!offlineUsername.trim()}>
+            {t('common.add')}
+          </Button>
         </form>
       )}
 
       {/* Account list */}
       <div className="space-y-2">
         {accounts.length === 0 ? (
-          <p className="py-8 text-center text-sm text-rf-text-muted">{t('accounts.empty')}</p>
+          <p className="py-8 text-center text-sm text-rf-text-muted">
+            {t(accountsLoaded ? 'accounts.empty' : 'accounts.loading')}
+          </p>
         ) : (
           accounts.map((account) => (
             <div
@@ -195,7 +206,15 @@ export function AccountsPage() {
               </div>
               <div className="flex gap-1">
                 {account.id !== activeAccountId && (
-                  <Button variant="ghost" size="sm" onClick={() => setActive(account.id)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      void setActive(account.id).then((failure) =>
+                        show(failure, t('accounts.failed')),
+                      )
+                    }
+                  >
                     {t('accounts.setActive')}
                   </Button>
                 )}
@@ -207,19 +226,23 @@ export function AccountsPage() {
                     variant="ghost"
                     size="sm"
                     icon={<ExternalLink size={12} />}
-                    onClick={() => void api.system.openUrl(MC_ACCOUNT_URL)}
+                    onClick={() => void openLink(MC_ACCOUNT_URL)}
                   >
                     {t('accounts.manage')}
                   </Button>
                 )}
-                <Button
-                  variant="danger"
-                  size="sm"
+                {/* Asked first: for a Microsoft account it removes the saved
+                    sign-in, and getting it back means the whole login again. */}
+                <ConfirmButton
                   icon={<LogOut size={12} />}
-                  onClick={() => logout(account.id)}
+                  question={t('accounts.logoutAsk', { name: account.username })}
+                  confirmLabel={t('accounts.logout')}
+                  onConfirm={() =>
+                    void logout(account.id).then((failure) => show(failure, t('accounts.failed')))
+                  }
                 >
                   {t('accounts.logout')}
-                </Button>
+                </ConfirmButton>
               </div>
             </div>
           ))

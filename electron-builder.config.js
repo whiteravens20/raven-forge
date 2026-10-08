@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 /**
  * Raven Forge Launcher — electron-builder configuration
  * Builds: NSIS installer (Windows), .deb + AppImage (Linux)
@@ -13,10 +15,36 @@
  *   See docs/SIGNING.md for OV/EV certificate setup
  */
 
+/**
+ * Which platform this run packages for: the one named on the command line, or,
+ * with none named, the one it runs on.
+ *
+ * Asked because the product goes by two names. electron-builder builds the
+ * `.deb`'s install folder out of the product name and offers no other lever, so
+ * "Raven Forge Launcher" put the program in `/opt/Raven Forge Launcher` — a
+ * path with spaces, which every script and every `ldd` then has to quote. On
+ * Linux the product is therefore named like the package, as the binary, the
+ * desktop entry and the data folder already are; what the player reads is the
+ * desktop entry's own `Name`, set further down, and is unchanged. Windows keeps
+ * the spaced name for the installer's title and the uninstall entry, and gets
+ * its folder from build/installer.nsh.
+ *
+ * One platform per run, then: a run for both would give one of them the other's
+ * name.
+ */
+const args = process.argv.slice(2);
+const named = (...flags) => args.some((arg) => flags.includes(arg));
+const linuxNamed = named('--linux', '-l');
+const otherNamed = named('--win', '--windows', '-w', '--mac', '--macos', '-m', '-o');
+if (linuxNamed && otherNamed) {
+  throw new Error('Package one platform per run: the product is named differently on Linux.');
+}
+const forLinux = linuxNamed || (!otherNamed && process.platform === 'linux');
+
 /** @type {import('electron-builder').Configuration} */
 const config = {
   appId: 'com.ravenforge.launcher',
-  productName: 'Raven Forge Launcher',
+  productName: forLinux ? 'raven-forge-launcher' : 'Raven Forge Launcher',
   copyright: 'Copyright © 2026 White Ravens',
 
   directories: {
@@ -26,12 +54,46 @@ const config = {
 
   files: ['dist/**/*', 'package.json'],
 
+  // The licence asks that every copy come with its text, and NOTICE that the
+  // attribution travel with it. The NSIS licence page shows the first only, and
+  // only while installing, so both are copied next to the app as well.
+  extraResources: ['LICENSE', 'NOTICE'],
+
   // Asar archive for security + performance
   asar: true,
   asarUnpack: [
     // Native modules that can't run from asar
     'node_modules/keytar/**',
   ],
+
+  // ── What the packaged program refuses to be ──────────────
+  // Electron's binary comes with two ways to make any app built on it into
+  // something else: `ELECTRON_RUN_AS_NODE` turns it into a plain Node.js that
+  // runs whatever script it is handed, and `--inspect` opens a debugger on the
+  // main process, the one that holds the accounts and starts programs. Neither
+  // is anything the launcher uses, and both are switched off in the binary
+  // itself — as fuses, which no flag, variable or setting turns back on.
+  //
+  // The first is also a plain bug fixed: a terminal that sets
+  // `ELECTRON_RUN_AS_NODE` for its own purposes (the one in VS Code does)
+  // started the launcher as a Node prompt and not as the launcher.
+  //
+  // `NODE_OPTIONS` is left alone on purpose. A packaged Electron already takes
+  // nothing from it that could load code or open a debugger, and the fuse that
+  // would silence it silences `NODE_EXTRA_CA_CERTS` with it — the one way a
+  // player behind a proxy that re-signs HTTPS can tell the launcher about the
+  // proxy's certificate.
+  //
+  // The browser inside has a debugger as well, `--remote-debugging-port`, and
+  // for that one there is no fuse: the launcher takes it off its own command
+  // line as it starts — `refuseRemoteDebugging` in src/main/security.ts.
+  //
+  // `npm run dev` and the tests run the Electron in node_modules, which this
+  // does not touch.
+  electronFuses: {
+    runAsNode: false,
+    enableNodeCliInspectArguments: false,
+  },
 
   // ── Windows ──────────────────────────────────────────────
   win: {
@@ -127,7 +189,7 @@ const config = {
     // audit misses them.
     //
     // Deliberately *not* electron-builder's default list. That one carries libxss1,
-    // libxtst6 and libuuid1, which Electron 41 references nowhere, and omits
+    // libxtst6 and libuuid1, which Electron 44 references nowhere, and omits
     // libasound2, libgbm1 and libnss3's own libnspr4, which it does need.
     //
     // Names are the pre-t64 ones on purpose: Ubuntu 24.04's libgtk-3-0t64 and

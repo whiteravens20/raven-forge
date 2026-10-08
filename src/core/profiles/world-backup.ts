@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { log } from '../../main/logger';
@@ -68,6 +70,21 @@ async function worldsIn(savesDir: string): Promise<string[]> {
   }
 }
 
+/**
+ * What `backup.json` says about the copy it sits beside.
+ *
+ * The size is in it because the copy does not change, and finding it out means
+ * a `stat` of every region file of every world in it. It used to be found out
+ * again each time the list was shown — once per backup, on every visit to the
+ * profile, and once more whenever an old copy was to be pruned.
+ */
+interface BackupRecord {
+  createdAt: string;
+  reason: WorldBackupReason;
+  worlds: string[];
+  bytes?: number;
+}
+
 /** What this profile has that would be worth keeping. */
 export async function listWorlds(profileId: string): Promise<string[]> {
   return worldsIn(await savesDirFor(profileId));
@@ -90,12 +107,15 @@ export async function listBackups(profileId: string): Promise<WorldBackup[]> {
       .map(async (entry): Promise<WorldBackup | null> => {
         const dir = path.join(root, entry.name);
         try {
-          const meta = JSON.parse(await fs.readFile(path.join(dir, 'backup.json'), 'utf-8')) as {
-            createdAt: string;
-            reason: WorldBackupReason;
-            worlds: string[];
-          };
-          return { id: entry.name, ...meta, bytes: await directorySize(dir) };
+          const record = path.join(dir, 'backup.json');
+          const meta = JSON.parse(await fs.readFile(record, 'utf-8')) as BackupRecord;
+          if (typeof meta.bytes === 'number') return { id: entry.name, ...meta, bytes: meta.bytes };
+
+          // A backup from before the size was written down. Measured this once
+          // and noted, so that it is not measured again at every look.
+          const bytes = await directorySize(path.join(dir, 'saves'));
+          await writeJsonAtomic(record, { ...meta, bytes }).catch(() => undefined);
+          return { id: entry.name, ...meta, bytes };
         } catch {
           // A directory with no readable record is a half-written backup from a
           // crash. Listing it would offer a restore that cannot work.
@@ -116,12 +136,28 @@ export async function listBackups(profileId: string): Promise<WorldBackup[]> {
  * Without this every version change leaves another full copy of every world
  * behind, and a profile quietly grows without anybody choosing that. A manual
  * backup is somebody's decision and is never touched.
+ *
+ * Neither is anything named in `keep`, however old it sorts. Age alone used to
+ * decide, and age is the id, which is whatever the clock said. Restoring the
+ * oldest of five automatic copies pruned the very one being restored; and with
+ * the clock set back, the copy just taken sorted oldest and went the moment it
+ * was made.
+ *
+ * Never throws. This is housekeeping after something that has already worked,
+ * and an old copy that will not go — a file in it held open, on Windows — must
+ * not turn a restore that put the worlds back into one that reports failure.
+ * Whatever stays is past keeping the next time as well, and is tried again.
  */
-async function pruneAutomatic(profileId: string): Promise<void> {
+async function pruneAutomatic(profileId: string, keep: string[]): Promise<void> {
   const automatic = (await listBackups(profileId)).filter((b) => b.reason !== 'manual');
   for (const stale of automatic.slice(KEEP_AUTOMATIC)) {
-    await fs.rm(backupDir(profileId, stale.id), { recursive: true, force: true });
-    log.info(`Pruned automatic world backup ${stale.id} of profile ${profileId}`);
+    if (keep.includes(stale.id)) continue;
+    try {
+      await fs.rm(backupDir(profileId, stale.id), { recursive: true, force: true });
+      log.info(`Pruned automatic world backup ${stale.id} of profile ${profileId}`);
+    } catch (err) {
+      log.warn(`Could not prune world backup ${stale.id} of profile ${profileId}:`, err);
+    }
   }
 }
 
@@ -135,6 +171,18 @@ export async function backupWorlds(
   profileId: string,
   reason: WorldBackupReason = 'manual',
 ): Promise<WorldBackup> {
+  const backup = await copyWorldsAside(profileId, reason);
+  if (reason !== 'manual') await pruneAutomatic(profileId, [backup.id]);
+  return backup;
+}
+
+/**
+ * The copy itself, and nothing else: no older backup is touched from here.
+ *
+ * Apart from `backupWorlds` so that a restore can take its safety copy without
+ * pruning in the same breath — see `restoreBackup`.
+ */
+async function copyWorldsAside(profileId: string, reason: WorldBackupReason): Promise<WorldBackup> {
   const savesDir = await savesDirFor(profileId);
   const worlds = await worldsIn(savesDir);
   if (worlds.length === 0) throw new Error('This profile has no worlds to back up.');
@@ -148,16 +196,15 @@ export async function backupWorlds(
   await fs.mkdir(path.dirname(dir), { recursive: true });
   await fs.mkdir(dir);
 
+  let bytes: number;
   try {
     // Symlinks are copied as symlinks, not followed. A link in `saves/` points
     // outside the profile as often as not, and a backup that silently swallowed
     // whatever it aimed at would be a surprise in both directions.
     await fs.cp(savesDir, path.join(dir, 'saves'), { recursive: true });
-    await writeJsonAtomic(path.join(dir, 'backup.json'), {
-      createdAt: createdAt.toISOString(),
-      reason,
-      worlds,
-    });
+    bytes = await directorySize(path.join(dir, 'saves'));
+    const record: BackupRecord = { createdAt: createdAt.toISOString(), reason, worlds, bytes };
+    await writeJsonAtomic(path.join(dir, 'backup.json'), record);
   } catch (err) {
     // A partial copy that lists as a backup is the one outcome worth avoiding
     // entirely — it would be offered as a restore.
@@ -165,15 +212,13 @@ export async function backupWorlds(
     throw err;
   }
 
-  if (reason !== 'manual') await pruneAutomatic(profileId);
-
   log.info(`Backed up ${worlds.length} world(s) of profile ${profileId} as ${id} (${reason})`);
   return {
     id,
     createdAt: createdAt.toISOString(),
     reason,
     worlds,
-    bytes: await directorySize(dir),
+    bytes,
   };
 }
 
@@ -183,6 +228,12 @@ export async function backupWorlds(
  * Whatever is being replaced is copied aside first, and that copy is made
  * *before* anything is deleted — so a restore chosen by mistake is itself
  * undoable, and a failure part-way through has left the originals somewhere.
+ *
+ * Nothing is pruned until the worlds are back. The safety copy is an automatic
+ * backup like any other, and taking it used to prune on the spot: restoring the
+ * oldest of five deleted that very backup, then `saves/`, and then failed for
+ * want of anything to copy. Until the copy back has finished, the backup being
+ * restored and the safety copy are the only two places the worlds exist.
  *
  * @returns the safety copy taken, or null when there was nothing to save
  */
@@ -198,12 +249,17 @@ export async function restoreBackup(
 
   const savesDir = await savesDirFor(profileId);
   const existing = await worldsIn(savesDir);
-  const safety = existing.length > 0 ? await backupWorlds(profileId, 'before-restore') : null;
+  const safety = existing.length > 0 ? await copyWorldsAside(profileId, 'before-restore') : null;
 
   await fs.rm(savesDir, { recursive: true, force: true });
   await fs.cp(source, savesDir, { recursive: true });
 
   log.info(`Restored world backup ${backupId} into profile ${profileId}`);
+
+  // The backup just restored stays even when it is the oldest: it was asked for
+  // by name a moment ago, and a list it has vanished from reads as a restore
+  // that used it up.
+  if (safety) await pruneAutomatic(profileId, [backupId, safety.id]);
   return safety;
 }
 

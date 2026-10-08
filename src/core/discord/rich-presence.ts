@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 /**
  * "Playing Raven Forge" on the player's Discord profile, for as long as the
  * game is running.
@@ -243,60 +245,32 @@ function sendActivity(sock: net.Socket, activity: unknown): void {
   );
 }
 
-/**
- * Announce that a profile is running.
- *
- * Deliberately says nothing about which server the player is on. That address
- * would be handed to their entire friends list, and unlike the profile name it
- * is not something they chose to publish — the profile name, version and loader
- * are all the status has ever needed.
- */
-export async function setGamePresence(presence: GamePresence): Promise<void> {
-  try {
-    if (!HAS_APP_ID) {
-      log.info('Discord Rich Presence: no application ID compiled in, skipping.');
-      return;
-    }
-    disconnect();
-
-    const sock = await connect();
-    if (!sock) {
-      log.info('Discord Rich Presence: no Discord IPC socket found, skipping.');
-      return;
-    }
-    if (!(await handshake(sock))) {
-      log.info('Discord Rich Presence: Discord did not complete the handshake, skipping.');
-      sock.destroy();
-      return;
-    }
-
-    // Once connected, a dropped socket is not worth a reconnect loop: the
-    // player quit Discord mid-session, and the status they left has gone with
-    // it. Nothing here may take the launcher down with it, though.
-    sock.on('error', (err) => {
-      log.info(`Discord Rich Presence: connection lost (${err.message}).`);
-      disconnect();
-    });
-    sock.on('close', () => disconnect());
-
-    socket = sock;
-    sendActivity(sock, {
-      details: presence.profileName,
-      state: `Minecraft ${presence.minecraftVersion} · ${presence.loader}`,
-      timestamps: { start: presence.startedAt },
-      // Unknown asset keys are ignored, so this lights up when the artwork is
-      // uploaded to the portal and costs nothing until then.
-      assets: { large_image: 'raven-forge', large_text: 'Raven Forge' },
-    });
-    log.info(`Discord Rich Presence: showing "${presence.profileName}".`);
-  } catch (err) {
-    log.info(`Discord Rich Presence: not shown (${err instanceof Error ? err.message : err}).`);
-    disconnect();
-  }
+/** What Discord is told about a running game. */
+function activityOf(presence: GamePresence): unknown {
+  return {
+    details: presence.profileName,
+    state: `Minecraft ${presence.minecraftVersion} · ${presence.loader}`,
+    timestamps: { start: presence.startedAt },
+    // Unknown asset keys are ignored, so this lights up when the artwork is
+    // uploaded to the portal and costs nothing until then.
+    assets: { large_image: 'raven-forge', large_text: 'Raven Forge' },
+  };
 }
 
+/** The games that are running, by profile, the one started last at the end. */
+const sessions = new Map<string, GamePresence>();
+
+/**
+ * Counted up by every change to what should be shown. Finding Discord takes
+ * awaits, and whoever comes back from them checks that nothing was asked in
+ * the meantime — see `show`.
+ */
+let asked = 0;
+
+const newest = (): GamePresence | undefined => [...sessions.values()].at(-1);
+
 /** Take the status down. Safe to call when nothing was ever shown. */
-export function clearGamePresence(): void {
+function hide(): void {
   const sock = socket;
   if (!sock) return;
   socket = null;
@@ -311,4 +285,87 @@ export function clearGamePresence(): void {
     // A socket that died on its own is exactly the case this must not report.
     sock.destroy();
   }
+}
+
+/** Bring Discord in line with `sessions`: the newest game, or nothing. */
+async function show(): Promise<void> {
+  const mine = ++asked;
+  try {
+    if (!sessions.size) {
+      hide();
+      return;
+    }
+    if (!HAS_APP_ID) {
+      log.info('Discord Rich Presence: no application ID compiled in, skipping.');
+      return;
+    }
+
+    if (!socket) {
+      const sock = await connect();
+      if (!sock) {
+        log.info('Discord Rich Presence: no Discord IPC socket found, skipping.');
+        return;
+      }
+      if (!(await handshake(sock))) {
+        log.info('Discord Rich Presence: Discord did not complete the handshake, skipping.');
+        sock.destroy();
+        return;
+      }
+      // Something changed while Discord was being found — the game ended, or
+      // another started — and whoever changed it is making its own connection.
+      // This used to carry on and show the status regardless: a game that quit
+      // at once, or never started, stayed "playing" until the launcher closed.
+      if (mine !== asked || socket) {
+        sock.destroy();
+        return;
+      }
+
+      // Once connected, a dropped socket is not worth a reconnect loop: the
+      // player quit Discord mid-session, and the status they left has gone with
+      // it. Nothing here may take the launcher down with it, though.
+      sock.on('error', (err) => {
+        log.info(`Discord Rich Presence: connection lost (${err.message}).`);
+        disconnect();
+      });
+      sock.on('close', () => disconnect());
+      socket = sock;
+    }
+
+    const presence = newest();
+    if (!presence) {
+      hide();
+      return;
+    }
+    sendActivity(socket, activityOf(presence));
+    log.info(`Discord Rich Presence: showing "${presence.profileName}".`);
+  } catch (err) {
+    log.info(`Discord Rich Presence: not shown (${err instanceof Error ? err.message : err}).`);
+    disconnect();
+  }
+}
+
+/**
+ * Announce that a profile is running.
+ *
+ * Deliberately says nothing about which server the player is on. That address
+ * would be handed to their entire friends list, and unlike the profile name it
+ * is not something they chose to publish — the profile name, version and loader
+ * are all the status has ever needed.
+ */
+export async function setGamePresence(profileId: string, presence: GamePresence): Promise<void> {
+  // Taken out first so that it goes back in at the end, as the newest.
+  sessions.delete(profileId);
+  sessions.set(profileId, presence);
+  await show();
+}
+
+/**
+ * A profile's game is over.
+ *
+ * The status goes only when it was the last one running. With two games up,
+ * the first to end used to take down the status of the one still being played.
+ */
+export async function clearGamePresence(profileId: string): Promise<void> {
+  if (!sessions.delete(profileId)) return;
+  await show();
 }

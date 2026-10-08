@@ -1,11 +1,19 @@
-import { app, BrowserWindow } from 'electron';
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { app, BrowserWindow, Menu, session } from 'electron';
 import { initLogger, log } from './logger';
+import { establishAppHome } from './home';
+import type { AppHome } from '../core/config/app-home';
 import { createMainWindow, getMainWindow } from './window';
-import { installContentSecurityPolicy } from './security';
-import { registerAllIpcHandlers } from './ipc-handlers';
+import {
+  installContentSecurityPolicy,
+  installPermissionPolicy,
+  refuseRemoteDebugging,
+} from './security';
+import { holdHandlersUntil, registerAllIpcHandlers } from './ipc-handlers';
 import { loadSettings } from '../core/config/settings-manager';
 import { ensureDataDirectories } from './init';
-import { applyProxySettings } from '../core/net/proxy';
+import { applyProxySettings, proxyCredentialsFor } from '../core/net/proxy';
 import { initUpdater, checkForUpdates } from '../core/updater/launcher-updater';
 import { checkAllProfilesForPackUpdates } from '../core/mods/mod-sync';
 
@@ -57,7 +65,34 @@ function registerCrashHandlers(): void {
  * created in the first tick of the handler, so losing the race would put a
  * second window on screen and take it away again.
  */
-function registerAppLifecycle(): void {
+/** How long the page's requests wait for a start that has not finished. */
+const STARTUP_PATIENCE_MS = 15_000;
+
+/**
+ * Make the data folders and put the proxy in place.
+ *
+ * Never rejects and never takes for ever: what waits on it is every request
+ * the page makes, and a data folder on a drive that does not answer must leave
+ * a launcher that says so rather than one that says nothing.
+ */
+async function startUp(): Promise<void> {
+  const setup = (async () => {
+    await ensureDataDirectories();
+    await applyProxySettings(await loadSettings());
+  })().catch((err: unknown) => log.error('Failed to initialize:', err));
+
+  let timer: NodeJS.Timeout | undefined;
+  const patience = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      log.warn(`Still starting after ${STARTUP_PATIENCE_MS / 1000} s — carrying on without it`);
+      resolve();
+    }, STARTUP_PATIENCE_MS);
+  });
+  await Promise.race([setup, patience]);
+  clearTimeout(timer);
+}
+
+function registerAppLifecycle(home: AppHome): void {
   app.on('second-instance', () => {
     // The launcher's own window, not whichever one happens to be first: a
     // sign-in is a second BrowserWindow, and raising that instead would answer a
@@ -72,10 +107,30 @@ function registerAppLifecycle(): void {
 
   app.whenReady().then(async () => {
     initLogger();
+    if (home.migratedFrom) log.info(`Renamed the home from ${home.migratedFrom}`);
+    if (home.legacyInUse) {
+      log.warn(`${home.legacyInUse} is in use, so it is the home for this session as it stands`);
+    }
 
     // After the logger and before anything that can throw: these exist to write
     // to the log, so registering them earlier would only lose what they caught.
     registerCrashHandlers();
+
+    // No spell checking. The launcher has a handful of one-line fields, and on
+    // Linux the checker fetches a dictionary for the system's language from a
+    // Google address the privacy page does not list — three megabytes, at every
+    // first start, for a feature nobody asked for. Switching the checker off is
+    // not enough: the dictionaries are loaded for whatever languages are set,
+    // enabled or not, so the list is emptied too. Before the first window, which
+    // is what starts that load; the Microsoft sign-in window shares this session.
+    session.defaultSession.setSpellCheckerLanguages([]);
+    session.defaultSession.setSpellCheckerEnabled(false);
+
+    // A packaged launcher has no menu, and so none of the shortcuts Electron's
+    // default one brings with it: reload, the developer tools, close-window.
+    // Its window is frameless, so the menu was never seen — only its shortcuts
+    // were live, and a reload in the middle of an install is nobody's intention.
+    if (app.isPackaged) Menu.setApplicationMenu(null);
 
     // The window is opened before any of the setup below it. None of that setup
     // is slow — six mkdirs and a settings file — but all of it used to run with
@@ -85,16 +140,15 @@ function registerAppLifecycle(): void {
     // CSP first regardless: it has to be installed before the very first
     // document, and handlers have to exist before the renderer can invoke one.
     installContentSecurityPolicy();
+    installPermissionPolicy();
     registerAllIpcHandlers();
-    createMainWindow();
 
-    try {
-      await ensureDataDirectories();
-      // Before anything fetches: the updater check below is an outbound request.
-      await applyProxySettings(await loadSettings());
-    } catch (err) {
-      log.error('Failed to initialize:', err);
-    }
+    // Before anything fetches. The handlers wait for this, so the page's first
+    // requests cannot be on their way before the proxy is in place.
+    const started = startUp();
+    holdHandlersUntil(started);
+    createMainWindow();
+    await started;
 
     initUpdater();
     void checkForUpdates();
@@ -103,6 +157,16 @@ function registerAppLifecycle(): void {
     void checkAllProfilesForPackUpdates();
 
     log.info('Raven Forge Launcher ready.');
+  });
+
+  // A proxy that wants a name and a password asks Chromium, and Chromium asks
+  // here. Only the proxy from Settings is answered, with what its address says.
+  app.on('login', (event, _contents, _details, authInfo, callback) => {
+    if (!authInfo.isProxy) return;
+    const credentials = proxyCredentialsFor(authInfo.host, authInfo.port);
+    if (!credentials) return;
+    event.preventDefault();
+    callback(credentials.username, credentials.password);
   });
 
   app.on('window-all-closed', () => {
@@ -118,9 +182,18 @@ function registerAppLifecycle(): void {
   });
 }
 
+// Ahead of everything, in the turn the script starts in: by the end of it the
+// browser has read its command line.
+refuseRemoteDebugging();
+
+// Where the launcher lives is settled next: the single-instance lock below is
+// kept in that directory, so it has to be the right one by the time it is asked
+// for.
+const home = establishAppHome();
+
 // Prevent multiple instances.
 if (app.requestSingleInstanceLock()) {
-  registerAppLifecycle();
+  registerAppLifecycle(home);
 } else {
   app.quit();
 }

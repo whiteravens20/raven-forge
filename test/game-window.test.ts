@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect } from 'vitest';
 import { customResolution } from '../src/core/minecraft/launch-args';
 import { profileSchema } from '../src/shared/validators';
@@ -64,6 +66,17 @@ describe('the profile schema and the window', () => {
 
   it('drops a full-screen value that is not a yes or a no', () => {
     expect(profileSchema.parse({ ...base, fullscreen: 'yes' }).fullscreen).toBeUndefined();
+  });
+
+  it('keeps a game language that is a locale code', () => {
+    expect(profileSchema.parse({ ...base, gameLanguage: 'pl_pl' }).gameLanguage).toBe('pl_pl');
+  });
+
+  it('drops a game language that could not be one line of options.txt', () => {
+    // The value is written into the game's settings file as `lang:<value>`.
+    for (const bad of ['pl_pl\nfullscreen:true', 'PL', '../../etc', 'pl-PL', '']) {
+      expect(profileSchema.parse({ ...base, gameLanguage: bad }).gameLanguage).toBeUndefined();
+    }
   });
 
   it('still refuses the fields a launch depends on', () => {

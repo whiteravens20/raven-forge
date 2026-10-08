@@ -1,5 +1,8 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect } from 'react';
 import { useProgressStore } from '@stores/progress-store';
+import { useGameStore } from '@stores/game-store';
 import { formatBytes } from '@renderer/format';
 import { useT, type TFunction, type TranslationKey } from '@renderer/i18n';
 import type { ProgressMessage } from '@shared/ipc-types';
@@ -31,6 +34,8 @@ export function InstallProgressOverlay() {
   const init = useProgressStore((s) => s.init);
   const entries = useProgressStore((s) => s.entries);
   const hasActive = useProgressStore((s) => s.hasActive);
+  const installing = useProgressStore((s) => s.installing);
+  const launching = useGameStore((s) => s.preparing.size > 0);
 
   useEffect(() => {
     init();
@@ -42,10 +47,24 @@ export function InstallProgressOverlay() {
   const overall = items.reduce((acc, e) => acc + e.progress, 0) / items.length;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border border-rf-border bg-rf-bg-secondary/95 p-3 shadow-lg backdrop-blur animate-fade-in">
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border border-rf-border bg-rf-bg-secondary/95 p-3 shadow-lg backdrop-blur animate-fade-in"
+    >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-display font-semibold uppercase tracking-wider text-rf-text-secondary">
-          {t('progress.title')}
+          {/* Named for what is happening. This box is on screen at every launch,
+              and at nearly every launch it is checking files that are already
+              there — under the heading "Install progress" that read as the
+              pack being installed again each time. */}
+          {t(
+            installing
+              ? 'progress.titleInstalling'
+              : launching
+                ? 'progress.titlePreparing'
+                : 'progress.titleChecking',
+          )}
         </span>
         <ProgressRing progress={overall} />
       </div>

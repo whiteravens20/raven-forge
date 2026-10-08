@@ -1,8 +1,11 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../src/core/config/defaults';
+import { REFUSED, madeUnreadable } from './helpers/unreadable';
 
 /**
  * `settings.json`, and what happens when it is not what was expected.
@@ -82,18 +85,43 @@ describe('loadSettings', () => {
     expect((await fs.readdir(root)).some((f) => f.includes('.broken-'))).toBe(true);
   });
 
-  it.skipIf(asRoot)('does not overwrite a file nobody could read', async () => {
-    // Unreadable is not the same as absent. A permissions problem answered by
-    // writing defaults is a permissions problem that eats the settings.
-    await fs.writeFile(settingsFile(), JSON.stringify({ ...DEFAULT_SETTINGS, theme: 'light' }));
-    await fs.chmod(settingsFile(), 0o000);
-
+  it('keeps a stored trusted key the verifier cannot use, and the file with it', async () => {
+    // Builds before the key check stored whatever was pasted into the form. Such
+    // a key verifies nothing and still switches enforcement on; dropping it on
+    // the way in would switch enforcement off with nobody having asked, and
+    // refusing it would move the whole file aside.
+    const cutShort = {
+      name: 'Cut short',
+      publicKey: 'MCowBQYDK2VwAyEA',
+      addedAt: '2026-01-01T00:00:00.000Z',
+    };
+    await fs.writeFile(
+      settingsFile(),
+      JSON.stringify({ ...DEFAULT_SETTINGS, theme: 'light', trustedPublicKeys: [cutShort] }),
+    );
     const { loadSettings } = await loadModule();
-    expect(await loadSettings()).toEqual(DEFAULT_SETTINGS);
-
-    await fs.chmod(settingsFile(), 0o600);
-    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8')).theme).toBe('light');
+    const settings = await loadSettings();
+    expect(settings.theme).toBe('light');
+    expect(settings.trustedPublicKeys).toEqual([cutShort]);
+    expect((await fs.readdir(root)).some((f) => f.includes('.broken-'))).toBe(false);
   });
+
+  it.skipIf(asRoot)(
+    'does not overwrite a file nobody could read',
+    async () => {
+      // Unreadable is not the same as absent. A permissions problem answered by
+      // writing defaults is a permissions problem that eats the settings.
+      await fs.writeFile(settingsFile(), JSON.stringify({ ...DEFAULT_SETTINGS, theme: 'light' }));
+      const readable = await madeUnreadable(settingsFile());
+
+      const { loadSettings } = await loadModule();
+      expect(await loadSettings()).toEqual(DEFAULT_SETTINGS);
+
+      await readable();
+      expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8')).theme).toBe('light');
+    },
+    30_000,
+  );
 });
 
 describe('updateSettings', () => {
@@ -133,6 +161,103 @@ describe('resetSettings', () => {
     expect(await resetSettings()).toEqual(DEFAULT_SETTINGS);
     expect(await getSettings()).toEqual(DEFAULT_SETTINGS);
     expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+/**
+ * The launcher starts on the defaults when the file cannot be read, and those
+ * defaults are a stand-in, not the settings.
+ *
+ * Nothing used to tell the two apart. The first change made after such a start
+ * was merged into the defaults and saved — over the proxy, the trusted keys and
+ * the theme in a file nobody had read, with no copy kept.
+ */
+describe.skipIf(asRoot)('after a start that could not read the file', () => {
+  const real = {
+    ...DEFAULT_SETTINGS,
+    theme: 'light',
+    proxyUrl: 'http://proxy.example.net:8080',
+    trustedPublicKeys: [
+      {
+        name: 'Mine',
+        publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+        addedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+  };
+
+  /** A start with the file out of reach, and the way to put it back in reach. */
+  async function startUnreadable() {
+    await fs.writeFile(settingsFile(), JSON.stringify(real));
+    const readable = await madeUnreadable(settingsFile());
+    const mod = await loadModule();
+    expect(await mod.loadSettings()).toEqual(DEFAULT_SETTINGS);
+    return { ...mod, readable };
+  }
+
+  it('refuses a change instead of saving the defaults over the file', async () => {
+    const { updateSettings, readable } = await startUnreadable();
+
+    await expect(updateSettings({ showLiveConsole: true })).rejects.toThrow(REFUSED);
+
+    await readable();
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(real);
+  }, 30_000);
+
+  it('refuses a reset for the same reason', async () => {
+    const { resetSettings, readable } = await startUnreadable();
+
+    await expect(resetSettings()).rejects.toThrow(REFUSED);
+
+    await readable();
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(real);
+  }, 30_000);
+
+  it('builds the change on what the file holds once it can be read', async () => {
+    const { updateSettings, getSettings, readable } = await startUnreadable();
+    await readable();
+
+    const updated = await updateSettings({ showLiveConsole: true });
+
+    const expected = { ...real, showLiveConsole: true };
+    expect(updated).toEqual(expected);
+    expect(await getSettings()).toEqual(expected);
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(expected);
+  });
+});
+
+describe('overlapping changes', () => {
+  it('does not let two updates in flight lose each other', async () => {
+    // Each one is a read, a merge and a write with an `await` in the middle.
+    // Unqueued, they all merged into the same starting point, and whichever
+    // finished last erased the rest — after each had been answered as saved.
+    const { loadSettings, updateSettings, getSettings } = await loadModule();
+    await loadSettings();
+
+    const replies = await Promise.all([
+      updateSettings({ theme: 'light' }),
+      updateSettings({ downloadConcurrency: 2 }),
+      updateSettings({ showLiveConsole: true }),
+    ]);
+
+    const all = { theme: 'light', downloadConcurrency: 2, showLiveConsole: true };
+    expect(replies[2]).toMatchObject(all);
+    expect(await getSettings()).toMatchObject(all);
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toMatchObject(all);
+  });
+
+  it('does not let an update made during a reset bring the old settings back', async () => {
+    // The update merged into what was cached when it was called — the settings
+    // the reset was in the middle of replacing — and then saved all of them.
+    const { loadSettings, updateSettings, resetSettings, getSettings } = await loadModule();
+    await loadSettings();
+    await updateSettings({ theme: 'light' });
+
+    await Promise.all([resetSettings(), updateSettings({ downloadConcurrency: 2 })]);
+
+    const expected = { ...DEFAULT_SETTINGS, downloadConcurrency: 2 };
+    expect(await getSettings()).toEqual(expected);
+    expect(JSON.parse(await fs.readFile(settingsFile(), 'utf-8'))).toEqual(expected);
   });
 });
 

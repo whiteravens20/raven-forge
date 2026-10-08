@@ -1,10 +1,12 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useMemo } from 'react';
-import { useSettingsStore } from '@stores/settings-store';
+import { useSettingsStore } from '../stores/settings-store';
 import type { Locale } from '@shared/ipc-types';
 import { en, type PluralKey, type TranslationKey, type Translations } from './en';
 import { pl } from './pl';
 
-export type { TranslationKey, Translations, PluralKey, Locale };
+export type { TranslationKey };
 export { localized } from './localized';
 
 /**
@@ -22,7 +24,7 @@ export { localized } from './localized';
  * union in step: adding a locale there without a dictionary here fails to
  * compile.
  */
-export const LOCALES = { pl, en } satisfies Record<Locale, Translations>;
+const LOCALES = { pl, en } satisfies Record<Locale, Translations>;
 
 /** Endonyms — a language is listed the way its own speakers write it. */
 export const LOCALE_NAMES: Record<Locale, string> = {
@@ -55,7 +57,7 @@ function interpolate(template: string, vars?: TranslationVars): string {
   );
 }
 
-export function translate(locale: Locale, key: TranslationKey, vars?: TranslationVars): string {
+function translate(locale: Locale, key: TranslationKey, vars?: TranslationVars): string {
   // English is the last resort rather than the raw key: a locale that is
   // missing an entry should degrade to a readable sentence, not to
   // `settings.trustedKeysHint` in the middle of a settings page.
@@ -78,12 +80,7 @@ function rulesFor(locale: Locale): Intl.PluralRules {
   return rules;
 }
 
-export function plural(
-  locale: Locale,
-  base: PluralKey,
-  count: number,
-  vars?: TranslationVars,
-): string {
+function plural(locale: Locale, base: PluralKey, count: number, vars?: TranslationVars): string {
   const category = rulesFor(locale).select(count);
   // English never produces `few`/`many`, and a translator may legitimately
   // leave a category out where their language does not distinguish it, so an

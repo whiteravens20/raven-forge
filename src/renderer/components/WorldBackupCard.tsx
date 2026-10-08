@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Archive, RotateCcw, Trash2, Save } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { ConfirmButton } from '@components/ui/ConfirmButton';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useLocale, useT } from '@renderer/i18n';
@@ -28,11 +31,20 @@ export function WorldBackupCard({ profileId }: { profileId: string }) {
   /** The backup whose "are you sure" is showing; restoring replaces live worlds. */
   const [confirming, setConfirming] = useState<string | null>(null);
 
+  // The profile this card is showing now. A copy of a large world takes long
+  // enough to select another profile in, and what it then reported — the first
+  // profile's worlds, its backups, "backed up" — used to land on the second.
+  const shown = useRef(profileId);
+  useEffect(() => {
+    shown.current = profileId;
+  }, [profileId]);
+
   const reload = useCallback(async () => {
     const [w, b] = await Promise.all([
       api.profiles.listWorlds(profileId),
       api.profiles.listBackups(profileId),
     ]);
+    if (shown.current !== profileId) return;
     setWorlds(w.success && w.data ? w.data : []);
     setBackups(b.success && b.data ? b.data : []);
   }, [profileId]);
@@ -41,45 +53,57 @@ export function WorldBackupCard({ profileId }: { profileId: string }) {
     setError(null);
     setNote(null);
     setConfirming(null);
+    setBusy(false);
     void reload();
   }, [reload]);
 
-  const act = async (run: () => Promise<string | null>) => {
+  // A session is where worlds come from: the list read before it is not the
+  // list after it.
+  useEffect(
+    () =>
+      api.on('game:exited', (info) => {
+        if (info.profileId === profileId) void reload();
+      }),
+    [profileId, reload],
+  );
+
+  /** Run one action on this profile, and report it only if it is still the one shown. */
+  const act = async (run: () => Promise<{ failure?: string; note?: string }>) => {
     setBusy(true);
     setError(null);
     setNote(null);
-    try {
-      const failure = await run();
-      if (failure) setError(failure);
-      await reload();
-    } finally {
-      setBusy(false);
-    }
+    const outcome = await run().catch((err: unknown) => ({
+      failure: err instanceof Error ? err.message : String(err),
+      note: undefined,
+    }));
+    if (shown.current !== profileId) return;
+    if (outcome.failure) setError(outcome.failure);
+    else if (outcome.note) setNote(outcome.note);
+    await reload();
+    setBusy(false);
   };
 
   const backUp = () =>
     act(async () => {
       const r = await api.profiles.backupWorlds(profileId);
-      if (!r.success) return r.error ?? t('worlds.backupFailed');
-      setNote(t('worlds.backedUp'));
-      return null;
+      if (!r.success) return { failure: r.error ?? t('worlds.backupFailed') };
+      return { note: t('worlds.backedUp') };
     });
 
   const restore = (backupId: string) =>
     act(async () => {
       setConfirming(null);
       const r = await api.profiles.restoreBackup(profileId, backupId);
-      if (!r.success) return r.error ?? t('worlds.restoreFailed');
+      if (!r.success) return { failure: r.error ?? t('worlds.restoreFailed') };
       // `data` is the copy taken of what was just replaced — the reason this is
       // recoverable, so it is what gets said rather than a bare "done".
-      setNote(r.data ? t('worlds.restoredWithSafety') : t('worlds.restored'));
-      return null;
+      return { note: r.data ? t('worlds.restoredWithSafety') : t('worlds.restored') };
     });
 
   const remove = (backupId: string) =>
     act(async () => {
       const r = await api.profiles.deleteBackup(profileId, backupId);
-      return r.success ? null : (r.error ?? t('worlds.deleteFailed'));
+      return r.success ? {} : { failure: r.error ?? t('worlds.deleteFailed') };
     });
 
   return (
@@ -151,13 +175,13 @@ export function WorldBackupCard({ profileId }: { profileId: string }) {
                     onClick={() => setConfirming(backup.id)}
                     title={t('worlds.restore')}
                   />
-                  <Button
-                    variant="danger"
-                    size="sm"
+                  <ConfirmButton
                     icon={<Trash2 size={12} />}
-                    loading={busy}
-                    onClick={() => void remove(backup.id)}
                     title={t('common.delete')}
+                    question={t('worlds.confirmDelete')}
+                    confirmLabel={t('common.delete')}
+                    loading={busy}
+                    onConfirm={() => void remove(backup.id)}
                   />
                 </>
               )}

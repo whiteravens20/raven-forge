@@ -1,11 +1,13 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { acceptedLoaders } from '../../shared/constants';
+import { isProject, type InstalledIdentity } from '../../shared/mod-identity';
 import { getModVersions, getProjectTitle, type ModrinthVersion } from './modrinth-api';
 import type {
   CompatibilityIssue,
   InstallPlan,
   InstalledMod,
   ModSearchResult,
-  PlannedDependency,
   Profile,
 } from '../../shared/ipc-types';
 
@@ -36,21 +38,16 @@ const SUPPORTED_VERSIONS_SHOWN = 3;
 // ── Dependencies ───────────────────────────────────────────
 
 /**
- * The required dependencies of a build that are not already in the profile.
- *
- * One level deep, deliberately. Modrinth's `required` edges are shallow in
- * practice — a mod needs Fabric API, an addon needs the mod it extends — and
- * those dependencies declare their own, so the transitive case resolves itself
- * the moment each one is installed by the same path. A full graph walk would be
- * machinery built for a shape that does not occur.
+ * The required dependencies of a build that are not already in the profile —
+ * the ones it names itself. What those need in turn is {@link resolveDependencies}.
  */
 export function requiredDependencies(
   version: ModrinthVersion,
-  installed: Array<{ id: string }>,
+  installed: InstalledIdentity[],
 ): Array<{ projectId: string; versionId: string | null }> {
   return version.dependencies
     .filter((d) => d.dependency_type === 'required' && d.project_id)
-    .filter((d) => !installed.some((m) => m.id === d.project_id))
+    .filter((d) => !installed.some((m) => isProject(m, d.project_id as string)))
     .map((d) => ({ projectId: d.project_id as string, versionId: d.version_id }));
 }
 
@@ -67,7 +64,7 @@ function conflictingWith(version: ModrinthVersion, installed: InstalledMod[]): s
   return (
     version.dependencies
       .filter((d) => d.dependency_type === 'incompatible' && d.project_id)
-      .map((d) => installed.find((m) => m.id === d.project_id))
+      .map((d) => installed.find((m) => isProject(m, d.project_id as string)))
       .filter((m): m is InstalledMod => Boolean(m))
       // The installed name is already on hand and is what the player sees in
       // their own list — no reason to ask Modrinth what it calls that project.
@@ -75,41 +72,75 @@ function conflictingWith(version: ModrinthVersion, installed: InstalledMod[]): s
   );
 }
 
+/** A dependency, with the build of it that fits the profile. */
+export interface ResolvedDependency {
+  projectId: string;
+  /** The project's title, not the build's. */
+  name: string;
+  version: ModrinthVersion;
+}
+
 /**
- * Resolve each missing dependency to a build for this profile.
+ * Enough for any real mod, and a stop for a chain that has no end to it: every
+ * step here is two requests to Modrinth, decided by what the last one said.
+ */
+const MAX_DEPENDENCIES = 64;
+
+/**
+ * Everything a build cannot start without that the profile does not have: what
+ * it requires, what those require, and so on down.
+ *
+ * All the way down, because nothing else resolves the rest. This used to stop
+ * at the first level on the reasoning that each dependency "declares its own"
+ * and the chain completes itself as they are installed — but they are installed
+ * by a path that resolves nothing, so it never did. Applied Mekanistics needs
+ * AE2, AE2 needs GuideME, and the profile got the first two and crashed on the
+ * third.
  *
  * A dependency with no build is reported rather than skipped: it is the reason
  * the mod will fail to start, and finding that out from a crash log after the
  * fact is exactly what this whole module exists to avoid.
  */
-async function planDependencies(
+export async function resolveDependencies(
   version: ModrinthVersion,
   target: ProfileTarget,
-  installed: InstalledMod[],
-): Promise<{ dependencies: PlannedDependency[]; unresolved: string[] }> {
+  installed: InstalledIdentity[],
+): Promise<{ resolved: ResolvedDependency[]; unresolved: string[] }> {
   const loaders = acceptedLoaders(target.modLoader);
-  const dependencies: PlannedDependency[] = [];
+  const resolved: ResolvedDependency[] = [];
   const unresolved: string[] = [];
 
-  for (const dep of requiredDependencies(version, installed)) {
-    // The project's title, not the build's. `ModrinthVersion.name` is a label
-    // like "[1.21.4] Sodium 0.6.5", which reads badly in a sentence.
-    const name = await getProjectTitle(dep.projectId);
-    const candidates = await getModVersions(dep.projectId, target.minecraftVersion, loaders);
-    // A pinned `version_id` is the publisher saying *this* build; honour it when
-    // it is among the ones that fit, and fall back to newest when it is not.
-    const match = dep.versionId
-      ? (candidates.find((v) => v.id === dep.versionId) ?? candidates[0])
-      : candidates[0];
+  // Decided once each. The build being installed counts as decided: two mods
+  // that require each other would otherwise fetch one another for ever.
+  const decided = new Set<string>([version.project_id]);
+  const pending = [version];
 
-    if (match) {
-      dependencies.push({ id: dep.projectId, name, version: match.version_number || match.id });
-    } else {
-      unresolved.push(name);
+  for (let next = pending.shift(); next; next = pending.shift()) {
+    for (const dep of requiredDependencies(next, installed)) {
+      if (decided.has(dep.projectId) || decided.size > MAX_DEPENDENCIES) continue;
+      decided.add(dep.projectId);
+
+      // The project's title, not the build's. `ModrinthVersion.name` is a label
+      // like "[1.21.4] Sodium 0.6.5", which reads badly in a sentence.
+      const name = await getProjectTitle(dep.projectId);
+      const candidates = await getModVersions(dep.projectId, target.minecraftVersion, loaders);
+      // A pinned `version_id` is the publisher saying *this* build; honour it
+      // when it is among the ones that fit, and fall back to newest when it is
+      // not.
+      const match = dep.versionId
+        ? (candidates.find((v) => v.id === dep.versionId) ?? candidates[0])
+        : candidates[0];
+
+      if (!match) {
+        unresolved.push(name);
+        continue;
+      }
+      resolved.push({ projectId: dep.projectId, name, version: match });
+      pending.push(match);
     }
   }
 
-  return { dependencies, unresolved };
+  return { resolved, unresolved };
 }
 
 // ── Choosing a build ───────────────────────────────────────
@@ -216,17 +247,17 @@ export async function planModInstall(
   const { version, issues } = await chooseBuild(mod.id, target, true);
   if (!version) return { name: mod.name, dependencies: [], issues };
 
-  const conflicts = await conflictingWith(version, installed);
+  const conflicts = conflictingWith(version, installed);
   if (conflicts.length > 0) issues.push({ kind: 'conflicts-with', names: conflicts });
 
-  const { dependencies, unresolved } = await planDependencies(version, target, installed);
+  const { resolved, unresolved } = await resolveDependencies(version, target, installed);
   if (unresolved.length > 0) issues.push({ kind: 'dependency-no-build', names: unresolved });
 
   return {
     name: mod.name,
     versionId: version.id,
     versionName: version.version_number || version.id,
-    dependencies,
+    dependencies: resolved.map((dep) => dep.name),
     issues,
   };
 }

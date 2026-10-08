@@ -1,15 +1,23 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { app, ipcMain, dialog, shell, type IpcMainInvokeEvent } from 'electron';
-import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { log } from './logger';
+import { log, LOG_FILE } from './logger';
 import { getMainWindow } from './window';
 import { assertTrustedSender } from './security';
+import { relaunchLauncher } from './relaunch';
 import { getSettings, updateSettings, resetSettings } from '../core/config/settings-manager';
-import { applyProxySettings } from '../core/net/proxy';
+import { applyProxySettings, assertProxyUsable } from '../core/net/proxy';
 import { paths } from '../core/config/paths';
-import { dataRootSource, dataRootUnavailable, defaultDataRoot } from '../core/config/data-root';
-import { applyDataRoot, planDataRootChange } from '../core/config/data-root-move';
+import {
+  dataRootSource,
+  dataRootUnavailable,
+  defaultDataRoot,
+  writeDataRootPointer,
+} from '../core/config/data-root';
+import { applyDataRoot, pathConcerns, planDataRootChange } from '../core/config/data-root-move';
+import { measureStorage } from '../core/config/storage-map';
 import { fetchNews, fetchAnnouncements } from '../core/news/news-fetcher';
 import {
   getAllProfiles,
@@ -19,10 +27,11 @@ import {
   deleteProfile,
   duplicateProfile,
   exportProfile,
-  importProfile,
+  importProfileFile,
   summarizeProfileFiles,
   listOrphanedProfiles,
   adoptOrphanedProfile,
+  getUnreadableProfileEntries,
   discardOrphanedProfile,
 } from '../core/profiles/profile-manager';
 import {
@@ -37,8 +46,9 @@ import {
   restoreBackup,
   deleteBackup,
 } from '../core/profiles/world-backup';
-import { getProfileSyncStatus, getLastManifestVerification } from '../core/mods/mod-sync';
 import {
+  getProfileSyncStatus,
+  getLastManifestVerification,
   getInstalledMods,
   syncManifest,
   installModFromSearch,
@@ -47,16 +57,20 @@ import {
 } from '../core/mods/mod-sync';
 import { checkModUpdates, updateMods } from '../core/mods/mod-updates';
 import { searchMods, getSearchFacets } from '../core/mods/modrinth-api';
+import { getProjectDetails } from '../core/mods/project-details';
 import { planModInstall, planContentInstall } from '../core/mods/compatibility';
 import { listCataloguePacks } from '../core/packs/catalogue';
 import {
   importMrpack,
+  installModrinthPack,
   createProfileFromManifest,
   createProfileFromUrl,
 } from '../core/packs/pack-installer';
 import { exportProfileAsMrpack } from '../core/packs/mrpack-export';
 import { getShaderLoaderState, installShaderLoader } from '../core/mods/shader-loader';
+import { addModFromFile } from '../core/mods/local-mod';
 import {
+  addContentFromFile,
   listContent,
   installContent,
   removeContent,
@@ -65,10 +79,17 @@ import {
 import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater/launcher-updater';
 import { detectSystemJava, probeJava } from '../core/java/java-manager';
 import { requiredJavaFor } from '../core/minecraft/java-requirement';
-import { getLoaderVersions } from '../core/modloader/loader-manager';
-import { launchGame, killGame, isGameRunning, getLogTail } from '../core/minecraft/game-launcher';
-import { getVersionManifest } from '../core/minecraft/version-manifest';
-import { cancelJob } from '../core/util/cancellation';
+import { getLoaderVersions, loaderBuildStarts } from '../core/modloader/loader-manager';
+import {
+  launchGame,
+  killGame,
+  isGameBusy,
+  isGameRunning,
+  getLogLines,
+} from '../core/minecraft/game-launcher';
+import { getCachedVersionMeta, getVersionManifest } from '../core/minecraft/version-manifest';
+import { cancelJob, isCancellation } from '../core/util/cancellation';
+import { errorText } from '../core/util/error-text';
 import { machineMemoryMb } from '../core/util/machine-memory';
 import {
   loginMicrosoft,
@@ -76,20 +97,23 @@ import {
   logoutAccount,
   getAuthState,
   setActiveAccount,
-  refreshAccount,
 } from '../core/auth/microsoft-auth';
 import type {
   IpcResult,
   IpcErrorCode,
   ErrorMessage,
+  ContentKind,
   GlobalSettings,
   TrustedKey,
+  MrpackExportOptions,
   WorldBackupReason,
   SystemInfo,
   ShaderLoaderResult,
 } from '../shared/ipc-types';
 import { AuthServersUnreachableError } from '../core/auth/auth-errors';
-import { launchRefusal } from '../core/minecraft/launch-errors';
+import { refusalOf } from '../core/util/refusal';
+import { trustedKeyRing } from '../shared/branding';
+import { isEd25519PublicKey } from '../shared/trusted-key';
 
 /** Log tail limits — enough to diagnose a crash, small enough to ship over IPC. */
 const LOG_TAIL_DEFAULT_LINES = 500;
@@ -114,8 +138,30 @@ function fail<T>(error: string, code?: IpcErrorCode, errorMessage?: ErrorMessage
  * an Error prepends. These strings are shown to the user verbatim, and
  * "Login failed: Error: Microsoft login is not configured" reads like a bug.
  */
-function reason(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+/**
+ * What a handler says went wrong: the error, and what was underneath it. A
+ * failed request is "fetch failed" whatever the reason, and the reason is the
+ * part somebody can act on.
+ */
+const reason = errorText;
+
+/** Settled once the launcher has finished starting — see {@link holdHandlersUntil}. */
+let started: Promise<unknown> = Promise.resolve();
+
+/**
+ * Have every handler wait for the launcher to finish starting before it runs.
+ *
+ * The window is opened first and the page asks for its news the moment it is
+ * up, while the settings are still being read and the proxy has not been set.
+ * On a quick disk the proxy won that race every time; on a slow one the first
+ * requests went out directly, past the proxy somebody had configured to keep
+ * exactly that from happening. Waiting makes it a rule rather than a habit.
+ *
+ * The window's own buttons do not wait: a launcher slow to start must still be
+ * one that can be closed.
+ */
+export function holdHandlersUntil(ready: Promise<unknown>): void {
+  started = ready;
 }
 
 /**
@@ -129,8 +175,9 @@ function handle(
   channel: string,
   listener: (event: IpcMainInvokeEvent, ...args: never[]) => unknown,
 ): void {
-  ipcMain.handle(channel, (event, ...args) => {
+  ipcMain.handle(channel, async (event, ...args) => {
     assertTrustedSender(event, channel);
+    if (!channel.startsWith('window:')) await started;
     return listener(event, ...(args as never[]));
   });
 }
@@ -162,10 +209,7 @@ export function registerAllIpcHandlers(): void {
   handle('system:get-info', async () => {
     const info: SystemInfo = {
       launcherVersion: app.getVersion(),
-      platform: process.platform as SystemInfo['platform'],
-      arch: process.arch,
       totalMemoryMb: machineMemoryMb(),
-      freeMemoryMb: Math.round(os.freemem() / 1024 / 1024),
       dataDirectory: paths.root,
       crashReportsDirectory: paths.crashReportsDir,
     };
@@ -175,18 +219,37 @@ export function registerAllIpcHandlers(): void {
     // `shell.openPath` runs whatever the OS associates with the target — an
     // `.exe` or `.bat` on Windows, a `.desktop` entry on Linux — so an
     // unrestricted one is a way to execute an arbitrary file by asking the
-    // renderer nicely. Every real caller passes a directory the main process
-    // itself produced, so confining it to those costs nothing.
+    // renderer nicely. Every real caller passes a folder, or a crash report,
+    // that the main process itself produced, so confining it to the launcher's
+    // own data costs nothing.
     if (!paths.isInsideLauncherData(targetPath)) {
       log.warn(`Refused to open a path outside the launcher's data directory: ${targetPath}`);
       return fail("That path is outside the launcher's data directory");
     }
+    // Asked first, because the system is not always able to say: handed a path
+    // that does not exist, `shell.openPath` on Linux neither opens anything nor
+    // answers, and the button that asked would wait for ever.
     try {
-      await shell.openPath(targetPath);
-      return ok(undefined);
-    } catch (err) {
-      return fail(`Failed to open path: ${reason(err)}`);
+      await fs.stat(targetPath);
+    } catch {
+      return fail('That folder is not there');
     }
+    // `shell.openPath` does not throw: it resolves with a message when the
+    // system could not open the thing, and with an empty string when it could.
+    // Discarding that made every "open folder" button here report success on a
+    // machine with no file manager to open one with.
+    const failure = await shell.openPath(targetPath);
+    return failure ? fail(failure) : ok(undefined);
+  });
+  handle('system:get-storage', async () => {
+    try {
+      return ok(await measureStorage());
+    } catch (err) {
+      return fail(`Failed to measure the launcher's files: ${reason(err)}`);
+    }
+  });
+  handle('system:relaunch', () => {
+    relaunchLauncher();
   });
   handle('system:open-url', async (_event, url: string) => {
     // Only allow https:// and http:// URLs for security
@@ -207,6 +270,10 @@ export function registerAllIpcHandlers(): void {
       if (!win) return fail('No window available');
       const result = await dialog.showOpenDialog(win, {
         properties: ['openFile'],
+        // Named, like every other "pick a file" here, and not left to whatever
+        // the Electron in use starts a dialog in: up to 42 that was the folder
+        // the system remembered, and from 43 it is this one.
+        defaultPath: app.getPath('downloads'),
         filters: filters ?? [{ name: 'All Files', extensions: ['*'] }],
       });
       if (result.canceled || result.filePaths.length === 0) return ok(null);
@@ -227,7 +294,7 @@ export function registerAllIpcHandlers(): void {
    */
   handle('system:read-log', async (_event, lines?: number, since?: number) => {
     const wanted = Math.min(Math.max(lines ?? LOG_TAIL_DEFAULT_LINES, 1), LOG_TAIL_MAX_LINES);
-    const file = path.join(paths.logsDir, 'main.log');
+    const file = path.join(paths.logsDir, LOG_FILE);
     let handle;
     try {
       handle = await fs.open(file, 'r');
@@ -278,6 +345,9 @@ export function registerAllIpcHandlers(): void {
   });
   handle('settings:update', async (_event, updates: Partial<GlobalSettings>) => {
     try {
+      // Before it is written down, not after: an address that cannot be used
+      // must not be what the next start reads.
+      if ('proxyUrl' in updates) await assertProxyUsable(updates.proxyUrl);
       const settings = await updateSettings(updates);
       await applyProxySettings(settings);
       return ok(settings);
@@ -300,13 +370,24 @@ export function registerAllIpcHandlers(): void {
   });
   handle('settings:add-trusted-key', async (_event, key: TrustedKey) => {
     try {
+      // The schema does not ask this: it reads back keys stored before anything
+      // checked them, and has to take those as they are.
+      if (!isEd25519PublicKey(key.publicKey)) {
+        return fail('That is not an Ed25519 public key — it has to be 32 bytes in base64');
+      }
       const settings = await getSettings();
-      const exists = settings.trustedPublicKeys.some((k) => k.publicKey === key.publicKey);
-      if (exists) return fail('Key already exists');
-      await updateSettings({
-        trustedPublicKeys: [...settings.trustedPublicKeys, key],
-      });
-      return ok(undefined);
+      // Against the whole ring, built-in key included. Stored a second time,
+      // that one would switch enforcement on from an entry the list hides and
+      // offers no button to remove.
+      const exists = trustedKeyRing(settings.trustedPublicKeys).some(
+        (k) => k.publicKey === key.publicKey,
+      );
+      if (exists) return fail('That key is already trusted');
+      return ok(
+        await updateSettings({
+          trustedPublicKeys: [...settings.trustedPublicKeys, key],
+        }),
+      );
     } catch (err) {
       return fail(`Failed to add trusted key: ${reason(err)}`);
     }
@@ -314,10 +395,11 @@ export function registerAllIpcHandlers(): void {
   handle('settings:remove-trusted-key', async (_event, publicKey: string) => {
     try {
       const settings = await getSettings();
-      await updateSettings({
-        trustedPublicKeys: settings.trustedPublicKeys.filter((k) => k.publicKey !== publicKey),
-      });
-      return ok(undefined);
+      return ok(
+        await updateSettings({
+          trustedPublicKeys: settings.trustedPublicKeys.filter((k) => k.publicKey !== publicKey),
+        }),
+      );
     } catch (err) {
       return fail(`Failed to remove trusted key: ${reason(err)}`);
     }
@@ -331,6 +413,7 @@ export function registerAllIpcHandlers(): void {
         defaultPath: defaultDataRoot(),
         source: dataRootSource(),
         unavailable: dataRootUnavailable(),
+        ...pathConcerns(paths.root),
       });
     } catch (err) {
       return fail(`Failed to read the data directory: ${reason(err)}`);
@@ -358,26 +441,37 @@ export function registerAllIpcHandlers(): void {
     }
   });
   /**
+   * The move, and then a restart — which the renderer asks for separately, with
+   * `system:relaunch`, once it has shown how the move ended.
+   *
    * The restart is not a convenience. Every module that has already read a path
    * — the settings cache, the java manager, an in-flight download — is holding
    * the old root, and there is no version of re-pointing them all that is worth
-   * trusting with somebody's saves. Coming back up is the one way that is.
+   * trusting with somebody's saves. Coming back up is the one way that is. It
+   * used to follow the move by itself after 600 ms, which left no moment in
+   * which to say that some of the old copies could not be removed.
    */
   handle('settings:apply-data-root', async (_event, target: string) => {
     try {
-      await applyDataRoot(target, (event) => {
-        getMainWindow()?.webContents.send('progress:data-root', event);
-      });
+      return ok(
+        await applyDataRoot(target, (event) => {
+          getMainWindow()?.webContents.send('progress:data-root', event);
+        }),
+      );
     } catch (err) {
       return fail(`Failed to move the data directory: ${reason(err)}`);
     }
-    // Long enough for this reply to reach the renderer, which is showing the
-    // restart notice it is about to be replaced by.
-    setTimeout(() => {
-      app.relaunch();
-      app.quit();
-    }, 600);
-    return ok(undefined);
+  });
+  handle('settings:forget-data-root', async () => {
+    try {
+      // Only for a folder that cannot be reached. With one that can, this would
+      // be a way to walk away from the data without the dialog that says so.
+      if (!dataRootUnavailable()) return fail('The data directory is reachable');
+      await writeDataRootPointer(null);
+      return ok(undefined);
+    } catch (err) {
+      return fail(`Failed to forget the data directory: ${reason(err)}`);
+    }
   });
 
   // ── News & Announcements ────────────────────────────────
@@ -415,6 +509,8 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await loginMicrosoft());
     } catch (err) {
+      // Closing the sign-in window is an answer, not an error.
+      if (isCancellation(err)) return fail('Sign-in was called off', 'CANCELLED');
       log.error('Microsoft login failed:', err);
       return fail(`Login failed: ${reason(err)}`);
     }
@@ -449,13 +545,6 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to set active account: ${reason(err)}`);
     }
   });
-  handle('auth:refresh', async (_event, accountId: string) => {
-    try {
-      return ok(await refreshAccount(accountId));
-    } catch (err) {
-      return fail(`Token refresh failed: ${reason(err)}`);
-    }
-  });
 
   // ── Profiles ─────────────────────────────────────────────
   handle('profiles:get-all', async () => {
@@ -481,6 +570,14 @@ export function registerAllIpcHandlers(): void {
   });
   handle('profiles:delete', async (_event, profileId: string, deleteFiles: boolean) => {
     try {
+      // The game has the profile's files open, and a launch being prepared is
+      // still writing them: deleting underneath either removes what it can and
+      // leaves the rest, and the game carries on in a folder that is half gone.
+      if (isGameBusy(profileId)) {
+        return fail(
+          'Close the game first — a profile cannot be deleted while its game is running.',
+        );
+      }
       await deleteProfile(profileId, deleteFiles);
       return ok(undefined);
     } catch (err) {
@@ -516,8 +613,20 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to delete those files: ${reason(err)}`);
     }
   });
+  handle('profiles:unreadable-entries', async () => {
+    try {
+      return ok(await getUnreadableProfileEntries());
+    } catch (err) {
+      return fail(`Failed to read the profile list: ${reason(err)}`);
+    }
+  });
   handle('profiles:duplicate', async (_event, profileId: string, name?: string) => {
     try {
+      // The copy takes the worlds, and a world the game has open copies as a
+      // half-written region file.
+      if (isGameRunning(profileId)) {
+        return fail('Close the game first — its worlds cannot be copied while it is open.');
+      }
       return ok(await duplicateProfile(profileId, name));
     } catch (err) {
       return fail(`Failed to duplicate profile: ${reason(err)}`);
@@ -550,33 +659,53 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to export profile: ${reason(err)}`);
     }
   });
-  handle('profiles:export-pack', async (_event, profileId: string) => {
+  handle(
+    'profiles:export-pack',
+    async (_event, profileId: string, options?: MrpackExportOptions) => {
+      try {
+        const win = getMainWindow();
+        if (!win) return fail('No window available');
+        const profile = await getProfile(profileId);
+        if (!profile) return fail('Profile not found');
+
+        // The dialog runs in main, so the renderer never names a destination — it
+        // asks for an export and the person at the keyboard says where it goes.
+        // `defaultPath` needs a directory as well as a name: given a bare file
+        // name the picker opens wherever the process happens to have been
+        // started, which for a packaged app is nowhere anybody keeps files.
+        const suggested = `${profile.name.replace(/[^\p{L}\p{N} ._-]/gu, '_')}.mrpack`;
+        const chosen = await dialog.showSaveDialog(win, {
+          defaultPath: path.join(app.getPath('downloads'), suggested),
+          filters: [{ name: 'Modrinth modpack', extensions: ['mrpack'] }],
+        });
+        if (chosen.canceled || !chosen.filePath) return ok(null);
+
+        // Only the one answer it is asked for, and only as a yes or a no.
+        return ok(
+          await exportProfileAsMrpack(profileId, chosen.filePath, {
+            settings: options?.settings !== false,
+          }),
+        );
+      } catch (err) {
+        return fail(`Could not export that profile as a pack: ${reason(err)}`);
+      }
+    },
+  );
+  handle('profiles:import', async () => {
     try {
       const win = getMainWindow();
       if (!win) return fail('No window available');
-      const profile = await getProfile(profileId);
-      if (!profile) return fail('Profile not found');
-
-      // The dialog runs in main, so the renderer never names a destination — it
-      // asks for an export and the person at the keyboard says where it goes.
-      // `defaultPath` needs a directory as well as a name: given a bare file
-      // name the picker opens wherever the process happens to have been
-      // started, which for a packaged app is nowhere anybody keeps files.
-      const suggested = `${profile.name.replace(/[^\p{L}\p{N} ._-]/gu, '_')}.mrpack`;
-      const chosen = await dialog.showSaveDialog(win, {
-        defaultPath: path.join(app.getPath('downloads'), suggested),
-        filters: [{ name: 'Modrinth modpack', extensions: ['mrpack'] }],
+      // Asked here for the same reason the pack export asks here: the renderer
+      // never names a path, so there is no path for it to get wrong. It used to
+      // pick the file and then read it with `fetch('file://…')`, which only
+      // works for as long as the page itself happens to be a `file://` one.
+      const chosen = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        defaultPath: app.getPath('downloads'),
+        filters: [{ name: 'Raven Forge profile', extensions: ['json'] }],
       });
-      if (chosen.canceled || !chosen.filePath) return ok(null);
-
-      return ok(await exportProfileAsMrpack(profileId, chosen.filePath));
-    } catch (err) {
-      return fail(`Could not export that profile as a pack: ${reason(err)}`);
-    }
-  });
-  handle('profiles:import', async (_event, json: string) => {
-    try {
-      return ok(await importProfile(json));
+      if (chosen.canceled || chosen.filePaths.length === 0) return ok(null);
+      return ok(await importProfileFile(chosen.filePaths[0]));
     } catch (err) {
       return fail(`Failed to import profile: ${reason(err)}`);
     }
@@ -684,8 +813,24 @@ export function registerAllIpcHandlers(): void {
       return fail(`Could not import that pack: ${reason(err)}`);
     }
   });
+  handle('packs:install-modrinth', async (_event, pack, wanted) => {
+    try {
+      return ok(await installModrinthPack(pack, wanted));
+    } catch (err) {
+      return fail(`Could not install that pack: ${reason(err)}`);
+    }
+  });
 
   // ── Mods ─────────────────────────────────────────────────
+  /**
+   * Said by everything below that changes a profile's mods, shaders or resource
+   * packs. The pages switch those controls off while the game is up, but a
+   * request already on its way is not stopped by a button going grey — and the
+   * game has those files open, or is about to read them.
+   */
+  const GAME_IS_UP =
+    'Close the game first — its files cannot be changed while it is running or being started.';
+
   handle('mods:get-installed', async (_event, profileId: string) => {
     try {
       return ok(await getInstalledMods(profileId));
@@ -695,17 +840,42 @@ export function registerAllIpcHandlers(): void {
   });
   handle('mods:sync-manifest', async (_event, profileId: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       await syncManifest(profileId);
       return ok(undefined);
     } catch (err) {
+      // Stopping a sync is something the player did, not something that went
+      // wrong; the profile's state says it was left as it was.
+      if (isCancellation(err)) return ok(undefined);
       return fail(`Mod sync failed: ${reason(err)}`);
     }
   });
   handle('mods:install-from-search', async (_event, profileId, mod, version) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       return ok(await installModFromSearch(profileId, mod, version));
     } catch (err) {
       return fail(`Failed to install mod: ${reason(err)}`);
+    }
+  });
+  handle('mods:add-from-file', async (_event, profileId: string) => {
+    try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
+      const win = getMainWindow();
+      if (!win) return fail('No window available');
+
+      // Asked here for the same reason as for a shader or a resource pack: a
+      // channel that took a path would put any file on the disk on the game's
+      // class path.
+      const chosen = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        defaultPath: app.getPath('downloads'),
+        filters: [{ name: 'Minecraft mod', extensions: ['jar'] }],
+      });
+      if (chosen.canceled || chosen.filePaths.length === 0) return ok(null);
+      return ok(await addModFromFile(profileId, chosen.filePaths[0]));
+    } catch (err) {
+      return fail(`Failed to add that file: ${reason(err)}`, undefined, refusalOf(err));
     }
   });
   handle('mods:check-install', async (_event, profileId, mod) => {
@@ -719,6 +889,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('mods:uninstall', async (_event, profileId: string, modId: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       await uninstallMod(profileId, modId);
       return ok(undefined);
     } catch (err) {
@@ -729,6 +900,7 @@ export function registerAllIpcHandlers(): void {
     'mods:toggle-enabled',
     async (_event, profileId: string, modId: string, enabled: boolean) => {
       try {
+        if (isGameBusy(profileId)) return fail(GAME_IS_UP);
         await toggleModEnabled(profileId, modId, enabled);
         return ok(undefined);
       } catch (err) {
@@ -745,6 +917,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('mods:update', async (_event, profileId: string, modIds: string[]) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       return ok(await updateMods(profileId, modIds));
     } catch (err) {
       return fail(`Failed to update mods: ${reason(err)}`);
@@ -755,6 +928,16 @@ export function registerAllIpcHandlers(): void {
       return ok(await searchMods(filters));
     } catch (err) {
       return fail(`Mod search failed: ${reason(err)}`);
+    }
+  });
+  handle('mods:get-details', async (_event, ids: unknown) => {
+    try {
+      // Whatever arrives is narrowed to names Modrinth could know before any
+      // of it is sent; a profile has a few hundred entries at the very most.
+      const keys = Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
+      return ok(await getProjectDetails(keys.slice(0, 2000)));
+    } catch (err) {
+      return fail(`Could not load descriptions: ${reason(err)}`);
     }
   });
   handle('mods:get-facets', async (_event, projectType) => {
@@ -782,9 +965,10 @@ export function registerAllIpcHandlers(): void {
   });
   handle(
     'content:install-shader',
-    async (_event, profileId: string, source: string, version?: string) => {
+    async (_event, profileId: string, projectId: string, version?: string) => {
       try {
-        await installContent('shaders', profileId, source, version);
+        if (isGameBusy(profileId)) return fail(GAME_IS_UP);
+        await installContent('shaders', profileId, projectId, version);
         return ok(undefined);
       } catch (err) {
         return fail(`Failed to install shader: ${reason(err)}`);
@@ -811,6 +995,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('content:install-shader-loader', async (_event, profileId: string, projectId: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       const profile = await getProfile(profileId);
       if (!profile) return fail(`Profile ${profileId} not found`);
       return ok(
@@ -830,9 +1015,10 @@ export function registerAllIpcHandlers(): void {
   });
   handle(
     'content:install-resourcepack',
-    async (_event, profileId: string, source: string, version?: string) => {
+    async (_event, profileId: string, projectId: string, version?: string) => {
       try {
-        await installContent('resourcepacks', profileId, source, version);
+        if (isGameBusy(profileId)) return fail(GAME_IS_UP);
+        await installContent('resourcepacks', profileId, projectId, version);
         return ok(undefined);
       } catch (err) {
         return fail(`Failed to install resource pack: ${reason(err)}`);
@@ -841,6 +1027,7 @@ export function registerAllIpcHandlers(): void {
   );
   handle('content:remove-shader', async (_event, profileId: string, id: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       await removeContent('shaders', profileId, id);
       return ok(undefined);
     } catch (err) {
@@ -849,6 +1036,7 @@ export function registerAllIpcHandlers(): void {
   });
   handle('content:remove-resourcepack', async (_event, profileId: string, id: string) => {
     try {
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       await removeContent('resourcepacks', profileId, id);
       return ok(undefined);
     } catch (err) {
@@ -859,6 +1047,7 @@ export function registerAllIpcHandlers(): void {
     'content:reorder-resourcepacks',
     async (_event, profileId: string, orderedIds: string[]) => {
       try {
+        if (isGameBusy(profileId)) return fail(GAME_IS_UP);
         await reorderResourcePacks(profileId, orderedIds);
         return ok(undefined);
       } catch (err) {
@@ -866,6 +1055,30 @@ export function registerAllIpcHandlers(): void {
       }
     },
   );
+  handle('content:add-from-file', async (_event, profileId: string, kind: ContentKind) => {
+    try {
+      // Checked here, not assumed: it picks the folder the file is copied into.
+      if (kind !== 'shaders' && kind !== 'resourcepacks') return fail('Not a kind of pack');
+      if (isGameBusy(profileId)) return fail(GAME_IS_UP);
+      const win = getMainWindow();
+      if (!win) return fail('No window available');
+
+      // Which file is asked here, so the page never names a path: a channel
+      // that took one would copy any file on the disk into a profile, for
+      // whoever could send it a message.
+      const chosen = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        defaultPath: app.getPath('downloads'),
+        filters: [{ name: 'Zip archive', extensions: ['zip'] }],
+      });
+      if (chosen.canceled || chosen.filePaths.length === 0) return ok(null);
+      return ok(await addContentFromFile(kind, profileId, chosen.filePaths[0]));
+    } catch (err) {
+      // A refusal carries the same sentence twice: English here for the log,
+      // and a key the page says in the player's language.
+      return fail(`Failed to add that file: ${reason(err)}`, undefined, refusalOf(err));
+    }
+  });
 
   // ── Java ─────────────────────────────────────────────────
   handle('java:detect-system', async () => {
@@ -877,13 +1090,13 @@ export function registerAllIpcHandlers(): void {
   });
   handle('java:probe', async (_event, binPath: string, minecraftVersion: string) => {
     try {
-      // The requirement without a version meta: the table in `requiredJavaFor`
-      // is enough to say "too old" in the editor, and fetching Mojang's meta
-      // for a field somebody is still typing in would be a network round trip
-      // per keystroke.
+      // The requirement as Mojang states it when this version's metadata is
+      // already on disk, and by rule when it is not: fetching it for a field
+      // somebody is still typing in would be a network round trip per keystroke.
+      const meta = await getCachedVersionMeta(minecraftVersion);
       return ok({
         version: await probeJava(binPath),
-        requiredVersion: requiredJavaFor(minecraftVersion),
+        requiredVersion: requiredJavaFor(minecraftVersion, meta),
       });
     } catch (err) {
       return fail(`Failed to check ${binPath}: ${reason(err)}`);
@@ -896,6 +1109,13 @@ export function registerAllIpcHandlers(): void {
       return ok(await getLoaderVersions(loader, mcVersion));
     } catch (err) {
       return fail(`Failed to get loader versions: ${reason(err)}`);
+    }
+  });
+  handle('loaders:build-starts', async (_event, loader, loaderVersion, mcVersion) => {
+    try {
+      return ok(await loaderBuildStarts(loader, loaderVersion, mcVersion));
+    } catch (err) {
+      return fail(`Failed to check the loader build: ${reason(err)}`);
     }
   });
 
@@ -913,7 +1133,7 @@ export function registerAllIpcHandlers(): void {
       }
       // A refusal carries the same sentence twice: English here for the log,
       // and a key the renderer says in the player's language.
-      return fail(`Failed to launch game: ${reason(err)}`, undefined, launchRefusal(err));
+      return fail(`Failed to launch game: ${reason(err)}`, undefined, refusalOf(err));
     }
   });
   handle('game:kill', async (_event, profileId: string) => {
@@ -924,9 +1144,27 @@ export function registerAllIpcHandlers(): void {
       return fail(`Failed to kill game: ${reason(err)}`);
     }
   });
-  handle('game:get-log-tail', async (_event, profileId: string, lines?: number) => {
+  /**
+   * Which profiles have a game up.
+   *
+   * Worked out from the profile list, because the launcher only ever starts a
+   * game for a profile and `isGameRunning` is the question it already answers.
+   * The renderer's own record comes from `game:started` and `game:exited`, and
+   * is gone when its page reloads — which is what the error screen's button
+   * does. Without this it came back offering Play for a game that was running
+   * and no way to stop it.
+   */
+  handle('game:get-running', async () => {
     try {
-      return ok(getLogTail(profileId, lines));
+      const profiles = await getAllProfiles();
+      return ok(profiles.map((profile) => profile.id).filter(isGameRunning));
+    } catch (err) {
+      return fail(`Failed to list running games: ${reason(err)}`);
+    }
+  });
+  handle('game:get-log-tail', async (_event, profileId: string) => {
+    try {
+      return ok(getLogLines(profileId));
     } catch (err) {
       return fail(`Failed to read game log: ${reason(err)}`);
     }

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import crypto from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import { offlineUuid } from '../src/core/auth/offline-uuid';

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // Minecraft version manifest types (from Mojang APIs)
 
 export interface VersionManifest {
@@ -93,6 +95,11 @@ export interface Library {
   /** Integrity metadata published alongside Maven-style entries (Fabric/Quilt) */
   sha1?: string;
   size?: number;
+  /**
+   * The same, as Forge wrote it up to 1.12.2: every SHA-1 the jar may have,
+   * since it was served both plain and packed.
+   */
+  checksums?: string[];
   rules?: Rule[];
   natives?: Record<string, string>;
   extract?: { exclude: string[] };
@@ -100,4 +107,8 @@ export interface Library {
 
 export interface AssetIndex {
   objects: Record<string, { hash: string; size: number }>;
+  /** 1.6 to 1.7.2: the game reads its assets by name, from one folder of them. */
+  virtual?: boolean;
+  /** Before 1.6: the game reads them from `resources/` in its own directory. */
+  map_to_resources?: boolean;
 }

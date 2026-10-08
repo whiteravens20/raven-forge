@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { Agent, buildConnector, type Dispatcher } from 'undici';
 import { SocksClient } from 'socks';
 
@@ -20,6 +22,9 @@ const SCHEME_TO_TYPE: Record<string, 4 | 5> = {
   'socks5h:': 5,
   'socks:': 5,
 };
+
+/** The `code` on every error a connection through the proxy fails with. */
+export const SOCKS_PROXY_FAILED = 'ERR_SOCKS_PROXY';
 
 export function isSocksProxy(url: string): boolean {
   try {
@@ -75,7 +80,17 @@ export function createSocksDispatcher(proxyUrl: string): Dispatcher {
         tlsConnect({ ...options, httpSocket: socket }, callback);
       })
       .catch((err: unknown) => {
-        callback(err instanceof Error ? err : new Error(String(err)), null);
+        // Given a code, because the client's own errors have none: without one
+        // a proxy that is down did not read as a network failure, and a player
+        // whose proxy had gone away was told their session had expired.
+        //
+        // And made afresh rather than passed on: the client's error carries the
+        // options it was created with, the proxy's password among them.
+        const message = err instanceof Error ? err.message : String(err);
+        callback(
+          Object.assign(new Error(`SOCKS proxy: ${message}`), { code: SOCKS_PROXY_FAILED }),
+          null,
+        );
       });
   };
 

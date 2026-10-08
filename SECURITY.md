@@ -17,7 +17,7 @@ fix ships.
 
 Please include:
 
-- The version (`package.json` `version`, or Info → the version line in the app) and your OS.
+- The version (`package.json` `version`, or the version line under Settings → Updates in the app) and your OS.
 - What an attacker gains, and what they need in order to try it.
 - Reproduction steps, or a proof of concept.
 - Any relevant log fragments — **with tokens and usernames redacted** (see below).
@@ -35,10 +35,13 @@ notes is offered for every valid report unless you prefer otherwise.
 
 ### Redact your logs before sharing them
 
-`launcher.log` and crash reports can contain a **live Minecraft access token**
-(passed to the game as `--accessToken`), your username and UUID, and local file
-paths. Strip those before attaching a log to an issue or a report. If you have
-already posted one publicly, sign out and back in — that invalidates the session.
+`logs/main.log` holds your username, your UUID and local file paths, and it
+keeps the game's own output, into which a mod can print anything. The launcher
+takes the **Minecraft session token** (passed to the game as `--accessToken`)
+out of every line before it is logged, and a crash report is written with the
+username, UUID and home directory removed as well — but read either through
+before attaching it to an issue or a report. If you have posted a token
+publicly, sign out and back in — that invalidates the session.
 
 ---
 
@@ -63,13 +66,23 @@ download.
 - **Every downloaded file is hash-checked** before it is installed. `sha512` wins
   over `sha256` when a manifest carries both (`src/core/mods/integrity.ts`).
   A mismatch deletes the file and fails the sync — it is never installed "anyway".
-- **Manifests can be signed** with Ed25519 (`tweetnacl`) and are verified against
-  a per-profile public key before their contents are acted on
-  (`src/core/updater/manifest-verify.ts`). The signature covers a canonical JSON
-  form of the whole manifest with keys sorted **recursively** — see
-  [`docs/MANIFEST-SCHEMA.md`](docs/MANIFEST-SCHEMA.md).
-- Signature verification is only as strong as the key distribution. A profile
-  with no `publicKey` configured gets no signature guarantee at all, only hashes.
+- **Manifests can be signed** with Ed25519 (`tweetnacl`) and are verified before
+  their contents are acted on (`src/core/updater/manifest-verify.ts`). The
+  signature covers a canonical JSON form of the whole manifest with keys sorted
+  **recursively** — see [`docs/MANIFEST-SCHEMA.md`](docs/MANIFEST-SCHEMA.md).
+- **Which key counts depends on where the manifest came from.** One from the
+  White Ravens packs site is held to the key compiled into the launcher, and to
+  no other: it must verify, on every install, whatever is in Settings. Any other
+  manifest is checked against the keys the player has added under Settings →
+  Trusted keys, which apply to every profile.
+- **A manifest from the network cannot name a file on the player's computer.**
+  An entry that gives a path instead of an address (`source: "local"`) is read
+  only from a manifest the same computer serves, which is where a pack is
+  built; from any other address it refuses the whole manifest, before anything
+  is copied or fetched (`assertLocalFilesAllowed` in `src/core/mods/mod-sync.ts`).
+- Signature verification is only as strong as the key distribution. With no key
+  added, a manifest from anywhere else gets no signature guarantee at all, only
+  hashes.
 - The places where a wrong answer is silent rather than loud carry tests in
   `test/` — hash selection and comparison, canonicalization, launch-argument
   assembly, offline UUID derivation, and every refusal that has to hold: a path
@@ -99,7 +112,10 @@ download.
   launcher degrades to a `0600` `auth.json` rather than refusing to log in. That
   is a deliberate, documented trade-off, not an oversight — and it is surfaced in
   the app rather than only logged, because the person whose refresh token is in a
-  plaintext file is the one who gets to decide whether that is acceptable.
+  plaintext file is the one who gets to decide whether that is acceptable. A
+  single secret the keychain refuses is kept the same way: on Windows that is
+  one longer than the 2,560 bytes the Credential Manager takes, a limit the
+  packaging job measures on Windows itself.
 - **No credential ever leaves the machine** except to Microsoft's and Mojang's own
   endpoints as part of the OAuth chain.
 
@@ -116,6 +132,19 @@ download.
 - External links open in the **system browser**, never in an Electron window, and
   only for `http://`/`https://` URLs — both at the window-open handler and at the
   `system:open-url` IPC boundary.
+- The packaged program is the launcher and nothing else. Electron's binary can
+  be told to be a plain Node.js that runs any script it is handed
+  (`ELECTRON_RUN_AS_NODE`), and to open a debugger on the main process
+  (`--inspect`); both are switched off in the binary itself, as fuses
+  (`electronFuses` in `electron-builder.config.js`), and read back off it by the
+  packaging job and by every release. The embedded browser has a debugger of its
+  own, `--remote-debugging-port` or `--remote-debugging-pipe`, and no fuse for
+  it: the packaged launcher takes both off its command line as the first thing
+  it does, before the browser has read them (`refuseRemoteDebugging` in
+  `src/main/security.ts`), and the packaging job starts the installed program
+  with the switch, on Linux and on Windows, to see that nothing answers. All of
+  this limits what the launcher can be started as; it is not a defence against
+  a program that already runs as the player.
 
 ### Supply chain
 
@@ -162,7 +191,7 @@ Every one of those is itemised, with what it sends, in
 [docs/PRIVACY.md](docs/PRIVACY.md) ([po polsku](docs/PRIVACY.pl.md)) — which is
 also where the local data, the credential store and the known gaps are described
 in full. The launcher shows the same picture for the running install under
-Info → Privacy.
+About → Privacy.
 
 ---
 
@@ -170,9 +199,11 @@ Info → Privacy.
 
 Listed on purpose. An honest list beats a clean-looking one.
 
-- **No signature requirement.** Manifest signing is opt-in per profile. A profile
-  pointed at an unsigned manifest trusts whoever controls that URL, bounded only
-  by the hashes that same manifest supplies.
+- **No signature requirement for third-party manifests.** Until a trusted key is
+  added in Settings, a profile pointed at an unsigned manifest that is not White
+  Ravens' own trusts whoever controls that URL, bounded only by the hashes that
+  same manifest supplies. Adding a key turns the requirement on for every such
+  manifest.
 - **Mods are not sandboxed.** A Minecraft mod is arbitrary Java running with your
   user's privileges. Raven Forge verifies that you got _the file the manifest
   named_; it cannot tell you that file is safe. Only add manifest sources you

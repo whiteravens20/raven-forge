@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -27,8 +29,8 @@ let root: string;
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-startup-'));
-  // Diagnostics stay in Electron's own directory whatever the data root does,
-  // so the two are pointed at different places here on purpose.
+  // The home and the data root are pointed at different places on purpose, so
+  // that something created in the wrong one of the two shows.
   userData.path = path.join(root, 'userData');
   process.env.RAVENFORGE_DATA_DIR = path.join(root, 'data');
 });
@@ -56,11 +58,13 @@ describe('ensureDataDirectories', () => {
     }
   });
 
-  it('creates the two diagnostics folders in userData, not under the data root', async () => {
+  it('creates the two diagnostics folders with the data, not in the home', async () => {
+    // They were pinned to the home once. Data moved to another drive then left
+    // a folder of the launcher's files behind, and "open the logs" opened it.
     await ensure();
-    expect(await isDir(path.join(root, 'userData', 'logs'))).toBe(true);
-    expect(await isDir(path.join(root, 'userData', 'crash-reports'))).toBe(true);
-    await expect(fs.access(path.join(root, 'data', 'logs'))).rejects.toThrow();
+    expect(await isDir(path.join(root, 'data', 'logs'))).toBe(true);
+    expect(await isDir(path.join(root, 'data', 'crash-reports'))).toBe(true);
+    await expect(fs.access(path.join(root, 'userData', 'logs'))).rejects.toThrow();
   });
 
   it('leaves what is already there alone', async () => {

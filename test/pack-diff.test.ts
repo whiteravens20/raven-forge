@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect } from 'vitest';
 import { pendingChanges } from '../src/core/mods/pack-diff';
 import type { ModEntry } from '../src/shared/manifest-schema';
@@ -17,7 +19,6 @@ const entry = (id: string, version: string, side: ModEntry['side'] = 'client'): 
     source: 'url',
     url: `https://example.test/${id}-${version}.jar`,
     fileName: `${id}-${version}.jar`,
-    required: true,
     side,
   }) as ModEntry;
 
@@ -28,8 +29,6 @@ const installed = (id: string, version: string, fromManifest = true): InstalledM
     version,
     source: 'url',
     fileName: `${id}-${version}.jar`,
-    required: true,
-    side: 'client',
     enabled: true,
     fromManifest,
   }) as InstalledMod;

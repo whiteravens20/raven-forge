@@ -1,9 +1,11 @@
-import { useEffect, Fragment } from 'react';
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { useEffect, useMemo, Fragment } from 'react';
 import { X, ExternalLink } from 'lucide-react';
 import { parseArticle, type Block, type Span } from '@shared/article';
 import { useT } from '@renderer/i18n';
-
-const api = window.ravenforge;
+import { openLink } from '@renderer/open';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 export interface Article {
   title: string;
@@ -25,6 +27,7 @@ export interface Article {
  */
 export function ArticleReader({ article, onClose }: { article: Article; onClose: () => void }) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
 
   // Escape closes it. A modal that can only be dismissed by hitting a specific
   // 16px target is a modal a keyboard user is stuck in.
@@ -36,7 +39,9 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const blocks = article.body ? parseArticle(article.body) : parseArticle(article.excerpt ?? '');
+  // Once per article, not once per render.
+  const text = article.body || article.excerpt || '';
+  const blocks = useMemo(() => parseArticle(text), [text]);
 
   return (
     <div
@@ -45,8 +50,10 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
       role="presentation"
     >
       <div
-        className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={article.title}
@@ -78,7 +85,7 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
         {article.url && (
           <footer className="border-t border-rf-border px-5 py-2.5">
             <button
-              onClick={() => void api.system.openUrl(article.url!)}
+              onClick={() => void openLink(article.url!)}
               className="inline-flex items-center gap-1.5 text-xs text-rf-accent-text hover:underline"
             >
               <ExternalLink size={13} />
@@ -145,7 +152,7 @@ function SpanView({ span }: { span: Span }) {
     case 'link':
       return (
         <button
-          onClick={() => void api.system.openUrl(span.href)}
+          onClick={() => void openLink(span.href)}
           className="text-rf-accent-text hover:underline"
         >
           {span.text}

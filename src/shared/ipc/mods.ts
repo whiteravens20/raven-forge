@@ -1,20 +1,24 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // Mods, shaders and resource packs — searching, installing, compatibility.
 // Part of the IPC contract — see `../ipc-types.ts`.
 
 import type { ModLoaderType } from './profiles';
 
 export type ModSource = 'modrinth' | 'url' | 'local';
-export type ModSide = 'client' | 'server' | 'both';
 
 export interface InstalledMod {
   id: string;
+  /**
+   * The Modrinth project this is, where a pack's manifest says so. A manifest
+   * names its entries as it likes, and this is the name the rest of Modrinth
+   * knows the mod by — see `isProject`.
+   */
+  projectId?: string;
   name: string;
   version: string;
   source: ModSource;
   fileName: string;
-  sha256?: string;
-  required: boolean;
-  side: ModSide;
   enabled: boolean;
   /** true = from server manifest, false = user-installed */
   fromManifest: boolean;
@@ -29,9 +33,9 @@ export interface InstalledMod {
  * survives a restart and so installing quotes the id back — the player gets the
  * build they were shown, not whatever became newest since.
  *
- * `projectId` is here because the lock entry may not carry it: a jar dropped
- * into `mods/` by hand is recognised by its hash, and this is where the project
- * it turned out to belong to is written down.
+ * `projectId` is here because the lock entry may not carry it: a jar a pack
+ * carried inside itself is recognised by its hash, and this is where the
+ * project it turned out to belong to is written down.
  */
 export interface ModUpdate {
   versionId: string;
@@ -47,6 +51,12 @@ export interface ModUpdateSummary {
   updates: number;
   /** Files Modrinth has never seen: a private build, or a jar compiled locally. */
   unknown: number;
+  /**
+   * Files Modrinth knows, of a project with no build for this profile's
+   * Minecraft version and loader — a mod kept through a version change, or one
+   * added from a file made for another version.
+   */
+  noBuild: number;
 }
 
 /**
@@ -70,8 +80,35 @@ export interface ModSearchResult {
   categories: string[];
 }
 
+/**
+ * What an installed mod, shader or resource pack is, as Modrinth describes it.
+ *
+ * Looked up for the installed lists, which otherwise know a name, a version and
+ * a file — nothing that says what the thing does or where it came from.
+ */
+export interface ProjectDetails {
+  slug: string;
+  description: string;
+  iconUrl?: string;
+}
+
+/** The two kinds of pack the Looks page keeps, named after their folders. */
+export type ContentKind = 'shaders' | 'resourcepacks';
+
 /** What Modrinth calls a project type. Shaders and resource packs are not mods. */
-export type ContentProjectType = 'mod' | 'shader' | 'resourcepack';
+export type ContentProjectType = 'mod' | 'shader' | 'resourcepack' | 'modpack';
+
+/**
+ * One page of search results, and how many there are in all.
+ *
+ * The total is what makes a second page askable: a bare list of twenty cannot
+ * say whether there were twenty matches or two thousand, and the search used to
+ * show the first twenty of either with nothing to tell them apart.
+ */
+export interface ModSearchPage {
+  hits: ModSearchResult[];
+  total: number;
+}
 
 /**
  * Search facets for one project type. `groups` mirrors Modrinth's own headers —
@@ -110,12 +147,12 @@ export interface ShaderLoaderOption {
  * this is asked *before* nagging: the install looks identical either way.
  */
 export type ShaderLoaderState =
-  | { status: 'already-installed'; name: string }
+  | { status: 'already-installed' }
   | { status: 'choose'; options: ShaderLoaderOption[] }
   /** Candidates exist but none publishes anything for this Minecraft version. */
   | { status: 'no-build'; mcVersion: string; modLoader: ModLoaderType }
   /** A vanilla profile cannot run shaders at all — they need a mod. */
-  | { status: 'unsupported'; modLoader: ModLoaderType };
+  | { status: 'unsupported' };
 
 export type ShaderLoaderResult =
   | { status: 'installed'; name: string; dependencies: string[] }
@@ -142,8 +179,8 @@ export interface CataloguePack {
   summaryI18n?: Record<string, string>;
   minecraftVersion: string;
   modLoader: string;
+  /** What the pack asks for, when it asks for something a machine could give. */
   recommendedRamMb?: number;
-  serverIp?: string;
   modCount: number;
   totalDownloadBytes: number;
   manifestUrl: string;
@@ -172,13 +209,6 @@ export type CompatibilityIssue =
   /** A required dependency exists but publishes nothing for this profile. */
   | { kind: 'dependency-no-build'; names: string[] };
 
-/** A required dependency that is missing and would be installed alongside. */
-export interface PlannedDependency {
-  id: string;
-  name: string;
-  version: string;
-}
-
 /**
  * What installing something into a profile would actually do, worked out before
  * anything is downloaded.
@@ -192,19 +222,31 @@ export interface InstallPlan {
   name: string;
   versionId?: string;
   versionName?: string;
-  dependencies: PlannedDependency[];
+  /** The required dependencies that are missing and would be installed alongside, by name. */
+  dependencies: string[];
   issues: CompatibilityIssue[];
 }
 
 /**
- * The outcome of installing a mod: the mod, plus whatever had to come with it.
+ * The outcome of installing a mod: whatever had to come with it.
  *
- * `dependencies` is not decoration. Required dependencies are installed without
- * being asked for, and a launcher that silently adds files to a profile is a
- * launcher nobody can debug — so the names come back to be shown.
+ * Required dependencies are installed without being asked for, and a launcher
+ * that silently adds files to a profile is a launcher nobody can debug — so
+ * the names come back to be shown.
  */
 export interface ModInstallResult {
-  mod: InstalledMod;
+  dependencies: string[];
+}
+
+/**
+ * A mod added from a file on this computer.
+ *
+ * The page did not choose the file, so it is told what it turned out to be:
+ * the mod's own name where Modrinth knows the file, and the file's otherwise.
+ */
+export interface ModAddition {
+  name: string;
+  /** What had to come with it, as for a mod picked out of the search. */
   dependencies: string[];
 }
 

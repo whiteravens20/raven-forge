@@ -1,9 +1,13 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { NavLink } from 'react-router';
 import { Home, FolderOpen, Package, Sparkles, Settings, User, Coffee } from 'lucide-react';
 import { useT, type TranslationKey } from '@renderer/i18n';
 
 // The icon strip is narrow, so each entry carries a short label for the tile
-// and a full one for assistive tech — they are not always the same word.
+// and a full one for assistive tech — they are not always the same word. The
+// tile is as wide as the longest of them needs: "Ustawienia", which has to be
+// that word, because it is the one every other screen sends people to.
 const navItems = [
   { to: '/', icon: Home, short: 'nav.home.short', title: 'nav.home.title' },
   { to: '/profiles', icon: FolderOpen, short: 'nav.profiles.short', title: 'nav.profiles.title' },
@@ -32,7 +36,7 @@ export function Sidebar() {
           to={to}
           aria-label={t(title)}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center w-12 h-12 rounded-lg text-[10px] gap-0.5 transition-colors outline-none focus:ring-1 focus:ring-rf-accent-text ${
+            `flex flex-col items-center justify-center w-14 h-12 rounded-lg text-[10px] gap-0.5 transition-colors outline-none focus:ring-1 focus:ring-rf-accent-text ${
               isActive
                 ? 'bg-rf-accent/15 text-rf-accent-text'
                 : 'text-rf-text-muted hover:text-rf-text-secondary hover:bg-rf-surface'
@@ -49,7 +53,7 @@ export function Sidebar() {
           to="/about"
           aria-label={t('nav.about.title')}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center w-12 h-12 rounded-lg text-[10px] gap-0.5 transition-colors outline-none focus:ring-1 focus:ring-rf-accent-text ${
+            `flex flex-col items-center justify-center w-14 h-12 rounded-lg text-[10px] gap-0.5 transition-colors outline-none focus:ring-1 focus:ring-rf-accent-text ${
               isActive
                 ? 'bg-rf-accent/15 text-rf-accent-text'
                 : 'text-rf-text-muted hover:text-rf-text-secondary hover:bg-rf-surface'

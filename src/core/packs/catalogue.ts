@@ -1,7 +1,10 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { z } from 'zod';
 import { log } from '../../main/logger';
-import { WHITE_RAVENS_PACKS_URL } from '../../shared/branding';
-import { readJsonCapped } from '../net/json';
+import { WHITE_RAVENS_PACKS_URL, isFirstPartyManifestUrl } from '../../shared/branding';
+import { assertSecureAnswer, readJsonCapped } from '../net/json';
+import { isPlausiblePackRam } from '../../shared/memory';
 import type { CataloguePack } from '../../shared/ipc-types';
 
 /**
@@ -17,7 +20,9 @@ import type { CataloguePack } from '../../shared/ipc-types';
 
 const catalogueSchema = z.object({
   indexVersion: z.literal(1),
-  generatedAt: z.string().optional(),
+  // Only what the picker shows is named. A field of the wrong type refuses the
+  // whole catalogue, so every one listed here that nothing reads is a way for
+  // a harmless change on the packs site to empty the list in every launcher.
   packs: z.array(
     z.object({
       slug: z.string().min(1),
@@ -31,19 +36,16 @@ const catalogueSchema = z.object({
       // field is the one that can never change shape.
       summaryI18n: z.record(z.string(), z.string()).optional(),
       minecraft: z.string().min(1),
-      loader: z.object({ type: z.string(), version: z.string().optional() }),
-      recommendedRamMb: z.number().optional(),
-      server: z.object({ ip: z.string(), port: z.number().optional() }).nullable().optional(),
-      counts: z
-        .object({ mods: z.number(), resourcePacks: z.number(), shaders: z.number() })
-        .partial()
-        .optional(),
+      loader: z.object({ type: z.string() }),
+      // Whatever it holds: it is only shown, and a figure that makes no sense
+      // is left off the card instead of taking the catalogue down with it.
+      recommendedRamMb: z.unknown().optional(),
+      counts: z.object({ mods: z.number() }).partial().optional(),
       totalDownloadBytes: z.number().optional(),
       // Null when the catalogue was built without PACK_BASE_URL. A pack with no
       // manifest cannot be installed, so it is dropped rather than listed as
       // something that fails on click.
       manifestUrl: z.string().url().nullable().optional(),
-      mrpackUrl: z.string().url().nullable().optional(),
     }),
   ),
 });
@@ -57,6 +59,7 @@ export async function listCataloguePacks(): Promise<CataloguePack[]> {
   if (!res.ok) {
     throw new Error(`the server answered ${res.status} ${res.statusText}`);
   }
+  assertSecureAnswer(res);
 
   const parsed = catalogueSchema.safeParse(await readJsonCapped(res, 'The pack catalogue'));
   if (!parsed.success) {
@@ -66,9 +69,21 @@ export async function listCataloguePacks(): Promise<CataloguePack[]> {
     );
   }
 
-  const packs = parsed.data.packs.filter((pack) => Boolean(pack.manifestUrl));
-  const dropped = parsed.data.packs.length - packs.length;
+  const listed = parsed.data.packs.filter((pack) => Boolean(pack.manifestUrl));
+  const dropped = parsed.data.packs.length - listed.length;
   if (dropped > 0) log.warn(`${dropped} pack(s) in the catalogue carry no manifest URL`);
+
+  // Only a manifest on the White Ravens packs site. The picker offers these as
+  // White Ravens' own, and what makes that true of a pack is the built-in key —
+  // which is only demanded of a first-party address. The catalogue itself is
+  // not signed: whoever could change that one file, without the key, could
+  // otherwise list a manifest of their own under the White Ravens heading and
+  // have it installed with no signature asked for.
+  const packs = listed.filter((pack) => isFirstPartyManifestUrl(pack.manifestUrl!));
+  const foreign = listed.length - packs.length;
+  if (foreign > 0) {
+    log.warn(`${foreign} pack(s) in the catalogue point outside the White Ravens packs site`);
+  }
 
   return packs.map((pack) => ({
     slug: pack.slug,
@@ -78,8 +93,7 @@ export async function listCataloguePacks(): Promise<CataloguePack[]> {
     summaryI18n: pack.summaryI18n,
     minecraftVersion: pack.minecraft,
     modLoader: pack.loader.type,
-    recommendedRamMb: pack.recommendedRamMb,
-    serverIp: pack.server?.ip,
+    recommendedRamMb: isPlausiblePackRam(pack.recommendedRamMb) ? pack.recommendedRamMb : undefined,
     modCount: pack.counts?.mods ?? 0,
     totalDownloadBytes: pack.totalDownloadBytes ?? 0,
     manifestUrl: pack.manifestUrl!,

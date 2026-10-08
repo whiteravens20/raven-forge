@@ -1,8 +1,10 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { AlertTriangle, Info, AlertCircle, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useT } from '@renderer/i18n';
 
-type BadgeType = 'info' | 'warning' | 'urgent' | 'success';
+type BadgeType = 'info' | 'warning' | 'urgent';
 
 interface BadgeProps {
   type: BadgeType;
@@ -15,14 +17,12 @@ const styles: Record<BadgeType, string> = {
   info: 'bg-rf-accent/10 border-rf-accent/30 text-rf-accent-text',
   warning: 'bg-rf-warning/10 border-rf-warning/30 text-rf-warning',
   urgent: 'bg-rf-danger/10 border-rf-danger/30 text-rf-danger',
-  success: 'bg-rf-success/10 border-rf-success/30 text-rf-success',
 };
 
 const icons: Record<BadgeType, typeof Info> = {
   info: Info,
   warning: AlertTriangle,
   urgent: AlertCircle,
-  success: Info,
 };
 
 export function Banner({ type, children, dismissible, onDismiss }: BadgeProps) {
@@ -36,7 +36,8 @@ export function Banner({ type, children, dismissible, onDismiss }: BadgeProps) {
       aria-live={type === 'urgent' ? 'assertive' : 'polite'}
     >
       <Icon size={16} className="shrink-0" aria-hidden="true" />
-      <span className="flex-1">{children}</span>
+      {/* What a banner says is often the thing to copy: a reason, a path. */}
+      <span className="flex-1 select-text">{children}</span>
       {dismissible && onDismiss && (
         <button
           onClick={onDismiss}

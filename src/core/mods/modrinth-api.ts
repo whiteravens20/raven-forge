@@ -1,15 +1,22 @@
-import { MODRINTH_API_BASE, isClientModLoader } from '../../shared/constants';
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { MODRINTH_API_BASE, acceptedLoaders, isClientModLoader } from '../../shared/constants';
 import { modrinthUserAgent } from '../net/user-agent';
 import { isSafeFileName } from '../../shared/manifest-schema';
 import type {
   ContentProjectType,
   FacetGroups,
   ModSearchFilters,
-  ModSearchResult,
+  ModSearchPage,
 } from '../../shared/ipc-types';
 
 // ── Modrinth API helpers ───────────────────────────────────
 
+/**
+ * Ids and slugs reach the functions below from search results and from pack
+ * manifests, and each becomes a segment of a request path — so each is encoded
+ * where it is used, and a value with a slash in it stays one segment.
+ */
 async function modrinthFetch(endpoint: string): Promise<Response> {
   const res = await fetch(`${MODRINTH_API_BASE}${endpoint}`, {
     headers: {
@@ -100,16 +107,29 @@ interface ModrinthDependency {
 
 // ── Search ─────────────────────────────────────────────────
 
-export async function searchMods(filters: ModSearchFilters): Promise<ModSearchResult[]> {
+/** Modrinth refuses a page larger than this. */
+const MAX_SEARCH_PAGE = 100;
+
+export async function searchMods(filters: ModSearchFilters): Promise<ModSearchPage> {
   const projectType = filters.projectType ?? 'mod';
 
   const facets: string[][] = [];
   facets.push([`project_type:${projectType}`]);
   if (filters.gameVersion) facets.push([`versions:${filters.gameVersion}`]);
-  // A loader facet only means anything for mods. Resource packs have no loader,
-  // and shaders are categorised by the shader loader that runs them (iris,
-  // optifine) — facetting those on `fabric` returns nothing at all.
-  if (filters.loader && projectType === 'mod') facets.push([`categories:${filters.loader}`]);
+  // A loader facet only means anything for mods and for packs of them. Resource
+  // packs have no loader, and shaders are categorised by the shader loader that
+  // runs them (iris, optifine) — facetting those on `fabric` returns nothing.
+  if (filters.loader && projectType === 'mod') {
+    // Every loader whose mods this one runs, as one group, which Modrinth ORs.
+    // Quilt runs Fabric's, and three in four of those are tagged for Fabric
+    // alone: asked for `quilt` by name, a Quilt profile's search had neither
+    // Fabric API nor Sodium in it — both of which it then installs happily.
+    const loaders = acceptedLoaders(filters.loader);
+    if (loaders.length > 0) facets.push(loaders.map((loader) => `categories:${loader}`));
+  } else if (filters.loader && projectType === 'modpack') {
+    // A pack is built for one loader, and the profile it makes is that one.
+    facets.push([`categories:${filters.loader}`]);
+  }
   // Each category becomes its own facet group, which Modrinth ANDs: asking for
   // `iris` and `realistic` means both, not either.
   for (const category of filters.categories ?? []) facets.push([`categories:${category}`]);
@@ -117,25 +137,27 @@ export async function searchMods(filters: ModSearchFilters): Promise<ModSearchRe
   const params = new URLSearchParams({
     query: filters.query,
     facets: JSON.stringify(facets),
-    limit: String(filters.limit ?? 20),
-    offset: String(filters.offset ?? 0),
+    limit: String(Math.min(Math.max(filters.limit ?? 20, 1), MAX_SEARCH_PAGE)),
+    offset: String(Math.max(filters.offset ?? 0, 0)),
   });
 
   const res = await modrinthFetch(`/search?${params}`);
   const data = (await res.json()) as ModrinthSearchResponse;
 
-  return data.hits.map((hit) => ({
-    id: hit.project_id,
-    slug: hit.slug,
-    name: hit.title,
-    description: hit.description,
-    author: hit.author,
-    iconUrl: hit.icon_url ?? undefined,
-    downloads: hit.downloads,
-    source: 'modrinth' as const,
-    versions: hit.versions,
-    categories: hit.categories,
-  }));
+  return {
+    total: data.total_hits,
+    hits: data.hits.map((hit) => ({
+      id: hit.project_id,
+      slug: hit.slug,
+      name: hit.title,
+      description: hit.description,
+      author: hit.author,
+      iconUrl: hit.icon_url ?? undefined,
+      downloads: hit.downloads,
+      versions: hit.versions,
+      categories: hit.categories,
+    })),
+  };
 }
 
 /**
@@ -194,8 +216,11 @@ export async function getSearchFacets(projectType: ContentProjectType): Promise<
   )
     .filter((l) => l.supported_project_types.includes(projectType))
     // A launcher starts a client, so the server platforms Modrinth also files
-    // under `mod` (bukkit, paper, velocity …) would only be dead options.
-    .filter((l) => projectType !== 'mod' || isClientModLoader(l.name))
+    // under `mod` and `modpack` (bukkit, paper, velocity …) would only be dead
+    // options.
+    .filter(
+      (l) => (projectType !== 'mod' && projectType !== 'modpack') || isClientModLoader(l.name),
+    )
     .map((l) => l.name)
     .sort();
 
@@ -215,6 +240,37 @@ export async function getSearchFacets(projectType: ContentProjectType): Promise<
       names: sortFacetGroup(header, names),
     })),
   };
+}
+
+// ── Projects ───────────────────────────────────────────────
+
+export interface ModrinthProject {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  icon_url: string | null;
+}
+
+/** How many ids go in one request — they travel in the query string. */
+const PROJECT_BATCH = 100;
+
+/**
+ * Several projects at once, by id or by slug.
+ *
+ * Modrinth answers for either and simply leaves out a name it does not know,
+ * so the reply can be shorter than the question and that is not an error.
+ */
+export async function getProjects(idsOrSlugs: string[]): Promise<ModrinthProject[]> {
+  const found: ModrinthProject[] = [];
+  for (let i = 0; i < idsOrSlugs.length; i += PROJECT_BATCH) {
+    const params = new URLSearchParams({
+      ids: JSON.stringify(idsOrSlugs.slice(i, i + PROJECT_BATCH)),
+    });
+    const res = await modrinthFetch(`/projects?${params}`);
+    found.push(...((await res.json()) as ModrinthProject[]));
+  }
+  return found;
 }
 
 // ── Version listing ────────────────────────────────────────
@@ -238,7 +294,7 @@ export async function getModVersions(
   const loaderList = typeof loaders === 'string' ? [loaders] : (loaders ?? []);
   if (loaderList.length > 0) params.set('loaders', JSON.stringify(loaderList));
 
-  const res = await modrinthFetch(`/project/${projectId}/version?${params}`);
+  const res = await modrinthFetch(`/project/${encodeURIComponent(projectId)}/version?${params}`);
   return (await res.json()) as ModrinthVersion[];
 }
 
@@ -250,7 +306,7 @@ export async function getModVersions(
  * warning is exactly that case.
  */
 export async function getVersion(versionId: string): Promise<ModrinthVersion> {
-  const res = await modrinthFetch(`/version/${versionId}`);
+  const res = await modrinthFetch(`/version/${encodeURIComponent(versionId)}`);
   return (await res.json()) as ModrinthVersion;
 }
 
@@ -331,7 +387,7 @@ export async function getProjectTitle(projectId: string): Promise<string> {
 
   // The promise is cached, not the result, so concurrent callers share one
   // request instead of racing to make the same one.
-  const pending = modrinthFetch(`/project/${projectId}`)
+  const pending = modrinthFetch(`/project/${encodeURIComponent(projectId)}`)
     .then(async (res) => ((await res.json()) as { title: string }).title)
     .catch((err: unknown) => {
       // A failure must not be remembered, or one flaky request would poison the

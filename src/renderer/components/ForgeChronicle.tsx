@@ -1,9 +1,12 @@
-import { useEffect, useRef } from 'react';
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import iconMono from '@assets/icons/icon-mono.svg?raw';
 import { InlineSvg } from '@components/ui/InlineSvg';
 import { useLocale, useT } from '@renderer/i18n';
 import { useRichT } from '@renderer/i18n/rich';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 interface ForgeChronicleProps {
   onClose: () => void;
@@ -28,18 +31,17 @@ export function ForgeChronicle({ onClose }: ForgeChronicleProps) {
   const t = useT();
   const rich = useRichT();
   const locale = useLocale();
-  const dialogRef = useRef<HTMLElement>(null);
+  // Focus moves to the dialog itself rather than the close button: screen
+  // readers still announce it and tabbing starts inside, but no control lights
+  // up with a browser focus ring the moment the scroll unrolls.
+  const dialogRef = useDialogFocus<HTMLElement>();
 
-  // Esc closes, matching every other dismissible surface in the app. Focus
-  // moves to the dialog itself rather than the close button: screen readers
-  // still announce it and tabbing starts inside, but no control lights up
-  // with a browser focus ring the moment the scroll unrolls.
+  // Esc closes, matching every other dismissible surface in the app.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    dialogRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 

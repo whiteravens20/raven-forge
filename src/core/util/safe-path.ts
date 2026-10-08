@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -21,19 +23,62 @@ import path from 'node:path';
  * @returns the absolute destination, its parent created and proven contained
  */
 export async function resolveWithin(baseDir: string, relative: string): Promise<string> {
-  const dest = path.resolve(baseDir, relative);
-  const rel = path.relative(baseDir, dest);
-  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error(`Refusing to write outside the target directory: ${relative}`);
-  }
+  const dest = containedPath(baseDir, relative);
 
   const parent = path.dirname(dest);
   await fs.mkdir(parent, { recursive: true });
   const [realParent, realBase] = await Promise.all([fs.realpath(parent), fs.realpath(baseDir)]);
-  const relReal = path.relative(realBase, realParent);
-  if (relReal.startsWith('..') || path.isAbsolute(relReal)) {
+  if (leavesTheTree(path.relative(realBase, realParent))) {
     throw new Error(`Refusing to follow a symlink out of the target directory: ${relative}`);
   }
 
   return dest;
+}
+
+/**
+ * `relative` under `baseDir`, refused when it names a place that is not.
+ *
+ * The first of {@link resolveWithin}'s two checks, by itself, and touching
+ * nothing: no folder made, no link followed. It is for the trees the launcher
+ * keeps for itself — its libraries, its asset indexes — where nobody else has
+ * put a link, and where the path is one of several hundred asked about before
+ * every launch. Those paths come out of a version profile, and a loader's
+ * profile is whatever the loader's server sent: joined on as they came, a
+ * library "at" `../../x` was fetched to wherever that led.
+ *
+ * @returns the absolute destination
+ */
+export function containedPath(baseDir: string, relative: string): string {
+  const dest = path.resolve(baseDir, relative);
+  const rel = path.relative(baseDir, dest);
+  if (rel === '' || leavesTheTree(rel)) {
+    throw new Error(`Refusing to write outside the target directory: ${relative}`);
+  }
+  return dest;
+}
+
+/**
+ * Whether what sits at `file` is a link to somewhere else. Nothing there at
+ * all is not one.
+ *
+ * Asked wherever a file is about to be replaced and the open itself cannot be
+ * told to refuse a link: Windows has no `O_NOFOLLOW`.
+ */
+export async function isSymlink(file: string): Promise<boolean> {
+  try {
+    return (await fs.lstat(file)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether a relative path climbs out of where it starts.
+ *
+ * By its first component, not by its first two characters: `..cache/x.json` is
+ * a folder with an odd name inside the tree, and a pack that ships one is
+ * entitled to have it written.
+ */
+function leavesTheTree(rel: string): boolean {
+  return rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
 }

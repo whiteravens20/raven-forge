@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import path from 'node:path';
 import { paths } from '../config/paths';
 import { isSafeFileName } from '../../shared/manifest-schema';
@@ -14,7 +16,7 @@ import type { ModLoaderType } from '../../shared/ipc-types';
  * is never re-parsed on read, so neither reaches here having passed a schema.
  *
  * A version that is not a single path component is refused rather than joined.
- * The failure it prevents is not merely a stray directory: `getLoaderProfilePath`
+ * The failure it prevents is not merely a stray directory: `loaderProfilePath`
  * points at a file that is read back and parsed as the version metadata the game
  * launches from, and that metadata carries `mainClass` and the JVM arguments.
  */

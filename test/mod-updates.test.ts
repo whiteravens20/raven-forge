@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,6 +32,10 @@ const profile: Profile = {
 
 /** hash → the newest build Modrinth would name for that file. */
 const latest = new Map<string, unknown>();
+/** Hashes of files Modrinth knows, whatever version and loader they were made for. */
+const known = new Set<string>();
+/** The hashes each "which builds are these?" was asked about. */
+const identified: string[][] = [];
 const asked: Array<{ hashes: string[]; loaders: string[]; gameVersions: string[] }> = [];
 
 vi.mock('../src/main/logger', () => ({
@@ -55,6 +61,10 @@ vi.mock('../src/core/mods/modrinth-api', () => ({
   latestVersionsByHash: async (hashes: string[], loaders: string[], gameVersions: string[]) => {
     asked.push({ hashes, loaders, gameVersions });
     return new Map(hashes.filter((h) => latest.has(h)).map((h) => [h, latest.get(h)]));
+  },
+  versionsByHash: async (hashes: string[]) => {
+    identified.push(hashes);
+    return new Map(hashes.filter((h) => known.has(h)).map((h) => [h, {}]));
   },
   getVersion: async () => ({}),
   getProjectTitle: async () => 'Title',
@@ -82,8 +92,6 @@ function mod(over: Partial<InstalledMod> & { id: string; fileName: string }): In
     name: over.id,
     version: '1.0.0',
     source: 'modrinth',
-    required: false,
-    side: 'both',
     enabled: true,
     fromManifest: false,
     ...over,
@@ -108,7 +116,9 @@ async function lockFile(): Promise<InstalledMod[]> {
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'mod-updates-'));
   latest.clear();
+  known.clear();
   asked.length = 0;
+  identified.length = 0;
 });
 
 afterEach(async () => {
@@ -124,7 +134,7 @@ describe('checkModUpdates', () => {
 
     const summary = await checkModUpdates('p1');
 
-    expect(summary).toEqual({ checked: 1, updates: 1, unknown: 0 });
+    expect(summary).toEqual({ checked: 1, updates: 1, unknown: 0, noBuild: 0 });
     expect((await lockFile())[0].updateAvailable).toEqual({
       versionId: 'v2',
       versionNumber: '0.6.5',
@@ -142,7 +152,7 @@ describe('checkModUpdates', () => {
 
     const summary = await checkModUpdates('p1');
 
-    expect(summary).toEqual({ checked: 1, updates: 0, unknown: 0 });
+    expect(summary).toEqual({ checked: 1, updates: 0, unknown: 0, noBuild: 0 });
     expect((await lockFile())[0].updateAvailable).toBeUndefined();
   });
 
@@ -204,7 +214,38 @@ describe('checkModUpdates', () => {
 
     const summary = await checkModUpdates('p1');
 
-    expect(summary).toEqual({ checked: 2, updates: 1, unknown: 1 });
+    expect(summary).toEqual({ checked: 2, updates: 1, unknown: 1, noBuild: 0 });
+  });
+
+  it('tells a mod Modrinth knows, with no build for this profile, from a file it has never seen', async () => {
+    // Modrinth leaves both out of its answer about newer builds. Reported
+    // alike, a mod installed from Modrinth read "not on Modrinth" the moment
+    // the profile moved to a Minecraft version its project has not reached.
+    await profileWith(
+      [
+        mod({ id: 'private', fileName: 'private.jar', source: 'local' }),
+        mod({ id: 'left-behind', fileName: 'left-behind.jar' }),
+        mod({ id: 'mine', fileName: 'mine.jar' }),
+      ],
+      { 'private.jar': 'nobody knows this', 'left-behind.jar': 'made for 1.20', 'mine.jar': 'c' },
+    );
+    latest.set(sha512('c'), build('v2', '2.0', 'newer'));
+    known.add(sha512('made for 1.20'));
+
+    const summary = await checkModUpdates('p1');
+
+    expect(summary).toEqual({ checked: 3, updates: 1, unknown: 1, noBuild: 1 });
+    // Only the files the first answer left out are asked about again.
+    expect(identified).toEqual([[sha512('nobody knows this'), sha512('made for 1.20')]]);
+  });
+
+  it('asks nothing more when every file was answered for', async () => {
+    await profileWith([mod({ id: 'mine', fileName: 'mine.jar' })], { 'mine.jar': 'c' });
+    latest.set(sha512('c'), build('v1', '1.0', 'c'));
+
+    await checkModUpdates('p1');
+
+    expect(identified).toEqual([]);
   });
 
   it('skips a mod whose jar has gone missing rather than failing the check', async () => {
@@ -216,6 +257,6 @@ describe('checkModUpdates', () => {
 
     const summary = await checkModUpdates('p1');
 
-    expect(summary).toEqual({ checked: 1, updates: 1, unknown: 0 });
+    expect(summary).toEqual({ checked: 1, updates: 1, unknown: 0, noBuild: 0 });
   });
 });

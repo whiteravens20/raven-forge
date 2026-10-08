@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { BrowserWindow, session } from 'electron';
 import crypto from 'node:crypto';
 import { log } from '../../main/logger';
@@ -12,7 +14,7 @@ import {
 import type { MinecraftAccount, AuthState } from '../../shared/ipc-types';
 import { BUILD_CLIENT_ID } from './build-config';
 import { offlineUuid } from './offline-uuid';
-import { AuthServersUnreachableError, isNetworkFailure } from './auth-errors';
+import { AuthAnswerError, AuthServersUnreachableError, isAuthOutage } from './auth-errors';
 import {
   saveAccount,
   removeAccount,
@@ -22,6 +24,8 @@ import {
   getMcSession,
   getAuthState as getStoredAuthState,
 } from './token-store';
+import { CancelledError } from '../util/cancellation';
+import { RefusedError } from '../util/refusal';
 
 // ── Azure AD App Registration ──────────────────────────────
 // To use real Microsoft auth, register your own app and set RAVENFORGE_CLIENT_ID
@@ -147,7 +151,9 @@ async function getMsAuthCode(): Promise<{ code: string; verifier: string }> {
     authWindow.webContents.on('will-navigate', onNavigate);
 
     authWindow.on('closed', () => {
-      reject(new Error('Authentication window was closed'));
+      // The player's own doing, and said as that: it used to come back as a
+      // failed login, in red, for somebody who had only changed their mind.
+      reject(new CancelledError('Sign-in'));
     });
   });
 }
@@ -190,7 +196,7 @@ async function exchangeMsCodeForTokens(code: string, verifier: string): Promise<
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`MS token exchange failed (${res.status}): ${text}`);
+    throw new AuthAnswerError(`MS token exchange failed (${res.status}): ${text}`, res.status);
   }
   return res.json() as Promise<MsTokenResponse>;
 }
@@ -212,7 +218,7 @@ async function refreshMsTokens(refreshToken: string): Promise<MsTokenResponse> {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`MS token refresh failed (${res.status}): ${text}`);
+    throw new AuthAnswerError(`MS token refresh failed (${res.status}): ${text}`, res.status);
   }
   return res.json() as Promise<MsTokenResponse>;
 }
@@ -246,7 +252,7 @@ async function authenticateXboxLive(
   });
 
   if (!res.ok) {
-    throw new Error(`Xbox Live auth failed (${res.status})`);
+    throw new AuthAnswerError(`Xbox Live auth failed (${res.status})`, res.status);
   }
 
   const data = (await res.json()) as XblResponse;
@@ -287,7 +293,7 @@ async function authenticateXsts(xblToken: string): Promise<string> {
         'This account belongs to a minor and requires a parent to add it to a Family',
       );
     }
-    throw new Error(`XSTS auth failed (${res.status}): XErr=${xerr}`);
+    throw new AuthAnswerError(`XSTS auth failed (${res.status}): XErr=${xerr}`, res.status);
   }
 
   const data = (await res.json()) as { Token: string };
@@ -313,7 +319,7 @@ async function authenticateMinecraft(xstsToken: string, userHash: string): Promi
   });
 
   if (!res.ok) {
-    throw new Error(`Minecraft auth failed (${res.status})`);
+    throw new AuthAnswerError(`Minecraft auth failed (${res.status})`, res.status);
   }
 
   return res.json() as Promise<McAuthResponse>;
@@ -335,7 +341,7 @@ async function getMinecraftProfile(mcAccessToken: string): Promise<McProfile> {
     if (res.status === 404) {
       throw new Error('This account does not own Minecraft: Java Edition');
     }
-    throw new Error(`Failed to get MC profile (${res.status})`);
+    throw new AuthAnswerError(`Failed to get MC profile (${res.status})`, res.status);
   }
 
   return res.json() as Promise<McProfile>;
@@ -369,9 +375,15 @@ export function activeSkinUrl(profile: McProfile): string | undefined {
 function pushAuthState(): void {
   const win = getMainWindow();
   if (!win || win.isDestroyed()) return;
-  getStoredAuthState().then((state) => {
-    win.webContents.send('auth:state-changed', state);
-  });
+  getStoredAuthState()
+    .then((state) => {
+      win.webContents.send('auth:state-changed', state);
+    })
+    // A store that cannot be read says so instead of passing for an empty one,
+    // and nothing awaits this: the window simply keeps the list it has.
+    .catch((err: unknown) => {
+      log.warn('Could not send the auth state to the window:', err);
+    });
 }
 
 async function fullMicrosoftAuthChain(
@@ -396,7 +408,6 @@ async function fullMicrosoftAuthChain(
     username: profile.name,
     type: 'microsoft',
     skinUrl: activeSkinUrl(profile),
-    lastAuthenticated: new Date().toISOString(),
   };
 
   await saveAccount(account, msRefreshToken, {
@@ -438,7 +449,6 @@ export async function loginOffline(username: string): Promise<MinecraftAccount> 
     uuid: offlineUuid(username),
     username,
     type: 'offline',
-    lastAuthenticated: new Date().toISOString(),
   };
 
   // Must complete before returning: the renderer re-reads auth state the moment
@@ -500,7 +510,7 @@ export async function setActiveAccount(accountId: string): Promise<void> {
   pushAuthState();
 }
 
-export async function refreshAccount(accountId: string): Promise<MinecraftAccount> {
+async function refreshAccount(accountId: string): Promise<MinecraftAccount> {
   const existing = await getAccount(accountId);
   if (!existing) throw new Error(`Account ${accountId} not found`);
 
@@ -524,6 +534,22 @@ export async function refreshAccount(accountId: string): Promise<MinecraftAccoun
 const TOKEN_EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
 /**
+ * What a launch is told when only signing in again will do.
+ *
+ * A refusal, with a key: it is the one failure of this chain that ends in
+ * something for the player to go and do, and it used to reach them as a line
+ * of English diagnostics under "could not start the game".
+ */
+function sessionExpired(cause?: unknown): RefusedError {
+  const refusal = new RefusedError(
+    { key: 'launchError.sessionExpired' },
+    'Session expired — please log in again',
+  );
+  refusal.cause = cause;
+  return refusal;
+}
+
+/**
  * Return a currently-valid Minecraft session token for an account, silently
  * re-running the auth chain when the stored one is expired or nearly so.
  *
@@ -539,17 +565,18 @@ export async function getMinecraftAccessToken(accountId: string): Promise<string
   try {
     await refreshAccount(accountId);
   } catch (err) {
-    // "Cannot reach the servers" and "the servers rejected us" both surface as a
-    // rejected fetch, but only one of them is fixed by logging in again.
-    if (isNetworkFailure(err)) {
-      log.warn(`Auth servers unreachable while refreshing ${accountId}:`, err);
+    // No answer, an answer that the service is busy or broken, and an answer
+    // that the account is refused all arrive here as a rejection. Only the last
+    // is put right by signing in again; the first two are met by it again.
+    if (isAuthOutage(err)) {
+      log.warn(`Auth servers unreachable or not serving while refreshing ${accountId}:`, err);
       throw new AuthServersUnreachableError(err);
     }
     log.error(`Silent token refresh failed for ${accountId}:`, err);
-    throw new Error('Session expired — please log in again', { cause: err });
+    throw sessionExpired(err);
   }
 
   const refreshed = await getMcSession(accountId);
-  if (!refreshed) throw new Error('Session expired — please log in again');
+  if (!refreshed) throw sessionExpired();
   return refreshed.accessToken;
 }

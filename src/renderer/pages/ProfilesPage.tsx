@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Plus,
@@ -7,7 +9,6 @@ import {
   X,
   Edit3,
   Download,
-  Upload,
   FolderOpen,
   RefreshCw,
   ShieldCheck,
@@ -15,8 +16,10 @@ import {
   Package,
 } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
+import { useAuthStore } from '@stores/auth-store';
 import { useGameStore } from '@stores/game-store';
 import { Button } from '@components/ui/Button';
+import { ConfirmButton } from '@components/ui/ConfirmButton';
 import { Input } from '@components/ui/Input';
 import { Select } from '@components/ui/Select';
 import { Switch } from '@components/ui/Switch';
@@ -25,15 +28,20 @@ import { ProfileAvatar } from '@components/ProfileAvatar';
 import { ProfileIconPicker } from '@components/ProfileIconPicker';
 import { ProfileDeleteDialog } from '@components/ProfileDeleteDialog';
 import { ProfileSourcePicker } from '@components/ProfileSourcePicker';
+import { GameFailureNotice } from '@components/GameFailureNotice';
+import { CrashReporter } from '@components/CrashReporter';
 import { WorldBackupCard } from '@components/WorldBackupCard';
 import { VersionChangeDialog } from '@components/VersionChangeDialog';
 import { RamField } from '@components/RamField';
+import { isAllocatableRam, isManifestUrl, isServerPort } from '@shared/profile-draft';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useMachineMemoryMb } from '@hooks/use-machine-memory';
-import { useLocale, useT } from '@renderer/i18n';
+import { useLocale, useT, type TranslationKey } from '@renderer/i18n';
 import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '@shared/constants';
+import { GAME_LANGUAGES } from '@shared/game-languages';
 import { loaderLabel } from '@shared/labels';
+import { defaultLoaderVersion, listedLoaderVersion } from '@shared/loader-version';
 import { recommendedRamMb } from '@shared/memory';
 import type {
   ModLoaderType,
@@ -46,7 +54,9 @@ import type {
   LoaderVersion,
   JavaInstallation,
   JavaProbe,
+  UnreadableProfileEntries,
 } from '@shared/ipc-types';
+import { openProfileFolder } from '@renderer/open';
 
 const api = window.ravenforge;
 
@@ -69,11 +79,30 @@ const LOADER_OPTIONS = [
 
 type DraftProfile = Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>;
 
+/**
+ * The form labels of the fields a profile import leaves out, keyed by field.
+ *
+ * `Partial`, because the list of fields is the main process's to extend: one
+ * added there and not here is shown under its own name instead of a label.
+ */
+const DROPPED_FIELD_LABELS: Partial<Record<string, TranslationKey>> = {
+  customJavaPath: 'profileForm.java',
+  javaArgs: 'profileForm.javaArgsShort',
+  manifestUrl: 'profiles.manifestUrl',
+};
+
+/**
+ * What a new profile is on until Mojang's list has been read — and for good
+ * when it cannot be. With the list in hand the form moves it to the newest
+ * release; a constant alone meant every new profile started two years back.
+ */
+const FALLBACK_MINECRAFT_VERSION = '1.21.4';
+
 /** `totalMb` is the machine's memory, or undefined when it could not be read. */
 function emptyDraft(totalMb: number | undefined): DraftProfile {
   return {
     name: '',
-    minecraftVersion: '1.21.4',
+    minecraftVersion: FALLBACK_MINECRAFT_VERSION,
     modLoader: 'fabric',
     modLoaderVersion: undefined,
     manifestUrl: undefined,
@@ -85,6 +114,7 @@ function emptyDraft(totalMb: number | undefined): DraftProfile {
     windowWidth: undefined,
     windowHeight: undefined,
     fullscreen: undefined,
+    gameLanguage: undefined,
     notes: undefined,
   };
 }
@@ -108,19 +138,45 @@ function windowSizeProblem(draft: DraftProfile): 'incomplete' | 'range' | null {
   return null;
 }
 
+/**
+ * The part of a profile the form edits.
+ *
+ * Not the pictures and not the play statistics. Save sends the whole draft, and
+ * the main process merges it over the profile — so a draft that carried them
+ * wrote back whatever they had been when Edit was pressed: the avatar picked a
+ * moment ago in this same form went back to the old one, and a game that ended
+ * while the form was open lost that session's hours.
+ */
 function profileToDraft(p: Profile): DraftProfile {
-  const { id: _id, createdAt: _ca, updatedAt: _ua, ...draft } = p;
+  const {
+    id: _id,
+    createdAt: _ca,
+    updatedAt: _ua,
+    iconPath: _iconPath,
+    iconUrl: _iconUrl,
+    iconPreset: _iconPreset,
+    lastPlayed: _lastPlayed,
+    totalPlayTimeMinutes: _playTime,
+    ...draft
+  } = p;
   return draft;
 }
 
 export function ProfilesPage() {
   const profiles = useProfileStore((s) => s.profiles);
+  const profilesLoaded = useProfileStore((s) => s.loaded);
   const selectedId = useProfileStore((s) => s.selectedProfileId);
   const select = useProfileStore((s) => s.select);
   const createProfile = useProfileStore((s) => s.create);
   const updateProfile = useProfileStore((s) => s.update);
   const removeProfile = useProfileStore((s) => s.remove);
   const duplicateProfile = useProfileStore((s) => s.duplicate);
+  const duplicating = useProfileStore((s) =>
+    s.selectedProfileId ? s.duplicating.has(s.selectedProfileId) : false,
+  );
+  const removing = useProfileStore((s) =>
+    s.selectedProfileId ? s.removing.has(s.selectedProfileId) : false,
+  );
   const reload = useProfileStore((s) => s.load);
 
   const t = useT();
@@ -135,10 +191,17 @@ export function ProfilesPage() {
   const [choosingSource, setChoosingSource] = useState(false);
   /** Profile files left on disk by a "delete, keep files". */
   const [orphans, setOrphans] = useState<OrphanedProfile[]>([]);
+  /** Entries of the stored list that are not profiles, and so are not above. */
+  const [unreadable, setUnreadable] = useState<UnreadableProfileEntries | null>(null);
   /** The last pack export, so its result can be reported instead of vanishing. */
   const [exported, setExported] = useState<MrpackExport | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Something worth saying that is not a failure — what an import left out. */
+  const [notice, setNotice] = useState<string | null>(null);
   const [exportingPack, setExportingPack] = useState(false);
+  /** Open while the player is asked what a pack export should hold. */
+  const [askingExport, setAskingExport] = useState(false);
+  const [exportSettings, setExportSettings] = useState(true);
   /** Set while a Minecraft version change is waiting to be confirmed. */
   const [versionChange, setVersionChange] = useState<ProfileFileSummary | null>(null);
 
@@ -151,29 +214,79 @@ export function ProfilesPage() {
     void refreshOrphans();
   }, [refreshOrphans, profiles.length]);
 
-  const adopt = async (profileId: string) => {
-    const result = await api.profiles.adoptOrphaned(profileId);
-    if (result.success) {
-      await reload();
-      select(profileId);
+  useEffect(() => {
+    let cancelled = false;
+    void api.profiles.unreadableEntries().then((result) => {
+      if (!cancelled) setUnreadable(result.success && result.data ? result.data : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profiles.length]);
+  const unreadableCount = unreadable?.count ?? 0;
+
+  /**
+   * The kept profiles being put back or deleted right now. Deleting one removes
+   * its worlds, which takes as long as they are large, and both buttons used to
+   * sit there looking unpressed for all of it.
+   */
+  const [orphanBusy, setOrphanBusy] = useState<ReadonlySet<string>>(new Set());
+  const whileOrphanBusy = async (profileId: string, work: () => Promise<void>) => {
+    if (orphanBusy.has(profileId)) return;
+    setActionError(null);
+    setOrphanBusy((ids) => new Set(ids).add(profileId));
+    try {
+      await work();
+      await refreshOrphans();
+    } finally {
+      setOrphanBusy((ids) => {
+        const next = new Set(ids);
+        next.delete(profileId);
+        return next;
+      });
     }
-    await refreshOrphans();
   };
 
-  const discard = async (profileId: string) => {
-    await api.profiles.discardOrphaned(profileId);
-    await refreshOrphans();
-  };
-  const [syncing, setSyncing] = useState(false);
+  const adopt = (profileId: string) =>
+    whileOrphanBusy(profileId, async () => {
+      const result = await api.profiles.adoptOrphaned(profileId);
+      if (result.success) {
+        await reload();
+        select(profileId);
+      } else {
+        setActionError(result.error ?? t('orphans.restoreFailed'));
+      }
+    });
 
-  const beginPreparing = useGameStore((s) => s.beginPreparing);
-  const endPreparing = useGameStore((s) => s.endPreparing);
-  const quickConnectPreparing = useGameStore((s) =>
-    selectedId ? s.preparing.has(selectedId) : false,
+  const discard = (profileId: string) =>
+    whileOrphanBusy(profileId, async () => {
+      const r = await api.profiles.discardOrphaned(profileId);
+      if (!r.success) setActionError(r.error ?? t('orphans.discardFailed'));
+    });
+  /**
+   * The profiles a sync was started for from this page and has not come back.
+   *
+   * By id. This was one flag for the page, so a sync started on one profile
+   * showed as running on whichever profile was looked at next — with a Cancel
+   * that stopped that other profile's launch instead — and its result, when it
+   * arrived, was written onto the badge of the profile then on screen.
+   */
+  const [syncingIds, setSyncingIds] = useState<ReadonlySet<string>>(new Set());
+  const syncing = selectedId ? syncingIds.has(selectedId) : false;
+  /** Whichever profile is on screen now, for a reply that arrives later. */
+  const shownId = useRef(selectedId);
+  useEffect(() => {
+    shownId.current = selectedId;
+  }, [selectedId]);
+  // A sync rewrites the mods folder, and a launch being prepared or a game
+  // that is up is reading it. Starting one under the other also aborted the
+  // launch without a word: both register a job for the profile, and the second
+  // cancels the first.
+  const gameBusy = useGameStore((s) =>
+    selectedId ? s.preparing.has(selectedId) || s.running.has(selectedId) : false,
   );
-  const quickConnectBusy = useGameStore((s) =>
-    selectedId ? s.running.has(selectedId) || s.preparing.has(selectedId) : false,
-  );
+  /** Why the main process would not save what is in the form. */
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
 
@@ -184,10 +297,11 @@ export function ProfilesPage() {
       return;
     }
     // The guard every other effect on this page has, and this one did not.
-    // `manifest.verify` goes to the network, so switching profiles while it is
-    // in flight used to land profile A's sync state and signature badge on the
-    // screen showing profile B — and a signature badge is the one thing here
-    // that must never be about a different pack than the one being read.
+    // Both answers come back a moment after they are asked for, so switching
+    // profiles in between used to land profile A's sync state and signature
+    // badge on the screen showing profile B — and a signature badge is the one
+    // thing here that must never be about a different pack than the one being
+    // read.
     let cancelled = false;
     void api.profiles.getSyncStatus(selectedId).then((r) => {
       if (!cancelled && r.success && r.data) setSyncStatus(r.data);
@@ -220,18 +334,37 @@ export function ProfilesPage() {
   const startFromScratch = () => {
     setChoosingSource(false);
     setDraft(emptyDraft(machineMemoryMb));
+    setSaveError(null);
     setMode('create');
   };
 
   const startEdit = () => {
     if (!selectedProfile) return;
     setDraft(profileToDraft(selectedProfile));
+    setSaveError(null);
     setMode('edit');
   };
 
   const cancel = () => setMode('view');
 
-  const save = async () => {
+  /**
+   * True from Save until the profile is written. Two things in between take
+   * time and showed nothing: counting a profile's files before a version
+   * change, and copying its worlds aside when that was asked for.
+   */
+  const [saving, setSaving] = useState(false);
+  const whileSaving = async (work: () => Promise<void>) => {
+    setSaving(true);
+    try {
+      await work();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const save = () => whileSaving(saveDraft);
+
+  const saveDraft = async () => {
     if (!draft.name.trim()) return;
     // Changing the Minecraft version is not an edit like the others: the mods
     // stay behind at the version they were built for, and a world opened by a
@@ -254,54 +387,106 @@ export function ProfilesPage() {
 
   /** Write the draft out. Split from `save` so the dialog can call it too. */
   const commit = async (backupFirst = false) => {
-    if (mode === 'create') {
-      await createProfile(draft);
-    } else if (mode === 'edit' && selectedProfile) {
-      if (backupFirst) {
-        // Before the profile moves, not after: a failed copy must leave the
-        // profile exactly as it was rather than half-changed.
-        const backup = await api.profiles.backupWorlds(selectedProfile.id, 'version-change');
-        if (!backup.success) {
-          setActionError(backup.error ?? t('versionChange.backupFailed'));
-          return;
-        }
+    setSaveError(null);
+    if (mode === 'edit' && selectedProfile && backupFirst) {
+      // Before the profile moves, not after: a failed copy must leave the
+      // profile exactly as it was rather than half-changed.
+      const backup = await api.profiles.backupWorlds(selectedProfile.id, 'version-change');
+      if (!backup.success) {
+        setActionError(backup.error ?? t('versionChange.backupFailed'));
+        return;
       }
-      await updateProfile(selectedProfile.id, draft);
+    }
+
+    const saved =
+      mode === 'create'
+        ? await createProfile(draft)
+        : mode === 'edit' && selectedProfile
+          ? await updateProfile(selectedProfile.id, draft)
+          : undefined;
+    // The form stays open over what was typed. It used to close either way,
+    // and a profile the main process had refused was simply not there.
+    if (saved && !saved.success) {
+      setSaveError(saved.error ?? t('profileForm.saveFailed'));
+      return;
     }
     setMode('view');
   };
 
   const handleSync = async () => {
-    if (!selectedId) return;
-    setSyncing(true);
+    const id = selectedId;
+    if (!id || syncingIds.has(id) || gameBusy) return;
+    const hasAddress = Boolean(selectedProfile?.manifestUrl);
+    setSyncingIds((ids) => new Set(ids).add(id));
     try {
-      await api.mods.syncManifest(selectedId);
-      const r = await api.profiles.getSyncStatus(selectedId);
-      if (r.success && r.data) setSyncStatus(r.data);
+      await api.mods.syncManifest(id);
+      // Both badges are asked again, and only shown if this profile is still
+      // the one on screen. The signature badge was not asked at all, so a
+      // profile that read "Not checked yet" went on reading it after the sync
+      // that had just checked.
+      const [status, verified] = await Promise.all([
+        api.profiles.getSyncStatus(id),
+        hasAddress ? api.manifest.verify(id) : undefined,
+      ]);
+      if (shownId.current !== id) return;
+      if (status.success && status.data) setSyncStatus(status.data);
+      if (verified?.success && verified.data) setVerification(verified.data);
     } finally {
-      setSyncing(false);
+      setSyncingIds((ids) => {
+        const next = new Set(ids);
+        next.delete(id);
+        return next;
+      });
+      stopCancelling(id);
     }
   };
+
+  /** Profiles whose sync has been asked to stop and has not let go yet. */
+  const [cancellingSync, setCancellingSync] = useState<ReadonlySet<string>>(new Set());
+  const stopCancelling = (id: string) =>
+    setCancellingSync((ids) => {
+      const next = new Set(ids);
+      next.delete(id);
+      return next;
+    });
 
   const handleCancelSync = async () => {
-    if (!selectedId) return;
-    await api.game.cancel(selectedId);
+    const id = selectedId;
+    if (!id || cancellingSync.has(id)) return;
+    setActionError(null);
+    setCancellingSync((ids) => new Set(ids).add(id));
+    const r = await api.game.cancel(id);
+    // `false` is the main process having nothing registered for the profile at
+    // that moment — a sync between two of its steps, or one just finishing. The
+    // button is given back so it can be pressed again, with a word about why
+    // nothing stopped; when it did stop, the sync returning is what clears this.
+    if (!r.success || !r.data) {
+      stopCancelling(id);
+      setActionError(r.error ?? t('profiles.cancelSyncFailed'));
+    }
   };
 
-  const handleQuickConnect = async () => {
-    if (!selectedId || quickConnectBusy) return;
-    beginPreparing(selectedId);
-    try {
-      await api.game.launch({ profileId: selectedId, quickConnect: true });
-    } finally {
-      endPreparing(selectedId);
-    }
+  const handleDuplicate = async () => {
+    if (!selectedProfile) return;
+    setActionError(null);
+    setNotice(null);
+    const r = await duplicateProfile(
+      selectedProfile.id,
+      t('profiles.copyName', { name: selectedProfile.name }),
+    );
+    // Said either way: the copy is everything but the world backups, and
+    // whoever goes looking for those in it should not conclude they were lost.
+    if (r.success) setNotice(t('profiles.duplicated'));
+    else setActionError(r.error ?? t('profiles.duplicateFailed'));
   };
 
   const handleExport = async () => {
     if (!selectedId) return;
     const r = await api.profiles.export(selectedId);
-    if (!r.success || !r.data) return;
+    if (!r.success || !r.data) {
+      setActionError(r.error ?? t('profiles.exportFailed'));
+      return;
+    }
     const blob = new Blob([r.data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -314,34 +499,34 @@ export function ProfilesPage() {
   /**
    * Export the profile as a `.mrpack` — the mods, not just the settings.
    *
-   * Where it goes is asked in the main process, so nothing here names a path.
-   * A `null` result is the player closing that dialog, which is not a failure
-   * and should say nothing at all.
+   * Asked about first: a pack carries the author's own game settings and mod
+   * configuration unless they say otherwise, and it used to carry them without
+   * saying so. Where it goes is asked in the main process, so nothing here names
+   * a path. A `null` result is the player closing that dialog, which is not a
+   * failure and should say nothing at all.
    */
-  const handleExportPack = async () => {
-    if (!selectedId) return;
+  // The question is about one profile; it does not follow the selection to another.
+  useEffect(() => {
+    setAskingExport(false);
+  }, [selectedId]);
+
+  const askExportPack = () => {
     setExported(null);
     setActionError(null);
+    setAskingExport(true);
+  };
+
+  const handleExportPack = async () => {
+    if (!selectedId) return;
     setExportingPack(true);
     try {
-      const r = await api.profiles.exportPack(selectedId);
+      const r = await api.profiles.exportPack(selectedId, { settings: exportSettings });
       if (!r.success) setActionError(r.error ?? t('profiles.exportPackFailed'));
       else if (r.data) setExported(r.data);
+      setAskingExport(false);
     } finally {
       setExportingPack(false);
     }
-  };
-
-  const handleImport = async () => {
-    const filePath = await api.system.selectFile([{ name: 'Profile JSON', extensions: ['json'] }]);
-    if (!filePath.success || !filePath.data) return;
-    // Read file via fetch — file:// URLs aren't allowed, so we round-trip through a fresh tag
-    const json = await fetch(`file://${filePath.data}`)
-      .then((r) => r.text())
-      .catch(() => null);
-    if (!json) return;
-    await api.profiles.import(json);
-    await reload();
   };
 
   return (
@@ -352,28 +537,20 @@ export function ProfilesPage() {
           <h2 className="text-xs font-display font-semibold text-rf-text-secondary uppercase tracking-wider">
             {t('profiles.title')}
           </h2>
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Upload size={14} />}
-              onClick={handleImport}
-              title={t('profiles.import')}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Plus size={14} />}
-              onClick={startCreate}
-              title={t('profiles.new')}
-            />
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Plus size={14} />}
+            onClick={startCreate}
+            title={t('profiles.new')}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {profiles.map((profile) => (
             <button
               key={profile.id}
+              aria-current={profile.id === selectedId ? 'true' : undefined}
               onClick={() => {
                 select(profile.id);
                 setMode('view');
@@ -393,14 +570,20 @@ export function ProfilesPage() {
               </span>
             </button>
           ))}
-          {profiles.length === 0 && orphans.length === 0 && (
-            <EmptyState
-              kind="profiles"
-              title={t('profiles.empty')}
-              hint={t('profiles.emptyHint')}
-              className="p-4"
-            />
+          {!profilesLoaded && (
+            <p className="p-4 text-sm text-rf-text-muted">{t('profiles.loading')}</p>
           )}
+          {profilesLoaded &&
+            profiles.length === 0 &&
+            orphans.length === 0 &&
+            unreadableCount === 0 && (
+              <EmptyState
+                kind="profiles"
+                title={t('profiles.empty')}
+                hint={t('profiles.emptyHint')}
+                className="p-4"
+              />
+            )}
 
           {/* Files kept behind by a delete. Directories are keyed by id, so
               nothing else in the launcher would ever lead back to them — without
@@ -424,15 +607,39 @@ export function ProfilesPage() {
                     </p>
                   )}
                   <div className="mt-1.5 flex gap-1">
-                    <Button size="sm" variant="secondary" onClick={() => void adopt(profile.id)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={orphanBusy.has(profile.id)}
+                      onClick={() => void adopt(profile.id)}
+                    >
                       {t('orphans.restore')}
                     </Button>
-                    <Button size="sm" variant="danger" onClick={() => void discard(profile.id)}>
+                    <ConfirmButton
+                      question={t('orphans.confirmDiscard')}
+                      confirmLabel={t('common.delete')}
+                      loading={orphanBusy.has(profile.id)}
+                      onConfirm={() => void discard(profile.id)}
+                    >
                       {t('orphans.discard')}
-                    </Button>
+                    </ConfirmButton>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* A profile that is in the file and not on this list, with nothing
+              said, reads as a profile the launcher lost. */}
+          {unreadable && unreadableCount > 0 && (
+            <div className="border-t border-rf-border p-3">
+              <h3 className="text-xs font-display font-semibold uppercase tracking-wider text-rf-text-secondary">
+                {t('unreadable.title')}
+              </h3>
+              <p className="mt-1 text-xs text-rf-text-muted">
+                {t.plural('unreadable.body', unreadableCount)}
+              </p>
+              <p className="mt-1 break-all text-xs text-rf-text select-text">{unreadable.file}</p>
             </div>
           )}
         </div>
@@ -445,7 +652,54 @@ export function ProfilesPage() {
             seen by the person who caused it. */}
         {actionError && (
           <div className="mx-auto mb-4 max-w-2xl">
-            <Banner type="urgent">{actionError}</Banner>
+            <Banner type="urgent" dismissible onDismiss={() => setActionError(null)}>
+              {actionError}
+            </Banner>
+          </div>
+        )}
+        {notice && (
+          <div className="mx-auto mb-4 max-w-2xl">
+            <Banner type="info" dismissible onDismiss={() => setNotice(null)}>
+              {notice}
+            </Banner>
+          </div>
+        )}
+        {askingExport && (
+          <div
+            className="mx-auto mb-4 max-w-2xl rounded-lg border border-rf-border bg-rf-surface p-4"
+            role="group"
+            aria-label={t('profiles.exportPack')}
+          >
+            <p className="text-sm text-rf-text">{t('profiles.exportPackAsk')}</p>
+            <label className="mt-3 flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={exportSettings}
+                onChange={(e) => setExportSettings(e.target.checked)}
+                className="mt-0.5 accent-rf-accent"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-rf-text">
+                  {t('profiles.exportPackSettings')}
+                </span>
+                <span className="mt-0.5 block text-xs text-rf-text-muted">
+                  {t('profiles.exportPackSettingsHint')}
+                </span>
+              </span>
+            </label>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={exportingPack}
+                onClick={() => setAskingExport(false)}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button size="sm" loading={exportingPack} onClick={() => void handleExportPack()}>
+                {t('profiles.exportPackGo')}
+              </Button>
+            </div>
           </div>
         )}
         {exported && (
@@ -467,6 +721,9 @@ export function ProfilesPage() {
                 })}`}
               {exported.skippedDisabled > 0 &&
                 ` ${t.plural('profiles.exportPackSkipped', exported.skippedDisabled)}`}
+              {/* Said, because it is theirs: whoever gets the pack gets these. */}
+              {exported.settingsFiles > 0 &&
+                ` ${t.plural('profiles.exportPackCarried', exported.settingsFiles)}`}
             </Banner>
           </div>
         )}
@@ -475,7 +732,9 @@ export function ProfilesPage() {
             draft={draft}
             onChange={setDraft}
             onCancel={cancel}
-            onSave={save}
+            onSave={() => void save()}
+            saving={saving}
+            saveError={saveError}
             isCreate={mode === 'create'}
             profile={mode === 'edit' ? selectedProfile : undefined}
             machineMemoryMb={machineMemoryMb}
@@ -486,23 +745,19 @@ export function ProfilesPage() {
             syncStatus={syncStatus}
             verification={verification}
             syncing={syncing}
-            onCancelSync={handleCancelSync}
+            syncBlocked={gameBusy}
+            onCancelSync={() => void handleCancelSync()}
+            cancellingSync={cancellingSync.has(selectedProfile.id)}
+            deleting={removing}
             onEdit={startEdit}
-            onDuplicate={() =>
-              duplicateProfile(
-                selectedProfile.id,
-                t('profiles.copyName', { name: selectedProfile.name }),
-              )
-            }
+            onDuplicate={() => void handleDuplicate()}
+            duplicating={duplicating}
             onDelete={() => setDeleting(selectedProfile)}
             onExport={handleExport}
-            onExportPack={handleExportPack}
+            onExportPack={askExportPack}
             exportingPack={exportingPack}
-            onOpenFolder={() => void api.profiles.openFolder(selectedProfile.id)}
+            onOpenFolder={() => void openProfileFolder(selectedProfile.id, selectedProfile.name)}
             onSync={handleSync}
-            onQuickConnect={handleQuickConnect}
-            quickConnectBusy={quickConnectBusy}
-            quickConnectPreparing={quickConnectPreparing}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-rf-text-muted">
@@ -515,9 +770,37 @@ export function ProfilesPage() {
         <ProfileSourcePicker
           onCancel={() => setChoosingSource(false)}
           onScratch={startFromScratch}
-          onCreated={(profileId) => {
+          onCreated={(profile, said) => {
             setChoosingSource(false);
-            void reload().then(() => select(profileId));
+            // A profile file can carry a Java path, JVM arguments and a pack
+            // address, and an import takes none of them. Said here, where the
+            // new profile is on screen, so nobody finds out at the first launch.
+            const dropped = said?.dropped ?? [];
+            setNotice(
+              dropped.length > 0
+                ? t('profiles.importDropped', {
+                    fields: dropped
+                      .map((field) => {
+                        const label = DROPPED_FIELD_LABELS[field];
+                        return label ? t(label) : field;
+                      })
+                      .join(', '),
+                  })
+                : null,
+            );
+            // A pack whose files did not all arrive still left a profile, and
+            // this is the screen with the button that finishes the job — so
+            // this is where it is said, naming that button.
+            setActionError(
+              said?.unfinished
+                ? t('packs.installUnfinished', {
+                    name: profile.name,
+                    action: t(profile.manifestUrl ? 'profiles.sync' : 'profiles.repair'),
+                    error: said.unfinished,
+                  })
+                : null,
+            );
+            void reload().then(() => select(profile.id));
           }}
         />
       )}
@@ -530,7 +813,7 @@ export function ProfilesPage() {
           onCancel={() => setVersionChange(null)}
           onConfirm={(backupFirst) => {
             setVersionChange(null);
-            void commit(backupFirst);
+            void whileSaving(() => commit(backupFirst));
           }}
         />
       )}
@@ -543,7 +826,12 @@ export function ProfilesPage() {
           onConfirm={(deleteFiles) => {
             const id = deleting.id;
             setDeleting(null);
-            void removeProfile(id, deleteFiles);
+            setActionError(null);
+            void removeProfile(id, deleteFiles).then((r) => {
+              if (!r.success) setActionError(r.error ?? t('profiles.deleteFailed'));
+              // Files that would not go are listed as kept; show them now.
+              void refreshOrphans();
+            });
           }}
         />
       )}
@@ -558,18 +846,22 @@ interface DetailProps {
   syncStatus: ProfileSyncStatus | null;
   verification: ManifestVerification | null;
   syncing: boolean;
+  /** The game is running or being got ready, so the mods cannot be changed. */
+  syncBlocked: boolean;
   onCancelSync: () => void;
+  /** Cancel was pressed and the sync has not let go yet. */
+  cancellingSync: boolean;
+  /** The profile is on its way out. */
+  deleting: boolean;
   onEdit: () => void;
   onDuplicate: () => void;
+  duplicating: boolean;
   onDelete: () => void;
   onExport: () => void;
   onExportPack: () => void;
   exportingPack: boolean;
   onOpenFolder: () => void;
   onSync: () => void;
-  onQuickConnect: () => void;
-  quickConnectBusy: boolean;
-  quickConnectPreparing: boolean;
 }
 
 function ProfileDetail({
@@ -577,22 +869,25 @@ function ProfileDetail({
   syncStatus,
   verification,
   syncing,
+  syncBlocked,
   onCancelSync,
+  cancellingSync,
+  deleting,
   onEdit,
   onDuplicate,
+  duplicating,
   onDelete,
   onExport,
   onExportPack,
   exportingPack,
   onOpenFolder,
   onSync,
-  onQuickConnect,
-  quickConnectBusy,
-  quickConnectPreparing,
 }: DetailProps) {
   const t = useT();
   // Dates follow the UI language, not a hardcoded pl-PL.
   const locale = useLocale();
+  const crashInfo = useGameStore((s) => s.getCrashInfo(profile.id));
+  const clearCrash = useGameStore((s) => s.clearCrash);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -610,15 +905,16 @@ function ProfileDetail({
             variant="ghost"
             size="sm"
             icon={<Copy size={14} />}
+            loading={duplicating}
             onClick={onDuplicate}
-            title={t('common.duplicate')}
+            title={t('profiles.duplicate')}
           />
           <Button
             variant="ghost"
             size="sm"
             icon={<Download size={14} />}
             onClick={onExport}
-            title={t('common.export')}
+            title={t('profiles.exportSettings')}
           />
           <Button
             variant="ghost"
@@ -639,6 +935,7 @@ function ProfileDetail({
             variant="danger"
             size="sm"
             icon={<Trash2 size={14} />}
+            loading={deleting}
             onClick={onDelete}
             title={t('common.delete')}
           />
@@ -658,48 +955,71 @@ function ProfileDetail({
         />
       </div>
 
-      {profile.manifestUrl && (
+      {/* A profile made from a pack file gets the same box. It follows no
+          address, but the pack it was installed from is kept, and syncing
+          against that is how an install that stopped half-way is finished. */}
+      {(profile.manifestUrl || syncStatus?.importedPack) && (
         <div className="space-y-2 rounded-lg border border-rf-border bg-rf-surface p-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-rf-text-muted">{t('profiles.manifestUrl')}</p>
+            <p className="text-xs text-rf-text-muted">
+              {t(profile.manifestUrl ? 'profiles.manifestUrl' : 'profiles.importedPack')}
+            </p>
             <Button
               variant="secondary"
               size="sm"
               icon={<RefreshCw size={12} />}
               loading={syncing}
-              disabled={syncing}
+              disabled={syncing || syncBlocked}
+              title={syncBlocked ? t('profiles.syncBlocked') : undefined}
               onClick={onSync}
             >
-              {t('profiles.sync')}
+              {t(profile.manifestUrl ? 'profiles.sync' : 'profiles.repair')}
             </Button>
             {/* A modpack sync is a long download — let the user stop it. */}
             {syncing && (
-              <Button variant="ghost" size="sm" icon={<X size={12} />} onClick={onCancelSync}>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<X size={12} />}
+                loading={cancellingSync}
+                onClick={onCancelSync}
+              >
                 {t('common.cancel')}
               </Button>
             )}
           </div>
-          <p className="text-xs font-mono text-rf-text break-all">{profile.manifestUrl}</p>
+          {profile.manifestUrl ? (
+            <p className="text-xs font-mono text-rf-text break-all">{profile.manifestUrl}</p>
+          ) : (
+            <p className="text-xs text-rf-text-muted">{t('profiles.importedPackHint')}</p>
+          )}
           <div className="flex flex-wrap gap-2 pt-1">
             {syncStatus && <SyncBadge status={syncStatus} />}
             {verification && <VerificationBadge verification={verification} />}
           </div>
+          {/* The reason, in the main process's words. The badge alone said
+              "Sync error" for a dead address, a file that failed its hash and
+              a manifest refused over its signature alike. */}
+          {syncStatus?.status === 'error' && syncStatus.errorMessage && (
+            <p role="alert" className="break-words text-xs text-rf-danger">
+              {syncStatus.errorMessage}
+            </p>
+          )}
         </div>
       )}
 
-      {/* Spinner only while preparing — a running game has nothing pending. */}
-      {profile.serverIp && (
-        <Button
-          onClick={onQuickConnect}
-          size="lg"
-          loading={quickConnectPreparing}
-          disabled={quickConnectBusy}
-        >
-          {t('profiles.quickConnect', {
-            address: `${profile.serverIp}:${profile.serverPort ?? 25565}`,
-          })}
-        </Button>
+      {/* The card the home page shows, out of the same record. A game can be
+          started from here as well, and one that went down said nothing on this
+          page: the card was waiting on the other one. */}
+      {crashInfo?.crashed && (
+        <CrashReporter
+          crashInfo={crashInfo}
+          profile={profile}
+          onDismiss={() => clearCrash(profile.id)}
+        />
       )}
+
+      {profile.serverIp && <QuickConnect profile={profile} />}
 
       {profile.notes && (
         <div className="rounded-lg border border-rf-border bg-rf-surface p-3">
@@ -716,10 +1036,67 @@ function ProfileDetail({
             date: new Date(profile.lastPlayed).toLocaleDateString(locale),
           })}
           {profile.totalPlayTimeMinutes
-            ? ` • ${t('profiles.totalPlayTime', { hours: Math.round(profile.totalPlayTimeMinutes / 60) })}`
+            ? ` • ${
+                profile.totalPlayTimeMinutes < 60
+                  ? t('profiles.totalPlayMinutes', { minutes: profile.totalPlayTimeMinutes })
+                  : t('profiles.totalPlayTime', {
+                      hours: Math.round(profile.totalPlayTimeMinutes / 60),
+                    })
+              }`
             : ''}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Start the game and join the profile's server in one press.
+ *
+ * The same launch as Play, through the same routine in the game store, so it
+ * gets the same answers. It used to make the call itself and look at nothing
+ * that came back: with no account signed in, the button spun through the
+ * pack, Java and the assets and then went quiet.
+ */
+function QuickConnect({ profile }: { profile: Profile }) {
+  const t = useT();
+  const signedIn = useAuthStore((s) => s.accounts.some((a) => a.id === s.activeAccountId));
+  const preparing = useGameStore((s) => s.preparing.has(profile.id));
+  const running = useGameStore((s) => s.running.has(profile.id));
+  const cancelling = useGameStore((s) => s.cancelling.has(profile.id));
+  const launch = useGameStore((s) => s.launch);
+  const cancelLaunch = useGameStore((s) => s.cancelLaunch);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        {/* Spinner only while preparing — a running game has nothing pending. */}
+        <Button
+          size="lg"
+          loading={preparing}
+          disabled={!signedIn || running}
+          onClick={() => void launch(profile.id, { quickConnect: true })}
+        >
+          {t('profiles.quickConnect', {
+            address: `${profile.serverIp}:${profile.serverPort ?? 25565}`,
+          })}
+        </Button>
+        {preparing && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<X size={14} />}
+            loading={cancelling}
+            onClick={() => void cancelLaunch(profile.id)}
+          >
+            {cancelling ? t('home.cancelling') : t('home.cancelLaunch')}
+          </Button>
+        )}
+      </div>
+      {/* The launch needs an account and only finds that out after the
+          downloads, so the button says it first. */}
+      {!signedIn && <p className="text-xs text-rf-warning">{t('home.notSignedIn')}</p>}
+      <GameFailureNotice profileId={profile.id} />
     </div>
   );
 }
@@ -799,6 +1176,10 @@ interface FormProps {
   onChange: (next: DraftProfile) => void;
   onCancel: () => void;
   onSave: () => void;
+  /** True while the profile is being written, or prepared for that. */
+  saving: boolean;
+  /** Why the last Save was refused, in the main process's words. */
+  saveError: string | null;
   isCreate: boolean;
   /** The saved profile being edited; absent while creating a new one. */
   profile?: Profile;
@@ -811,6 +1192,8 @@ function ProfileForm({
   onChange,
   onCancel,
   onSave,
+  saving,
+  saveError,
   isCreate,
   profile,
   machineMemoryMb,
@@ -843,6 +1226,17 @@ function ProfileForm({
         return;
       }
       setMcVersions(r.data);
+      // A new profile that nobody has chosen a version for yet starts on the
+      // newest release, which heads the list.
+      const now = latest.current;
+      if (
+        isCreate &&
+        !showSnapshots &&
+        now.draft.minecraftVersion === FALLBACK_MINECRAFT_VERSION &&
+        r.data[0] !== FALLBACK_MINECRAFT_VERSION
+      ) {
+        now.onChange({ ...now.draft, minecraftVersion: r.data[0], modLoaderVersion: undefined });
+      }
       // A profile already pinned to a snapshot opens with the toggle off, and
       // its own version is then not among the options — which a <select>
       // renders as whatever happens to be first. Turning the toggle on is the
@@ -862,7 +1256,7 @@ function ProfileForm({
     return () => {
       cancelled = true;
     };
-  }, [showSnapshots]);
+  }, [showSnapshots, isCreate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -911,16 +1305,20 @@ function ProfileForm({
       // invites the player to type a version that cannot exist.
       setNoLoaderBuilds(versions.length === 0);
 
-      // Every loader version belongs to exactly one Minecraft version, so a
-      // version carried over from the previous selection is now wrong. Without
-      // this the select falls back to displaying its first option while the
-      // draft still holds the stale value — and that is what gets saved.
+      // The draft always holds a build that is on the list. Every loader
+      // version belongs to exactly one Minecraft version, so one carried over
+      // from the previous selection is now wrong — and one that was never
+      // chosen is not a choice the launcher can act on: a profile saved with
+      // "latest" in this field had no version, so its loader was never
+      // installed and it started as plain Minecraft. The default is therefore
+      // written into the draft, where it is visible and is what gets saved.
+      //
+      // On the list under another spelling counts as on it, and the draft takes
+      // the list's: a pack names a Forge build by its number alone.
       const { draft: current, onChange: apply } = latest.current;
-      if (
-        current.modLoaderVersion &&
-        !versions.some((v) => v.version === current.modLoaderVersion)
-      ) {
-        apply({ ...current, modLoaderVersion: undefined });
+      const listed = listedLoaderVersion(versions, current.modLoaderVersion, current.modLoader);
+      if (listed === undefined || listed !== current.modLoaderVersion) {
+        apply({ ...current, modLoaderVersion: listed ?? defaultLoaderVersion(versions) });
       }
     });
     return () => {
@@ -929,6 +1327,7 @@ function ProfileForm({
   }, [draft.modLoader, draft.minecraftVersion]);
 
   const t = useT();
+  const recommendedLoaderVersion = defaultLoaderVersion(loaderVersions);
   const set = <K extends keyof DraftProfile>(key: K, value: DraftProfile[K]) => {
     onChange({ ...draft, [key]: value });
   };
@@ -957,6 +1356,12 @@ function ProfileForm({
           })
         : undefined;
   const heightAtFault = sizeProblem === 'incomplete' && draft.windowHeight === undefined;
+
+  // The other three things the main process refuses a profile over. Said beside
+  // the field, and Save waits for them, rather than found out from a refusal.
+  const urlProblem = draft.manifestUrl !== undefined && !isManifestUrl(draft.manifestUrl);
+  const portProblem = draft.serverPort !== undefined && !isServerPort(draft.serverPort);
+  const ramProblem = !isAllocatableRam(draft.allocatedRamMb);
 
   // Same rule as the version list: whatever the profile is already set to is
   // always one of the options, so the control cannot show a runtime other than
@@ -1045,7 +1450,7 @@ function ProfileForm({
               <p className="text-xs text-rf-text-muted">{t('profileForm.snapshotHint')}</p>
             )}
           </div>
-        ) : (
+        ) : mcVersionsFailed ? (
           // Only reachable when Mojang's manifest could not be fetched and no
           // cached copy exists — a free field beats blocking profile creation.
           <Input
@@ -1053,7 +1458,18 @@ function ProfileForm({
             value={draft.minecraftVersion}
             onChange={(e) => set('minecraftVersion', e.target.value)}
             placeholder="1.21.4"
-            error={mcVersionsFailed ? t('profileForm.versionsFailed') : undefined}
+            error={t('profileForm.versionsFailed')}
+          />
+        ) : (
+          // Still on its way. This used to be the free field above, which then
+          // turned into a dropdown under the cursor — and for as long as the
+          // list took, looked like the way a version is meant to be chosen.
+          <Select
+            label={t('profileForm.mcVersion')}
+            options={[{ value: '', label: t('profileForm.versionsLoading') }]}
+            value=""
+            onChange={() => {}}
+            disabled
           />
         )}
         <Select
@@ -1078,23 +1494,35 @@ function ProfileForm({
         ) : loaderVersions.length > 0 ? (
           <Select
             label={t('profileForm.loaderVersion')}
-            options={[
-              { value: '', label: t('profileForm.loaderVersionLatest') },
-              ...loaderVersions.map((v) => ({
-                value: v.version,
-                label: v.stable ? v.version : `${v.version} (${t('profileForm.loaderUnstable')})`,
-              })),
-            ]}
+            options={loaderVersions.map((v) => ({
+              value: v.version,
+              label:
+                v.version === recommendedLoaderVersion
+                  ? `${v.version} — ${t('profileForm.loaderRecommended')}`
+                  : v.stable
+                    ? v.version
+                    : `${v.version} (${t('profileForm.loaderUnstable')})`,
+            }))}
             value={draft.modLoaderVersion ?? ''}
             onChange={(e) => set('modLoaderVersion', e.target.value || undefined)}
           />
-        ) : (
+        ) : loaderVersionsFailed ? (
+          // The list could not be fetched. Left empty, the build is chosen at
+          // the first launch, which needs the network anyway.
           <Input
             label={t('profileForm.loaderVersion')}
             value={draft.modLoaderVersion ?? ''}
             onChange={(e) => set('modLoaderVersion', e.target.value || undefined)}
-            placeholder="latest"
-            error={loaderVersionsFailed ? t('profileForm.versionsFailed') : undefined}
+            placeholder={t('profileForm.loaderVersionAuto')}
+            error={t('profileForm.versionsFailed')}
+          />
+        ) : (
+          <Select
+            label={t('profileForm.loaderVersion')}
+            options={[{ value: '', label: t('profileForm.versionsLoading') }]}
+            value=""
+            onChange={() => {}}
+            disabled
           />
         )}
         <RamField
@@ -1105,8 +1533,9 @@ function ProfileForm({
         <Input
           label={t('profileForm.manifestUrl')}
           value={draft.manifestUrl ?? ''}
-          onChange={(e) => set('manifestUrl', e.target.value || undefined)}
+          onChange={(e) => set('manifestUrl', e.target.value.trim() || undefined)}
           placeholder="https://server.com/manifest.json"
+          error={urlProblem ? t('profileForm.manifestUrlInvalid') : undefined}
         />
         <Input
           label={t('profileForm.serverIp')}
@@ -1122,14 +1551,18 @@ function ProfileForm({
           placeholder="25565"
           min={1}
           max={65535}
+          error={portProblem ? t('profileForm.serverPortRange') : undefined}
         />
-        <Input
-          label={t('profileForm.javaArgs')}
-          value={draft.javaArgs ?? ''}
-          onChange={(e) => set('javaArgs', e.target.value || undefined)}
-          placeholder="-XX:+UseG1GC"
-          className="col-span-2"
-        />
+        {/* The span goes on a wrapper: given to `Input` it lands on the field
+            inside, where there is no grid for it to span. */}
+        <div className="col-span-2">
+          <Input
+            label={t('profileForm.javaArgs')}
+            value={draft.javaArgs ?? ''}
+            onChange={(e) => set('javaArgs', e.target.value || undefined)}
+            placeholder="-XX:+UseG1GC"
+          />
+        </div>
       </div>
 
       {/* Folded away rather than absent: none of it is needed to make a profile
@@ -1179,6 +1612,24 @@ function ProfileForm({
             }
           />
           <p className="col-span-2 text-xs text-rf-text-muted">{t('profileForm.windowModeHint')}</p>
+          <Select
+            label={t('profileForm.gameLanguage')}
+            options={[
+              { value: '', label: t('profileForm.gameLanguageGame') },
+              // Whatever the profile already names is always on offer, the same
+              // rule the version and Java pickers follow: a code from outside
+              // the short list must not be shown as something else.
+              ...(draft.gameLanguage && !GAME_LANGUAGES.some((l) => l.code === draft.gameLanguage)
+                ? [{ value: draft.gameLanguage, label: draft.gameLanguage }]
+                : []),
+              ...GAME_LANGUAGES.map((l) => ({ value: l.code, label: l.name })),
+            ]}
+            value={draft.gameLanguage ?? ''}
+            onChange={(e) => set('gameLanguage', e.target.value || undefined)}
+          />
+          <p className="col-span-2 text-xs text-rf-text-muted">
+            {t('profileForm.gameLanguageHint')}
+          </p>
           <div className="col-span-2 flex flex-col gap-1">
             <Select
               label={t('profileForm.java')}
@@ -1196,10 +1647,11 @@ function ProfileForm({
       </details>
 
       <div className="space-y-2">
-        <label className="text-xs font-medium text-rf-text-secondary">
+        <label htmlFor="profile-notes" className="text-xs font-medium text-rf-text-secondary">
           {t('profileForm.notes')}
         </label>
         <textarea
+          id="profile-notes"
           value={draft.notes ?? ''}
           onChange={(e) => set('notes', e.target.value || undefined)}
           rows={3}
@@ -1208,11 +1660,31 @@ function ProfileForm({
         />
       </div>
 
+      {saveError && (
+        <Banner type="urgent">
+          {t('profileForm.saveRefused')} {saveError}
+        </Banner>
+      )}
+
       <div className="flex gap-2 pt-2">
         <Button
           onClick={onSave}
           icon={<Save size={14} />}
-          disabled={!draft.name.trim() || sizeProblem !== null}
+          loading={saving}
+          disabled={
+            !draft.name.trim() ||
+            sizeProblem !== null ||
+            urlProblem ||
+            portProblem ||
+            ramProblem ||
+            // A new profile takes the newest release once the list has come.
+            // Saved before that, it would be made on the version this form
+            // falls back to, which is on screen nowhere.
+            (isCreate && mcVersions.length === 0 && !mcVersionsFailed) ||
+            // The form says in red that this loader has nothing for this
+            // version, and used to save the pair all the same.
+            (draft.modLoader !== 'vanilla' && noLoaderBuilds)
+          }
         >
           {t('common.save')}
         </Button>

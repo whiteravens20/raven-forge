@@ -10,6 +10,7 @@
 #   latest.yml / latest-linux.yml + .blockmap   electron-updater feeds
 #   SHA256SUMS.txt                         checksums over every artefact
 #   sbom.cdx.json                          CycloneDX SBOM of the shipped deps
+#   Raven-Forge-Launcher-<ver>.sigstore.json   provenance attestation bundle
 #
 # The release is created as a DRAFT. electron-updater ignores drafts, so nothing
 # reaches users until the draft is published by hand — which is the point: check
@@ -61,7 +62,7 @@ jobs:
     outputs:
       on-main: ${{ steps.check.outputs.on-main }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # full history needed for the containment check
 
@@ -89,7 +90,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Compare
         run: |
@@ -120,9 +121,9 @@ jobs:
             target: win
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
@@ -164,6 +165,17 @@ jobs:
           # artefacts. Letting electron-builder publish too would race it.
           GH_TOKEN: ''
         run: npm run dist:${{ matrix.target }} -- --publish never
+
+      # The same reading the packaging job makes, of the binary this release
+      # ships: see .github/scripts/verify-fuses.mjs.
+      - name: Verify the fuses of the packaged binary
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = win ]; then
+            node .github/scripts/verify-fuses.mjs 'out/win-unpacked/Raven Forge Launcher.exe'
+          else
+            node .github/scripts/verify-fuses.mjs out/linux-unpacked/raven-forge-launcher
+          fi
 
       - name: Verify the client ID was baked in
         shell: bash
@@ -227,7 +239,7 @@ jobs:
           cat "SHA256SUMS-${{ matrix.target }}.txt"
 
       - name: Upload artefacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ matrix.target }}
           if-no-files-found: error
@@ -250,9 +262,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
@@ -269,7 +281,7 @@ jobs:
       - name: CycloneDX SBOM
         run: npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-format JSON --output-file sbom.cdx.json
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sbom
           path: sbom.cdx.json
@@ -285,12 +297,12 @@ jobs:
       id-token: write # sign the provenance attestation
       attestations: write # record it
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # tag message + release-note diffing
 
       - name: Download every artefact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: artifacts
           merge-multiple: true
@@ -311,12 +323,19 @@ jobs:
       # this workflow, at this commit. Verify with:
       #   gh attestation verify <file> --repo whiteravens20/raven-forge
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v4
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             artifacts/*.exe
             artifacts/*.deb
             artifacts/*.AppImage
+
+      # The same attestation as a release asset, so it travels with the installers.
+      - name: Keep the attestation bundle
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" "artifacts/Raven-Forge-Launcher-${GITHUB_REF_NAME#v}.sigstore.json"
 
       - name: Extract tag message
         id: tag-msg
@@ -332,7 +351,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create draft release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           draft: true
           generate_release_notes: true
@@ -346,6 +365,7 @@ jobs:
             artifacts/*.yml
             artifacts/SHA256SUMS.txt
             artifacts/sbom.cdx.json
+            artifacts/*.sigstore.json
           body: |
             ${{ steps.tag-msg.outputs.message }}
 
@@ -403,6 +423,8 @@ jobs:
             sha256sum -c SHA256SUMS.txt --ignore-missing
             gh attestation verify <file> --repo ${{ github.repository }}
             ```
+
+            The `.sigstore.json` file is the same attestation as a file, for `gh attestation verify --bundle`.
 
             `sbom.cdx.json` lists every production dependency inside the installer.
 

@@ -1,10 +1,12 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useState } from 'react';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { ProfileAvatar, invalidateAvatarCache } from '@components/ProfileAvatar';
 import { PROFILE_PRESETS, PROFILE_PRESET_IDS } from '@components/profile-presets';
 import { useProfileStore } from '@stores/profile-store';
-import { useT } from '@renderer/i18n';
+import { useT, type TranslationKey } from '@renderer/i18n';
 import type { Profile } from '@shared/ipc-types';
 
 const api = window.ravenforge;
@@ -53,10 +55,18 @@ export function ProfileIconPicker({ profile }: { profile: Profile }) {
     setError(null);
     // Drop any uploaded file first, otherwise it would keep winning.
     if (profile.iconPath) {
-      await api.profiles.setIcon(profile.id, null);
+      const cleared = await api.profiles.setIcon(profile.id, null);
+      if (!cleared.success) {
+        setError(cleared.error ?? t('profileIcon.failed'));
+        setBusy(false);
+        return;
+      }
       invalidateAvatarCache(profile.id);
     }
-    await update(profile.id, { iconPreset: profile.iconPreset === id ? undefined : id });
+    const saved = await update(profile.id, {
+      iconPreset: profile.iconPreset === id ? undefined : id,
+    });
+    if (!saved.success) setError(saved.error ?? t('profileIcon.failed'));
     setBusy(false);
   };
 
@@ -113,7 +123,13 @@ export function ProfileIconPicker({ profile }: { profile: Profile }) {
                   : 'border-transparent hover:border-rf-border'
               }`}
             >
-              <img src={PROFILE_PRESETS[id]} alt={id} width={36} height={36} className="rounded" />
+              <img
+                src={PROFILE_PRESETS[id]}
+                alt={t(`profileIcon.preset.${id}` as TranslationKey)}
+                width={36}
+                height={36}
+                className="rounded"
+              />
             </button>
           ))}
         </div>

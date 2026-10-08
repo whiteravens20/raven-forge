@@ -1,0 +1,186 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { describe, it, expect } from 'vitest';
+import {
+  compareLoaderVersionsDesc,
+  defaultLoaderVersion,
+  forgeBuildNumber,
+  isPrerelease,
+  listedLoaderVersion,
+} from '../src/shared/loader-version';
+
+/**
+ * Which loader build a profile gets when nobody chose one.
+ *
+ * This is the rule behind the profile editor's preselected build and behind a
+ * launch that finds none set. Getting it wrong is quiet: the profile installs
+ * and starts, on a beta nobody asked for.
+ */
+describe('defaultLoaderVersion', () => {
+  it('takes the build the loader recommends over a newer one', () => {
+    // Forge: one promoted build per Minecraft version, usually not the newest.
+    expect(
+      defaultLoaderVersion([
+        { version: '47.4.13', stable: true },
+        { version: '47.4.10', stable: true, recommended: true },
+        { version: '47.4.9', stable: true },
+      ]),
+    ).toBe('47.4.10');
+  });
+
+  it('skips prereleases when nothing is recommended', () => {
+    // NeoForge and Quilt name no recommended build.
+    expect(
+      defaultLoaderVersion([
+        { version: '21.4.200-beta', stable: false },
+        { version: '21.4.156', stable: true },
+      ]),
+    ).toBe('21.4.156');
+  });
+
+  it('still answers for a Minecraft version that only has prereleases', () => {
+    expect(defaultLoaderVersion([{ version: '26.2.0.3-beta', stable: false }])).toBe(
+      '26.2.0.3-beta',
+    );
+  });
+
+  it('has nothing to offer when the loader publishes nothing', () => {
+    expect(defaultLoaderVersion([])).toBeUndefined();
+  });
+});
+
+describe('compareLoaderVersionsDesc', () => {
+  it('puts Quilt builds newest first, which the Quilt API does not', () => {
+    // The first eight entries of the live list for 1.21.4, as it arrives.
+    const asServed = [
+      '0.20.0-beta.9',
+      '0.20.0-beta.7',
+      '0.20.0-beta.8',
+      '0.20.0-beta.1',
+      '0.20.0-beta.2',
+      '0.24.0',
+      '0.20.2-beta.1',
+      '0.20.0-beta.5',
+    ];
+    expect([...asServed].sort(compareLoaderVersionsDesc)).toEqual([
+      '0.24.0',
+      '0.20.2-beta.1',
+      '0.20.0-beta.9',
+      '0.20.0-beta.8',
+      '0.20.0-beta.7',
+      '0.20.0-beta.5',
+      '0.20.0-beta.2',
+      '0.20.0-beta.1',
+    ]);
+  });
+
+  it('compares components as numbers, not as text', () => {
+    expect(['0.9.0', '0.10.0', '0.29.2'].sort(compareLoaderVersionsDesc)).toEqual([
+      '0.29.2',
+      '0.10.0',
+      '0.9.0',
+    ]);
+  });
+
+  it('puts a release above its own prereleases', () => {
+    expect(['0.30.0-beta.2', '0.30.0', '0.30.0-beta.10'].sort(compareLoaderVersionsDesc)).toEqual([
+      '0.30.0',
+      '0.30.0-beta.10',
+      '0.30.0-beta.2',
+    ]);
+  });
+
+  it('puts Forge builds newest first, in the order Forge lists 1.12.2', () => {
+    // As served: newest-first for most of the list, then the last few builds
+    // appended oldest-first. Neither end of it is the newest.
+    const asServed = [
+      '14.23.5.2860',
+      '14.23.5.2859',
+      '14.23.4.2705',
+      '14.23.0.2491',
+      '14.23.5.2861',
+      '14.23.5.2862',
+      '14.23.5.2864',
+    ];
+    expect([...asServed].sort(compareLoaderVersionsDesc)).toEqual([
+      '14.23.5.2864',
+      '14.23.5.2862',
+      '14.23.5.2861',
+      '14.23.5.2860',
+      '14.23.5.2859',
+      '14.23.4.2705',
+      '14.23.0.2491',
+    ]);
+  });
+
+  it('orders the old Forge builds that name their branch after the hyphen', () => {
+    // 1.7.10 and 1.10.2. The tag is the Minecraft version or a branch, not a
+    // prerelease marker, and builds with and without one are interleaved.
+    expect(
+      ['10.13.0.1150', '10.13.4.1614-1.7.10', '10.13.1.1216-new', '10.13.2.1291'].sort(
+        compareLoaderVersionsDesc,
+      ),
+    ).toEqual(['10.13.4.1614-1.7.10', '10.13.2.1291', '10.13.1.1216-new', '10.13.0.1150']);
+    expect(
+      ['12.18.0.2001-1.10.0', '12.18.3.2511', '12.18.1.2016-failtests', '12.18.1.2011'].sort(
+        compareLoaderVersionsDesc,
+      ),
+    ).toEqual(['12.18.3.2511', '12.18.1.2016-failtests', '12.18.1.2011', '12.18.0.2001-1.10.0']);
+  });
+});
+
+describe('isPrerelease', () => {
+  it('reads the tag out of the version string', () => {
+    expect(isPrerelease('21.4.0-beta')).toBe(true);
+    expect(isPrerelease('0.30.0-beta.1')).toBe(true);
+    expect(isPrerelease('0.17.0-rc.2')).toBe(true);
+    expect(isPrerelease('26.1.0.0-alpha.3+snapshot')).toBe(true);
+  });
+
+  it('leaves an ordinary build alone', () => {
+    expect(isPrerelease('0.17.2')).toBe(false);
+    expect(isPrerelease('21.1.209')).toBe(false);
+    // Forge's own build numbering, which has a hyphen-free dotted form.
+    expect(isPrerelease('54.1.6')).toBe(false);
+  });
+});
+
+describe('forgeBuildNumber', () => {
+  it('is the build without the branch Forge’s list puts after some of them', () => {
+    expect(forgeBuildNumber('10.13.4.1614-1.7.10')).toBe('10.13.4.1614');
+    expect(forgeBuildNumber('12.16.1.1938-1.9.0')).toBe('12.16.1.1938');
+    expect(forgeBuildNumber('47.4.10')).toBe('47.4.10');
+  });
+});
+
+describe('listedLoaderVersion', () => {
+  const forge189 = [
+    { version: '11.15.1.2318-1.8.9', stable: true, recommended: true },
+    { version: '11.15.1.1902-1.8.9', stable: true },
+    { version: '11.15.1.1875', stable: true },
+  ];
+
+  it('finds a build under its own name', () => {
+    expect(listedLoaderVersion(forge189, '11.15.1.1875', 'forge')).toBe('11.15.1.1875');
+  });
+
+  it('finds the Forge build a pack names by its number alone', () => {
+    // What a Modrinth pack for 1.8.9 says, and what Forge calls that build.
+    expect(listedLoaderVersion(forge189, '11.15.1.1902', 'forge')).toBe('11.15.1.1902-1.8.9');
+  });
+
+  it('finds nothing for a build that is not there, or for no build at all', () => {
+    expect(listedLoaderVersion(forge189, '11.15.1.1', 'forge')).toBeUndefined();
+    expect(listedLoaderVersion(forge189, undefined, 'forge')).toBeUndefined();
+  });
+
+  it('does not take a release for its own beta on a loader where that is what a hyphen means', () => {
+    const quilt = [
+      { version: '0.30.1', stable: true },
+      { version: '0.30.1-beta.4', stable: false },
+    ];
+
+    expect(listedLoaderVersion(quilt, '0.30.1-beta.3', 'quilt')).toBeUndefined();
+    expect(listedLoaderVersion(quilt, '0.30.1-beta.4', 'quilt')).toBe('0.30.1-beta.4');
+  });
+});

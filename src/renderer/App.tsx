@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect } from 'react';
 import { HashRouter, Routes, Route } from 'react-router';
 import { TitleBar } from './components/layout/TitleBar';
@@ -16,7 +18,9 @@ import { useSettingsStore } from './stores/settings-store';
 import { useNewsStore } from './stores/news-store';
 import { InstallProgressOverlay } from './components/InstallProgressOverlay';
 import { UpdateToast } from './components/UpdateToast';
+import { Notice } from './components/Notice';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useLocale } from './i18n';
 
 export function App() {
   useEffect(() => {
@@ -26,11 +30,21 @@ export function App() {
     void useNewsStore.getState().load();
   }, []);
 
+  // A screen reader pronounces the page in the language the document claims,
+  // and it claimed English whatever was on it.
+  const locale = useLocale();
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   return (
-    <ErrorBoundary>
-      <HashRouter>
-        <div className="flex h-screen flex-col overflow-hidden bg-rf-bg text-rf-text font-sans">
-          <TitleBar />
+    <div className="flex h-screen flex-col overflow-hidden bg-rf-bg text-rf-text font-sans">
+      {/* Outside the boundary on purpose. The window has no frame, so this bar
+          is the only way to move, minimise or close it — and the error screen
+          used to replace it along with everything else. */}
+      <TitleBar />
+      <ErrorBoundary>
+        <HashRouter>
           <div className="flex flex-1 overflow-hidden">
             <Sidebar />
             <main className="flex-1 overflow-y-auto">
@@ -48,10 +62,11 @@ export function App() {
               </Routes>
             </main>
           </div>
+          <Notice />
           <InstallProgressOverlay />
           <UpdateToast />
-        </div>
-      </HashRouter>
-    </ErrorBoundary>
+        </HashRouter>
+      </ErrorBoundary>
+    </div>
   );
 }

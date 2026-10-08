@@ -13,26 +13,35 @@ bottom. It is the one thing no uninstaller on any platform will clean up for you
 
 ## Where the data lives
 
-| Platform | Data folder                                          |
+The launcher has a folder of its own, and unless you moved your data that is
+where the data is too:
+
+| Platform | The launcher folder                                  |
 | -------- | ---------------------------------------------------- |
-| Windows  | `%APPDATA%\Raven Forge Launcher`                     |
-| Linux    | `~/.config/Raven Forge Launcher`                     |
-| macOS    | `~/Library/Application Support/Raven Forge Launcher` |
+| Windows  | `%APPDATA%\raven-forge-launcher`                     |
+| Linux    | `~/.config/raven-forge-launcher`                     |
+| macOS    | `~/Library/Application Support/raven-forge-launcher` |
 
-That single folder holds everything: `settings.json`, `profiles.json`, one
-`.minecraft` per profile, the downloaded Minecraft assets, the mod loaders and
-the Java runtimes. [PRIVACY.md](PRIVACY.md) breaks it down file by file.
+It holds everything: `settings.json`, `profiles.json`, one folder per profile
+with its `.minecraft`, the downloaded Minecraft assets, the mod loaders, the
+Java runtimes, the log and the crash reports. [PRIVACY.md](PRIVACY.md) breaks
+it down file by file.
 
-**Settings → Data → Data folder** opens it, so you never have to find it by
-hand — as long as the launcher is still installed. Open it before you uninstall
-if you plan to keep anything.
+Versions up to 0.7.1 called it `Raven Forge Launcher`. A newer version renames
+it the first time it starts, so an install that was updated and never started
+since still has the old name.
 
-**Settings → Data → Move…** puts the data anywhere you like, and the tables here
-name the default. Moving it changes nothing on Linux, where nothing removes your
-data in the first place — see the Debian section for why. On Windows the
-uninstaller follows the move: `data-root.txt` stays in the folder above and
-names where the data went, and the uninstaller reads it, so both the folder it
-shows you and the folder it deletes are the real ones.
+**Settings → Data** lists every folder the launcher uses with a button that
+opens it, so you never have to find one by hand — as long as the launcher is
+still installed. Look there before you uninstall if you plan to keep anything.
+
+**Settings → Data → Move…** puts the data anywhere you like. All of it goes —
+the log and the crash reports included — and two things stay in the launcher
+folder: `browser/`, the embedded browser's own storage, and `data-root.txt`,
+one line naming where the data went. Moving changes nothing on Linux, where
+nothing removes your data in the first place — see the Debian section for why.
+On Windows the uninstaller follows the move: it reads `data-root.txt`, so both
+the folder it shows you and the folder it deletes are the real ones.
 
 Two smaller things live outside it:
 
@@ -46,26 +55,39 @@ Two smaller things live outside it:
 ## Windows
 
 The uninstaller — **Settings → Apps**, or `Uninstall Raven Forge Launcher.exe`
-in the install folder (by default `%LOCALAPPDATA%\Programs\Raven Forge Launcher`,
-unless you chose another one during setup) — asks one question:
+in the install folder (by default `%LOCALAPPDATA%\Programs\raven-forge-launcher`,
+or `…\Programs\Raven Forge Launcher` for an install first made by 0.7.1 or
+older, unless you chose another one during setup) — asks one question:
 
 > **Keep your Raven Forge data?**
 > Profiles, mods, worlds, downloaded Minecraft files and Java runtimes live in:
-> `%APPDATA%\Raven Forge Launcher`
+> `%APPDATA%\raven-forge-launcher`
 
 If you moved the data folder, the path in that message is the one you moved it
 to — the uninstaller reads `data-root.txt` before it asks.
 
-- **Yes** — the program is removed, the data folder is left exactly as it is.
-  Install Raven Forge again later and every profile, world and setting is back
-  where it was; a reinstall reads the same folder and does not reset it.
-- **No** — the data folder is deleted, along with the updater's download cache.
-  A moved folder is deleted too, and so is what stays behind in `%APPDATA%` —
-  the log, the crash reports and `data-root.txt` itself. There is no undo and it
-  does not go through the Recycle Bin.
+- **Yes** — the program is removed, the data is left exactly as it is. Install
+  Raven Forge again later and every profile, world and setting is back where it
+  was; a reinstall reads the same folder and does not reset it.
+- **No** — the data is deleted, along with the launcher folder in `%APPDATA%`.
+  There is no undo and it does not go through the Recycle Bin.
 
-Either way the program files, the Start menu and desktop shortcuts and the
-registry entries go.
+  In a folder you moved the data to, the uninstaller deletes the launcher's own
+  entries by name — `profiles`, `loaders`, `java`, `cache`, `logs`,
+  `crash-reports`, `settings.json`, `profiles.json` and `auth.json` — and then
+  the folder itself only if that left it empty. Anything else you keep there is
+  not touched.
+
+Either way the program files, the Start menu and desktop shortcuts, the registry
+entries and the updater's download cache go.
+
+The uninstaller of versions 0.6.0 to 0.7.1 gets two things wrong here. The
+question names the folder as `false`, whatever it is; and if you had moved your
+data, **No** deletes the launcher folder in `%APPDATA%` and leaves the folder
+you moved the data to as it was — delete that one by hand. It also leaves the
+updater's download cache behind when the answer is **Yes**. Updating the
+launcher first puts all three right, because the uninstaller is replaced with
+the program.
 
 Two cases skip the question deliberately:
 
@@ -75,7 +97,7 @@ Two cases skip the question deliberately:
   dialog in. Add `--delete-app-data` if you want the data gone in that case:
 
   ```
-  "%LOCALAPPDATA%\Programs\Raven Forge Launcher\Uninstall Raven Forge Launcher.exe" /S --delete-app-data
+  "%LOCALAPPDATA%\Programs\raven-forge-launcher\Uninstall Raven Forge Launcher.exe" /S --delete-app-data
   ```
 
   That flag reaches a moved data folder as well.
@@ -86,16 +108,17 @@ Two cases skip the question deliberately:
 sudo apt remove raven-forge-launcher
 ```
 
-This removes `/opt/Raven Forge Launcher`, the `/usr/bin` symlink, the desktop
-entry and the AppArmor profile. **Your data folder is not touched, and `apt
+This removes `/opt/raven-forge-launcher` — `/opt/Raven Forge Launcher`, where
+the package is an older one — the `/usr/bin` symlink, the desktop entry and the
+AppArmor profile. **Your data folder is not touched, and `apt
 purge` does not touch it either.** That is not an oversight: a Debian package is
 not allowed to delete files in a user's home directory, because a package is
 installed once for a machine while the data belongs to each account separately.
 
-To remove the data as well:
+To remove the data as well — and, if you moved it, the folder you moved it to:
 
 ```bash
-rm -rf ~/.config/"Raven Forge Launcher" ~/.cache/raven-forge-launcher-updater
+rm -rf ~/.config/raven-forge-launcher ~/.cache/raven-forge-launcher-updater
 ```
 
 ## Linux — AppImage

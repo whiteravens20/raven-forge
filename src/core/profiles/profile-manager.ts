@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -5,31 +7,134 @@ import type { Dirent } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
-import { profileSchema } from '../../shared/validators';
-import { recommendedRamMb } from '../../shared/memory';
-import { machineMemoryMb } from '../util/machine-memory';
-import type { OrphanedProfile, Profile, ProfileFileSummary } from '../../shared/ipc-types';
+import { serializeByKey } from '../util/serialize';
+import { profileSchema, storedProfileSchema } from '../../shared/validators';
+import type {
+  OrphanedProfile,
+  Profile,
+  ProfileFileSummary,
+  ProfileImport,
+  UnreadableProfileEntries,
+} from '../../shared/ipc-types';
 
 // ── Profiles index persistence ─────────────────────────────
 
 let cachedProfiles: Profile[] | null = null;
 
+/**
+ * What else the file's list held: entries that are not profiles, as they were
+ * read. They go back into the file with every write. Leaving them out would
+ * delete, at the first change to any profile, the one record of a profile
+ * whose folder and worlds are still on the disk.
+ */
+let unreadableEntries: unknown[] = [];
+
+/**
+ * The profile list, from the cache once the file has been read.
+ *
+ * The first read takes its turn in a queue. Several callers arrive before it
+ * has finished — the page asking for the list, the startup pack check — and
+ * each used to read the file for itself, which is harmless until the file is
+ * one that has to be moved aside: the second mover either fails on a file that
+ * is no longer there, or moves the good one a save has since put in its place.
+ */
 async function readProfilesIndex(): Promise<Profile[]> {
   if (cachedProfiles) return cachedProfiles;
-  try {
-    const raw = await fs.readFile(paths.profilesIndex, 'utf-8');
-    const parsed = JSON.parse(raw) as Profile[];
-    cachedProfiles = parsed;
-    return parsed;
-  } catch {
-    cachedProfiles = [];
-    return [];
-  }
+  return serializeByKey(paths.profilesIndex, async () => {
+    cachedProfiles ??= await loadProfilesIndex();
+    return cachedProfiles;
+  });
 }
 
+/**
+ * Read `profiles.json` from disk.
+ *
+ * Only a file that is not there reads as "no profiles". Every failure used to,
+ * and the answer was cached — so one read that failed on a locked file or a
+ * share that hiccuped left the launcher holding an empty list, and the next
+ * change of any kind wrote that list back over the real one.
+ *
+ * A file that is there and will not parse is moved aside rather than written
+ * over, so what it held can still be recovered by hand; if it cannot be moved
+ * it is left alone and the read fails. Any other error is the caller's to see,
+ * and is not remembered: the next call reads again.
+ *
+ * A list is taken an entry at a time. The whole of it used to be believed as
+ * it parsed, and one entry with no loader named — a file edited by hand — was
+ * handed to a window that then had nothing to draw but its error screen. An
+ * entry that is not a profile is now kept out of the list and in the file; so
+ * is the second of two that share an id, because the id is the folder.
+ */
+async function loadProfilesIndex(): Promise<Profile[]> {
+  const file = paths.profilesIndex;
+
+  let raw: string;
+  try {
+    raw = await fs.readFile(file, 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  if (Array.isArray(parsed)) {
+    const profiles: Profile[] = [];
+    const unreadable: unknown[] = [];
+    for (const [index, entry] of parsed.entries()) {
+      const read = storedProfileSchema.safeParse(entry);
+      const why = !read.success
+        ? read.error.issues.map((i) => `${i.path.join('.') || 'root'}: ${i.message}`).join('; ')
+        : profiles.some((p) => p.id === read.data.id)
+          ? `a profile with the id ${read.data.id} is already on the list`
+          : null;
+      if (read.success && why === null) {
+        profiles.push(read.data);
+      } else {
+        unreadable.push(entry);
+        log.warn(`${file}: entry ${index + 1} is not a profile and is left as it is — ${why}`);
+      }
+    }
+    unreadableEntries = unreadable;
+    return profiles;
+  }
+
+  const backup = `${file}.broken-${Date.now()}`;
+  log.error(`${file} is not a profile list — keeping a copy at ${backup} and starting empty`);
+  await fs.rename(file, backup);
+  unreadableEntries = [];
+  return [];
+}
+
+/** The cache follows the file: a write that failed leaves both as they were. */
 async function writeProfilesIndex(profiles: Profile[]): Promise<void> {
+  await writeJsonAtomic(paths.profilesIndex, [...profiles, ...unreadableEntries]);
   cachedProfiles = profiles;
-  await writeJsonAtomic(paths.profilesIndex, profiles);
+}
+
+/** The ids the entries that are not profiles carry, where they carry one. */
+function unreadableIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const entry of unreadableEntries) {
+    const id = (entry as { id?: unknown } | null)?.id;
+    if (typeof id === 'string') ids.add(id);
+  }
+  return ids;
+}
+
+/**
+ * How many entries of `profiles.json` are not profiles, and which file that is.
+ *
+ * For the profiles page to say: a profile that is missing from the list
+ * without a word looks like a profile the launcher lost.
+ */
+export async function getUnreadableProfileEntries(): Promise<UnreadableProfileEntries> {
+  await readProfilesIndex();
+  return { count: unreadableEntries.length, file: paths.profilesIndex };
 }
 
 /** The tail of the chain of in-flight mutations. */
@@ -85,11 +190,6 @@ export async function createProfile(
   const profile: Profile = profileSchema.parse({
     ...data,
     id: crypto.randomUUID(),
-    // The last word on RAM for callers that express no preference — profile
-    // import, and anything that grows a profile out of something other than the
-    // form. A machine is under it to ask, so it is asked; only when it cannot
-    // be measured does this land on the flat default.
-    allocatedRamMb: data.allocatedRamMb ?? recommendedRamMb(machineMemoryMb()),
     createdAt: now,
     updatedAt: now,
   });
@@ -200,7 +300,7 @@ export async function summarizeProfileFiles(profileId: string): Promise<ProfileF
  * `profiles/<id>/` — unreachable from the UI, but recoverable by hand, which is
  * the entire point of offering the choice.
  */
-export async function deleteProfile(profileId: string, deleteFiles = true): Promise<void> {
+export async function deleteProfile(profileId: string, deleteFiles: boolean): Promise<void> {
   const removed = await mutateProfiles((profiles) => {
     const idx = profiles.findIndex((p) => p.id === profileId);
     if (idx < 0) throw new Error(`Profile ${profileId} not found`);
@@ -212,13 +312,25 @@ export async function deleteProfile(profileId: string, deleteFiles = true): Prom
     try {
       await fs.rm(paths.profileDir(profileId), { recursive: true, force: true });
     } catch (err) {
-      log.warn(`Failed to delete profile directory for ${profileId}: ${err}`);
+      // Something in there would not go — a file the game or an editor still
+      // has open, on Windows. This was logged and answered as done, leaving a
+      // folder named by an id, with the worlds in it, that no screen listed.
+      // What is left is recorded as kept files, so it shows where those do and
+      // can be deleted from there, and the caller is told the truth.
+      await writeJsonAtomic(orphanRecordPath(profileId), removed).catch(() => undefined);
+      throw new Error(
+        `${name} is off the list, but not all of its files could be deleted — ` +
+          `${err instanceof Error ? err.message : String(err)}. ` +
+          'What is left is listed as kept files, and can be deleted from there.',
+        { cause: err },
+      );
     }
   } else {
     // Leave the profile's own record beside its files. Directories are named by
     // id, so without this the folder is an opaque UUID full of jars that nothing
     // — not the launcher, not the person who kept them — can identify later.
     await writeJsonAtomic(orphanRecordPath(profileId), removed);
+    keptFiles.delete(profileId);
     log.info(`Kept the files of profile ${name} at ${paths.profileDir(profileId)}`);
   }
 
@@ -229,6 +341,9 @@ export async function deleteProfile(profileId: string, deleteFiles = true): Prom
 function orphanRecordPath(profileId: string): string {
   return path.join(paths.profileDir(profileId), 'profile.json');
 }
+
+/** What each kept-behind profile holds, by id, for as long as it stays kept. */
+const keptFiles = new Map<string, ProfileFileSummary>();
 
 /**
  * Profile data left on disk that no profile in the index points at.
@@ -241,7 +356,9 @@ function orphanRecordPath(profileId: string): string {
  * since closed. Listing them is what makes keeping them a real offer.
  */
 export async function listOrphanedProfiles(): Promise<OrphanedProfile[]> {
-  const known = new Set((await readProfilesIndex()).map((p) => p.id));
+  // An entry that is not a profile still names its folder. Those files are not
+  // kept files: offered here, they could be deleted for good over a typo.
+  const known = new Set([...(await readProfilesIndex()).map((p) => p.id), ...unreadableIds()]);
   const orphans: OrphanedProfile[] = [];
 
   for (const entry of await listDir(paths.profilesDir)) {
@@ -249,7 +366,12 @@ export async function listOrphanedProfiles(): Promise<OrphanedProfile[]> {
     try {
       const raw = await fs.readFile(orphanRecordPath(entry.name), 'utf-8');
       const profile = profileSchema.parse(JSON.parse(raw));
-      orphans.push({ profile, files: await summarizeProfileFiles(entry.name) });
+      // Counted once. Nothing runs from these files any more, and counting them
+      // is a walk over every world they hold — which this used to do for each
+      // kept profile every time the profiles page was opened.
+      const files = keptFiles.get(entry.name) ?? (await summarizeProfileFiles(entry.name));
+      keptFiles.set(entry.name, files);
+      orphans.push({ profile, files });
     } catch {
       // No record, or an unreadable one. A directory the launcher cannot
       // identify is not something to offer restoring — leave it alone rather
@@ -276,12 +398,13 @@ export async function adoptOrphanedProfile(profileId: string): Promise<Profile> 
   };
 
   await mutateProfiles((profiles) => {
-    if (profiles.some((p) => p.id === profileId)) {
+    if (profiles.some((p) => p.id === profileId) || unreadableIds().has(profileId)) {
       throw new Error(`Profile ${profileId} is already on the list`);
     }
     profiles.push(restored);
   });
   await fs.rm(orphanRecordPath(profileId), { force: true });
+  keptFiles.delete(profileId);
   log.info(`Restored profile ${restored.name} (${profileId}) from kept files`);
   return restored;
 }
@@ -289,10 +412,11 @@ export async function adoptOrphanedProfile(profileId: string): Promise<Profile> 
 /** Delete kept-behind data for good. */
 export async function discardOrphanedProfile(profileId: string): Promise<void> {
   const profiles = await readProfilesIndex();
-  if (profiles.some((p) => p.id === profileId)) {
+  if (profiles.some((p) => p.id === profileId) || unreadableIds().has(profileId)) {
     throw new Error(`${profileId} belongs to a live profile, not to kept files`);
   }
   await fs.rm(paths.profileDir(profileId), { recursive: true, force: true });
+  keptFiles.delete(profileId);
   log.info(`Discarded kept files for ${profileId}`);
 }
 
@@ -317,7 +441,27 @@ export async function recordPlaySession(profileId: string, playTimeMinutes: numb
 }
 
 /**
+ * What a copy of a profile does not take with it, relative to the profile's
+ * directory.
+ *
+ * The world backups are copies already, and of the original's worlds as they
+ * were on some other day; taken along they would double the largest thing in
+ * the profile for nothing. The other two are the game's diagnostics about
+ * sessions the copy never played.
+ */
+const NOT_DUPLICATED = new Set([
+  'backups',
+  path.join('.minecraft', 'logs'),
+  path.join('.minecraft', 'crash-reports'),
+]);
+
+/**
  * Copy a profile, under a name the caller chooses.
+ *
+ * The files as well as the record: mods, configs, resource packs, shaders,
+ * worlds and the profile's own image. This used to copy only the entry in
+ * `profiles.json`, so "Duplicate" on a profile somebody had spent an evening
+ * building answered with an empty one of the same name.
  *
  * The name is a parameter because it is *persisted*. It used to be built here
  * as `${name} (kopia)` — Polish, baked into `profiles.json`, where switching
@@ -330,18 +474,45 @@ export async function duplicateProfile(profileId: string, name?: string): Promis
   if (!source) throw new Error(`Profile ${profileId} not found`);
 
   const { id: _id, createdAt: _ca, updatedAt: _ua, ...data } = source;
-  return createProfile({
+  const copy = await createProfile({
     ...data,
     name: name?.trim() || `${source.name} (copy)`,
     lastPlayed: undefined,
     totalPlayTimeMinutes: undefined,
   });
+
+  const from = paths.profileDir(source.id);
+  try {
+    // A profile whose directory was removed by hand still has settings worth
+    // copying, and nothing else to copy.
+    if ((await listDir(from)).length > 0) {
+      await fs.cp(from, paths.profileDir(copy.id), {
+        recursive: true,
+        filter: (entry) => !NOT_DUPLICATED.has(path.relative(from, entry)),
+      });
+    }
+    return copy;
+  } catch (err) {
+    // A copy that stopped part-way is a profile that looks whole and is
+    // missing whichever mods had not been reached. Better none than that one.
+    await deleteProfile(copy.id, true).catch(() => undefined);
+    throw err;
+  }
 }
 
+/**
+ * A profile as a file to hand to somebody else.
+ *
+ * Without the two fields that are only true on this machine. The Java path is
+ * a path into this computer, with the account's name in it as often as not,
+ * and an import drops it in any case; the image is a file in the profile's
+ * directory, which the export does not carry.
+ */
 export async function exportProfile(profileId: string): Promise<string> {
   const profile = await getProfile(profileId);
   if (!profile) throw new Error(`Profile ${profileId} not found`);
-  return JSON.stringify(profile, null, 2);
+  const { customJavaPath: _java, iconPath: _icon, ...shared } = profile;
+  return JSON.stringify(shared, null, 2);
 }
 
 /**
@@ -422,16 +593,54 @@ export function readImportedProfile(json: string): ImportedProfile {
     customJavaPath: _java,
     javaArgs: _jargs,
     manifestUrl: _murl,
+    // Neither picture comes along. The file one names a file the new profile
+    // does not have. The remote one is an address the launcher would fetch
+    // every time the profile is drawn, chosen by whoever wrote the file — which
+    // tells them when the launcher is open, and from where.
+    iconPath: _icon,
+    iconUrl: _iconUrl,
     ...data
   } = parsed.data;
 
   return { data, dropped };
 }
 
-export async function importProfile(json: string): Promise<Profile> {
+export async function importProfile(json: string): Promise<ProfileImport> {
   const { data, dropped } = readImportedProfile(json);
   if (dropped.length > 0) {
     log.warn(`Dropped ${dropped.join(' and ')} while importing profile ${data.name}`);
   }
-  return createProfile(data);
+  return { profile: await createProfile(data), dropped };
+}
+
+/**
+ * A profile export is a page of JSON. Anything far past that is not one, and
+ * is refused before it is read into memory rather than after.
+ */
+const MAX_PROFILE_FILE_BYTES = 1024 * 1024;
+
+/**
+ * {@link importProfile}, from a file on disk.
+ *
+ * Opened once and read up to one byte past the limit, rather than measured by
+ * name and then read by name: between those two the file can be swapped for
+ * another, and the one read need not be the one that was measured.
+ */
+export async function importProfileFile(filePath: string): Promise<ProfileImport> {
+  const handle = await fs.open(filePath, 'r');
+  try {
+    const buffer = Buffer.alloc(MAX_PROFILE_FILE_BYTES + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > MAX_PROFILE_FILE_BYTES) {
+      throw new Error('That file is too large to be a profile');
+    }
+    return await importProfile(buffer.subarray(0, length).toString('utf-8'));
+  } finally {
+    await handle.close();
+  }
 }

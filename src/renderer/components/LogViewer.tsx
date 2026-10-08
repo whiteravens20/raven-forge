@@ -1,7 +1,11 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardCheck, Copy, FileText, FolderOpen, RefreshCw, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useT } from '@renderer/i18n';
+import { openPath } from '@renderer/open';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 const api = window.ravenforge;
 
@@ -58,12 +62,14 @@ interface LogViewerProps {
 
 export function LogViewer({ onClose }: LogViewerProps) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const [lines, setLines] = useState<ParsedLine[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<LevelFilter>('all');
   const [copied, setCopied] = useState(false);
   const [follow, setFollow] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -139,7 +145,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
 
   const handleOpenFolder = async () => {
     const result = await api.system.getLogsPath();
-    if (result.success && result.data) await api.system.openPath(result.data);
+    if (result.success && result.data) await openPath(result.data);
   };
 
   const counts = useMemo(
@@ -157,8 +163,10 @@ export function LogViewer({ onClose }: LogViewerProps) {
       role="presentation"
     >
       <div
-        className="flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={t('logs.title')}
@@ -180,6 +188,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
             {(['all', 'warn', 'error'] as const).map((level) => (
               <button
                 key={level}
+                aria-pressed={filter === level}
                 onClick={() => setFilter(level)}
                 className={`rounded px-2 py-1 text-[11px] transition-colors ${
                   filter === level
@@ -196,11 +205,19 @@ export function LogViewer({ onClose }: LogViewerProps) {
             ))}
 
             <button
-              onClick={() => void refresh()}
+              onClick={() => {
+                // Long enough to be seen: the read itself is over in a frame,
+                // and a button that does its work without moving looks dead.
+                setRefreshing(true);
+                void Promise.all([refresh(), new Promise((done) => setTimeout(done, 400))]).then(
+                  () => setRefreshing(false),
+                );
+              }}
+              disabled={refreshing}
               className="ml-1 rounded p-1.5 text-rf-text-muted transition-colors hover:text-rf-text"
               aria-label={t('common.refresh')}
             >
-              <RefreshCw size={13} />
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} />
             </button>
             <button
               onClick={onClose}
@@ -215,6 +232,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
         <div
           ref={containerRef}
           onScroll={handleScroll}
+          role="log"
           className="flex-1 overflow-y-auto bg-rf-bg px-4 py-3 font-mono text-[11px] leading-relaxed"
         >
           {loading && <p className="text-rf-text-muted">{t('logs.loading')}</p>}
@@ -225,8 +243,14 @@ export function LogViewer({ onClose }: LogViewerProps) {
             </p>
           )}
 
+          {/* Thousands of rows, of which a screenful is ever on screen. The rest
+              are left unlaid-out until they scroll near, which is what makes a
+              full log open and filter at once instead of after a pause. */}
           {visible.map((line, idx) => (
-            <div key={idx} className={`whitespace-pre-wrap break-all ${levelClass(line.level)}`}>
+            <div
+              key={idx}
+              className={`whitespace-pre-wrap break-all [contain-intrinsic-size:auto_1.4em] [content-visibility:auto] ${levelClass(line.level)}`}
+            >
               {line.time && <span className="mr-2 text-rf-text-muted">{line.time}</span>}
               {line.message}
             </div>

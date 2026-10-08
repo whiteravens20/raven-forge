@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { BrowserWindow, shell } from 'electron';
 import path from 'node:path';
 import {
@@ -33,6 +35,7 @@ export function createMainWindow(): BrowserWindow {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      spellcheck: false,
     },
   });
 

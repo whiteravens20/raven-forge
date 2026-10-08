@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect } from 'vitest';
 import { tagLabel, loaderLabel } from '../src/shared/labels';
 
@@ -42,6 +44,12 @@ describe('tagLabel', () => {
 
   it('does not throw on an empty tag', () => {
     expect(tagLabel('')).toBe('');
+  });
+
+  it('treats a tag named like something every object has as a tag', () => {
+    // Looked up in a plain object, `constructor` came back as a function.
+    expect(tagLabel('constructor')).toBe('Constructor');
+    expect(tagLabel('toString')).toBe('ToString');
   });
 
   it('passes through a tag Modrinth adds tomorrow', () => {

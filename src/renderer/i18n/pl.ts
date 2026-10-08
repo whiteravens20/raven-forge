@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import type { Translations } from './en';
 
 /**
@@ -9,7 +11,7 @@ import type { Translations } from './en';
 export const pl: Translations = {
   // ── Navigation ───────────────────────────────────────────
   'nav.label': 'Nawigacja launchera',
-  'nav.home.short': 'Home',
+  'nav.home.short': 'Start',
   'nav.home.title': 'Strona główna',
   'nav.profiles.short': 'Profile',
   'nav.profiles.title': 'Profile',
@@ -28,12 +30,17 @@ export const pl: Translations = {
   'content.searchPacks': 'Szukaj paczek zasobów na Modrinth…',
   'content.searchFailed': 'Wyszukiwanie nie powiodło się.',
   'content.installFailed': 'Nie udało się zainstalować {name}.',
+  'content.addFile': 'Dodaj z pliku…',
+  'content.addFileFailed': 'Nie udało się dodać tego pliku.',
   'content.removeFailed': 'Nie udało się usunąć.',
   'content.reorderFailed': 'Nie udało się zapisać nowej kolejności.',
+  'content.listFailed': 'Nie udało się odczytać listy zainstalowanych.',
+  'content.loaderCheckFailed':
+    'Paczka shaderów jest zainstalowana, ale launcher nie mógł sprawdzić, czy ten profil ma loader shaderów, który ją uruchomi.',
   'content.emptyShaders': 'Brak zainstalowanych shaderów',
   'content.emptyPacks': 'Brak zainstalowanych paczek zasobów',
   'content.emptyHint':
-    'Przeglądaj, żeby coś dodać, albo pozwól synchronizacji manifestu je przynieść.',
+    'Przeglądaj, żeby coś dodać, dodaj plik, który już masz, albo pozwól synchronizacji manifestu je przynieść.',
   'content.orderHint': 'Wygrywa góra listy. Paczka zmienia tylko to, czego nie ruszyły te pod nią.',
   'content.moveUp': 'Przesuń {name} w górę',
   'content.moveDown': 'Przesuń {name} w dół',
@@ -50,9 +57,9 @@ export const pl: Translations = {
   'content.loaderInstalledWithDeps':
     'Zainstalowano {name} wraz z {deps}, których wymaga. Profil może już wczytywać paczki shaderów.',
   'content.loaderNoBuild':
-    'Żaden loader shaderów nie ma wydania dla {loader} na Minecraft {version}, więc ta paczka jeszcze się nie wczyta.',
+    'Żaden loader shaderów nie ma wersji dla {loader} na Minecraft {version}, więc ta paczka jeszcze się nie wczyta.',
   'content.loaderUnsupported':
-    'Ten profil jest vanilla. Shadery wymagają loadera modów — przełącz profil na Fabric, Quilt, Forge albo NeoForge.',
+    'Ten profil jest bez loadera (vanilla). Shadery wymagają loadera — przełącz profil na Fabric, Quilt, Forge albo NeoForge.',
   'content.loaderFailed': 'Paczka shaderów się zainstalowała, ale loader shaderów nie: {error}',
 
   // ── Wybór loadera shaderów ───────────────────────────────
@@ -65,11 +72,14 @@ export const pl: Translations = {
   // ── Filtry wyszukiwania (mody, shadery, paczki zasobów) ──
   'search.gameVersion': 'Wersja Minecraft',
   'search.noResults': 'Brak wyników.',
+  'search.shown': 'Pokazano {shown} z {total}',
+  'search.loadMore': 'Załaduj więcej',
+  'search.openProject': 'Otwórz stronę {name} na Modrinth',
   'search.noResultsFiltered':
     'Brak wyników. Filtry powyżej łączą się przez ORAZ, więc projekt bez wersji na {version} się nie pokaże — poluzuj któryś.',
   'nav.accounts.short': 'Konta',
   'nav.accounts.title': 'Konta',
-  'nav.settings.short': 'Opcje',
+  'nav.settings.short': 'Ustawienia',
   'nav.settings.title': 'Ustawienia',
   'nav.about.short': 'Info',
   'nav.about.title': 'Informacje',
@@ -87,14 +97,12 @@ export const pl: Translations = {
   'common.remove': 'Usuń',
   'common.delete': 'Usuń',
   'common.edit': 'Edytuj',
-  'common.duplicate': 'Duplikuj',
-  'common.export': 'Eksportuj',
-  'common.import': 'Importuj',
   'common.back': 'Wstecz',
   'common.close': 'Zamknij',
-  'common.dismiss': 'Odrzuć',
+  'common.dismiss': 'Ukryj',
   'common.refresh': 'Odśwież',
   'common.openFolder': 'Otwórz folder',
+  'common.openFailed': 'Nie udało się otworzyć: {what}.',
   'common.copy': 'Kopiuj',
   'common.copied': 'Skopiowano',
   'common.restart': 'Uruchom ponownie',
@@ -105,8 +113,6 @@ export const pl: Translations = {
   'common.installed': 'Zainstalowano',
   'common.enable': 'Włącz',
   'common.disable': 'Wyłącz',
-  'common.show': 'Pokaż',
-  'common.hide': 'Ukryj',
 
   // ── Home ─────────────────────────────────────────────────
   'home.signedInAs': 'Zalogowano jako',
@@ -115,33 +121,68 @@ export const pl: Translations = {
   'home.notSignedIn': 'Nie zalogowano — przejdź do zakładki Konta',
   'home.noProfiles': 'Brak profili — utwórz nowy w zakładce Profile',
   'home.play': 'GRAJ',
-  'home.running': 'Uruchomiona...',
-  'home.preparing': 'Uruchamianie...',
+  'home.profile': 'Profil do gry',
+  'home.running': 'Gra działa',
+  'home.preparing': 'Uruchamianie…',
   'home.cancelLaunch': 'Anuluj',
+  'home.cancelling': 'Anulowanie…',
   'home.stopGame': 'Zatrzymaj grę',
   'home.stopping': 'Zatrzymywanie…',
   'home.stopFailed': 'Nie udało się zatrzymać gry.',
   'home.authUnreachable':
-    'Nie udało się połączyć z serwerami logowania Microsoft. Możesz zagrać offline — tylko singleplayer i LAN, serwery w trybie online odrzucą połączenie.',
+    'Serwery logowania Microsoft są nieosiągalne albo chwilowo nie odpowiadają. Możesz zagrać offline — tylko singleplayer i LAN, serwery w trybie online odrzucą połączenie.',
   'home.launchOffline': 'Graj offline',
   'home.updatingLauncher': 'Aktualizowanie launchera…',
-  'home.updateBeforePlay': 'Przed startem gry zostanie zainstalowany launcher {version}.',
+  'home.updateBeforePlay':
+    'Graj najpierw zainstaluje launcher {version}: launcher uruchomi się ponownie i trzeba będzie nacisnąć Graj jeszcze raz.',
+  'home.updateNotNow': 'Nie teraz',
   'home.updateFailedPlayAnyway':
     'Nie udało się pobrać aktualizacji launchera — gra i tak wystartuje.',
   'home.launchFailed': 'Nie udało się uruchomić gry',
   'launchError.alreadyRunning': 'Ten profil już działa.',
   'launchError.alreadyPreparing': 'Ten profil jest już przygotowywany do uruchomienia.',
+  'launchError.noAccount':
+    'Nie wybrano konta. Dodaj je albo wybierz na stronie Konta i naciśnij Graj jeszcze raz.',
+  'launchError.sessionExpired':
+    'Logowanie tego konta Microsoft wygasło. Zaloguj się ponownie na stronie Konta i naciśnij Graj jeszcze raz.',
   'launchError.ramTooBig':
     'Ten profil ma przydzielone {allocated} RAM, a ten komputer ma {total}. Minecraft nie wystartuje z większą ilością pamięci, niż fizycznie jest — zmniejsz ją w edytorze profilu, gdzie {recommended} pasuje do tej maszyny.',
+  'launchError.loaderVersionUnknown':
+    'Nie udało się ustalić wersji {loader} dla Minecraft {version}. Sprawdź połączenie albo wybierz wersję loadera w edytorze profilu.',
+  'launchError.loaderFileMissing':
+    'Brakuje pliku loadera {file} albo jest on uszkodzony, a wytworzyć go może tylko instalator loadera. Uruchom profil jeszcze raz, mając połączenie z siecią — loader zainstaluje się wtedy ponownie.',
+  'launchError.loaderBuildTooOld':
+    '{loader} to wydanie starsze niż te, które ten launcher potrafi zainstalować. Wybierz nowsze wydanie loadera w edytorze profilu.',
   'launchError.javaNotRuntime':
     'Ten profil ma startować przez {path}, a to nie jest środowisko Java, które ten komputer potrafi uruchomić. Wskaż w edytorze profilu coś innego albo wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
   'launchError.javaTooOld':
     'Ten profil ma startować przez {path}, czyli Javę {found}, a ta wersja Minecrafta potrzebuje Javy {required}. Gra wystartowałaby i zaraz padła z błędem o wersji plików klas. Wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
-  'home.launchError': 'Błąd podczas uruchamiania gry',
+  'contentError.notZip': 'Ten plik nie jest archiwum zip.',
+  'contentError.notJar': 'Ten plik nie jest modem: mod to plik .jar.',
+  'contentError.needsLoader':
+    'Ten profil uruchamia czystego Minecrafta, który nie wczytuje modów. Najpierw wybierz loader w profilu.',
+  'contentError.wrongLoader':
+    'Ten mod jest przeznaczony dla: {made}, a ten profil działa na {profile}. Nie zostałby wczytany.',
+  'contentError.notResourcePack':
+    'To archiwum nie jest paczką zasobów: na jego najwyższym poziomie nie ma pliku pack.mcmeta.',
+  'contentError.nestedResourcePack':
+    'Paczka leży w tym archiwum wewnątrz folderu ({folder}), a Minecraft wczytuje tylko taką, której pack.mcmeta jest na najwyższym poziomie. Spakuj zawartość tego folderu, a nie sam folder.',
+  'contentError.notShaderPack':
+    'To archiwum nie jest paczką shaderów: na jego najwyższym poziomie nie ma folderu shaders.',
+  'contentError.nestedShaderPack':
+    'Paczka shaderów leży w tym archiwum wewnątrz folderu ({folder}), a jest wczytywana tylko wtedy, gdy jej folder shaders jest na najwyższym poziomie. Spakuj zawartość tego folderu, a nie sam folder.',
+  'contentError.ownedByPack':
+    '{name} już tu jest — pochodzi z modpacka, za którym podąża ten profil. Synchronizacja i tak przywróciłaby wersję z modpacka.',
   'home.showConsole': 'Pokaż konsolę',
   'home.hideConsole': 'Ukryj konsolę',
   'home.news': 'Aktualności',
   'home.refreshNews': 'Odśwież aktualności i ogłoszenia',
+  'home.newsRefreshing': 'Odświeżanie…',
+  'home.newsRefreshedSame': 'Sprawdzono o {time} — nic nowego',
+  'home.newsRefreshedNew.one': 'Sprawdzono o {time} — {count} nowy wpis',
+  'home.newsRefreshedNew.few': 'Sprawdzono o {time} — {count} nowe wpisy',
+  'home.newsRefreshedNew.many': 'Sprawdzono o {time} — {count} nowych wpisów',
+  'home.newsRefreshedNew.other': 'Sprawdzono o {time} — {count} nowego wpisu',
   'home.newsOlder': 'Starsze aktualności',
   'home.newsNewer': 'Nowsze aktualności',
   'home.newsStale': 'Nie udało się odświeżyć kanału — to ostatnie wczytane wpisy.',
@@ -154,7 +195,7 @@ export const pl: Translations = {
   // ── Live console ─────────────────────────────────────────
   'console.title': 'Konsola gry',
   'console.close': 'Zamknij konsolę',
-  'console.waiting': 'Oczekiwanie na logi gry...',
+  'console.waiting': 'Oczekiwanie na logi gry…',
 
   // ── Crash reporter ───────────────────────────────────────
   'crash.title': 'Gra uległa awarii',
@@ -167,17 +208,39 @@ export const pl: Translations = {
   'crash.openReport': 'Otwórz raport',
   'crash.reportBug': 'Zgłoś błąd',
 
+  'loaderHint.notOffered':
+    '{loader} to wydanie, którego launcher nie oferuje dla Minecraft {mcVersion}: należy do tych, które najpewniej tej wersji nie uruchomią. To może być przyczyna — wybierz inne wydanie w edytorze profilu.',
+  'loaderHint.notOfferedPack':
+    '{loader} to wydanie, którego launcher nie oferuje dla Minecraft {mcVersion}: należy do tych, które najpewniej tej wersji nie uruchomią. To może być przyczyna — to wydanie wskazuje paczka, więc zmienić je może jej autor.',
+
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profile',
   'profiles.new': 'Nowy profil',
-  'profiles.import': 'Importuj profil',
+  'profiles.importDropped':
+    'Profil zaimportowany. Plik zawierał też pola, których import celowo nie przenosi: {fields}. Decydują o tym, co uruchamia się na tym komputerze, więc ustaw je ręcznie w edytorze profilu, jeśli ufasz źródłu.',
   'profiles.empty': 'Brak profili',
   'profiles.emptyHint': 'Dodaj pierwszy profil przyciskiem +',
   'profiles.pickOrCreate': 'Wybierz profil lub utwórz nowy',
   'profiles.copyName': '{name} (kopia)',
+  'profiles.duplicate': 'Duplikuj razem z modami, ustawieniami i światami',
+  'profiles.duplicated':
+    'Kopia ma te same mody, konfiguracje, shadery, paczki zasobów i światy co oryginał. Kopie zapasowe światów zostały przy oryginale.',
+  'profiles.duplicateFailed': 'Nie udało się zduplikować profilu.',
+  'profiles.deleteFailed': 'Nie udało się usunąć profilu.',
+  'profiles.loading': 'Wczytywanie profili…',
+  'profiles.loadFailed': 'Nie udało się odczytać listy profili.',
+  'profiles.cancelSyncFailed':
+    'Nic nie zostało zatrzymane. Synchronizacja mogła się właśnie kończyć.',
   'profiles.openFolder': 'Otwórz folder profilu',
   'profiles.exportPack': 'Eksportuj jako modpack (.mrpack)',
+  'profiles.exportSettings': 'Eksportuj ustawienia profilu (.json) — bez modów',
   'profiles.exportPackFailed': 'Nie udało się wyeksportować profilu jako paczki.',
+  'profiles.exportFailed': 'Nie udało się wyeksportować ustawień tego profilu.',
+  'profiles.exportPackAsk': 'W paczce znajdą się mody, shadery i paczki zasobów tego profilu.',
+  'profiles.exportPackSettings': 'Dołącz ustawienia gry i konfigurację modów',
+  'profiles.exportPackSettingsHint':
+    'To plik options.txt i folder config: przypisania klawiszy, ustawienia grafiki i własne opcje każdego moda, takie jak na tym komputerze. Serwer, na którym ostatnio grano, nie trafia do paczki w żadnym przypadku.',
+  'profiles.exportPackGo': 'Wybierz, gdzie zapisać…',
   'profiles.exportPackDone.one': 'Zapisano do {path}. Paczka odsyła do 1 pliku na Modrinth.',
   // `do` governs the genitive, so `few` and `many` come out identical here.
   // Two forms that happen to agree, not one form written twice — leaving them
@@ -199,6 +262,10 @@ export const pl: Translations = {
   'profiles.exportPackSkipped.few': 'Pominięto {count} dodatki, które są wyłączone.',
   'profiles.exportPackSkipped.many': 'Pominięto {count} dodatków, które są wyłączone.',
   'profiles.exportPackSkipped.other': 'Pominięto {count} dodatków, które są wyłączone.',
+  'profiles.exportPackCarried.one': 'Dołączono 1 plik ustawień z tego komputera.',
+  'profiles.exportPackCarried.few': 'Dołączono {count} pliki ustawień z tego komputera.',
+  'profiles.exportPackCarried.many': 'Dołączono {count} plików ustawień z tego komputera.',
+  'profiles.exportPackCarried.other': 'Dołączono {count} plików ustawień z tego komputera.',
 
   // ── Światy i kopie ───────────────────────────────────────
   'worlds.title': 'Światy',
@@ -206,10 +273,12 @@ export const pl: Translations = {
   'worlds.backupNow': 'Zrób kopię',
   'worlds.backedUp': 'Światy zostały skopiowane.',
   'worlds.backupFailed': 'Nie udało się zrobić kopii światów.',
-  'worlds.noBackups': 'Brak kopii. Jedna powstaje automatycznie przed zmianą wersji.',
+  'worlds.noBackups':
+    'Brak kopii. Przy zmianie wersji Minecrafta launcher proponuje zrobić ją najpierw.',
   'worlds.restore': 'Przywróć tę kopię',
   'worlds.confirmRestore': 'Zastąpić obecne światy?',
   'worlds.confirmRestoreYes': 'Zastąp',
+  'worlds.confirmDelete': 'Usunąć tę kopię?',
   'worlds.restored': 'Światy zostały przywrócone.',
   'worlds.restoredWithSafety':
     'Światy zostały przywrócone. To, co było wcześniej, jest teraz osobną kopią — da się to cofnąć.',
@@ -247,6 +316,7 @@ export const pl: Translations = {
     'Profil zniknie z launchera tak czy inaczej. To, co stanie się z jego plikami, zależy od Ciebie.',
   'delete.alsoFiles': 'Usuń również pliki',
   'delete.counting': 'Sprawdzam, co tam jest…',
+  'delete.countFailed': 'Nie udało się policzyć zawartości folderu — mogą w nim być światy.',
   'delete.nothingInstalled': 'Nic nie zainstalowano • {size}',
   'delete.mods.one': '{count} mod',
   'delete.mods.few': '{count} mody',
@@ -271,7 +341,8 @@ export const pl: Translations = {
     'Ten profil ma {count} zapisanych światów. Później nie da się ich odzyskać.',
   'delete.worldsWarning.other':
     'Ten profil ma {count} zapisanego świata. Później nie da się go odzyskać.',
-  'delete.keptAt': 'Pliki zostaną w {path} — launcher po prostu przestanie je pokazywać.',
+  'delete.keptAt':
+    'Pliki zostaną w {path}. Będą na tej stronie w sekcji „Pozostawione pliki”, skąd można je przywrócić albo usunąć.',
   'delete.confirmWithFiles': 'Usuń z plikami',
   'delete.confirmKeepFiles': 'Usuń, zostaw pliki',
 
@@ -284,13 +355,23 @@ export const pl: Translations = {
   'packs.whitelistNote':
     'Nasze serwery chodzą na whiteliście — paczkę zainstalujesz od razu, ale o wejście na serwer trzeba poprosić.',
   'packs.scratchTitle': 'Stwórz własną paczkę od zera',
-  'packs.scratchBody': 'Pusty profil. Wybierasz wersję Minecrafta i loader, mody dodajesz sam.',
-  'packs.importTitle': 'Importuj własną paczkę',
-  'packs.importBody': 'Plik .mrpack, który już masz, albo link do manifestu.',
+  'packs.scratchBody':
+    'Pusty profil. Wybierasz wersję Minecrafta i loader, a mody dodajesz samodzielnie.',
+  'packs.modrinthTitle': 'Znajdź paczkę na Modrinth',
+  'packs.modrinthBody': 'Przeszukaj publiczne paczki modów i zainstaluj wybraną jako nowy profil.',
+  'packs.searchModrinth': 'Szukaj paczek modów na Modrinth…',
+  'packs.modrinthNote':
+    'Instaluje się najnowsza wersja paczki pasująca do filtrów powyżej — jako migawka, która sama się nie aktualizuje.',
+  'packs.importTitle': 'Importuj',
+  'packs.importBody':
+    'Plik paczki .mrpack, link do paczki albo plik profilu wyeksportowany z launchera.',
   'packs.loading': 'Wczytuję listę paczek…',
   'packs.none': 'Nie opublikowano jeszcze żadnej paczki.',
   'packs.listFailed': 'Nie udało się wczytać listy paczek.',
+  'packs.listRetry': 'Spróbuj ponownie',
   'packs.installFailed': 'Nie udało się zainstalować {name}.',
+  'packs.installUnfinished':
+    'Profil „{name}” został utworzony, ale nie wszystkie jego pliki dotarły. Kliknij w profilu „{action}”, a instalacja ruszy dalej od miejsca, w którym stanęła. Podany powód: {error}',
   'packs.importFailed': 'Nie udało się zaimportować tej paczki.',
   'packs.manifestFailed': 'Pod tym adresem nie ma paczki ani manifestu.',
   'packs.wrSyncNote': 'Te profile trzymają się serwera: każda synchronizacja przynosi zmiany.',
@@ -298,7 +379,14 @@ export const pl: Translations = {
   'packs.mods.few': '{count} mody',
   'packs.mods.many': '{count} modów',
   'packs.mods.other': '{count} moda',
-  'packs.fileTitle': 'Plik .mrpack',
+  'packs.ram': '{ram} RAM',
+  'packs.ramShort':
+    'Paczka potrzebuje {wanted} pamięci, a ten komputer może przeznaczyć {spare} — gra może tu działać słabo.',
+  'packs.profileFileTitle': 'Plik profilu (.json)',
+  'packs.profileFileBody':
+    'Ustawienia jednego profilu zapisane przyciskiem „Eksportuj” w tym launcherze: wersja Minecrafta, loader, RAM, serwer. Bez modów i światów — te przenosi paczka .mrpack.',
+  'packs.profileFileFailed': 'Nie udało się zaimportować tego pliku profilu.',
+  'packs.fileTitle': 'Plik paczki (.mrpack)',
   'packs.fileBody':
     'Format paczek Modrintha, który czytają też Prism, ATLauncher i aplikacja Modrintha. Instalowany jako migawka — sam się nie zaktualizuje.',
   'packs.chooseFile': 'Wybierz plik…',
@@ -309,20 +397,41 @@ export const pl: Translations = {
   // ── Pliki pozostawione po usunięciu ──────────────────────
   'orphans.title': 'Pozostawione pliki',
   'orphans.hint':
-    'Profile, które usunąłeś, zostawiając pliki. Przywrócenie stawia profil dokładnie tak, jak był.',
+    'Profile usunięte z pozostawieniem plików. Przywrócenie stawia profil dokładnie tak, jak był.',
   'orphans.restore': 'Przywróć',
   'orphans.discard': 'Usuń trwale',
+  'orphans.confirmDiscard': 'Usunąć te pliki razem ze światami?',
+  'orphans.discardFailed': 'Nie udało się usunąć tych plików.',
+  'orphans.restoreFailed': 'Nie udało się przywrócić tego profilu.',
+
+  // ── Wpisy listy profili, które nie są profilami ──────────
+  'unreadable.title': 'Wpisy nie do odczytania',
+  'unreadable.body.one':
+    'Jeden wpis na liście profili nie jest profilem, który ten launcher potrafi odczytać, więc go tu nie ma. Zostaje w pliku bez zmian, a jego folder jest nietknięty:',
+  'unreadable.body.few':
+    '{count} wpisy na liście profili nie są profilami, które ten launcher potrafi odczytać, więc ich tu nie ma. Zostają w pliku bez zmian, a ich foldery są nietknięte:',
+  'unreadable.body.many':
+    '{count} wpisów na liście profili nie jest profilami, które ten launcher potrafi odczytać, więc ich tu nie ma. Zostają w pliku bez zmian, a ich foldery są nietknięte:',
+  'unreadable.body.other':
+    '{count} wpisu na liście profili nie da się odczytać jako profili, więc ich tu nie ma. Zostają w pliku bez zmian, a ich foldery są nietknięte:',
 
   'profiles.fieldMinecraft': 'Minecraft',
-  'profiles.fieldLoader': 'Mod Loader',
+  'profiles.fieldLoader': 'Loader',
   'profiles.fieldRam': 'RAM',
   'profiles.fieldServer': 'Serwer',
-  'profiles.manifestUrl': 'Manifest URL',
+  'profiles.manifestUrl': 'Adres manifestu',
   'profiles.sync': 'Synchronizuj',
-  'profiles.quickConnect': 'Quick-Connect: {address}',
+  'profiles.syncBlocked':
+    'Nie w trakcie gry ani jej uruchamiania — synchronizacja zmienia mody, z których gra korzysta.',
+  'profiles.importedPack': 'Zaimportowana paczka',
+  'profiles.importedPackHint':
+    'Migawka — sama się nie aktualizuje. Naprawa sprawdza pliki z paczką, z której ten profil powstał, i pobiera to, czego brakuje.',
+  'profiles.repair': 'Napraw',
+  'profiles.quickConnect': 'Szybkie połączenie: {address}',
   'profiles.notes': 'Notatki',
   'profiles.lastPlayed': 'Ostatnio grano: {date}',
   'profiles.totalPlayTime': '{hours} h łącznie',
+  'profiles.totalPlayMinutes': '{minutes} min łącznie',
   'profiles.syncStatus.synced': 'Zsynchronizowano',
   'profiles.syncStatus.updates': 'Dostępne aktualizacje ({count})',
   'profiles.syncStatus.error': 'Błąd synchronizacji',
@@ -339,14 +448,15 @@ export const pl: Translations = {
   'profileForm.name': 'Nazwa profilu',
   'profileForm.namePlaceholder': 'np. Survival Server',
   'profileForm.mcVersion': 'Wersja Minecraft',
-  'profileForm.loader': 'Mod Loader',
+  'profileForm.loader': 'Loader',
   'profileForm.versionsLoading': 'Wczytywanie wersji…',
   'profileForm.versionsFailed': 'Nie udało się pobrać listy wersji — wpisz ręcznie',
   'profileForm.noLoaderBuilds':
-    '{loader} nie ma wydań dla Minecraft {mcVersion} — wybierz inną wersję lub loader',
-  'profileForm.loaderUnstable': 'niestabilna',
-  'profileForm.loaderVersionLatest': 'Najnowsza',
-  'profileForm.loaderVersion': 'Wersja Loadera (opcjonalnie)',
+    '{loader} nie ma dla Minecraft {mcVersion} wydań, które ten launcher potrafi uruchomić — wybierz inną wersję lub loader',
+  'profileForm.loaderUnstable': 'wersja testowa',
+  'profileForm.loaderRecommended': 'zalecana',
+  'profileForm.loaderVersion': 'Wersja loadera',
+  'profileForm.loaderVersionAuto': 'dobierze się przy pierwszym uruchomieniu',
   'profileForm.ram': 'Przydzielony RAM',
   'profileForm.ramMachine': 'Ten komputer ma {total}. Zalecane dla niego: {recommended}.',
   'profileForm.ramTight':
@@ -354,10 +464,16 @@ export const pl: Translations = {
   'profileForm.ramOver':
     '{value} to więcej, niż ten komputer ma ({total}). Minecraft się z tym nie uruchomi.',
   'profileForm.ramUseRecommended': 'Ustaw {recommended}',
-  'profileForm.manifestUrl': 'Manifest URL (opcjonalnie)',
-  'profileForm.serverIp': 'Serwer IP',
+  'profileForm.ramRange': 'Od {min} do {max} MB.',
+  'profileForm.manifestUrlInvalid': 'To nie jest adres. Musi zaczynać się od https://',
+  'profileForm.serverPortRange': 'Port to liczba całkowita od 1 do 65535.',
+  'profileForm.saveRefused': 'Profil nie został zapisany.',
+  'profileForm.saveFailed': 'Launcher nie podał powodu.',
+  'profileForm.manifestUrl': 'Adres manifestu (opcjonalnie)',
+  'profileForm.serverIp': 'Adres serwera',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Argumenty Java (opcjonalnie)',
+  'profileForm.javaArgsShort': 'Argumenty Java',
   'profileForm.java': 'Środowisko Java',
   'profileForm.javaManaged': 'To, które instaluje launcher',
   'profileForm.javaBrowse': 'Wskaż plik…',
@@ -369,7 +485,7 @@ export const pl: Translations = {
     'Launcher sam instaluje i utrzymuje właściwe środowisko dla każdej wersji Minecrafta. Wybierz tutaj coś innego tylko wtedy, gdy ten profil potrzebuje konkretnej maszyny wirtualnej.',
   'profileForm.showSnapshots': 'Pokaż snapshoty',
   'profileForm.snapshotHint':
-    'Snapshoty to cotygodniowe wersje testowe Mojanga. Większość modów nie ma pod nie buildów, a świat stworzony w snapshocie może się nie otworzyć w kolejnym wydaniu.',
+    'Snapshoty to cotygodniowe wersje testowe Mojanga. Większość modów nie ma pod nie wersji, a świat stworzony w snapshocie może się nie otworzyć w kolejnym wydaniu gry.',
   'profileForm.advanced': 'Zaawansowane',
   'profileForm.windowWidth': 'Szerokość okna gry',
   'profileForm.windowHeight': 'Wysokość okna gry',
@@ -383,6 +499,10 @@ export const pl: Translations = {
   'profileForm.windowModeFullscreen': 'Pełny ekran',
   'profileForm.windowModeHint':
     'Ustawienie inne niż „tak jak zostawiła gra” trafia przy każdym uruchomieniu do ustawień samej gry, więc unieważnia też F11 z poprzedniej sesji.',
+  'profileForm.gameLanguage': 'Język gry',
+  'profileForm.gameLanguageGame': 'Tak jak w grze (na start angielski)',
+  'profileForm.gameLanguageHint':
+    'Minecraft startuje po angielsku i zapamiętuje język wybrany w swoich ustawieniach. Język wybrany tutaj jest wpisywany do ustawień gry przy każdym uruchomieniu tego profilu, więc wygrywa z tym, co zmienisz w samej grze.',
   'profileForm.notes': 'Notatki',
   'profileForm.notesPlaceholder': 'Dowolne notatki o tym profilu',
 
@@ -392,6 +512,14 @@ export const pl: Translations = {
   'profileIcon.pick': 'Wybierz obraz',
   'profileIcon.formats': 'PNG, JPG, GIF, WebP lub SVG — maks. 2 MB.',
   'profileIcon.presets': '…lub wybierz jedną z wbudowanych:',
+  'profileIcon.preset.raven': 'Kruk',
+  'profileIcon.preset.anvil': 'Kowadło',
+  'profileIcon.preset.pickaxe': 'Kilof',
+  'profileIcon.preset.ember': 'Żar',
+  'profileIcon.preset.diamond': 'Diament',
+  'profileIcon.preset.shield': 'Tarcza',
+  'profileIcon.preset.compass': 'Kompas',
+  'profileIcon.preset.potion': 'Mikstura',
   'profileIcon.failed': 'Nie udało się ustawić ikony',
   'profileIcon.fileFilter': 'Obrazy',
 
@@ -400,19 +528,24 @@ export const pl: Translations = {
   'mods.pickProfile': 'Wybierz profil w zakładce Profile, aby zarządzać modami',
   'mods.tabInstalled': 'Zainstalowane',
   'mods.tabBrowse': 'Przeglądaj',
-  'mods.searchModrinth': 'Szukaj modów na Modrinth...',
+  'mods.searchModrinth': 'Szukaj modów na Modrinth…',
   'mods.searchHint': 'Wpisz nazwę albo po prostu kliknij Szukaj — filtry działają same.',
   'mods.loaderFilter': 'Loader',
   'mods.searchFailed': 'Wyszukiwanie nie powiodło się',
   'mods.installFailed': 'Nie udało się zainstalować {name}',
   'mods.empty': 'Brak zainstalowanych modów',
   'mods.emptyHint': 'Wyszukaj mody w zakładce Przeglądaj lub zsynchronizuj profil z manifestem',
-  'mods.fromManifest': 'z manifestu',
+  'mods.fromManifest': 'z paczki',
+  'mods.source.modrinth': 'Modrinth',
+  'mods.source.url': 'bezpośredni link',
+  'mods.source.local': 'plik lokalny',
   'mods.downloads.one': '{count} pobranie',
   'mods.downloads.few': '{count} pobrania',
   'mods.downloads.many': '{count} pobrań',
   'mods.downloads.other': '{count} pobrania',
   'mods.installedWithDeps': 'Zainstalowano {name}, a wraz z nim to, czego potrzebuje: {deps}',
+  'mods.addedFile': 'Dodano: {name}.',
+  'mods.addFileFailed': 'Nie udało się dodać tego pliku.',
   'mods.checkUpdates': 'Sprawdź aktualizacje',
   'mods.checkUpdatesFailed': 'Nie udało się sprawdzić aktualizacji.',
   'mods.updatesFound.one': '{count} mod ma nowszą wersję.',
@@ -425,21 +558,32 @@ export const pl: Translations = {
   'mods.unknownToModrinth.few': '{count} plików nie ma na Modrinth i nie da się ich sprawdzić.',
   'mods.unknownToModrinth.many': '{count} plików nie ma na Modrinth i nie da się ich sprawdzić.',
   'mods.unknownToModrinth.other': '{count} pliku nie ma na Modrinth i nie da się go sprawdzić.',
+  'mods.noBuildForProfile.one': '{count} mod nie ma wersji dla Minecrafta i loadera tego profilu.',
+  'mods.noBuildForProfile.few':
+    '{count} mody nie mają wersji dla Minecrafta i loadera tego profilu.',
+  'mods.noBuildForProfile.many':
+    '{count} modów nie ma wersji dla Minecrafta i loadera tego profilu.',
+  'mods.noBuildForProfile.other':
+    '{count} moda nie ma wersji dla Minecrafta i loadera tego profilu.',
   'mods.updateAll': 'Zaktualizuj wszystkie',
   'mods.update': 'Aktualizuj',
   'mods.updateTo': 'nowa: {version}',
   'mods.updated': 'Zaktualizowano: {names}',
   'mods.updateFailed': 'Nie udało się zaktualizować: {names}',
+  'mods.updateNotDone': 'Nie udało się zaktualizować modów.',
+  'mods.listFailed': 'Nie udało się odczytać listy zainstalowanych modów.',
+  'mods.toggleFailed': 'Nie udało się przełączyć moda {name}.',
+  'mods.removeFailed': 'Nie udało się usunąć moda {name}.',
+  'mods.gameBusy': 'Nie w trakcie gry ani jej uruchamiania — gra korzysta z tych plików.',
 
   // ── Kompatybilność ───────────────────────────────────────
   'compat.title': 'Czy {name} pasuje do tego profilu?',
-  'compat.wrongLoader': 'Brak buildu pod Twój loader — ten jest wydany pod: {loaders}',
-  'compat.wrongVersion': 'Brak buildu pod Twoją wersję Minecrafta — najnowsze są pod: {versions}',
+  'compat.wrongLoader': 'Brak wersji pod Twój loader — ten jest wydany pod: {loaders}',
+  'compat.wrongVersion': 'Brak wersji pod Twoją wersję Minecrafta — najnowsze są pod: {versions}',
   'compat.noBuild': 'Ten projekt nie udostępnia niczego, co dałoby się zainstalować.',
-  'compat.needsLoader':
-    'Ten profil jest waniliowy, więc nie ma loadera — mod nigdy nie zostanie wczytany.',
+  'compat.needsLoader': 'Ten profil jest bez loadera (vanilla) — mod nigdy nie zostanie wczytany.',
   'compat.conflictsWith': 'Zgłoszona niekompatybilność z czymś, co już masz: {names}',
-  'compat.dependencyNoBuild': 'Wymaga czegoś, co nie ma buildu pod ten profil: {names}',
+  'compat.dependencyNoBuild': 'Wymaga czegoś, co nie ma wersji pod ten profil: {names}',
   'compat.alsoInstalls': 'Zainstaluje też: {deps}',
   'compat.anywayHint':
     'Wersję {version} można zainstalować mimo to — te dane wypełnia autor i często są za rzeczywistością.',
@@ -450,23 +594,30 @@ export const pl: Translations = {
 
   // ── Accounts ─────────────────────────────────────────────
   'accounts.title': 'Konta',
-  'accounts.loginMicrosoft': 'Zaloguj z Microsoft',
-  'accounts.offlineMode': 'Tryb offline',
+  'accounts.loginMicrosoft': 'Zaloguj przez Microsoft',
+  'accounts.offlineMode': 'Dodaj konto offline',
   'accounts.privacyLink': 'Co Raven Forge robi z moimi danymi?',
   'accounts.playerName': 'Nazwa gracza',
   'accounts.empty': 'Brak kont — zaloguj się powyżej',
+  'accounts.loading': 'Wczytywanie kont…',
+  'accounts.loadFailed': 'Nie udało się odczytać kont.',
   'accounts.active': '• aktywne',
   'accounts.setActive': 'Ustaw aktywne',
   'accounts.manage': 'Ustawienia konta',
   'accounts.logout': 'Wyloguj',
+  'accounts.logoutAsk':
+    'Wylogować konto {name} z launchera? Zapisane logowanie zostanie usunięte z tego komputera.',
+  'accounts.failed': 'To się nie udało.',
   'accounts.loginFailed': 'Logowanie nie powiodło się',
-  'accounts.plaintextTitle': 'Dane logowania poza pęcherzem kluczy',
+  'accounts.plaintextTitle': 'Dane logowania poza pękiem kluczy',
   'accounts.plaintextBody':
     'Nie udało się użyć pęku kluczy systemu, więc logowanie Microsoft jest zapisane niezaszyfrowane w {file} (do odczytu tylko dla Twojego użytkownika). Na Linuksie zwykle znaczy to, że nie działa żaden demon pęku kluczy — gnome-keyring lub kwallet. Uruchom go i zaloguj się ponownie, aby przenieść dane z powrotem.',
 
   // ── Settings ─────────────────────────────────────────────
   'settings.title': 'Ustawienia',
-  'settings.loading': 'Ładowanie ustawień...',
+  'settings.loading': 'Ładowanie ustawień…',
+  'settings.saveFailed':
+    'Tego ustawienia nie udało się zapisać, więc wróciło do poprzedniej wartości.',
   'settings.section.appearance': 'Wygląd',
   'settings.section.behavior': 'Zachowanie',
   'settings.section.network': 'Sieć i pobieranie',
@@ -484,24 +635,25 @@ export const pl: Translations = {
     'Zainstalowano z pakietu systemowego. Aktualizuj przez menedżer pakietów (apt, dnf), nie stąd.',
   'settings.updateUnsignedPlatform':
     'Automatyczna aktualizacja nie jest jeszcze dostępna na tej platformie. Pobierz najnowsze wydanie z GitHuba.',
+  'settings.openReleases': 'Otwórz stronę wydań',
   'settings.updateCheckFailed': 'Nie udało się sprawdzić aktualizacji.',
   'settings.updateCheckFailedWith': 'Nie udało się sprawdzić aktualizacji: {error}',
-  'settings.updateDownloadFailed': 'Nie udało się pobrać aktualizacji.',
   'settings.section.data': 'Dane',
   'settings.theme': 'Motyw',
   'settings.theme.dark': 'Ciemny',
-  'settings.theme.oled': 'OLED Czarny',
+  'settings.theme.oled': 'Czarny OLED',
   'settings.theme.light': 'Jasny',
   'settings.language': 'Język',
   'settings.onLaunch': 'Po uruchomieniu gry',
   'settings.onLaunch.minimize': 'Minimalizuj',
   'settings.onLaunch.close': 'Zamknij',
   'settings.onLaunch.keepOpen': 'Zostaw otwarte',
-  'settings.showConsole': 'Pokaż konsolę gry',
+  'settings.onLaunchCloseHint':
+    'Okno launchera znika, gdy gra już działa, a launcher kończy pracę razem z grą. Jeśli gra ulegnie awarii, okno wraca, żeby raport z awarii nie przepadł.',
+  'settings.showConsole': 'Pokazuj na stronie głównej przycisk konsoli gry, gdy gra działa',
   'settings.offlineMode': 'Zawsze uruchamiaj offline',
   'settings.offlineModeHint':
     'Nigdy nie łączy się z serwerami logowania. Tylko singleplayer i LAN — serwery w trybie online odrzucą sesję offline.',
-  'settings.autoRemoveOrphans': 'Automatycznie usuwaj osierocone mody',
   'settings.discordPresence': 'Pokazuj grę na statusie Discorda',
   'settings.discordPresenceHint':
     'Kiedy gra działa, Twój status widzi nazwę profilu, wersję i loader — bez adresu serwera. ' +
@@ -509,16 +661,17 @@ export const pl: Translations = {
     '(np. CraftPresence) będą się z tym gryzły: Discord pokazuje jedną aktywność naraz.',
   'settings.concurrency': 'Jednoczesne pobierania (1–8)',
   'settings.concurrencyInvalid': 'Podaj liczbę od 1 do 8.',
-  'settings.proxy': 'Proxy URL (opcjonalnie)',
+  'settings.proxy': 'Adres proxy (opcjonalnie)',
   'settings.proxyPlaceholder': 'http:// lub socks5://uzytkownik:haslo@host:port',
   'settings.proxyInvalid':
     'Nieprawidłowy adres — wymagany schemat http://, https://, socks4:// lub socks5://.',
   'settings.proxyHint':
     'Obsługiwane są HTTP, HTTPS i SOCKS4/5. Przy SOCKS nazwy hostów rozwiązuje proxy, więc nic nie wycieka do lokalnego resolvera.',
   'settings.feedPlaceholder': 'https://twoj-serwer.com/api/{feed}.json',
-  'settings.newsFeed': 'News Feed URL',
+  'settings.newsFeed': 'Adres kanału aktualności',
   'settings.feedInvalid': 'To nie jest poprawny adres URL. Zostaw puste, aby wyłączyć kanał.',
-  'settings.announcementFeed': 'Announcement Feed URL',
+  'settings.feedUnreadable': 'Przy ostatniej próbie nie udało się nic odczytać spod tego adresu.',
+  'settings.announcementFeed': 'Adres kanału ogłoszeń',
   'settings.trustedKeysHint':
     'Klucz White Ravens jest wbudowany w launcher, dlatego paczki White Ravens są weryfikowane od pierwszego uruchomienia. Dopóki nie dodasz własnego klucza, launcher pokazuje wynik weryfikacji, ale niczego nie blokuje. Dodanie klucza włącza wymuszanie: instalowane będą wyłącznie podpisane manifesty, które da się zweryfikować.',
   'settings.allowUnverifiedInstaller': 'Pozwól na niezweryfikowane instalatory loadera',
@@ -531,27 +684,40 @@ export const pl: Translations = {
   'settings.trustedKeyValue': 'Klucz publiczny (base64)',
   'settings.trustedKeyAdd': 'Dodaj klucz',
   'settings.trustedKeyFailed': 'Nie udało się dodać klucza',
+  'settings.trustedKeyInvalid':
+    'To nie jest klucz publiczny Ed25519. Taki klucz to 32 bajty w base64: 44 znaki, z których ostatni to „=”. Blok PEM albo klucz w postaci eksportowanej przez OpenSSL to dłuższy format i nie zadziała.',
+  'settings.trustedKeyDuplicate': 'Ten klucz jest już na liście.',
+  'settings.trustedKeyUnusable':
+    'To nie jest klucz publiczny Ed25519: niczego nie zweryfikuje, a będąc na liście i tak włącza wymaganie podpisu. Usuń go.',
+  'settings.trustedKeyRemoveFailed': 'Nie udało się usunąć klucza',
+  'settings.trustedKeyConfirm': 'Usunąć ten klucz?',
+  'settings.trustedKeyConfirmLast':
+    'Usunąć ostatni klucz? Podpis przestanie być wymagany od paczek spoza White Ravens.',
   'settings.dataFolder': 'Folder danych',
   'settings.dataFolderHint':
-    'Profile, mody, pliki gry i pobrane wersje Javy. Po instalacji paczki to kilka gigabajtów.',
+    'Profile, mody, pliki gry, pobrane wersje Javy, logi i raporty z awarii. Po instalacji paczki to kilka gigabajtów. Pełna lista z rozmiarami jest poniżej.',
   'settings.dataFolderChange': 'Przenieś…',
   'settings.dataFolderRestore': 'Wróć do domyślnego',
   'settings.dataFolderEnv':
     'Dla tej instalacji ustawia go RAVENFORGE_DATA_DIR, więc nie zmienisz go tutaj.',
   'settings.dataFolderUnavailable':
-    'Nie udało się otworzyć wybranego folderu {path}, więc launcher korzysta z domyślnego. To, co tam było, dalej tam jest.',
-  'settings.crashReportsFolder': 'Raporty z awarii',
+    'Nie udało się otworzyć wybranego folderu {path} — dysk jest odłączony albo folder zniknął — więc launcher korzysta z domyślnego. To, co tam było, dalej tam jest; podłącz dysk i uruchom launcher ponownie.',
+  'settings.dataFolderForget': 'Zapomnij ten folder',
+  'settings.dataFolderForgetHint':
+    'Launcher przestanie go szukać i zostanie przy folderze domyślnym. Niczego w niedostępnym folderze nie rusza.',
   'settings.logs': 'Logi',
   'settings.showLogs': 'Pokaż logi',
   'settings.reset': 'Resetuj ustawienia',
   'settings.confirmReset': 'Zresetować wszystkie ustawienia do domyślnych?',
+  'settings.confirmResetKeys':
+    'Zresetować wszystkie ustawienia do domyślnych? Zniknie też każdy dodany przez Ciebie klucz, a podpis przestanie być wymagany od paczek spoza White Ravens.',
 
   // ── Log viewer ───────────────────────────────────────────
   'logs.title': 'Logi launchera',
   'logs.filterAll': 'Wszystko',
   'logs.filterWarn': 'Ostrzeżenia',
   'logs.filterError': 'Błędy',
-  'logs.loading': 'Wczytywanie logu...',
+  'logs.loading': 'Wczytywanie logu…',
   'logs.readFailed': 'Nie udało się odczytać logu',
   'logs.empty': 'Log jest pusty — nic jeszcze nie zostało zapisane.',
   'logs.noMatches': 'Brak wpisów pasujących do filtra.',
@@ -567,9 +733,11 @@ export const pl: Translations = {
   'logs.warnCount.other': '{count} ostrzeżenia',
 
   // ── Progress overlay ─────────────────────────────────────
-  'progress.title': 'Postęp instalacji',
+  'progress.titleInstalling': 'Pobieranie i instalacja',
+  'progress.titlePreparing': 'Przygotowywanie do uruchomienia',
+  'progress.titleChecking': 'Sprawdzanie plików',
   'progress.modSync': 'Synchronizacja modów',
-  'progress.loaderInstall': 'Instalacja mod loadera',
+  'progress.loaderInstall': 'Instalacja loadera',
   'progress.javaDownload': 'Pobieranie Javy',
   'progress.gameAssets': 'Pliki gry',
   'progress.launcherUpdate': 'Aktualizacja launchera',
@@ -579,7 +747,6 @@ export const pl: Translations = {
   'progress.files.other': '{done}/{total} pliku',
 
   // Komunikaty postępu nazywane przez proces główny — zob. `ProgressKey`.
-  'progress.msg.downloading': 'Pobieranie…',
   'progress.msg.checkingFiles': 'Sprawdzanie zainstalowanych plików…',
   'progress.msg.downloadingFile': 'Pobieranie {name}…',
   'progress.msg.checkingLibraries': 'Sprawdzanie bibliotek Minecraft {version}…',
@@ -611,6 +778,7 @@ export const pl: Translations = {
   'update.available': 'Dostępna aktualizacja: v{version}',
   'update.willInstall': 'v{version} zostanie zainstalowana po restarcie.',
   'update.pending': 'Nowa wersja launchera jest gotowa do pobrania.',
+  'update.whatsNew': 'Co nowego',
   'update.downloading': 'Pobieranie… {percent}%',
   'update.downloadFailed': 'Pobieranie aktualizacji nie powiodło się',
   'update.installFailed': 'Instalacja aktualizacji nie powiodła się',
@@ -618,8 +786,9 @@ export const pl: Translations = {
 
   // ── Error boundary ───────────────────────────────────────
   'error.title': 'Ups, coś poszło nie tak',
-  'error.body': 'Launcher napotkał nieoczekiwany błąd. Kliknij poniżej, aby spróbować ponownie.',
-  'error.restart': 'Uruchom ponownie',
+  'error.body':
+    'Launcher napotkał nieoczekiwany błąd. Przycisk poniżej wczytuje jego interfejs od nowa — uruchomiona gra działa dalej.',
+  'error.reload': 'Wczytaj okno ponownie',
 
   // ── About ────────────────────────────────────────────────
   'about.tagline':
@@ -629,6 +798,8 @@ export const pl: Translations = {
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Sekret kuźni',
   'about.privacy': 'Prywatność',
+  'about.legal':
+    'Wolne oprogramowanie na licencji GNU Affero General Public License w wersji 3: możesz je rozpowszechniać i zmieniać na warunkach tej licencji. Program nie ma żadnej gwarancji.',
 
   // ── Prywatność ───────────────────────────────────────────
   // Pisane dla kogoś, kto się niepokoi, a nie dla kogoś, kto pisał kod: bez
@@ -651,17 +822,71 @@ export const pl: Translations = {
 
   'privacy.local.title': 'Co zostaje na tym komputerze',
   'privacy.local.body':
-    'Wszystko leży w jednym folderze. To, gdzie on jest, zależy od Twojego systemu — ten launcher używa tego:',
-  'privacy.local.profiles':
-    'Twoje profile, a razem z nimi światy, zrzuty ekranu, ustawienia gry i mody.',
-  'privacy.local.settings':
-    'Twoje ustawienia launchera — wygląd, język i adresy, z których pobiera treści.',
-  'privacy.local.accounts': 'Twoja lista kont: nazwa gracza i data ostatniego logowania.',
-  'privacy.local.logs':
-    'Zapis tego, co launcher robił. Może zawierać Twoją nazwę gracza i nazwy folderów, więc przejrzyj go, zanim komuś wyślesz.',
-  'privacy.local.crashes': 'Raporty z awarii, już bez danych logowania.',
-  'privacy.local.keychain':
-    'Twoje hasło nie jest trzymane ani tutaj, ani nigdzie indziej — wpisujesz je na stronie Microsoftu, nie w tym launcherze. Launcher przechowuje tylko przepustkę, którą Microsoft odsyła, i wkłada ją do systemowego sejfu na hasła — tego samego, z którego korzysta Twoja przeglądarka. Jeśli Twój system takiego sejfu nie udostępnia, launcher trzyma ją u siebie w folderze i mówi o tym wprost na ekranie Konta.',
+    'Poniżej jest wszystko, co launcher zapisuje na tym komputerze — z miejscem i rozmiarem, zmierzone przed chwilą na Twoim dysku, a nie opisane z pamięci.',
+  'storage.total': 'Razem na dysku: {size}',
+  'storage.measuring': 'Mierzę pliki na dysku…',
+  'storage.refresh': 'Zmierz ponownie',
+  'storage.failed': 'Nie udało się zmierzyć plików launchera.',
+  'storage.openFailed': 'Nie udało się otworzyć tego folderu.',
+  'storage.nothingYet': 'jeszcze nic',
+  'storage.groupData': 'Folder danych — to on się przenosi',
+  'storage.groupHome': 'Folder launchera — zostaje na miejscu',
+  'storage.groupSystem': 'Poza tymi dwoma folderami',
+  'storage.homeIsData': 'Dopóki nie przeniesiesz danych, to ten sam folder co powyżej.',
+  'storage.profiles.title': 'Profile',
+  'storage.profiles.body':
+    'Każdy profil ma tu własny folder: światy, mody, paczki zasobów, shadery, zrzuty ekranu, ustawienia gry i kopie światów. To jedyna rzecz na tej liście, której nie da się pobrać ponownie.',
+  'storage.gameFiles.title': 'Pliki gry',
+  'storage.gameFiles.body':
+    'Wersje Minecrafta, biblioteki i zasoby pobrane od Mojanga, wspólne dla wszystkich profili. Usunięte pobiorą się ponownie przy następnym uruchomieniu.',
+  'storage.java.title': 'Środowiska Java',
+  'storage.java.body':
+    'Java, którą launcher pobrał dla wersji Minecrafta, które jej potrzebują. Usunięta pobierze się ponownie.',
+  'storage.loaders.title': 'Loadery',
+  'storage.loaders.body': 'Zainstalowane wersje Fabric, Quilt, Forge i NeoForge.',
+  'storage.state.title': 'Ustawienia i listy',
+  'storage.state.body':
+    'Trzy pliki: settings.json (ustawienia launchera), profiles.json (lista profili) i auth.json (lista kont: nazwa gracza i identyfikator konta, bez hasła).',
+  'storage.logs.title': 'Logi',
+  'storage.logs.body':
+    'Zapis tego, co robił launcher i co wypisywała gra. Zawiera Twoją nazwę gracza i ścieżki folderów, więc przejrzyj go, zanim komuś wyślesz.',
+  'storage.crashReports.title': 'Raporty z awarii',
+  'storage.crashReports.body':
+    'Jeden plik na każdą awarię gry, już bez tokenu i danych konta. Nigdzie nie są wysyłane — to Ty decydujesz, czy dołączyć któryś do zgłoszenia.',
+  'storage.browser.title': 'Pliki okna launchera',
+  'storage.browser.body':
+    'Okno launchera to wbudowana przeglądarka i tu trzyma swoje pliki: pamięć podręczną obrazków (ikony modów, grafiki aktualności), zapamiętane ukryte ogłoszenia, ostatnio wybrany profil i ciasteczka strony logowania Microsoft.',
+  'storage.pointer.title': 'Wskaźnik folderu danych',
+  'storage.pointer.body':
+    'Plik tekstowy z jedną linią: ścieżką do folderu danych. Po nim launcher i deinstalator trafiają do danych, które zostały przeniesione.',
+  'storage.updateCache.title': 'Pobrana aktualizacja launchera',
+  'storage.updateCache.body': 'Instalator nowej wersji, pobrany i czekający na instalację.',
+  'storage.program.title': 'Program',
+  'storage.program.body': 'Sam launcher — to, co położył tu instalator.',
+  'storage.legacyHome.title': 'Folder po starszej wersji',
+  'storage.legacyHome.body':
+    'Z tego folderu korzystały wersje do 0.7.1. Ta wersja ma swój i tego nie rusza — sprawdź, czy nie zostało w nim coś, czego potrzebujesz.',
+  'storage.keychain.title': 'Logowanie Microsoft — w magazynie poświadczeń systemu',
+  'storage.keychain.what':
+    'Twojego hasła launcher nie zna i nie przechowuje: wpisujesz je na stronie Microsoftu. Microsoft odsyła dwa klucze i tylko one są zapisywane — token odświeżania, którym launcher przedłuża logowanie bez pytania o hasło, oraz token sesji Minecrafta, ważny około doby.',
+  'storage.keychain.windows':
+    'W Windows trafiają do Menedżera poświadczeń: Panel sterowania → Konta użytkowników → Menedżer poświadczeń → Poświadczenia systemu Windows, wpisy zaczynające się od „com.ravenforge.launcher”. Windows szyfruje je Twoim kontem użytkownika; programy uruchomione na Twoim koncie mogą o nie poprosić, inni użytkownicy komputera nie.',
+  'storage.keychain.linux':
+    'W Linuksie trafiają do pęku kluczy pulpitu przez usługę Secret Service: GNOME Keyring (aplikacja „Hasła i klucze”) albo KWallet (KWalletManager), jako wpisy usługi „com.ravenforge.launcher”. Pęk jest zaszyfrowany hasłem logowania i otwarty, dopóki jesteś zalogowany; programy z Twojej sesji mogą z niego czytać.',
+  'storage.keychain.mac':
+    'W macOS trafiają do Pęku kluczy (aplikacja „Dostęp do pęku kluczy”), jako wpisy usługi „com.ravenforge.launcher”.',
+  'storage.keychain.none':
+    'Na tym komputerze: brak wpisów — nie jest zalogowane żadne konto Microsoft.',
+  'storage.keychain.count.one': 'Na tym komputerze: {count} wpis.',
+  'storage.keychain.count.few':
+    'Na tym komputerze: {count} wpisy, po dwa na każde konto Microsoft.',
+  'storage.keychain.count.many':
+    'Na tym komputerze: {count} wpisów, po dwa na każde konto Microsoft.',
+  'storage.keychain.count.other': 'Na tym komputerze: {count} wpisu.',
+  'storage.keychain.unavailable':
+    'Na tym komputerze magazyn poświadczeń nie odpowiada. Logowanie Microsoft jest wtedy zapisane w pliku auth.json w folderze danych, czytelnym tylko dla Twojego użytkownika — ekran Konta mówi o tym wprost.',
+  'storage.keychain.remove':
+    '„Wyloguj” w zakładce Konta usuwa oba wpisy tego konta. Możesz je też usunąć ręcznie w miejscu opisanym wyżej — launcher poprosi wtedy o ponowne logowanie.',
 
   'privacy.dest.title': 'Z kim launcher się kontaktuje',
   'privacy.dest.body':
@@ -677,18 +902,19 @@ export const pl: Translations = {
   'privacy.dest.java.when': 'gdy launcher instaluje za Ciebie Javę',
   'privacy.dest.java.sends': 'Która wersja Javy jest potrzebna i na jakim jesteś systemie.',
   'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge i Quilt',
-  'privacy.dest.loaders.when': 'przy instalacji tego, czego mody potrzebują do działania',
+  'privacy.dest.loaders.when': 'przy wyborze i instalacji loadera',
   'privacy.dest.modrinth.who': 'Modrinth',
-  'privacy.dest.modrinth.when': 'gdy szukasz modów albo sprawdzasz te, które masz',
+  'privacy.dest.modrinth.when':
+    'gdy szukasz modów i paczek, otwierasz listę zainstalowanych, sprawdzasz aktualizacje albo dodajesz mod z pliku',
   'privacy.dest.modrinth.sends':
-    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu — tak pyta się Modrinth, czym te pliki są. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
+    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Otwarcie listy modów, shaderów albo paczek zasobów profilu wysyła identyfikatory tych, które masz — tak launcher pobiera ich opisy i ikony, a odpowiedź pamięta przez tydzień. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu, a dodanie moda z pliku — skrót tego jednego pliku. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
   'privacy.dest.packs.who': 'White Ravens',
-  'privacy.dest.packs.when': 'wiadomości i lista paczek serwerowych',
+  'privacy.dest.packs.when': 'aktualności i ogłoszenia, lista paczek serwerowych i same paczki',
   'privacy.dest.updates.who': 'GitHub',
   'privacy.dest.updates.when': 'przy każdym starcie i gdy sprawdzasz aktualizacje',
   'privacy.dest.updates.sends':
     'Jedno pytanie: czy jest nowsza wersja? Dzieje się samo przy każdym starcie i na razie nie da się tego wyłączyć.',
-  'privacy.dest.feeds': 'Wiadomości, tak jak są ustawione na tym komputerze:',
+  'privacy.dest.feeds': 'Aktualności i ogłoszenia, tak jak są ustawione na tym komputerze:',
   'privacy.dest.feedOff': 'wyłączone — nic nie jest pobierane',
 
   'privacy.game.title': 'Gra to osobny program',
@@ -699,12 +925,23 @@ export const pl: Translations = {
 
   'privacy.control.title': 'O czym decydujesz Ty',
   'privacy.control.offline':
-    'Tryb offline w ogóle nie kontaktuje się z serwerami logowania — grasz sam albo w sieci domowej.',
+    'Logowanie: Ustawienia → Zachowanie → „Zawsze uruchamiaj offline”. Launcher nie łączy się wtedy z serwerami logowania Microsoft, Xbox ani Mojang; pliki gry i mody nadal się pobierają. Konto offline (Konta → Tryb offline) nie loguje się nigdzie w ogóle.',
   'privacy.control.feeds':
-    'Wyczyść adres wiadomości w Ustawieniach, a nic więcej nie będzie pobierane.',
-  'privacy.control.proxy': 'Proxy przepuszcza wszystko przez serwer, który sam wybierasz.',
+    'Aktualności i ogłoszenia: Ustawienia → Źródła treści. Wyczyść oba adresy, a launcher przestanie pobierać aktualności i ogłoszenia. Wpisz własne, a będzie pytał tylko je.',
+  'privacy.control.proxy':
+    'Proxy: Ustawienia → Sieć i pobieranie → Adres proxy. Przez wskazany serwer idą wszystkie połączenia launchera — pobieranie, logowanie, obrazki. Gra, kiedy już działa, łączy się po swojemu i proxy launchera jej nie obejmuje.',
+  'privacy.control.discord':
+    'Discord: Ustawienia → Zachowanie → „Pokazuj grę na statusie Discorda”, domyślnie wyłączone. Włączone pokazuje nazwę profilu, wersję i loader każdemu, kto widzi Twój profil na Discordzie — bez adresu serwera.',
+  'privacy.control.packs':
+    'Paczki: profil, który śledzi paczkę, pyta o nią adres ze swojego pola „Adres manifestu” — przy starcie launchera i przed każdym uruchomieniem gry. Usuń ten adres w edytorze profilu, a profil przestanie pytać i przestanie się aktualizować.',
+  'privacy.control.updates':
+    'Aktualizacje launchera: sprawdzane przy każdym starcie jednym zapytaniem do GitHuba. Tego na razie nie da się wyłączyć.',
+  'privacy.control.diagnostics':
+    'Logi i raporty z awarii: nie opuszczają komputera, dopóki ich komuś nie wyślesz. „Zgłoś błąd” otwiera stronę zgłoszeń w przeglądarce, a plik dołączasz ręcznie.',
+  'privacy.control.location':
+    'Miejsce na dysku: Ustawienia → Dane → „Przenieś…” przenosi folder danych tam, gdzie wskażesz.',
   'privacy.control.delete':
-    'Wylogowanie kasuje zapisane logowanie tego konta i zapomina je także w oknie logowania. Usunięcie powyższego folderu usuwa całą resztę — po naszej stronie nie ma czego usuwać.',
+    'Usuwanie: „Wyloguj” w zakładce Konta kasuje zapisane logowanie tego konta — wpisy w systemowym magazynie poświadczeń i ciasteczka okna logowania. Usunięcie folderu danych i folderu launchera z listy powyżej usuwa całą resztę; deinstalator w Windows pyta o to wprost. Po naszej stronie nie ma czego usuwać.',
 
   'privacy.fullPolicy': 'Przeczytaj pełną politykę prywatności',
   'privacy.fullPolicyHint':
@@ -743,21 +980,39 @@ export const pl: Translations = {
   'dataRoot.title': 'Przenieś folder danych',
   'dataRoot.from': 'Teraz',
   'dataRoot.to': 'Nowe miejsce',
-  'dataRoot.move': 'Przeniesione zostanie {size}. W starym miejscu nic nie zostaje.',
+  'dataRoot.moveSameVolume':
+    'Przeniesione zostanie {size}. To ten sam dysk, więc pliki zostaną przesunięte bez kopiowania — potrwa to chwilę.',
+  'dataRoot.moveCopy':
+    'Przeniesione zostanie {size}. Pliki zostaną skopiowane na drugi dysk, porównane z oryginałem i dopiero wtedy usunięte ze starego miejsca. Gdyby coś się nie udało, wszystko zostaje tam, gdzie było.',
+  'dataRoot.staysHome':
+    'W starym folderze zostanie tylko to, co nie jest danymi: plik data-root.txt, który wskazuje nowe miejsce, i folder browser z plikami okna launchera.',
+  'dataRoot.staysNothing': 'Stary folder zostanie opróżniony i usunięty.',
+  'dataRoot.replacesDebris':
+    'W nowym miejscu są puste pliki launchera albo pozostałość po niedokończonym przenoszeniu — zostaną zastąpione.',
+  'dataRoot.warnSpaces':
+    'Ta ścieżka zawiera spacje. Minecraft sobie z tym radzi, ale część modów i narzędzi nie — bezpieczniejszy jest folder bez spacji.',
+  'dataRoot.warnNonAscii':
+    'Ta ścieżka zawiera znaki spoza podstawowego alfabetu (na przykład polskie litery). Część modów sobie z nimi nie radzi — bezpieczniejszy jest folder z samych liter A–Z, cyfr i myślników.',
+  'dataRoot.done': 'Gotowe — launcher korzysta teraz z nowego folderu.',
+  'dataRoot.leftovers':
+    'Tych starych kopii nie udało się usunąć. Dane są bezpieczne w nowym miejscu, a te pliki są już zbędne — możesz je skasować ręcznie:',
   'dataRoot.adopt':
-    'W tym folderze są już dane launchera, więc zostaną użyte tak, jak są — nic nie jest kopiowane, a to, co w obecnym folderze, tam zostaje.',
+    'W tym folderze są już profile launchera, więc zostanie użyty tak, jak jest — nic nie jest kopiowane, a to, co jest w obecnym folderze, tam zostaje.',
   'dataRoot.free': 'Wolne miejsce w miejscu docelowym: {free}',
   'dataRoot.restartNotice': 'Po przeniesieniu launcher uruchomi się ponownie.',
   'dataRoot.confirm': 'Przenieś i uruchom ponownie',
   'dataRoot.confirmAdopt': 'Użyj tego folderu i uruchom ponownie',
   'dataRoot.moving': 'Przenoszenie danych…',
-  'dataRoot.restarting': 'Gotowe — ponowne uruchomienie launchera…',
+  'dataRoot.restarting': 'Launcher zaraz uruchomi się ponownie…',
   'dataRoot.failed': 'Nie udało się przenieść folderu danych: {error}',
   'dataRoot.problem.same': 'To już jest używany folder.',
   'dataRoot.problem.nested': 'Ten folder jest wewnątrz obecnego — wybierz taki spoza niego.',
   'dataRoot.problem.notWritable': 'Do tego folderu nie da się nic zapisać.',
+  'dataRoot.problem.notEmpty':
+    'W tym folderze są inne pliki, a podfolder „raven-forge-launcher”, który launcher by w nim utworzył, też jest zajęty. Wybierz inne miejsce.',
   'dataRoot.problem.noSpace': 'Za mało miejsca: do przeniesienia {size}, wolne {free}.',
   'dataRoot.problem.envLocked':
     'O miejscu na dane dla tej instalacji decyduje RAVENFORGE_DATA_DIR.',
-  'dataRoot.problem.gameRunning': 'Najpierw zamknij grę — działa z tego folderu.',
+  'dataRoot.problem.gameRunning':
+    'Najpierw zamknij grę i poczekaj, aż skończy się pobieranie — launcher pracuje teraz na tych plikach.',
 };

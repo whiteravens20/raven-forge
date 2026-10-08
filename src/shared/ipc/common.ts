@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // Results, error codes and progress — the shapes every channel shares.
 // Part of the IPC contract — see `../ipc-types.ts`.
 
@@ -21,10 +23,14 @@ export interface IpcResult<T> {
 
 /**
  * `AUTH_UNREACHABLE` — Microsoft's or Mojang's auth endpoints could not be
- * reached, as opposed to rejecting us. The distinction matters: unreachable is
- * recoverable by launching offline, rejected is not.
+ * reached, or answered that they are busy or failing, as opposed to rejecting
+ * us. The distinction matters: neither is anything wrong with the account, and
+ * both are recoverable by launching offline; a rejection is not.
+ *
+ * `CANCELLED` — the player called it off themselves, by closing the window it
+ * was happening in. Nothing went wrong and nothing is to be reported.
  */
-export type IpcErrorCode = 'AUTH_UNREACHABLE';
+export type IpcErrorCode = 'AUTH_UNREACHABLE' | 'CANCELLED';
 
 /**
  * Failure messages the main process may name for the renderer to say.
@@ -43,9 +49,23 @@ export type IpcErrorCode = 'AUTH_UNREACHABLE';
 export type ErrorKey =
   | 'launchError.alreadyRunning'
   | 'launchError.alreadyPreparing'
+  | 'launchError.noAccount'
+  | 'launchError.sessionExpired'
   | 'launchError.ramTooBig'
+  | 'launchError.loaderVersionUnknown'
+  | 'launchError.loaderFileMissing'
+  | 'launchError.loaderBuildTooOld'
   | 'launchError.javaNotRuntime'
-  | 'launchError.javaTooOld';
+  | 'launchError.javaTooOld'
+  | 'contentError.notZip'
+  | 'contentError.notJar'
+  | 'contentError.needsLoader'
+  | 'contentError.wrongLoader'
+  | 'contentError.notResourcePack'
+  | 'contentError.nestedResourcePack'
+  | 'contentError.notShaderPack'
+  | 'contentError.nestedShaderPack'
+  | 'contentError.ownedByPack';
 
 /** A failure the renderer can say in the user's language. */
 export interface ErrorMessage {
@@ -66,7 +86,6 @@ export interface ErrorMessage {
  * where it is resolved.
  */
 export type ProgressKey =
-  | 'progress.msg.downloading'
   | 'progress.msg.downloadingFile'
   | 'progress.msg.checkingFiles'
   | 'progress.msg.checkingLibraries'
@@ -121,4 +140,13 @@ export interface ProgressEvent {
   /** Files completed / total */
   filesCompleted?: number;
   filesTotal?: number;
+  /**
+   * Set while this step downloads or installs something, as opposed to checking
+   * what is already on disk.
+   *
+   * Every launch reports progress, because a profile's files are verified each
+   * time, and nearly every launch fetches nothing. The overlay reads this to say
+   * which of the two is happening instead of calling both an installation.
+   */
+  installing?: boolean;
 }

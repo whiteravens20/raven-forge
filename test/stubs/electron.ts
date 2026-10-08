@@ -1,9 +1,11 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 /**
  * Minimal `electron` stand-in for tests.
  *
  * Modules under `src/core/` reach Electron only through `paths.ts` and
  * `logger.ts`, both of which want `app.getPath('userData')` at import time.
- * Aliasing the module (see vitest.config.ts) means a pure function does not
+ * Aliasing the module (see vitest.config.mts) means a pure function does not
  * have to be pulled out of its file just to become testable.
  *
  * It is deliberately incomplete: a test that reaches further than this hits an
@@ -24,10 +26,10 @@ export const app = {
 export const session = {
   defaultSession: {
     setProxy: () => Promise.resolve(),
+    closeAllConnections: () => Promise.resolve(),
   },
 };
 
 export const BrowserWindow = class {};
 export const ipcMain = { handle: () => {}, on: () => {} };
 export const shell = { openExternal: () => Promise.resolve() };
-export const safeStorage = { isEncryptionAvailable: () => false };

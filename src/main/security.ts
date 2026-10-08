@@ -1,6 +1,38 @@
-import { session, type IpcMainInvokeEvent } from 'electron';
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { app, session, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { log } from './logger';
 import { getMainWindow } from './window';
+
+/**
+ * The switches by which the embedded browser opens a debugger of its own: on a
+ * port, and on a pair of pipes handed to it by whatever started it.
+ */
+const REMOTE_DEBUGGING_SWITCHES = ['remote-debugging-port', 'remote-debugging-pipe'];
+
+/**
+ * Take the embedded browser's debugger off a packaged launcher's command line.
+ *
+ * Started with `--remote-debugging-port`, Chromium serves its debugging
+ * protocol to whatever connects, and through it every window the launcher has
+ * — the Microsoft sign-in among them — can be read and driven from outside.
+ * Electron's own two ways of making the program into something else are
+ * switched off in the binary, as fuses (electron-builder.config.js). This one
+ * is Chromium's and has no fuse, so it is refused here.
+ *
+ * It is the first thing the main script does, and has to be: the browser reads
+ * its command line once that script has run, before the app is ready, and a
+ * switch taken off any later has already been obeyed. Seen both ways on
+ * Electron 44.
+ *
+ * Only in a packaged launcher, which is where the fuses are as well. `npm run
+ * dev` runs the Electron in node_modules, and a debugger on that one is the
+ * developer's own.
+ */
+export function refuseRemoteDebugging(): void {
+  if (!app.isPackaged) return;
+  for (const name of REMOTE_DEBUGGING_SWITCHES) app.commandLine.removeSwitch(name);
+}
 
 /**
  * The renderer's Content-Security-Policy.
@@ -13,7 +45,7 @@ import { getMainWindow } from './window';
  * The header is the one that matters: a `<meta>` policy only takes effect from
  * the point in the document where it is parsed, so anything that manages to get
  * markup in ahead of it is unconstrained. Confirmed to apply to `file://`
- * documents on Electron 41, which is how the packaged renderer is loaded.
+ * documents on Electron 44, which is how the packaged renderer is loaded.
  *
  * `style-src` needs `unsafe-inline` because React sets inline styles;
  * `script-src` deliberately does not, so there is no `eval` and no inline
@@ -36,7 +68,8 @@ function contentSecurityPolicy(dev: boolean): string {
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
     "img-src 'self' data: https:",
-    "connect-src 'self' https:",
+    // The page asks the main process for everything and fetches nothing itself.
+    "connect-src 'self'",
   ].join('; ');
 }
 
@@ -68,6 +101,28 @@ export function installContentSecurityPolicy(): void {
       },
     });
   });
+}
+
+/**
+ * Refuse every permission a page can ask the browser for, bar the one in use.
+ *
+ * Electron grants whatever is asked when nobody answers: camera, microphone,
+ * location, notifications. The launcher's own page asks for one thing, to put
+ * the log on the clipboard, and the Microsoft sign-in window — which loads
+ * pages that are not ours, in this same session — has no business with any.
+ */
+export function installPermissionPolicy(): void {
+  const granted = (contents: WebContents | null, permission: string): boolean =>
+    permission === 'clipboard-sanitized-write' &&
+    contents !== null &&
+    contents === getMainWindow()?.webContents;
+
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
+    callback(granted(contents, permission));
+  });
+  session.defaultSession.setPermissionCheckHandler((contents, permission) =>
+    granted(contents, permission),
+  );
 }
 
 /**

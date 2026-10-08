@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
@@ -6,12 +8,14 @@ import { promisify } from 'node:util';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { ADOPTIUM_API } from '../../shared/constants';
-import { verifyDownload } from '../mods/integrity';
 import { parseJavaVersion } from '../minecraft/java-requirement';
-import { LaunchRefusedError } from '../minecraft/launch-errors';
-import { getMainWindow } from '../../main/window';
+import { RefusedError } from '../util/refusal';
+import { emitProgress } from '../util/progress';
 import { downloadToFile } from '../net/download';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
+import { forEachConcurrently } from '../util/concurrency';
+import { serializeByKey } from '../util/serialize';
+import { systemTool } from '../util/system-tool';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
 
 const execFileAsync = promisify(execFile);
@@ -72,7 +76,10 @@ function getManagedJavaPath(majorVersion: number): string {
  */
 export async function probeJava(binPath: string): Promise<number | null> {
   try {
-    const { stderr } = await execFileAsync(binPath, ['-version'], { timeout: 5000 });
+    const { stderr } = await execFileAsync(binPath, ['-version'], {
+      timeout: 5000,
+      windowsHide: true,
+    });
     return parseJavaVersion(stderr);
   } catch {
     return null;
@@ -99,7 +106,7 @@ export async function resolveChosenJava(
 ): Promise<JavaInstallation> {
   const version = await probeJava(binPath);
   if (version === null) {
-    throw new LaunchRefusedError(
+    throw new RefusedError(
       { key: 'launchError.javaNotRuntime', vars: { path: binPath } },
       `This profile is set to launch with ${binPath}, and that is not a Java runtime this ` +
         `machine can run. Point it somewhere else in the profile editor, or clear the field to ` +
@@ -107,7 +114,7 @@ export async function resolveChosenJava(
     );
   }
   if (version < requiredVersion) {
-    throw new LaunchRefusedError(
+    throw new RefusedError(
       {
         key: 'launchError.javaTooOld',
         vars: { path: binPath, found: version, required: requiredVersion },
@@ -126,30 +133,73 @@ export async function resolveChosenJava(
       `Profile Java ${version} at ${binPath} is newer than the ${requiredVersion} asked for`,
     );
   }
-  return { version, path: binPath, vendor: 'chosen in the profile', managed: false };
+  return { version, path: binPath, vendor: 'chosen in the profile' };
 }
 
 // ── Detect system Java ─────────────────────────────────────
 
-export async function detectSystemJava(): Promise<JavaInstallation[]> {
-  const installations: JavaInstallation[] = [];
+/** Folders under Program Files that hold one runtime per subfolder. */
+const WINDOWS_JAVA_VENDORS = new Set(
+  [
+    'Java',
+    'Eclipse Adoptium',
+    'Eclipse Foundation',
+    'AdoptOpenJDK',
+    'Amazon Corretto',
+    'BellSoft',
+    'Microsoft',
+    'OpenJDK',
+    'RedHat',
+    'Semeru',
+    'Zulu',
+  ].map((name) => name.toLowerCase()),
+);
 
+/** A folder that is itself a runtime: `jdk-21`, `jre1.8.0_401`, `zulu-17`. */
+const RUNTIME_FOLDER = /^(java|jdk|jre|openjdk|temurin|zulu|corretto|liberica|semeru)/i;
+
+async function subfolders(dir: string): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Where a JVM may be under one Program Files folder.
+ *
+ * Every vendor's installer nests one level: `Java\jdk-21\bin`,
+ * `Zulu\zulu-21\bin`, `Eclipse Adoptium\jdk-21.0.2.13-hotspot\bin`. Looking
+ * for `bin\java.exe` directly inside the vendor's folder found none of them, so
+ * on Windows the list in the profile editor only ever held whatever `JAVA_HOME`
+ * named.
+ */
+export async function windowsJavaCandidates(programFiles: string): Promise<string[]> {
+  const candidates: string[] = [];
+  for (const entry of await subfolders(programFiles)) {
+    const dir = path.join(programFiles, entry);
+    if (RUNTIME_FOLDER.test(entry)) candidates.push(path.join(dir, 'bin', 'java.exe'));
+    if (!WINDOWS_JAVA_VENDORS.has(entry.toLowerCase())) continue;
+    for (const runtime of await subfolders(dir)) {
+      candidates.push(path.join(dir, runtime, 'bin', 'java.exe'));
+    }
+  }
+  return candidates;
+}
+
+/** How many JVMs are asked for their version at once. Each is a process. */
+const PROBES_AT_ONCE = 4;
+
+export async function detectSystemJava(): Promise<JavaInstallation[]> {
   const candidates: string[] = [];
 
   if (process.platform === 'win32') {
     const programFiles = process.env.ProgramFiles ?? 'C:\\Program Files';
     const programFilesX86 = process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)';
     for (const base of [programFiles, programFilesX86]) {
-      try {
-        const entries = await fs.readdir(base);
-        for (const entry of entries) {
-          if (/^(java|jdk|jre|adopt|temurin|zulu|corretto)/i.test(entry)) {
-            candidates.push(path.join(base, entry, 'bin', 'java.exe'));
-          }
-        }
-      } catch {
-        /* dir doesn't exist */
-      }
+      candidates.push(...(await windowsJavaCandidates(base)));
     }
   } else {
     // Linux/macOS common paths
@@ -159,14 +209,8 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
       '/usr/lib/jvm/default/bin/java',
       '/usr/lib/jvm/java/bin/java',
     );
-    // Add all /usr/lib/jvm entries
-    try {
-      const jvmEntries = await fs.readdir('/usr/lib/jvm');
-      for (const entry of jvmEntries) {
-        candidates.push(path.join('/usr/lib/jvm', entry, 'bin', 'java'));
-      }
-    } catch {
-      /* no jvm dir */
+    for (const entry of await subfolders('/usr/lib/jvm')) {
+      candidates.push(path.join('/usr/lib/jvm', entry, 'bin', 'java'));
     }
   }
 
@@ -175,32 +219,41 @@ export async function detectSystemJava(): Promise<JavaInstallation[]> {
     candidates.push(path.join(process.env.JAVA_HOME, 'bin', getJavaExecutable()));
   }
 
+  // One entry per real file: `/usr/bin/java` and three names under
+  // `/usr/lib/jvm` are routinely the same runtime.
   const seen = new Set<string>();
+  const distinct: string[] = [];
   for (const candidate of candidates) {
     try {
       const resolved = await fs.realpath(candidate);
       if (seen.has(resolved)) continue;
       seen.add(resolved);
-
-      const version = await probeJava(candidate);
-      if (version) {
-        installations.push({
-          version,
-          path: candidate,
-          vendor: 'system',
-          managed: false,
-        });
-      }
+      distinct.push(candidate);
     } catch {
       /* realpath failed — nothing there */
     }
   }
 
-  return installations;
+  // Several at a time, and still listed in the order they were found: asking
+  // one JVM after another took a second or more per runtime before the list
+  // appeared.
+  const versions = new Array<number | null>(distinct.length).fill(null);
+  await forEachConcurrently(
+    distinct.map((candidate, index) => ({ candidate, index })),
+    PROBES_AT_ONCE,
+    async ({ candidate, index }) => {
+      versions[index] = await probeJava(candidate);
+    },
+  );
+
+  return distinct.flatMap((candidate, index) => {
+    const version = versions[index];
+    return version ? [{ version, path: candidate, vendor: 'system' }] : [];
+  });
 }
 
 function emitJavaProgress(event: ProgressEvent): void {
-  getMainWindow()?.webContents.send('progress:java-download', event);
+  emitProgress('progress:java-download', event);
 }
 
 // ── Download & install from Adoptium ───────────────────────
@@ -232,32 +285,39 @@ async function resolveAdoptiumBinary(
   arch: string,
   signal?: AbortSignal,
 ): Promise<{ url: string; sha256: string }> {
-  const query = new URLSearchParams({
-    architecture: arch,
-    image_type: 'jre',
-    os: platform,
-    vendor: 'eclipse',
-  });
-  const res = await fetch(`${ADOPTIUM_API}/assets/latest/${majorVersion}/hotspot?${query}`, {
-    signal: withTimeout(signal, 15_000),
-  });
-  if (!res.ok) {
-    throw new Error(`Could not reach Adoptium to resolve JRE ${majorVersion}: HTTP ${res.status}`);
+  // A JRE where there is one, the JDK where there is not. Temurin published
+  // Java 16 as a JDK only, and 16 is what Minecraft 1.17 and 1.17.1 ask for: with
+  // the JRE the only thing asked about, neither version could be started, and no
+  // Forge or NeoForge build for them could even be installed.
+  for (const imageType of ['jre', 'jdk']) {
+    const query = new URLSearchParams({
+      architecture: arch,
+      image_type: imageType,
+      os: platform,
+      vendor: 'eclipse',
+    });
+    const res = await fetch(`${ADOPTIUM_API}/assets/latest/${majorVersion}/hotspot?${query}`, {
+      signal: withTimeout(signal, 15_000),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Could not reach Adoptium to resolve Java ${majorVersion}: HTTP ${res.status}`,
+      );
+    }
+
+    const assets = (await res.json()) as AdoptiumAsset[];
+    const pkg = assets.find((a) => a.binary?.package?.link)?.binary?.package;
+    if (!pkg?.link) continue;
+    if (!pkg.checksum) {
+      throw new Error(
+        `Adoptium listed Java ${majorVersion} for ${platform}/${arch} with no checksum — ` +
+          'refusing to install a runtime that cannot be verified',
+      );
+    }
+    return { url: pkg.link, sha256: pkg.checksum };
   }
 
-  const assets = (await res.json()) as AdoptiumAsset[];
-  const pkg = assets.find((a) => a.binary?.package?.link)?.binary?.package;
-  if (!pkg?.link) {
-    throw new Error(`Adoptium listed no JRE ${majorVersion} binary for ${platform}/${arch}`);
-  }
-  if (!pkg.checksum) {
-    throw new Error(
-      `Adoptium listed JRE ${majorVersion} for ${platform}/${arch} with no checksum — ` +
-        'refusing to install a runtime that cannot be verified',
-    );
-  }
-
-  return { url: pkg.link, sha256: pkg.checksum };
+  throw new Error(`Adoptium listed no Java ${majorVersion} runtime for ${platform}/${arch}`);
 }
 
 async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Promise<string> {
@@ -273,6 +333,7 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
     operationId: `java-${majorVersion}`,
     progress: 0,
     message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
+    installing: true,
   });
 
   const tmpFile = path.join(paths.cacheDir, `jre-${majorVersion}.${ext}`);
@@ -292,6 +353,9 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
     // held to https as well; the resolver's URL already is, and loopback stays
     // allowed for a mirror served locally.
     secure: true,
+    // The resolver guarantees a checksum, so the archive is never on disk under
+    // its name unless it is the one Adoptium published.
+    verify: { hashes: { sha256 }, label: `JRE ${majorVersion}` },
     onProgress: (bytes, declared) => {
       received = bytes;
       total = declared;
@@ -305,14 +369,10 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
         message: { key: 'progress.msg.javaDownloading', vars: { version: majorVersion } },
         bytesDownloaded: bytes,
         bytesTotal: declared,
+        installing: true,
       });
     },
   });
-
-  // Deletes the archive and throws on mismatch. Everything inside it is about
-  // to be extracted and then run as the JVM for every launch, and the resolver
-  // guarantees a checksum, so this always runs.
-  await verifyDownload(tmpFile, { sha256 }, `JRE ${majorVersion}`);
 
   emitJavaProgress({
     operationId: `java-${majorVersion}`,
@@ -326,37 +386,58 @@ async function downloadAdoptium(majorVersion: number, signal?: AbortSignal): Pro
   return tmpFile;
 }
 
+/**
+ * Unpack a runtime archive into `destDir`, replacing what is there.
+ *
+ * Unpacked beside the destination and swapped in once it is whole. It used to
+ * begin by deleting the destination and unpack into it, so a launcher closed
+ * mid-way left `bin/java` in place with half the runtime missing.
+ */
 async function extractArchive(
   archivePath: string,
   destDir: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  await fs.rm(destDir, { recursive: true, force: true });
-  await fs.mkdir(destDir, { recursive: true });
+  const staging = `${destDir}.new`;
+  await fs.rm(staging, { recursive: true, force: true });
+  await fs.mkdir(staging, { recursive: true });
 
-  // `tar` handles the zip too: Windows 10 1803 and later ship bsdtar, which
-  // reads zip archives. The `else` is not decoration — without it an extension
-  // this does not recognise made the whole function a silent no-op, and the
-  // failure surfaced several steps later as "installed JRE but failed to
-  // verify", which points at the wrong thing entirely.
-  if (archivePath.endsWith('.tar.gz')) {
-    await execFileAsync('tar', ['-xzf', archivePath, '-C', destDir, '--strip-components=1'], {
-      signal,
-    });
-  } else if (archivePath.endsWith('.zip')) {
-    await execFileAsync('tar', ['-xf', archivePath, '-C', destDir, '--strip-components=1'], {
-      signal,
-    });
-  } else {
-    throw new Error(`Cannot extract ${path.basename(archivePath)}: unrecognised archive type`);
-  }
-
-  // Ensure bin/java is executable
-  const javaExec = path.join(destDir, 'bin', getJavaExecutable());
   try {
-    await fs.chmod(javaExec, 0o755);
-  } catch {
-    /* Windows doesn't need chmod */
+    // `tar` handles the zip too: Windows 10 1803 and later ship bsdtar, which
+    // reads zip archives — and it is that one which is started, by where
+    // Windows keeps it: see `systemTool`. The `else` is not decoration — without it an extension
+    // this does not recognise made the whole function a silent no-op, and the
+    // failure surfaced several steps later as "installed JRE but failed to
+    // verify", which points at the wrong thing entirely.
+    const unpack = archivePath.endsWith('.tar.gz')
+      ? '-xzf'
+      : archivePath.endsWith('.zip')
+        ? '-xf'
+        : null;
+    if (!unpack) {
+      throw new Error(`Cannot extract ${path.basename(archivePath)}: unrecognised archive type`);
+    }
+    await execFileAsync(
+      systemTool('tar'),
+      [unpack, archivePath, '-C', staging, '--strip-components=1'],
+      {
+        signal,
+        windowsHide: true,
+      },
+    );
+
+    // Ensure bin/java is executable
+    try {
+      await fs.chmod(path.join(staging, 'bin', getJavaExecutable()), 0o755);
+    } catch {
+      /* Windows doesn't need chmod */
+    }
+
+    await fs.rm(destDir, { recursive: true, force: true });
+    await fs.rename(staging, destDir);
+  } catch (err) {
+    await fs.rm(staging, { recursive: true, force: true });
+    throw err;
   }
 
   // Clean up archive
@@ -367,22 +448,22 @@ async function extractArchive(
 // ── Public API ─────────────────────────────────────────────
 
 /**
- * Ensure a specific Java major version is available.
- * Downloads from Adoptium if not already installed.
- * Returns the installation info.
- */
-/**
  * Ensure a specific Java major version is available, downloading it from
  * Adoptium when it is not.
  *
  * "Already installed" used to mean nothing more than `bin/java` being present
  * and executable, and the `-version` check ran only on the freshly-extracted
- * path. But `extractArchive` starts by deleting the destination, so an
- * interrupted extraction can leave exactly that: the launcher binary in place
- * and half the runtime missing. Every later launch then took the short path,
- * said "already installed", and died inside the JVM with an error naming none of
- * this. Proving the runtime actually starts costs one short subprocess per
- * launch and is the only way to tell the two states apart.
+ * path. An interrupted extraction could leave exactly that: the launcher binary
+ * in place and half the runtime missing. Every later launch then took the short
+ * path, said "already installed", and died inside the JVM with an error naming
+ * none of this. Proving the runtime actually starts costs one short subprocess
+ * per launch and is the only way to tell the two states apart.
+ *
+ * One install per version at a time. Two profiles that need the same missing
+ * runtime are got ready at once whenever the player presses Play on both, and
+ * the second used to find it missing while the first was still unpacking,
+ * download the same archive over it and replace the directory — which by then
+ * the first profile's game could be running from.
  */
 export async function ensureJavaVersion(
   majorVersion: number,
@@ -394,23 +475,25 @@ export async function ensureJavaVersion(
     version: majorVersion,
     path: javaPath,
     vendor: 'Adoptium Temurin',
-    managed: true,
   };
 
-  if (await runtimeWorks(javaPath)) {
-    log.info(`Java ${majorVersion} already installed at ${javaPath}`);
+  return serializeByKey(`java:${dir}`, async () => {
+    // Asked here, inside the turn: whoever held it before may have installed it.
+    if (await runtimeWorks(javaPath)) {
+      log.info(`Java ${majorVersion} already installed at ${javaPath}`);
+      return installation;
+    }
+
+    throwIfCancelled(signal, 'Java install');
+    const archivePath = await downloadAdoptium(majorVersion, signal);
+    throwIfCancelled(signal, 'Java install');
+    await extractArchive(archivePath, dir, signal);
+
+    if (!(await runtimeWorks(javaPath))) {
+      throw new Error(`Installed JRE ${majorVersion} but it does not run`);
+    }
     return installation;
-  }
-
-  throwIfCancelled(signal, 'Java install');
-  const archivePath = await downloadAdoptium(majorVersion, signal);
-  throwIfCancelled(signal, 'Java install');
-  await extractArchive(archivePath, dir, signal);
-
-  if (!(await runtimeWorks(javaPath))) {
-    throw new Error(`Installed JRE ${majorVersion} but it does not run`);
-  }
-  return installation;
+  });
 }
 
 /** Does this path start a JVM? The one question that separates a usable runtime
@@ -418,7 +501,10 @@ export async function ensureJavaVersion(
 async function runtimeWorks(javaPath: string): Promise<boolean> {
   try {
     await fs.access(javaPath, fss.constants.X_OK);
-    const { stderr } = await execFileAsync(javaPath, ['-version'], { timeout: 10000 });
+    const { stderr } = await execFileAsync(javaPath, ['-version'], {
+      timeout: 10000,
+      windowsHide: true,
+    });
     log.info(`Verified Java ${parseJavaVersion(stderr)} at ${javaPath}`);
     return true;
   } catch {

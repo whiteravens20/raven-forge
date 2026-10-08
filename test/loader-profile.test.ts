@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,9 +11,10 @@ import type { VersionMeta } from '../src/core/minecraft/types';
  *
  * A loader install leaves a partial version meta on disk: its own `mainClass`,
  * its own libraries, and an `inheritsFrom` pointing at the vanilla version it
- * extends. Skipping it does not fail — it launches plain vanilla, with the
- * player's mods sitting in `mods/` doing nothing and no error anywhere. That
- * silence is why this is worth pinning.
+ * extends. Launching without it does not fail on its own — the game starts as
+ * plain vanilla, with the player's mods sitting in `mods/` doing nothing and no
+ * error anywhere. So a modded profile with nothing to merge is refused here,
+ * and that refusal is what these pin.
  */
 
 let root: string;
@@ -46,7 +49,6 @@ let mod: LoaderProfile;
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-loader-'));
   process.env.RAVENFORGE_DATA_DIR = root;
-  getVersionMeta.mockClear();
 
   vi.resetModules();
   const { reloadDataRoot } = await import('../src/core/config/data-root');
@@ -80,8 +82,12 @@ describe('resolveLaunchMeta', () => {
     expect(await mod.resolveLaunchMeta('vanilla', undefined, '1.21.4', vanilla)).toBe(vanilla);
   });
 
-  it('leaves a loader with no version pinned alone too', async () => {
-    expect(await mod.resolveLaunchMeta('fabric', undefined, '1.21.4', vanilla)).toBe(vanilla);
+  it('refuses a modded profile that has no loader version', async () => {
+    // It used to come back as vanilla, which is how a profile left on "latest"
+    // started without its loader.
+    await expect(mod.resolveLaunchMeta('fabric', undefined, '1.21.4', vanilla)).rejects.toThrow(
+      /No Fabric version was chosen/,
+    );
   });
 
   it('swaps in the loader main class and its libraries', async () => {
@@ -93,19 +99,20 @@ describe('resolveLaunchMeta', () => {
     expect(merged.libraries.map((l) => l.name)).toContain('com.mojang:logging:1.0.0');
   });
 
-  it('falls back to vanilla when the loader was never installed', async () => {
-    // Not a crash and not a lie: the launch goes ahead as vanilla, and the log
-    // line is the only place this is visible.
-    const merged = await mod.resolveLaunchMeta('fabric', '0.17.2', '1.21.4', vanilla);
-    expect(merged).toBe(vanilla);
+  it('refuses when the loader was never installed', async () => {
+    await expect(mod.resolveLaunchMeta('fabric', '0.17.2', '1.21.4', vanilla)).rejects.toThrow(
+      /Fabric 0\.17\.2 is not installed for Minecraft 1\.21\.4/,
+    );
   });
 
-  it('falls back to vanilla when the profile on disk will not parse', async () => {
+  it('refuses when the profile on disk will not parse', async () => {
     const dir = path.join(root, 'loaders', 'fabric', '1.21.4-0.17.2');
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, 'fabric-profile.json'), '{ truncated');
 
-    expect(await mod.resolveLaunchMeta('fabric', '0.17.2', '1.21.4', vanilla)).toBe(vanilla);
+    await expect(mod.resolveLaunchMeta('fabric', '0.17.2', '1.21.4', vanilla)).rejects.toThrow(
+      /is not installed/,
+    );
   });
 
   it('does not go back to the network for the version already in hand', async () => {
@@ -128,7 +135,32 @@ describe('resolveLaunchMeta', () => {
     expect(getVersionMeta).not.toHaveBeenCalled();
     expect(merged.mainClass).toBe('net.fabricmc.loader.impl.launch.knot.KnotClient');
   });
+});
 
+describe('readLoaderProfile', () => {
+  it('reads what an install left', async () => {
+    await writeProfile('fabric', '0.17.2', fabricProfile);
+    expect((await mod.readLoaderProfile('fabric', '0.17.2', '1.21.4'))?.mainClass).toBe(
+      'net.fabricmc.loader.impl.launch.knot.KnotClient',
+    );
+  });
+
+  it('counts a profile with no main class as not there', async () => {
+    // Merged over vanilla it would leave vanilla's own main class in place,
+    // which is the silent no-mods launch by another route.
+    await writeProfile('fabric', '0.17.2', { inheritsFrom: '1.21.4', libraries: [] });
+    expect(await mod.readLoaderProfile('fabric', '0.17.2', '1.21.4')).toBeNull();
+  });
+
+  it('counts a file that is not JSON as not there', async () => {
+    const dir = path.join(root, 'loaders', 'neoforge', '1.21.4-21.4.156');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'neoforge-profile.json'), '');
+    expect(await mod.readLoaderProfile('neoforge', '21.4.156', '1.21.4')).toBeNull();
+  });
+});
+
+describe('resolveLaunchMeta, as a path', () => {
   it('refuses a loader version that is not a path component', async () => {
     // It becomes a directory name. `../../` here used to read a profile JSON
     // from anywhere on disk.

@@ -1,12 +1,14 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useState } from 'react';
 import { ExternalLink, Info, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useT } from '@renderer/i18n';
-
-const api = window.ravenforge;
+import { openLink } from '@renderer/open';
 
 const DISMISS_KEY = 'rf-bedrock-card-dismissed';
-const BEDROCK_URL = 'https://www.minecraft.net/en-us/download';
+// Without the locale segment: left off, the site sends each visitor to their own.
+const BEDROCK_URL = 'https://www.minecraft.net/download';
 
 /**
  * Raven Forge is a Java Edition launcher and will stay one — Bedrock ships as a
@@ -43,7 +45,7 @@ export function BedrockInfoCard() {
             size="sm"
             icon={<ExternalLink size={12} />}
             className="mt-2.5"
-            onClick={() => void api.system.openUrl(BEDROCK_URL)}
+            onClick={() => void openLink(BEDROCK_URL)}
           >
             {t('bedrock.open')}
           </Button>

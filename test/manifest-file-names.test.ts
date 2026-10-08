@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import { isSafeFileName, fileNameFromUrl, modEntrySchema } from '../src/shared/manifest-schema';
@@ -41,10 +43,10 @@ describe('isSafeFileName', () => {
   });
 
   it('keeps every accepted name inside the directory it is joined to', () => {
-    const dir = '/home/u/.raven-forge/profiles/p/mods';
+    const dir = path.normalize('/home/u/.raven-forge/profiles/p/mods');
     for (const name of ['a.jar', '.x', '...jar', 'a b.jar', 'a..b.jar']) {
       expect(isSafeFileName(name)).toBe(true);
-      expect(path.join(dir, name).startsWith(`${dir}/`)).toBe(true);
+      expect(path.join(dir, name).startsWith(`${dir}${path.sep}`)).toBe(true);
     }
   });
 });
@@ -59,6 +61,14 @@ describe('modEntrySchema', () => {
   it('refuses the whole entry rather than repairing the name', () => {
     const parsed = modEntrySchema.safeParse({ ...base, fileName: '../../evil.jar' });
     expect(parsed.success).toBe(false);
+  });
+
+  it('takes an entry that still says `required`, and makes nothing of it', () => {
+    // Published manifests carry the word. Nothing in the launcher ever acted on
+    // it — every mod can be switched off — so it is read past, not refused.
+    const parsed = modEntrySchema.safeParse({ ...base, required: false });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).not.toHaveProperty('required');
   });
 });
 

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -63,7 +65,6 @@ vi.mock('electron', () => ({
       webRequest: { onHeadersReceived: () => {} },
     },
   },
-  safeStorage: { isEncryptionAvailable: () => false },
   BrowserWindow: class {},
   nativeTheme: { on: () => {} },
 }));

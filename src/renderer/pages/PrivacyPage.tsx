@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { ShieldCheck, ExternalLink, FolderOpen } from 'lucide-react';
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
+import { ShieldCheck, ExternalLink } from 'lucide-react';
 import {
   MS_AUTH_BASE,
   XBOX_AUTH_URL,
@@ -11,14 +12,16 @@ import {
   FABRIC_META_API,
   QUILT_META_API,
   FORGE_MAVEN_ROOT,
+  FORGE_PROMOTIONS_URL,
   NEOFORGE_MAVEN_ROOT,
   MODRINTH_API_BASE,
+  MODRINTH_CDN_HOST,
 } from '@shared/constants';
 import { WHITE_RAVENS_PACKS_URL, privacyPolicyUrl } from '@shared/branding';
 import { useSettingsStore } from '@stores/settings-store';
+import { StorageMap } from '@components/StorageMap';
 import { useT, useLocale, type TranslationKey } from '@renderer/i18n';
-
-const api = window.ravenforge;
+import { openLink } from '@renderer/open';
 
 /**
  * What this page is for.
@@ -27,12 +30,12 @@ const api = window.ravenforge;
  * this is deliberately not a copy of it — a second copy of a document is a
  * document that will disagree with the first one within two releases.
  *
- * It answers the same question about *this* install instead: the real data
- * directory, the feed addresses actually configured, and a destination list
- * built from the very constants the networking code fetches from. Change an
- * endpoint and this page changes with it; add one and it will be missing here,
- * which is the failure mode worth having, because it is the only one a reader
- * can spot.
+ * It answers the same question about *this* install instead: every place the
+ * launcher has written to on this disk, measured; the feed addresses actually
+ * configured; and a destination list built from the constants the networking
+ * code fetches from. Change an endpoint and this page changes with it; add one
+ * and it will be missing here, which is the failure mode worth having, because
+ * it is the only one a reader can spot.
  */
 
 /** `https://api.modrinth.com/v2` → `api.modrinth.com`. */
@@ -79,6 +82,7 @@ const DESTINATIONS: readonly Destination[] = [
       host(FABRIC_META_API),
       host(QUILT_META_API),
       host(FORGE_MAVEN_ROOT),
+      host(FORGE_PROMOTIONS_URL),
       host(NEOFORGE_MAVEN_ROOT),
     ],
     when: 'privacy.dest.loaders.when',
@@ -86,7 +90,8 @@ const DESTINATIONS: readonly Destination[] = [
   },
   {
     who: 'privacy.dest.modrinth.who',
-    hosts: [host(MODRINTH_API_BASE)],
+    // The API, and the host the files and icons it points at are served from.
+    hosts: [host(MODRINTH_API_BASE), MODRINTH_CDN_HOST],
     when: 'privacy.dest.modrinth.when',
     sends: 'privacy.dest.modrinth.sends',
     notable: true,
@@ -111,20 +116,6 @@ export function PrivacyPage() {
   const t = useT();
   const locale = useLocale();
   const settings = useSettingsStore((s) => s.settings);
-
-  const [dataDir, setDataDir] = useState('');
-  useEffect(() => {
-    void api.system.getInfo().then((r) => {
-      if (r.success && r.data) setDataDir(r.data.dataDirectory);
-    });
-  }, []);
-
-  const openDataFolder = async () => {
-    const result = await api.system.getInfo();
-    if (result.success && result.data) {
-      await api.system.openPath(result.data.dataDirectory);
-    }
-  };
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-6">
@@ -158,33 +149,9 @@ export function PrivacyPage() {
 
       <Section title={t('privacy.local.title')}>
         <p className="text-sm leading-relaxed text-rf-text-secondary">{t('privacy.local.body')}</p>
-        {/* The actual path, not a per-OS table someone has to match themselves. */}
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rf-border bg-rf-surface px-3 py-2">
-          <code className="flex-1 break-all font-mono text-xs text-rf-text-secondary">
-            {dataDir || '…'}
-          </code>
-          <button
-            onClick={() => void openDataFolder()}
-            className="flex shrink-0 items-center gap-1 text-sm text-rf-accent-text hover:underline"
-          >
-            <FolderOpen size={14} />
-            {t('common.openFolder')}
-          </button>
-        </div>
-        <ul className="space-y-1.5">
-          {(
-            [
-              'privacy.local.profiles',
-              'privacy.local.settings',
-              'privacy.local.accounts',
-              'privacy.local.logs',
-              'privacy.local.crashes',
-            ] as const
-          ).map((key) => (
-            <Item key={key}>{t(key)}</Item>
-          ))}
-        </ul>
-        <p className="text-xs leading-relaxed text-rf-text-muted">{t('privacy.local.keychain')}</p>
+        {/* Read off the disk, not written down: one path and "everything is in
+            it" was true of a default install and of nothing else. */}
+        <StorageMap />
       </Section>
 
       <Section title={t('privacy.dest.title')}>
@@ -234,6 +201,11 @@ export function PrivacyPage() {
               'privacy.control.offline',
               'privacy.control.feeds',
               'privacy.control.proxy',
+              'privacy.control.discord',
+              'privacy.control.packs',
+              'privacy.control.updates',
+              'privacy.control.diagnostics',
+              'privacy.control.location',
               'privacy.control.delete',
             ] as const
           ).map((key) => (
@@ -244,7 +216,7 @@ export function PrivacyPage() {
 
       <footer className="flex flex-col gap-2 border-t border-rf-border pt-4">
         <button
-          onClick={() => void api.system.openUrl(privacyPolicyUrl(locale))}
+          onClick={() => void openLink(privacyPolicyUrl(locale))}
           className="flex items-center gap-1.5 self-start text-sm text-rf-accent-text hover:underline"
         >
           <ExternalLink size={14} />

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,7 +40,7 @@ vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 vi.mock('../src/core/config/settings-manager', () => ({
-  getSettings: async () => ({ trustedPublicKeys: [], autoRemoveOrphanedMods: true }),
+  getSettings: async () => ({ trustedPublicKeys: [], downloadConcurrency: 1 }),
 }));
 vi.mock('../src/core/profiles/profile-manager', () => ({ getProfile: async () => profile }));
 vi.mock('../src/core/mods/content-manager', () => ({ syncContentFromManifest: async () => {} }));

@@ -1,12 +1,18 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useState, useCallback, useEffect } from 'react';
-import { Search, Download, Package, RefreshCw, ArrowUpCircle } from 'lucide-react';
+import { Search, Download, Package, RefreshCw, ArrowUpCircle, FilePlus } from 'lucide-react';
+import { usePagedSearch } from '@hooks/use-paged-search';
+import { InstalledEntryInfo, SearchPager, SearchResultRow } from '@components/SearchResults';
+import { projectKey, useProjectDetails } from '@hooks/use-project-details';
 import { useProfileStore } from '@stores/profile-store';
+import { useGameStore } from '@stores/game-store';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Switch } from '@components/ui/Switch';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
-import { useLocale, useT } from '@renderer/i18n';
+import { useT } from '@renderer/i18n';
 import {
   SearchFilters,
   EMPTY_FILTERS,
@@ -17,6 +23,7 @@ import { CompatibilityBadge } from '@components/CompatibilityBadge';
 import { CompatibilityDialog } from '@components/CompatibilityDialog';
 import { InstalledMark } from '@components/InstalledMark';
 import { isClientModLoader } from '@shared/constants';
+import { isProject } from '@shared/mod-identity';
 import type {
   FacetGroups,
   InstallPlan,
@@ -31,31 +38,52 @@ const NO_FACETS: FacetGroups = { loaders: [], groups: [], gameVersions: [] };
 
 export function ModsPage() {
   const profiles = useProfileStore((s) => s.profiles);
+  const profilesLoaded = useProfileStore((s) => s.loaded);
   const selectedId = useProfileStore((s) => s.selectedProfileId);
 
   const t = useT();
-  const locale = useLocale();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ModSearchResult[]>([]);
+  const search = usePagedSearch();
+  const { results, searching, searched } = search;
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
-  const [searching, setSearching] = useState(false);
   const [tab, setTab] = useState<'installed' | 'browse'>('installed');
   const [error, setError] = useState<string | null>(null);
   const [facets, setFacets] = useState<FacetGroups>(NO_FACETS);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
-  /** Set once a search has run, so the "nothing matched" line waits its turn. */
-  const [searched, setSearched] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * The mods something is being done to right now, by id: installed, updated,
+   * switched or removed.
+   *
+   * One set for all four. They were a single slot for installs and a second for
+   * updates, so pressing Install on another mod took the spinner off the first
+   * and left its button live — and a mod could be installed or updated twice at
+   * once, each run deleting the file the other had just written.
+   */
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const working = async (ids: string[], work: () => Promise<void>) => {
+    setBusy((now) => new Set([...now, ...ids]));
+    try {
+      await work();
+    } finally {
+      setBusy((now) => new Set([...now].filter((id) => !ids.includes(id))));
+    }
+  };
+  // The game has the mods folder open, and a launch being prepared is writing
+  // into it. Nothing here changes it underneath either.
+  const gameBusy = useGameStore((s) =>
+    selectedId ? s.running.has(selectedId) || s.preparing.has(selectedId) : false,
+  );
   /** Non-null while a compatibility warning is waiting on a decision. */
   const [plan, setPlan] = useState<{ mod: ModSearchResult; plan: InstallPlan } | null>(null);
   /** Something worth saying that is not a failure — dependencies that arrived. */
   const [note, setNote] = useState<string | null>(null);
+  /** A jar is being asked for, checked and copied in. */
+  const [addingFile, setAddingFile] = useState(false);
   /** The last update check's counts, or null before one has run this session. */
   const [updateCheck, setUpdateCheck] = useState<ModUpdateSummary | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
-  /** Ids being updated right now — a set, so "update all" lights every row. */
-  const [updating, setUpdating] = useState<Set<string>>(new Set());
 
+  const details = useProjectDetails(installed);
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const profileVersion = selectedProfile?.minecraftVersion;
   const profileLoader = selectedProfile?.modLoader;
@@ -63,9 +91,10 @@ export function ModsPage() {
   // whatever named them: a project id when the launcher installed them, a slug
   // when a pack manifest did. A search result carries both, so both are asked —
   // checking the id alone leaves half a pack's mods offered a second time.
-  const installedIds = new Set(installed.map((mod) => mod.id));
+  // By any of the names an entry can go by — a pack's own id for a mod is not
+  // the one the search speaks.
   const isInstalled = (mod: ModSearchResult) =>
-    installedIds.has(mod.id) || installedIds.has(mod.slug);
+    installed.some((entry) => isProject(entry, mod.id) || entry.id === mod.slug);
 
   // The badge is on the entry, put there by the last check, so this needs no
   // second source of truth and no request of its own.
@@ -79,33 +108,26 @@ export function ModsPage() {
     if (!selectedId) return;
     const result = await api.mods.getInstalled(selectedId);
     if (result.success && result.data) setInstalled(result.data);
-  }, [selectedId]);
+    // Said, and the list left as it was: an unread list is not an empty one.
+    else setError(result.error ?? t('mods.listFailed'));
+  }, [selectedId, t]);
 
-  const handleSearch = async () => {
-    setSearching(true);
+  const handleSearch = () => {
     setError(null);
-    try {
-      const result = await api.mods.search({
-        query: query.trim(),
-        // Every constraint comes from the visible filter row. Reading the
-        // version and loader straight off the profile is what made a search for
-        // a mod that exists come back empty with nothing on screen to explain
-        // it — Modrinth ANDs the facets, so "26.2 AND fabric" genuinely has no
-        // Mekanism in it.
-        gameVersion: filters.gameVersion || undefined,
-        // Typed and separate from `categories`, even though Modrinth files
-        // loaders under the same facet key — the profile's loader is a
-        // constraint, not a tag the user picked.
-        loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
-        categories: categoriesWithoutLoader(filters),
-        limit: 20,
-      });
-      if (result.success && result.data) setResults(result.data);
-      else setError(result.error ?? t('mods.searchFailed'));
-      setSearched(true);
-    } finally {
-      setSearching(false);
-    }
+    void search.search({
+      query: query.trim(),
+      // Every constraint comes from the visible filter row. Reading the
+      // version and loader straight off the profile is what made a search for
+      // a mod that exists come back empty with nothing on screen to explain
+      // it — Modrinth ANDs the facets, so "26.2 AND fabric" genuinely has no
+      // Mekanism in it.
+      gameVersion: filters.gameVersion || undefined,
+      // Typed and separate from `categories`, even though Modrinth files
+      // loaders under the same facet key: it is a dropdown of its own in the
+      // filter row, and the build offered for a result is chosen against it.
+      loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
+      categories: categoriesWithoutLoader(filters),
+    });
   };
 
   /**
@@ -117,11 +139,10 @@ export function ModsPage() {
    * returns names the exact build so installing cannot quietly pick another.
    */
   const handleInstall = async (mod: ModSearchResult) => {
-    if (!selectedId) return;
+    if (!selectedId || busy.has(mod.id)) return;
     setError(null);
     setNote(null);
-    setBusyId(mod.id);
-    try {
+    await working([mod.id], async () => {
       const check = await api.mods.checkInstall(selectedId, mod);
       if (!check.success || !check.data) {
         setError(check.error ?? t('mods.installFailed', { name: mod.name }));
@@ -134,8 +155,44 @@ export function ModsPage() {
         return;
       }
       await install(mod, check.data.versionId);
+    });
+  };
+
+  /**
+   * Add a mod the player already has as a jar.
+   *
+   * Which file is asked by the main process, so all this hears back is what it
+   * turned out to be — or nothing, when the dialog was closed.
+   */
+  const handleAddFile = async () => {
+    if (!selectedId || addingFile) return;
+    setError(null);
+    setNote(null);
+    setAddingFile(true);
+    try {
+      const result = await api.mods.addFromFile(selectedId);
+      if (!result.success) {
+        // A refusal is about the file that was picked, and comes with words
+        // for it: what is wrong with it, and what would work instead.
+        setError(
+          result.errorMessage
+            ? t(result.errorMessage.key, result.errorMessage.vars)
+            : (result.error ?? t('mods.addFileFailed')),
+        );
+      } else if (result.data) {
+        const { name, dependencies } = result.data;
+        setNote(
+          dependencies.length > 0
+            ? t('mods.installedWithDeps', { name, deps: dependencies.join(', ') })
+            : t('mods.addedFile', { name }),
+        );
+        // Where it has just appeared.
+        setTab('installed');
+      }
+      // Read again either way: a jar can be in place and what it needs not.
+      await loadInstalled();
     } finally {
-      setBusyId(null);
+      setAddingFile(false);
     }
   };
 
@@ -182,15 +239,17 @@ export function ModsPage() {
     }
   };
 
-  const handleUpdate = async (modIds: string[]) => {
+  const handleUpdate = async (wanted: string[]) => {
+    // Not the ones already on their way: "Update all" pressed after one row's
+    // "Update" used to send that mod a second time.
+    const modIds = wanted.filter((id) => !busy.has(id));
     if (!selectedId || modIds.length === 0) return;
     setError(null);
     setNote(null);
-    setUpdating(new Set(modIds));
-    try {
+    await working(modIds, async () => {
       const result = await api.mods.update(selectedId, modIds);
       if (!result.success || !result.data) {
-        setError(result.error ?? t('mods.checkUpdatesFailed'));
+        setError(result.error ?? t('mods.updateNotDone'));
         return;
       }
       // Both halves get said. A run that updated nine mods and lost one is not
@@ -199,27 +258,46 @@ export function ModsPage() {
       const { updated, failed } = result.data;
       if (updated.length > 0) setNote(t('mods.updated', { names: updated.join(', ') }));
       if (failed.length > 0) {
-        setError(t('mods.updateFailed', { names: failed.map((f) => f.name).join(', ') }));
+        // With the reason each one gave. The names alone said that something
+        // went wrong and left out the only part that says what to do about it.
+        setError(
+          t('mods.updateFailed', {
+            names: failed.map((f) => (f.error ? `${f.name} (${f.error})` : f.name)).join('; '),
+          }),
+        );
       }
       // The counts came from the check, and installing has just invalidated
       // them. The badges below come from the reloaded list, which is current.
       setUpdateCheck(null);
       await loadInstalled();
-    } finally {
-      setUpdating(new Set());
-    }
+    });
   };
 
-  const handleToggle = async (modId: string, enabled: boolean) => {
-    if (!selectedId) return;
-    await api.mods.toggleEnabled(selectedId, modId, enabled);
-    await loadInstalled();
+  // Both used to drop the answer. A switch that could not be flipped — the jar
+  // deleted by hand, or held open by the game on Windows — simply did nothing,
+  // and a mod that could not be removed left the list all the same.
+  const handleToggle = async (mod: InstalledMod, enabled: boolean) => {
+    if (!selectedId || busy.has(mod.id)) return;
+    setError(null);
+    await working([mod.id], async () => {
+      const result = await api.mods.toggleEnabled(selectedId, mod.id, enabled);
+      if (!result.success) {
+        setError(result.error ?? t('mods.toggleFailed', { name: mod.name }));
+      }
+      await loadInstalled();
+    });
   };
 
-  const handleUninstall = async (modId: string) => {
-    if (!selectedId) return;
-    await api.mods.uninstall(selectedId, modId);
-    await loadInstalled();
+  const handleUninstall = async (mod: InstalledMod) => {
+    if (!selectedId || busy.has(mod.id)) return;
+    setError(null);
+    await working([mod.id], async () => {
+      const result = await api.mods.uninstall(selectedId, mod.id);
+      if (!result.success) {
+        setError(result.error ?? t('mods.removeFailed', { name: mod.name }));
+      }
+      await loadInstalled();
+    });
   };
 
   useEffect(() => {
@@ -256,7 +334,7 @@ export function ModsPage() {
   if (!selectedProfile) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-rf-text-muted">
-        {t('mods.pickProfile')}
+        {t(profilesLoaded ? 'mods.pickProfile' : 'profiles.loading')}
       </div>
     );
   }
@@ -279,8 +357,22 @@ export function ModsPage() {
               {t('mods.checkUpdates')}
             </Button>
           )}
+          {/* For what Modrinth does not have: a mod published elsewhere, a
+              build an author handed out. */}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<FilePlus size={14} />}
+            loading={addingFile}
+            disabled={gameBusy}
+            title={gameBusy ? t('mods.gameBusy') : undefined}
+            onClick={() => void handleAddFile()}
+          >
+            {t('content.addFile')}
+          </Button>
           <div className="flex gap-1 rounded-lg border border-rf-border bg-rf-surface p-0.5">
             <button
+              aria-pressed={tab === 'installed'}
               onClick={() => {
                 setTab('installed');
                 loadInstalled();
@@ -294,6 +386,7 @@ export function ModsPage() {
               {t('mods.tabInstalled')}
             </button>
             <button
+              aria-pressed={tab === 'browse'}
               onClick={() => setTab('browse')}
               className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
                 tab === 'browse'
@@ -335,6 +428,9 @@ export function ModsPage() {
             loaderLabel={t('mods.loaderFilter')}
           />
 
+          {search.error !== null && (
+            <Banner type="urgent">{search.error || t('mods.searchFailed')}</Banner>
+          )}
           {error && <Banner type="urgent">{error}</Banner>}
           {note && (
             <Banner type="info" dismissible onDismiss={() => setNote(null)}>
@@ -347,13 +443,11 @@ export function ModsPage() {
       {plan && (
         <CompatibilityDialog
           plan={plan.plan}
-          busy={busyId === plan.mod.id}
           onCancel={() => setPlan(null)}
           onInstall={() => {
             const pending = plan;
             setPlan(null);
-            setBusyId(pending.mod.id);
-            void install(pending.mod, pending.plan.versionId).finally(() => setBusyId(null));
+            void working([pending.mod.id], () => install(pending.mod, pending.plan.versionId));
           }}
         />
       )}
@@ -384,11 +478,14 @@ export function ModsPage() {
                     : t('mods.upToDate')}
                 {updateCheck.unknown > 0 &&
                   ` ${t.plural('mods.unknownToModrinth', updateCheck.unknown)}`}
+                {updateCheck.noBuild > 0 &&
+                  ` ${t.plural('mods.noBuildForProfile', updateCheck.noBuild)}`}
               </p>
               {outdated.length > 1 && (
                 <Button
                   size="sm"
-                  loading={updating.size > 1}
+                  loading={outdated.every((mod) => busy.has(mod.id))}
+                  disabled={gameBusy}
                   onClick={() => void handleUpdate(outdated.map((mod) => mod.id))}
                 >
                   {t('mods.updateAll')}
@@ -405,26 +502,30 @@ export function ModsPage() {
                 key={mod.id}
                 className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"
               >
-                <Package size={18} className="shrink-0 text-rf-text-muted" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-rf-text truncate">{mod.name}</p>
-                  <p className="text-xs text-rf-text-muted">
-                    {mod.version} • {mod.source}
-                    {mod.fromManifest && ` • ${t('mods.fromManifest')}`}
-                    {mod.updateAvailable && (
-                      <span className="text-rf-accent-text">
-                        {' • '}
-                        {t('mods.updateTo', { version: mod.updateAvailable.versionNumber })}
-                      </span>
-                    )}
-                  </p>
-                </div>
+                <InstalledEntryInfo
+                  entry={mod}
+                  details={details[projectKey(mod)]}
+                  fallbackIcon={<Package size={18} className="shrink-0 text-rf-text-muted" />}
+                >
+                  {/* A file off the disk has no version anybody recorded. */}
+                  {mod.source === 'local'
+                    ? t('mods.source.local')
+                    : `${mod.version} • ${t(`mods.source.${mod.source}`)}`}
+                  {mod.fromManifest && ` • ${t('mods.fromManifest')}`}
+                  {mod.updateAvailable && (
+                    <span className="text-rf-accent-text">
+                      {' • '}
+                      {t('mods.updateTo', { version: mod.updateAvailable.versionNumber })}
+                    </span>
+                  )}
+                </InstalledEntryInfo>
                 <div className="flex items-center gap-2">
                   {mod.updateAvailable && (
                     <Button
                       size="sm"
                       icon={<ArrowUpCircle size={14} />}
-                      loading={updating.has(mod.id)}
+                      loading={busy.has(mod.id)}
+                      disabled={gameBusy}
                       onClick={() => void handleUpdate([mod.id])}
                     >
                       {t('mods.update')}
@@ -432,12 +533,24 @@ export function ModsPage() {
                   )}
                   <Switch
                     checked={mod.enabled}
-                    onChange={(next) => handleToggle(mod.id, next)}
+                    onChange={(next) => void handleToggle(mod, next)}
                     label={mod.name}
-                    title={mod.enabled ? t('common.disable') : t('common.enable')}
+                    title={
+                      gameBusy
+                        ? t('mods.gameBusy')
+                        : mod.enabled
+                          ? t('common.disable')
+                          : t('common.enable')
+                    }
+                    disabled={gameBusy || busy.has(mod.id)}
                   />
                   {!mod.fromManifest && (
-                    <Button variant="danger" size="sm" onClick={() => handleUninstall(mod.id)}>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={gameBusy || busy.has(mod.id)}
+                      onClick={() => void handleUninstall(mod)}
+                    >
                       {t('common.remove')}
                     </Button>
                   )}
@@ -458,50 +571,44 @@ export function ModsPage() {
             </p>
           )}
           {results.map((mod) => (
-            <div
+            <SearchResultRow
               key={mod.id}
-              className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"
+              item={mod}
+              action={
+                isInstalled(mod) ? (
+                  <InstalledMark />
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Download size={14} />}
+                    loading={busy.has(mod.id)}
+                    disabled={gameBusy}
+                    title={gameBusy ? t('mods.gameBusy') : undefined}
+                    onClick={() => void handleInstall(mod)}
+                  >
+                    {t('common.install')}
+                  </Button>
+                )
+              }
             >
-              {mod.iconUrl ? (
-                <img src={mod.iconUrl} alt="" className="h-10 w-10 rounded shrink-0" />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded bg-rf-bg-tertiary shrink-0">
-                  <Package size={18} className="text-rf-text-muted" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-rf-text">{mod.name}</p>
-                <p className="text-xs text-rf-text-muted truncate">{mod.description}</p>
-                <p className="text-xs text-rf-text-muted">
-                  {mod.author} •{' '}
-                  {t.plural('mods.downloads', mod.downloads, {
-                    count: mod.downloads.toLocaleString(locale),
-                  })}
-                </p>
-                {/* Judged against the profile, not against the filter row: the
-                    filters can be widened to browse, and what matters is where
-                    the mod is about to land. */}
-                <CompatibilityBadge
-                  item={mod}
-                  gameVersion={profileVersion}
-                  modLoader={profileLoader}
-                />
-              </div>
-              {isInstalled(mod) ? (
-                <InstalledMark />
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<Download size={14} />}
-                  loading={busyId === mod.id}
-                  onClick={() => void handleInstall(mod)}
-                >
-                  {t('common.install')}
-                </Button>
-              )}
-            </div>
+              {/* Judged against the profile, not against the filter row: the
+                  filters can be widened to browse, and what matters is where
+                  the mod is about to land. */}
+              <CompatibilityBadge
+                item={mod}
+                gameVersion={profileVersion}
+                modLoader={profileLoader}
+              />
+            </SearchResultRow>
           ))}
+          <SearchPager
+            shown={results.length}
+            total={search.total}
+            hasMore={search.hasMore}
+            loading={search.loadingMore}
+            onMore={() => void search.loadMore()}
+          />
         </div>
       )}
     </div>

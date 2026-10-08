@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 /**
  * English dictionary — the reference locale.
  *
@@ -39,11 +41,17 @@ export const en = {
   'content.searchPacks': 'Search Modrinth for resource packs…',
   'content.searchFailed': 'Search failed.',
   'content.installFailed': 'Could not install {name}.',
+  'content.addFile': 'Add from a file…',
+  'content.addFileFailed': 'Could not add that file.',
   'content.removeFailed': 'Could not remove that.',
   'content.reorderFailed': 'Could not save the new order.',
+  'content.listFailed': 'Could not read what is installed.',
+  'content.loaderCheckFailed':
+    'The shader pack is installed, but the launcher could not check whether this profile has a shader loader to run it.',
   'content.emptyShaders': 'No shaders installed',
   'content.emptyPacks': 'No resource packs installed',
-  'content.emptyHint': 'Browse to add one, or let a manifest sync bring it in.',
+  'content.emptyHint':
+    'Browse to add one, add a file you already have, or let a manifest sync bring it in.',
   'content.orderHint':
     'Top of the list wins. A pack only changes what the ones below it left alone.',
   'content.moveUp': 'Move {name} up',
@@ -76,6 +84,9 @@ export const en = {
   // ── Search filters (mods, shaders, resource packs) ───────
   'search.gameVersion': 'Minecraft version',
   'search.noResults': 'Nothing matched.',
+  'search.shown': 'Showing {shown} of {total}',
+  'search.loadMore': 'Load more',
+  'search.openProject': 'Open the {name} page on Modrinth',
   'search.noResultsFiltered':
     'Nothing matched. The filters above are ANDed together, so a project with no build for {version} will not appear — widen one of them.',
   'nav.accounts.short': 'Accounts',
@@ -98,14 +109,12 @@ export const en = {
   'common.remove': 'Remove',
   'common.delete': 'Delete',
   'common.edit': 'Edit',
-  'common.duplicate': 'Duplicate',
-  'common.export': 'Export',
-  'common.import': 'Import',
   'common.back': 'Back',
   'common.close': 'Close',
   'common.dismiss': 'Dismiss',
   'common.refresh': 'Refresh',
   'common.openFolder': 'Open folder',
+  'common.openFailed': 'Could not open {what}.',
   'common.copy': 'Copy',
   'common.copied': 'Copied',
   'common.restart': 'Restart',
@@ -116,8 +125,6 @@ export const en = {
   'common.installed': 'Installed',
   'common.enable': 'Enable',
   'common.disable': 'Disable',
-  'common.show': 'Show',
-  'common.hide': 'Hide',
 
   // ── Home ─────────────────────────────────────────────────
   'home.signedInAs': 'Signed in as',
@@ -126,33 +133,66 @@ export const en = {
   'home.notSignedIn': 'Not signed in — go to the Accounts tab',
   'home.noProfiles': 'No profiles — create one in the Profiles tab',
   'home.play': 'PLAY',
+  'home.profile': 'Profile to play',
   'home.running': 'Running…',
   'home.preparing': 'Starting…',
   'home.cancelLaunch': 'Cancel',
+  'home.cancelling': 'Cancelling…',
   'home.stopGame': 'Stop the game',
   'home.stopping': 'Stopping…',
   'home.stopFailed': 'Could not stop the game.',
   'home.authUnreachable':
-    'Could not reach the Microsoft sign-in servers. You can play offline — singleplayer and LAN only, and online-mode servers will refuse the connection.',
+    'The Microsoft sign-in servers could not be reached, or are not answering just now. You can play offline — singleplayer and LAN only, and online-mode servers will refuse the connection.',
   'home.launchOffline': 'Play offline',
   'home.updatingLauncher': 'Updating launcher…',
-  'home.updateBeforePlay': 'Launcher {version} will be installed before the game starts.',
+  'home.updateBeforePlay':
+    'Play installs launcher {version} first: the launcher restarts, and Play has to be pressed once more.',
+  'home.updateNotNow': 'Not now',
   'home.updateFailedPlayAnyway':
     'The launcher update could not be downloaded — the game will start anyway.',
   'home.launchFailed': 'Could not start the game',
   'launchError.alreadyRunning': 'This profile is already running.',
   'launchError.alreadyPreparing': 'This profile is already being prepared for launch.',
+  'launchError.noAccount':
+    'No account is selected. Add one or pick one on the Accounts page, then press Play again.',
+  'launchError.sessionExpired':
+    'The sign-in of this Microsoft account has expired. Sign in again on the Accounts page, then press Play again.',
   'launchError.ramTooBig':
     'This profile allocates {allocated} of RAM and this machine has {total}. Minecraft cannot start with more memory than the machine has — lower it in the profile editor, where {recommended} suits this one.',
+  'launchError.loaderVersionUnknown':
+    'Could not work out which {loader} build to use for Minecraft {version}. Check the connection, or pick a loader version in the profile editor.',
+  'launchError.loaderFileMissing':
+    "The mod loader's file {file} is missing or damaged, and only the loader's installer can make it. Start the profile again with a connection — the loader is then installed again.",
+  'launchError.loaderBuildTooOld':
+    '{loader} is a build from before the kind of install this launcher can do. Pick a newer build of the loader in the profile editor.',
   'launchError.javaNotRuntime':
     'This profile is set to launch with {path}, and that is not a Java runtime this machine can run. Point it somewhere else in the profile editor, or clear the field to use the runtime the launcher installs itself.',
   'launchError.javaTooOld':
     'This profile is set to launch with {path}, which is Java {found}, and this version of Minecraft needs Java {required}. It would start and then stop with an error about class file versions. Clear the field to use the runtime the launcher installs itself.',
-  'home.launchError': 'Error while starting the game',
+  'contentError.notZip': 'That file is not a zip archive.',
+  'contentError.notJar': 'That file is not a mod: a mod is a .jar file.',
+  'contentError.needsLoader':
+    'This profile runs plain Minecraft, which reads no mods. Choose a mod loader for the profile first.',
+  'contentError.wrongLoader':
+    'That mod is made for {made}, and this profile runs {profile}. It would not be loaded.',
+  'contentError.notResourcePack':
+    'That archive is not a resource pack: there is no pack.mcmeta at its top level.',
+  'contentError.nestedResourcePack':
+    'The pack is inside a folder ({folder}) in that archive, and Minecraft only reads one whose pack.mcmeta is at the top level. Zip what is in that folder, not the folder itself.',
+  'contentError.notShaderPack':
+    'That archive is not a shader pack: there is no shaders folder at its top level.',
+  'contentError.nestedShaderPack':
+    'The shader pack is inside a folder ({folder}) in that archive, and it is only read when its shaders folder is at the top level. Zip what is in that folder, not the folder itself.',
+  'contentError.ownedByPack':
+    '{name} is already here, put there by the modpack this profile follows. A sync would put the modpack’s copy back.',
   'home.showConsole': 'Show console',
   'home.hideConsole': 'Hide console',
   'home.news': 'News',
   'home.refreshNews': 'Refresh news and announcements',
+  'home.newsRefreshing': 'Refreshing…',
+  'home.newsRefreshedSame': 'Checked at {time} — nothing new',
+  'home.newsRefreshedNew.one': 'Checked at {time} — {count} new entry',
+  'home.newsRefreshedNew.other': 'Checked at {time} — {count} new entries',
   'home.newsOlder': 'Older news',
   'home.newsNewer': 'Newer news',
   'home.newsStale': 'Could not refresh the feed — these are the last entries loaded.',
@@ -177,17 +217,40 @@ export const en = {
   'crash.openReport': 'Open report',
   'crash.reportBug': 'Report a bug',
 
+  // Under a crash or a failed launch, when the profile holds a loader build
+  // the editor's list would not have offered.
+  'loaderHint.notOffered':
+    '{loader} is not a build this launcher offers for Minecraft {mcVersion}: it is among those not expected to start it. That may be the reason — choose another build in the profile editor.',
+  'loaderHint.notOfferedPack':
+    "{loader} is not a build this launcher offers for Minecraft {mcVersion}: it is among those not expected to start it. That may be the reason — the pack names this build, so it is the pack's author who can change it.",
+
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profiles',
   'profiles.new': 'New profile',
-  'profiles.import': 'Import profile',
+  'profiles.importDropped':
+    'Profile imported. The file also carried fields an import deliberately leaves out: {fields}. They decide what runs on this computer, so set them yourself in the profile editor if you trust where the file came from.',
   'profiles.empty': 'No profiles',
   'profiles.emptyHint': 'Add your first profile with the + button',
   'profiles.pickOrCreate': 'Select a profile, or create a new one',
   'profiles.copyName': '{name} (copy)',
+  'profiles.duplicate': 'Duplicate, with its mods, settings and worlds',
+  'profiles.duplicated':
+    'The copy has the same mods, configs, shaders, resource packs and worlds as the original. The world backups stay with the original.',
+  'profiles.duplicateFailed': 'Could not duplicate the profile.',
+  'profiles.deleteFailed': 'Could not delete the profile.',
+  'profiles.loading': 'Loading profiles…',
+  'profiles.loadFailed': 'Could not read the profile list.',
+  'profiles.cancelSyncFailed': 'Nothing was stopped. The sync may be finishing already.',
   'profiles.openFolder': 'Open profile folder',
   'profiles.exportPack': 'Export as a modpack (.mrpack)',
+  'profiles.exportSettings': 'Export the profile’s settings (.json) — not its mods',
   'profiles.exportPackFailed': 'Could not export that profile as a pack.',
+  'profiles.exportFailed': 'Could not export that profile’s settings.',
+  'profiles.exportPackAsk': 'The pack will hold this profile’s mods, shaders and resource packs.',
+  'profiles.exportPackSettings': 'Include the game settings and the mods’ configuration',
+  'profiles.exportPackSettingsHint':
+    'That is options.txt and the config folder: key bindings, video settings and each mod’s own options, as they are on this computer. The server you last joined is left out either way.',
+  'profiles.exportPackGo': 'Choose where to save…',
   'profiles.exportPackDone.one': 'Saved to {path}. The pack links to one file on Modrinth.',
   'profiles.exportPackDone.other': 'Saved to {path}. The pack links to {count} files on Modrinth.',
   'profiles.exportPackBundled.one':
@@ -196,6 +259,8 @@ export const en = {
     'Another {count} files ({size}) are not on Modrinth, so they were written into the pack itself.',
   'profiles.exportPackSkipped.one': 'Left out one item that is switched off.',
   'profiles.exportPackSkipped.other': 'Left out {count} items that are switched off.',
+  'profiles.exportPackCarried.one': 'One file of this computer’s settings went in with it.',
+  'profiles.exportPackCarried.other': '{count} files of this computer’s settings went in with it.',
 
   // ── Worlds and backups ───────────────────────────────────
   'worlds.title': 'Worlds',
@@ -203,10 +268,11 @@ export const en = {
   'worlds.backupNow': 'Back up',
   'worlds.backedUp': 'The worlds were copied aside.',
   'worlds.backupFailed': 'Could not back up the worlds.',
-  'worlds.noBackups': 'No copies yet. One is taken automatically before a version change.',
+  'worlds.noBackups': 'No copies yet. Changing the Minecraft version offers to take one first.',
   'worlds.restore': 'Restore this copy',
   'worlds.confirmRestore': 'Replace the current worlds?',
   'worlds.confirmRestoreYes': 'Replace',
+  'worlds.confirmDelete': 'Delete this backup?',
   'worlds.restored': 'The worlds were restored.',
   'worlds.restoredWithSafety':
     'The worlds were restored. What was there before is now a copy of its own, so this is undoable.',
@@ -237,6 +303,7 @@ export const en = {
     'The profile disappears from the launcher either way. What happens to its files is up to you.',
   'delete.alsoFiles': 'Delete the files too',
   'delete.counting': 'Checking what is there…',
+  'delete.countFailed': 'What is in the folder could not be counted — there may be worlds in it.',
   'delete.nothingInstalled': 'Nothing installed • {size}',
   'delete.mods.one': '{count} mod',
   'delete.mods.other': '{count} mods',
@@ -249,7 +316,8 @@ export const en = {
   'delete.worldsWarning.one': 'This profile has a world save. It cannot be recovered afterwards.',
   'delete.worldsWarning.other':
     'This profile has {count} world saves. They cannot be recovered afterwards.',
-  'delete.keptAt': 'The files stay at {path} — the launcher will simply stop listing them.',
+  'delete.keptAt':
+    'The files stay at {path}. They are listed under “Leftover files” on this page, where they can be put back or deleted.',
   'delete.confirmWithFiles': 'Delete with files',
   'delete.confirmKeepFiles': 'Delete, keep files',
 
@@ -264,18 +332,34 @@ export const en = {
   'packs.scratchTitle': 'Build a pack from scratch',
   'packs.scratchBody':
     'An empty profile. Choose the Minecraft version and loader, add mods yourself.',
-  'packs.importTitle': 'Import your own pack',
-  'packs.importBody': 'A .mrpack file you already have, or a link to a manifest.',
+  'packs.modrinthTitle': 'Find a pack on Modrinth',
+  'packs.modrinthBody': 'Search public modpacks and install one as a new profile.',
+  'packs.searchModrinth': 'Search modpacks on Modrinth…',
+  'packs.modrinthNote':
+    'The newest version of the pack that fits the filters above is installed — as a snapshot, which will not update itself.',
+  'packs.importTitle': 'Import',
+  'packs.importBody':
+    'A .mrpack pack file, a link to a pack, or a profile file exported from the launcher.',
   'packs.loading': 'Loading the pack list…',
   'packs.none': 'No packs are published yet.',
   'packs.listFailed': 'Could not load the pack list.',
+  'packs.listRetry': 'Try again',
   'packs.installFailed': 'Could not install {name}.',
+  'packs.installUnfinished':
+    'Profile “{name}” was created, but its files did not all arrive. Press “{action}” on the profile and the install carries on from where it stopped. The reason given: {error}',
   'packs.importFailed': 'Could not import that pack.',
   'packs.manifestFailed': 'That address holds neither a pack nor a manifest.',
   'packs.wrSyncNote': 'These profiles follow the server: every sync brings whatever changed.',
   'packs.mods.one': '{count} mod',
   'packs.mods.other': '{count} mods',
-  'packs.fileTitle': 'A .mrpack file',
+  'packs.ram': '{ram} of RAM',
+  'packs.ramShort':
+    'It asks for {wanted} of memory and this computer can spare {spare}, so it may run poorly here.',
+  'packs.profileFileTitle': 'A profile file (.json)',
+  'packs.profileFileBody':
+    'The settings of one profile, as saved by “Export” in this launcher: Minecraft version, loader, RAM, server. No mods and no worlds — a .mrpack pack carries those.',
+  'packs.profileFileFailed': 'Could not import that profile file.',
+  'packs.fileTitle': 'A pack file (.mrpack)',
   'packs.fileBody':
     'The Modrinth pack format, which Prism, ATLauncher and the Modrinth app also read. Installed as a snapshot — it will not update itself.',
   'packs.chooseFile': 'Choose a file…',
@@ -289,17 +373,34 @@ export const en = {
     'Profiles you deleted but kept the files of. Restoring one puts it back exactly as it was.',
   'orphans.restore': 'Restore',
   'orphans.discard': 'Delete for good',
+  'orphans.confirmDiscard': 'Delete these files, worlds included?',
+  'orphans.discardFailed': 'Could not delete those files.',
+  'orphans.restoreFailed': 'Could not put that profile back.',
+
+  // ── Entries of the profile list that are not profiles ────
+  'unreadable.title': 'Entries that cannot be read',
+  'unreadable.body.one':
+    'One entry of the profile list is not a profile this launcher can read, so it is not here. It stays in the file as it is, and its folder is not touched:',
+  'unreadable.body.other':
+    '{count} entries of the profile list are not profiles this launcher can read, so they are not here. They stay in the file as they are, and their folders are not touched:',
 
   'profiles.fieldMinecraft': 'Minecraft',
-  'profiles.fieldLoader': 'Mod loader',
+  'profiles.fieldLoader': 'Loader',
   'profiles.fieldRam': 'RAM',
   'profiles.fieldServer': 'Server',
   'profiles.manifestUrl': 'Manifest URL',
   'profiles.sync': 'Sync',
+  'profiles.syncBlocked':
+    'Not while the game is running or starting — a sync changes the mods it is using.',
+  'profiles.importedPack': 'Imported pack',
+  'profiles.importedPackHint':
+    'A snapshot — it does not update itself. Repair checks the files against the pack this profile was made from and downloads whatever is missing.',
+  'profiles.repair': 'Repair',
   'profiles.quickConnect': 'Quick connect: {address}',
   'profiles.notes': 'Notes',
   'profiles.lastPlayed': 'Last played: {date}',
   'profiles.totalPlayTime': '{hours} h total',
+  'profiles.totalPlayMinutes': '{minutes} min total',
   'profiles.syncStatus.synced': 'In sync',
   'profiles.syncStatus.updates': 'Updates available ({count})',
   'profiles.syncStatus.error': 'Sync error',
@@ -316,14 +417,15 @@ export const en = {
   'profileForm.name': 'Profile name',
   'profileForm.namePlaceholder': 'e.g. Survival Server',
   'profileForm.mcVersion': 'Minecraft version',
-  'profileForm.loader': 'Mod loader',
+  'profileForm.loader': 'Loader',
   'profileForm.versionsLoading': 'Loading versions…',
   'profileForm.versionsFailed': 'Could not load the version list — type it manually',
   'profileForm.noLoaderBuilds':
-    '{loader} has no builds for Minecraft {mcVersion} — pick another version or loader',
-  'profileForm.loaderUnstable': 'unstable',
-  'profileForm.loaderVersionLatest': 'Latest',
-  'profileForm.loaderVersion': 'Loader version (optional)',
+    '{loader} has no builds for Minecraft {mcVersion} that this launcher can run — pick another version or loader',
+  'profileForm.loaderUnstable': 'prerelease',
+  'profileForm.loaderRecommended': 'recommended',
+  'profileForm.loaderVersion': 'Loader version',
+  'profileForm.loaderVersionAuto': 'chosen at the first launch',
   'profileForm.ram': 'Allocated RAM',
   'profileForm.ramMachine': 'This machine has {total}. Recommended for it: {recommended}.',
   'profileForm.ramTight':
@@ -331,10 +433,16 @@ export const en = {
   'profileForm.ramOver':
     '{value} is more than this machine has ({total}). Minecraft will not start with it.',
   'profileForm.ramUseRecommended': 'Use {recommended}',
+  'profileForm.ramRange': 'Between {min} and {max} MB.',
+  'profileForm.manifestUrlInvalid': 'That is not an address. It has to start with https://',
+  'profileForm.serverPortRange': 'A port is a whole number from 1 to 65535.',
+  'profileForm.saveRefused': 'The profile was not saved.',
+  'profileForm.saveFailed': 'The launcher gave no reason.',
   'profileForm.manifestUrl': 'Manifest URL (optional)',
   'profileForm.serverIp': 'Server IP',
   'profileForm.serverPort': 'Port',
   'profileForm.javaArgs': 'Java arguments (optional)',
+  'profileForm.javaArgsShort': 'Java arguments',
   'profileForm.java': 'Java runtime',
   'profileForm.javaManaged': 'The one the launcher installs',
   'profileForm.javaBrowse': 'Choose a file…',
@@ -360,6 +468,10 @@ export const en = {
   'profileForm.windowModeFullscreen': 'Fullscreen',
   'profileForm.windowModeHint':
     'Anything other than “however the game left it” is written into the game’s own settings at every launch, so it also overrules an F11 from the last session.',
+  'profileForm.gameLanguage': 'Game language',
+  'profileForm.gameLanguageGame': 'As set in the game (English to begin with)',
+  'profileForm.gameLanguageHint':
+    'Minecraft starts in English and remembers the language picked in its own settings. A language chosen here is written into the game’s settings every time this profile starts, so it overrules a change made in the game itself.',
   'profileForm.notes': 'Notes',
   'profileForm.notesPlaceholder': 'Any notes about this profile',
 
@@ -369,6 +481,14 @@ export const en = {
   'profileIcon.pick': 'Choose image',
   'profileIcon.formats': 'PNG, JPG, GIF, WebP or SVG — max 2 MB.',
   'profileIcon.presets': '…or pick one of the built-in ones:',
+  'profileIcon.preset.raven': 'Raven',
+  'profileIcon.preset.anvil': 'Anvil',
+  'profileIcon.preset.pickaxe': 'Pickaxe',
+  'profileIcon.preset.ember': 'Ember',
+  'profileIcon.preset.diamond': 'Diamond',
+  'profileIcon.preset.shield': 'Shield',
+  'profileIcon.preset.compass': 'Compass',
+  'profileIcon.preset.potion': 'Potion',
   'profileIcon.failed': 'Could not set the icon',
   'profileIcon.fileFilter': 'Images',
 
@@ -384,10 +504,15 @@ export const en = {
   'mods.installFailed': 'Could not install {name}',
   'mods.empty': 'No mods installed',
   'mods.emptyHint': 'Search for mods in the Browse tab, or sync the profile with a manifest',
-  'mods.fromManifest': 'from manifest',
+  'mods.fromManifest': 'from the pack',
+  'mods.source.modrinth': 'Modrinth',
+  'mods.source.url': 'direct link',
+  'mods.source.local': 'local file',
   'mods.downloads.one': '{count} download',
   'mods.downloads.other': '{count} downloads',
   'mods.installedWithDeps': 'Installed {name}, along with what it needs: {deps}',
+  'mods.addedFile': 'Added {name}.',
+  'mods.addFileFailed': 'Could not add that file.',
   'mods.checkUpdates': 'Check for updates',
   'mods.checkUpdatesFailed': 'Could not check for updates.',
   'mods.updatesFound.one': '{count} mod has a newer build.',
@@ -396,11 +521,20 @@ export const en = {
   'mods.noneToCheck': 'Nothing here to check — this profile’s mods come from its manifest.',
   'mods.unknownToModrinth.one': '{count} file is not on Modrinth and cannot be checked.',
   'mods.unknownToModrinth.other': '{count} files are not on Modrinth and cannot be checked.',
+  'mods.noBuildForProfile.one':
+    '{count} mod has no build for this profile’s Minecraft version and loader.',
+  'mods.noBuildForProfile.other':
+    '{count} mods have no build for this profile’s Minecraft version and loader.',
   'mods.updateAll': 'Update all',
   'mods.update': 'Update',
   'mods.updateTo': 'new: {version}',
   'mods.updated': 'Updated: {names}',
   'mods.updateFailed': 'Could not update: {names}',
+  'mods.updateNotDone': 'Could not update the mods.',
+  'mods.listFailed': 'Could not read which mods are installed.',
+  'mods.toggleFailed': 'Could not switch {name}.',
+  'mods.removeFailed': 'Could not remove {name}.',
+  'mods.gameBusy': 'Not while the game is running or starting — it is using these files.',
 
   // ── Compatibility ────────────────────────────────────────
   'compat.title': 'Does {name} fit this profile?',
@@ -423,14 +557,19 @@ export const en = {
   // ── Accounts ─────────────────────────────────────────────
   'accounts.title': 'Accounts',
   'accounts.loginMicrosoft': 'Sign in with Microsoft',
-  'accounts.offlineMode': 'Offline mode',
+  'accounts.offlineMode': 'Add an offline account',
   'accounts.privacyLink': 'What does Raven Forge do with my data?',
   'accounts.playerName': 'Player name',
   'accounts.empty': 'No accounts — sign in above',
+  'accounts.loading': 'Loading accounts…',
+  'accounts.loadFailed': 'Could not read the accounts.',
   'accounts.active': '• active',
   'accounts.setActive': 'Set active',
   'accounts.manage': 'Account settings',
   'accounts.logout': 'Sign out',
+  'accounts.logoutAsk':
+    'Sign {name} out of the launcher? The saved sign-in is removed from this computer.',
+  'accounts.failed': 'That did not work.',
   'accounts.loginFailed': 'Sign-in failed',
   'accounts.plaintextTitle': 'Credentials are not in the system keychain',
   'accounts.plaintextBody':
@@ -439,6 +578,7 @@ export const en = {
   // ── Settings ─────────────────────────────────────────────
   'settings.title': 'Settings',
   'settings.loading': 'Loading settings…',
+  'settings.saveFailed': 'That setting could not be saved, so it is back as it was.',
   'settings.section.appearance': 'Appearance',
   'settings.section.behavior': 'Behaviour',
   'settings.section.network': 'Network and downloads',
@@ -456,9 +596,9 @@ export const en = {
     'Installed from a system package. Update it with your package manager (apt, dnf), not from here.',
   'settings.updateUnsignedPlatform':
     'Self-update is not available on this platform yet. Download the newest release from GitHub.',
+  'settings.openReleases': 'Open the releases page',
   'settings.updateCheckFailed': 'Could not check for updates.',
   'settings.updateCheckFailedWith': 'Could not check for updates: {error}',
-  'settings.updateDownloadFailed': 'Could not download the update.',
   'settings.section.data': 'Data',
   'settings.theme': 'Theme',
   'settings.theme.dark': 'Dark',
@@ -469,11 +609,12 @@ export const en = {
   'settings.onLaunch.minimize': 'Minimise',
   'settings.onLaunch.close': 'Close',
   'settings.onLaunch.keepOpen': 'Stay open',
-  'settings.showConsole': 'Show the game console',
+  'settings.onLaunchCloseHint':
+    'The launcher window goes away once the game is running, and the launcher quits when the game does. If the game crashes the window comes back instead, so the crash report is not missed.',
+  'settings.showConsole': 'Offer the game’s console on the home page while a game is running',
   'settings.offlineMode': 'Always launch offline',
   'settings.offlineModeHint':
     'Never contacts the sign-in servers. Singleplayer and LAN only — online-mode servers refuse an offline session.',
-  'settings.autoRemoveOrphans': 'Automatically remove orphaned mods',
   'settings.discordPresence': 'Show the game on your Discord status',
   'settings.discordPresenceHint':
     'While the game runs, your status shows the profile name, version and loader — never the ' +
@@ -490,6 +631,7 @@ export const en = {
   'settings.feedPlaceholder': 'https://your-server.com/api/{feed}.json',
   'settings.newsFeed': 'News feed URL',
   'settings.feedInvalid': 'Not a valid URL. Leave it empty to turn the feed off.',
+  'settings.feedUnreadable': 'Nothing could be read from this address the last time it was tried.',
   'settings.announcementFeed': 'Announcement feed URL',
   'settings.trustedKeysHint':
     'The White Ravens key is built into the launcher, which is why White Ravens packs verify on a fresh install. Until you add a key of your own the launcher reports what it verified but blocks nothing. Adding one switches enforcement on: only a signed manifest that verifies is installed.',
@@ -503,42 +645,73 @@ export const en = {
   'settings.trustedKeyValue': 'Public key (base64)',
   'settings.trustedKeyAdd': 'Add key',
   'settings.trustedKeyFailed': 'Could not add the key',
+  'settings.trustedKeyInvalid':
+    'That is not an Ed25519 public key. One is 32 bytes in base64: 44 characters, the last of them “=”. A PEM block, or a key as OpenSSL exports it, is a longer format and will not work.',
+  'settings.trustedKeyDuplicate': 'That key is already on the list.',
+  'settings.trustedKeyUnusable':
+    'Not an Ed25519 public key: it can verify nothing, and being on the list it still makes a signature required. Remove it.',
+  'settings.trustedKeyRemoveFailed': 'Could not remove the key',
+  'settings.trustedKeyConfirm': 'Remove this key?',
+  'settings.trustedKeyConfirmLast':
+    'Remove the last key? Signatures will no longer be required of packs from outside White Ravens.',
   'settings.dataFolder': 'Data folder',
   'settings.dataFolderHint':
-    'Profiles, mods, game files and the managed Java runtimes. Several gigabytes once a pack is installed.',
+    'Profiles, mods, game files, downloaded Java runtimes, logs and crash reports. Several gigabytes once a pack is installed. The full list, with sizes, is below.',
   'settings.dataFolderChange': 'Move…',
   'settings.dataFolderRestore': 'Back to the default',
   'settings.dataFolderEnv':
     'Set for this install by RAVENFORGE_DATA_DIR, so it cannot be changed here.',
   'settings.dataFolderUnavailable':
-    'The chosen folder {path} could not be reached, so the launcher is using the default one. Anything you had there is still there.',
-  'settings.crashReportsFolder': 'Crash reports',
+    'The chosen folder {path} could not be opened — the drive is unplugged or the folder is gone — so the launcher is using the default one. What was there is still there; plug the drive in and start the launcher again.',
+  'settings.dataFolderForget': 'Forget that folder',
+  'settings.dataFolderForgetHint':
+    'The launcher stops looking for it and stays with the default folder. Nothing in the unreachable folder is touched.',
   'settings.logs': 'Logs',
   'settings.showLogs': 'Show logs',
   'settings.reset': 'Reset settings',
   'settings.confirmReset': 'Reset all settings to their defaults?',
+  'settings.confirmResetKeys':
+    'Reset all settings to their defaults? Every key you added goes with them, and signatures will no longer be required of packs from outside White Ravens.',
 
   // ── Data folder ──────────────────────────────────────────
   'dataRoot.title': 'Move the data folder',
   'dataRoot.from': 'Now',
   'dataRoot.to': 'New location',
-  'dataRoot.move': '{size} moves across. Nothing is left behind in the old location.',
+  'dataRoot.moveSameVolume':
+    '{size} moves across. It is the same disk, so the files are moved without being copied — this takes a moment.',
+  'dataRoot.moveCopy':
+    '{size} moves across. The files are copied to the other disk, compared with the originals, and only then removed from the old location. If anything goes wrong, everything stays where it was.',
+  'dataRoot.staysHome':
+    'Only what is not data stays in the old folder: the file data-root.txt, which points at the new location, and the folder browser, which holds the launcher window’s own files.',
+  'dataRoot.staysNothing': 'The old folder is emptied and removed.',
+  'dataRoot.replacesDebris':
+    'The new location holds empty launcher files, or what an unfinished move left behind — they are replaced.',
+  'dataRoot.warnSpaces':
+    'This path has spaces in it. Minecraft copes, but some mods and tools do not — a folder without spaces is the safer choice.',
+  'dataRoot.warnNonAscii':
+    'This path has characters outside the basic alphabet in it (accented letters, for example). Some mods cannot cope with them — a folder made of A–Z, digits and hyphens is the safer choice.',
+  'dataRoot.done': 'Done — the launcher now uses the new folder.',
+  'dataRoot.leftovers':
+    'These old copies could not be removed. The data is safe in the new location and these files are no longer needed — you can delete them by hand:',
   'dataRoot.adopt':
-    'That folder already holds launcher data, so it will be used as it is — nothing is copied, and what is in the current folder stays there.',
+    'That folder already holds launcher profiles, so it is used as it is — nothing is copied, and what is in the current folder stays there.',
   'dataRoot.free': 'Free at the destination: {free}',
   'dataRoot.restartNotice': 'The launcher restarts once the move is done.',
   'dataRoot.confirm': 'Move and restart',
   'dataRoot.confirmAdopt': 'Use this folder and restart',
   'dataRoot.moving': 'Moving data…',
-  'dataRoot.restarting': 'Done — restarting the launcher…',
+  'dataRoot.restarting': 'The launcher is about to restart…',
   'dataRoot.failed': 'The data folder could not be moved: {error}',
   'dataRoot.problem.same': 'That is already the folder in use.',
   'dataRoot.problem.nested': 'That folder is inside the current one — pick one outside it.',
   'dataRoot.problem.notWritable': 'Nothing can be written to that folder.',
+  'dataRoot.problem.notEmpty':
+    'That folder holds other files, and the “raven-forge-launcher” folder the launcher would make inside it is taken as well. Pick somewhere else.',
   'dataRoot.problem.noSpace': 'Not enough room: {size} to move, {free} free.',
   'dataRoot.problem.envLocked':
     'RAVENFORGE_DATA_DIR decides where the data lives for this install.',
-  'dataRoot.problem.gameRunning': 'Close the game first — it is running out of this folder.',
+  'dataRoot.problem.gameRunning':
+    'Close the game first, and wait for any download to finish — the launcher is working on these files right now.',
 
   // ── Log viewer ───────────────────────────────────────────
   'logs.title': 'Launcher logs',
@@ -557,9 +730,11 @@ export const en = {
   'logs.warnCount.other': '{count} warnings',
 
   // ── Progress overlay ─────────────────────────────────────
-  'progress.title': 'Install progress',
+  'progress.titleInstalling': 'Downloading and installing',
+  'progress.titlePreparing': 'Preparing to launch',
+  'progress.titleChecking': 'Checking files',
   'progress.modSync': 'Syncing mods',
-  'progress.loaderInstall': 'Installing mod loader',
+  'progress.loaderInstall': 'Installing the loader',
   'progress.javaDownload': 'Downloading Java',
   'progress.gameAssets': 'Game files',
   'progress.launcherUpdate': 'Updating the launcher',
@@ -567,7 +742,6 @@ export const en = {
   'progress.files.other': '{done}/{total} files',
 
   // Progress lines named by the main process — see `ProgressKey` in ipc-types.
-  'progress.msg.downloading': 'Downloading…',
   // Two lines for the two halves of a pack sync, so the counter under the bar
   // says which one it is counting.
   'progress.msg.checkingFiles': 'Checking the installed files…',
@@ -602,6 +776,7 @@ export const en = {
   'update.available': 'Update available: v{version}',
   'update.willInstall': 'v{version} will be installed after a restart.',
   'update.pending': 'A new launcher version is ready to download.',
+  'update.whatsNew': 'What’s new',
   'update.downloading': 'Downloading… {percent}%',
   'update.downloadFailed': 'Downloading the update failed',
   'update.installFailed': 'Installing the update failed',
@@ -609,8 +784,9 @@ export const en = {
 
   // ── Error boundary ───────────────────────────────────────
   'error.title': 'Something went wrong',
-  'error.body': 'The launcher hit an unexpected error. Click below to try again.',
-  'error.restart': 'Restart',
+  'error.body':
+    'The launcher hit an unexpected error. Reloading the window below starts its interface again — a game that is running is left alone.',
+  'error.reload': 'Reload the window',
 
   // ── About ────────────────────────────────────────────────
   'about.tagline':
@@ -620,6 +796,8 @@ export const en = {
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Secret of the forge',
   'about.privacy': 'Privacy',
+  'about.legal':
+    'Free software under the GNU Affero General Public License, version 3: you may share and change it on the terms of that licence. It comes with no warranty.',
 
   // ── Privacy ──────────────────────────────────────────────
   // Written for whoever is worried, not for whoever wrote the code: no file
@@ -642,17 +820,68 @@ export const en = {
 
   'privacy.local.title': 'What stays on this computer',
   'privacy.local.body':
-    'All of it sits in one folder. Where that folder is depends on your system — this is the one this launcher is using:',
-  'privacy.local.profiles':
-    'Your profiles, and with them your worlds, screenshots, game settings and mods.',
-  'privacy.local.settings':
-    'Your launcher settings — the look, the language, and the addresses it downloads from.',
-  'privacy.local.accounts': 'Your list of accounts: player name, and when you last signed in.',
-  'privacy.local.logs':
-    'A record of what the launcher has been doing. It can contain your player name and folder names, so look it over before sending it to anybody.',
-  'privacy.local.crashes': 'Crash reports, with the sign-in details already taken out.',
-  'privacy.local.keychain':
-    'Your password is not kept here or anywhere else — you type it on Microsoft’s page, not in this launcher. What the launcher does keep is the pass Microsoft hands back, and it puts that in the safe your system provides for passwords, the same one your web browser uses. If your system offers no such safe, the launcher keeps it in its own folder instead and says so plainly on the Accounts screen.',
+    'Below is everything the launcher writes on this computer — with where it is and how much, measured a moment ago on your disk rather than described from memory.',
+  'storage.total': 'On disk in all: {size}',
+  'storage.measuring': 'Measuring the files on disk…',
+  'storage.refresh': 'Measure again',
+  'storage.failed': 'The launcher’s files could not be measured.',
+  'storage.openFailed': 'That folder could not be opened.',
+  'storage.nothingYet': 'nothing yet',
+  'storage.groupData': 'The data folder — the one that moves',
+  'storage.groupHome': 'The launcher folder — it stays put',
+  'storage.groupSystem': 'Outside those two folders',
+  'storage.homeIsData': 'Until you move the data, this is the same folder as the one above.',
+  'storage.profiles.title': 'Profiles',
+  'storage.profiles.body':
+    'Each profile has a folder of its own here: worlds, mods, resource packs, shaders, screenshots, game settings and world backups. It is the one thing on this list that cannot be downloaded again.',
+  'storage.gameFiles.title': 'Game files',
+  'storage.gameFiles.body':
+    'Minecraft versions, libraries and assets downloaded from Mojang, shared by every profile. Deleted, they are downloaded again at the next launch.',
+  'storage.java.title': 'Java runtimes',
+  'storage.java.body':
+    'The Java the launcher downloaded for the Minecraft versions that need it. Deleted, it is downloaded again.',
+  'storage.loaders.title': 'Loaders',
+  'storage.loaders.body': 'The installed builds of Fabric, Quilt, Forge and NeoForge.',
+  'storage.state.title': 'Settings and lists',
+  'storage.state.body':
+    'Three files: settings.json (launcher settings), profiles.json (the list of profiles) and auth.json (the list of accounts: player name and account id, no password).',
+  'storage.logs.title': 'Logs',
+  'storage.logs.body':
+    'A record of what the launcher did and what the game printed. It has your player name and folder paths in it, so read it before sending it to anyone.',
+  'storage.crashReports.title': 'Crash reports',
+  'storage.crashReports.body':
+    'One file per game crash, with the token and the account details already taken out. They are sent nowhere — you decide whether to attach one to a report.',
+  'storage.browser.title': 'The launcher window’s files',
+  'storage.browser.body':
+    'The launcher’s window is an embedded browser, and this is where it keeps its own files: a cache of images (mod icons, news pictures), the announcements you dismissed, which profile was selected last, and the cookies of the Microsoft sign-in page.',
+  'storage.pointer.title': 'Pointer to the data folder',
+  'storage.pointer.body':
+    'A text file with one line: the path of the data folder. It is how the launcher and the uninstaller find data that has been moved.',
+  'storage.updateCache.title': 'A downloaded launcher update',
+  'storage.updateCache.body':
+    'The installer of a new version, downloaded and waiting to be installed.',
+  'storage.program.title': 'The program',
+  'storage.program.body': 'The launcher itself — what the installer put here.',
+  'storage.legacyHome.title': 'A folder from an older version',
+  'storage.legacyHome.body':
+    'Versions up to 0.7.1 used this folder. This version has its own and leaves this one alone — check that nothing you need is still in it.',
+  'storage.keychain.title': 'The Microsoft sign-in — in the system’s credential store',
+  'storage.keychain.what':
+    'The launcher does not know your password and does not keep it: you type it on Microsoft’s own page. Microsoft sends back two keys and only those are stored — a refresh token, which lets the launcher renew the sign-in without asking for the password, and a Minecraft session token, good for about a day.',
+  'storage.keychain.windows':
+    'On Windows they go into Credential Manager: Control Panel → User Accounts → Credential Manager → Windows Credentials, the entries beginning “com.ravenforge.launcher”. Windows encrypts them with your user account; programs running as you can ask for them, other users of the computer cannot.',
+  'storage.keychain.linux':
+    'On Linux they go into the desktop’s keyring through the Secret Service: GNOME Keyring (the “Passwords and Keys” app) or KWallet (KWalletManager), as entries of the service “com.ravenforge.launcher”. The keyring is encrypted with your login password and open for as long as you are logged in; programs in your session can read from it.',
+  'storage.keychain.mac':
+    'On macOS they go into the Keychain (the “Keychain Access” app), as entries of the service “com.ravenforge.launcher”.',
+  'storage.keychain.none': 'On this computer: no entries — no Microsoft account is signed in.',
+  'storage.keychain.count.one': 'On this computer: {count} entry.',
+  'storage.keychain.count.other':
+    'On this computer: {count} entries, two for each Microsoft account.',
+  'storage.keychain.unavailable':
+    'On this computer the credential store does not answer. The Microsoft sign-in is then kept in the file auth.json in the data folder, readable only by your user — the Accounts page says so outright.',
+  'storage.keychain.remove':
+    '“Sign out” on the Accounts page removes both of that account’s entries. You can also delete them by hand in the place described above — the launcher will then ask you to sign in again.',
 
   'privacy.dest.title': 'Who the launcher talks to',
   'privacy.dest.body':
@@ -668,13 +897,14 @@ export const en = {
   'privacy.dest.java.when': 'when the launcher installs Java for you',
   'privacy.dest.java.sends': 'Which version of Java is needed, and which system you are on.',
   'privacy.dest.loaders.who': 'Fabric, Forge, NeoForge and Quilt',
-  'privacy.dest.loaders.when': 'when installing what mods need to run',
+  'privacy.dest.loaders.when': 'when choosing and installing a loader',
   'privacy.dest.modrinth.who': 'Modrinth',
-  'privacy.dest.modrinth.when': 'when you look for mods, or check the ones you have',
+  'privacy.dest.modrinth.when':
+    'when you look for mods and packs, open the list of what is installed, check for updates, or add a mod from a file',
   'privacy.dest.modrinth.sends':
-    'What you type into the search box, and the filters you set. Checking for updates or exporting a pack also sends a hash of each mod file in that profile, which is how Modrinth is asked what those files are. Nothing that says who you are — the request names the launcher that is asking, not the person.',
+    'What you type in the search box, and the filters you set. Opening a profile’s list of mods, shaders or resource packs sends the identifiers of the ones you have — that is how the launcher fetches their descriptions and icons, and it remembers the answer for a week. Checking for updates, or exporting a pack, also sends a hash of each mod file in that profile, and adding a mod from a file sends the hash of that one file. Nothing that says who you are — the request introduces the launcher that is asking, not a person.',
   'privacy.dest.packs.who': 'White Ravens',
-  'privacy.dest.packs.when': 'news, and the list of server packs',
+  'privacy.dest.packs.when': 'news, the list of server packs, and the packs themselves',
   'privacy.dest.updates.who': 'GitHub',
   'privacy.dest.updates.when': 'at every start, and when you check for updates',
   'privacy.dest.updates.sends':
@@ -690,11 +920,23 @@ export const en = {
 
   'privacy.control.title': 'What you decide',
   'privacy.control.offline':
-    'Offline mode never contacts a sign-in server at all — you play on your own or on a home network.',
-  'privacy.control.feeds': 'Clear the news address in Settings and nothing more is downloaded.',
-  'privacy.control.proxy': 'A proxy sends everything through a server you choose yourself.',
+    'Signing in: Settings → Behaviour → “Always launch offline”. The launcher then never contacts the Microsoft, Xbox or Mojang sign-in servers; game files and mods are still downloaded. An offline account (Accounts → Offline mode) signs in nowhere at all.',
+  'privacy.control.feeds':
+    'News: Settings → Content sources. Clear both addresses and the launcher stops fetching news and announcements. Enter your own and it asks only those.',
+  'privacy.control.proxy':
+    'A proxy: Settings → Network and downloads → Proxy URL. Every connection the launcher makes — downloads, sign-in, images — goes through the server you name. The game, once it is running, connects for itself and is not covered by the launcher’s proxy.',
+  'privacy.control.discord':
+    'Discord: Settings → Behaviour → “Show the game on your Discord status”, off by default. Switched on, it shows the profile’s name, version and loader to everyone who can see your Discord profile — never a server address.',
+  'privacy.control.packs':
+    'Packs: a profile that follows a pack asks the address in its “Manifest URL” field about it — when the launcher starts and before every launch of the game. Remove that address in the profile editor and the profile stops asking, and stops updating.',
+  'privacy.control.updates':
+    'Launcher updates: checked at every start with one request to GitHub. This cannot be switched off yet.',
+  'privacy.control.diagnostics':
+    'Logs and crash reports: they do not leave the computer until you send them to someone yourself. “Report a bug” opens the issue page in your browser, and you attach the file by hand.',
+  'privacy.control.location':
+    'Where it all is: Settings → Data → “Move…” moves the data folder to wherever you point.',
   'privacy.control.delete':
-    'Signing out deletes that account’s saved sign-in, and forgets it in the sign-in window too. Deleting the folder above removes everything else — on our side there is nothing to delete.',
+    'Deleting: “Sign out” on the Accounts page erases that account’s saved sign-in — its entries in the system’s credential store and the sign-in window’s cookies. Deleting the data folder and the launcher folder listed above removes everything else; the Windows uninstaller asks about it outright. There is nothing on our side to delete.',
 
   'privacy.fullPolicy': 'Read the full privacy policy',
   'privacy.fullPolicyHint':

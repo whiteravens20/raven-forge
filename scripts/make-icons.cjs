@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 /**
  * Rasterise assets/icons/icon.svg into the bitmaps electron-builder needs.
  *
@@ -6,8 +8,9 @@
  * rasteriser — an offscreen window renders the SVG once at 1024 and `nativeImage`
  * downscales from there, which is sharper than re-rendering per size.
  *
- * CommonJS on purpose: Electron 41 does not execute a `.mjs` entry point — the
- * module is silently never run, with no error and no output.
+ * CommonJS because the Electron it was written on, 41, did not execute a `.mjs`
+ * entry point — the module was silently never run, with no error and no
+ * output. Electron 44 does run one; nothing here would gain from the change.
  *
  * Outputs:
  *   assets/icons/icon.png          — 512×512, used by the Linux targets
@@ -120,6 +123,18 @@ async function render(html, width, height) {
 
   await win.loadURL(`data:text/html;base64,${Buffer.from(html).toString('base64')}`);
   const frame = await painted;
+  // A window is no taller or wider than the display it is on, shown or not.
+  // On one smaller than what is asked for here the frame comes back short, the
+  // page inside it has grown scrollbars, and scaling that to size made icons
+  // that were squashed, with a scrollbar down one side — and nothing said so.
+  const got = frame.getSize();
+  if (got.width * height !== got.height * width) {
+    win.destroy();
+    throw new Error(
+      `asked for ${width}x${height} and was given ${got.width}x${got.height}: ` +
+        'the display is too small for the window the icons are rendered in',
+    );
+  }
   const sized =
     frame.getSize().width === width ? frame : frame.resize({ width, height, quality: 'best' });
   win.destroy();

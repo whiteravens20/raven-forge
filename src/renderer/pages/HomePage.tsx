@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useState } from 'react';
 import { Play, RefreshCw, Terminal, Gamepad2, X, Square } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
@@ -7,6 +9,7 @@ import { useGameStore } from '@stores/game-store';
 import { useSettingsStore } from '@stores/settings-store';
 import { Button } from '@components/ui/Button';
 import { Banner } from '@components/ui/Banner';
+import { GameFailureNotice } from '@components/GameFailureNotice';
 import { LiveConsole } from '@components/LiveConsole';
 import { NewsStrip } from '@components/NewsStrip';
 import { ProfileAvatar } from '@components/ProfileAvatar';
@@ -17,40 +20,52 @@ import { useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import { useUpdaterStore } from '@stores/updater-store';
 
-const api = window.ravenforge;
-
 /** Feed dates are ISO strings from a file someone hand-edits; show what parses. */
 function formatDate(iso: string, locale: string): string | undefined {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? undefined : date.toLocaleDateString(locale);
 }
 
+/** How long the refresh icon turns at the least; see `handleRefreshNews`. */
+const REFRESH_SPIN_MS = 600;
+
+function formatTime(timestamp: number, locale: string): string {
+  return new Date(timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+}
+
 export function HomePage() {
   const profiles = useProfileStore((s) => s.profiles);
+  const profilesLoaded = useProfileStore((s) => s.loaded);
   const selectedId = useProfileStore((s) => s.selectedProfileId);
   const selectProfile = useProfileStore((s) => s.select);
 
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
   const accounts = useAuthStore((s) => s.accounts);
+  const accountsLoaded = useAuthStore((s) => s.loaded);
 
   const news = useNewsStore((s) => s.news);
   const announcements = useNewsStore((s) => s.announcements);
   const dismissedIds = useNewsStore((s) => s.dismissedIds);
   const dismiss = useNewsStore((s) => s.dismiss);
   const refreshNews = useNewsStore((s) => s.refresh);
-  const feedError = useNewsStore((s) => s.feedError);
+  const feedError = useNewsStore((s) => s.newsFailed || s.announcementsFailed);
+  const newsLoading = useNewsStore((s) => s.loading);
+  const lastRefresh = useNewsStore((s) => s.lastRefresh);
 
   const settings = useSettingsStore((s) => s.settings);
 
-  // Both selected as derived booleans, not as the predicate functions.
-  // `useGameStore((s) => s.isRunning)` returns a stable function reference, so
-  // it never changes and never re-renders: closing the game left the button
-  // reading "Running" until some unrelated state (opening the console, say)
-  // forced a render. Select the value, not the getter.
+  // Selected as values, not as functions that work them out. A selector that
+  // hands back a function hands back the same one every time, so it never
+  // changes and never re-renders: closing the game left the button reading
+  // "Running" until some unrelated state (opening the console, say) forced a
+  // render.
   const runningNow = useGameStore((s) => (selectedId ? s.running.has(selectedId) : false));
   const preparingNow = useGameStore((s) => (selectedId ? s.preparing.has(selectedId) : false));
-  const beginPreparing = useGameStore((s) => s.beginPreparing);
-  const endPreparing = useGameStore((s) => s.endPreparing);
+  const cancellingNow = useGameStore((s) => (selectedId ? s.cancelling.has(selectedId) : false));
+  const stoppingNow = useGameStore((s) => (selectedId ? s.stopping.has(selectedId) : false));
+  const launch = useGameStore((s) => s.launch);
+  const cancelLaunch = useGameStore((s) => s.cancelLaunch);
+  const stop = useGameStore((s) => s.stop);
   const crashInfo = useGameStore((s) => (selectedId ? s.getCrashInfo(selectedId) : undefined));
   const clearCrash = useGameStore((s) => s.clearCrash);
   const toggleConsole = useGameStore((s) => s.toggleConsole);
@@ -58,17 +73,18 @@ export function HomePage() {
     selectedId ? s.isConsoleVisible(selectedId) : false,
   );
 
-  const [launchError, setLaunchError] = useState<string | null>(null);
-  const [stopping, setStopping] = useState(false);
+  /** Outlives the fetch itself, so a refresh that answers instantly is still seen to turn. */
+  const [refreshSpinning, setRefreshSpinning] = useState(false);
   /** The news item or announcement currently open in the reader. */
   const [reading, setReading] = useState<Article | null>(null);
-  /** Set when a launch failed only because the auth servers could not be reached. */
-  const [offlineOffer, setOfflineOffer] = useState(false);
   const pendingUpdate = useUpdaterStore((s) => s.available);
   const updateStage = useUpdaterStore((s) => s.stage);
-  const downloadPending = useUpdaterStore((s) => s.downloadPending);
+  const updatePostponed = useUpdaterStore((s) => s.postponed);
+  const downloadUpdate = useUpdaterStore((s) => s.download);
   const installUpdate = useUpdaterStore((s) => s.install);
-  const dismissUpdate = useUpdaterStore((s) => s.dismiss);
+  const postponeUpdate = useUpdaterStore((s) => s.postpone);
+  /** Whether pressing Play installs the waiting launcher update instead of starting the game. */
+  const updateFirst = Boolean(pendingUpdate) && !updatePostponed && updateStage !== 'failed';
   const t = useT();
   const locale = useLocale();
 
@@ -76,95 +92,74 @@ export function HomePage() {
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
   const busyNow = runningNow || preparingNow;
 
-  /**
-   * @param offlineMode `true` retries a launch that failed because the auth
-   *        servers were unreachable. Left undefined the global setting decides.
-   */
-  const handleLaunch = async (offlineMode?: boolean) => {
+  const handleLaunch = async () => {
     if (!selectedId || !selectedProfile || busyNow) return;
 
     // A waiting launcher update is installed before the game starts, because a
     // launcher that is about to replace itself should not first spend minutes
     // downloading assets and then restart out from under a running game.
     //
-    // Only a *known* update blocks this. The state comes from the startup
-    // check's events, so a click never waits on the network — and a failed or
-    // never-completed check leaves `available` null and play proceeds.
-    if (pendingUpdate && updateStage !== 'failed') {
-      const ready = await downloadPending();
-      if (ready) {
-        await installUpdate(); // quits and relaunches into the new version
-        return;
-      }
-      // Download failed: say so, and let the game start anyway. Being unable to
-      // update is not a reason to be unable to play.
+    // Only a *known* update does this, and only until the player says "later":
+    // that used to hide the notification and change nothing here, so the next
+    // press of Play restarted the launcher all the same. The state comes from
+    // the startup check's events, so a click never waits on the network — and a
+    // failed or never-completed check leaves `available` null and play proceeds.
+    if (updateFirst) {
+      const ready = await downloadUpdate();
+      // Quits and relaunches into the new version — unless it could not, and
+      // being unable to update is not a reason to be unable to play.
+      if (ready && (await installUpdate())) return;
     }
 
-    setLaunchError(null);
-    setOfflineOffer(false);
-    clearCrash(selectedId);
-    beginPreparing(selectedId);
-    try {
-      const result = await api.game.launch({ profileId: selectedId, offlineMode });
-      if (!result.success) {
-        // Unreachable is recoverable and rejected is not, so only one of them
-        // gets an offer — and this banner stays until it is acted on rather
-        // than timing out under the reader.
-        if (result.code === 'AUTH_UNREACHABLE') {
-          setOfflineOffer(true);
-          return;
-        }
-        // A refusal the launcher raised about the profile comes with a key,
-        // and is said in the player's language; anything else is a diagnostic
-        // and arrives in English, which is also what the log holds.
-        setLaunchError(
-          result.errorMessage
-            ? t(result.errorMessage.key, result.errorMessage.vars)
-            : (result.error ?? t('home.launchFailed')),
-        );
-      }
-    } catch {
-      setLaunchError(t('home.launchError'));
-    } finally {
-      // `game:started` normally clears this; do it here too so a launch that
-      // fails before spawning does not leave the button disabled forever.
-      endPreparing(selectedId);
-    }
-  };
-
-  const handleCancel = async () => {
-    if (!selectedId) return;
-    await api.game.cancel(selectedId);
-    // Main resolves the launch call quietly after aborting; clear the button
-    // here too so it frees up even if that resolution is slow.
-    endPreparing(selectedId);
+    await launch(selectedId);
   };
 
   /**
-   * Stop a game that is already up.
+   * Refresh both feeds, visibly.
    *
-   * `killGame` — SIGTERM, then SIGKILL after ten seconds, and it does not report
-   * success until the process has actually gone — has been complete since the
-   * launcher could start a game, and nothing called it: a Minecraft that hung on
-   * its splash screen could only be dealt with from outside the launcher. The
-   * running state is not cleared here; the process's own `exit` handler sends
-   * `game:exited`, which is the one event that means it really stopped.
+   * The feed usually has not moved, so the cards do not change — and a button
+   * that changes nothing reads as a button that did nothing. The icon turns for
+   * at least `REFRESH_SPIN_MS` because a warm connection answers faster than an
+   * eye catches, and the line beside it then says how the attempt ended.
    */
-  const handleStop = async () => {
-    if (!selectedId) return;
-    setStopping(true);
+  const handleRefreshNews = async () => {
+    if (refreshSpinning) return;
+    setRefreshSpinning(true);
+    const started = Date.now();
     try {
-      const result = await api.game.kill(selectedId);
-      if (!result.success) setLaunchError(result.error ?? t('home.stopFailed'));
+      await refreshNews();
     } finally {
-      setStopping(false);
+      const rest = REFRESH_SPIN_MS - (Date.now() - started);
+      if (rest > 0) await new Promise((resolve) => setTimeout(resolve, rest));
+      setRefreshSpinning(false);
     }
   };
+
+  const refreshing = newsLoading || refreshSpinning;
+  // A failed refresh is reported by the warning under the heading, which stays
+  // until a later attempt works; this line only ever reports one that did.
+  const refreshNote = refreshing
+    ? t('home.newsRefreshing')
+    : lastRefresh && !feedError
+      ? lastRefresh.added > 0
+        ? t.plural('home.newsRefreshedNew', lastRefresh.added, {
+            time: formatTime(lastRefresh.at, locale),
+          })
+        : t('home.newsRefreshedSame', { time: formatTime(lastRefresh.at, locale) })
+      : null;
 
   // One banner at a time, in feed order — the publisher decides what is most
   // urgent, and a stack of them pushes the launch button off the fold. Dismiss
   // it and the next one takes its place.
-  const announcement = announcements.find((a) => !dismissedIds.has(a.id));
+  //
+  // One that cannot be dismissed never leaves the head of that queue, and so
+  // used to hide everything behind it for as long as it stayed in the feed. It
+  // keeps its place, and the first one that can be dismissed is shown under it.
+  const waiting = announcements.filter((a) => !dismissedIds.has(a.id));
+  const shown =
+    waiting[0] && !waiting[0].dismissible
+      ? [waiting[0], ...waiting.filter((a) => a.dismissible).slice(0, 1)]
+      : waiting.slice(0, 1);
 
   return (
     // `isolate` is load-bearing: without it this container is no stacking
@@ -177,12 +172,12 @@ export function HomePage() {
       {/* The announcement. Only one with something more to say is clickable —
           a banner that opens a dialog repeating its own single sentence teaches
           people the click is not worth making. */}
-      {announcement && (
+      {shown.map((announcement) => (
         // Everywhere else a banner sits on a page background; here it sits on
         // the backdrop, and its own `/10` tint is far too thin to be a surface
         // — over the Nether scene the text came out at 1.7:1. The wrapper is
         // the surface, so the tint has something known to be a tint *of*.
-        <div className="rounded-lg bg-rf-bg">
+        <div key={announcement.id} className="rounded-lg bg-rf-bg">
           <Banner
             type={announcement.type}
             dismissible={announcement.dismissible}
@@ -208,7 +203,7 @@ export function HomePage() {
             )}
           </Banner>
         </div>
-      )}
+      ))}
 
       {reading && <ArticleReader article={reading} onClose={() => setReading(null)} />}
 
@@ -244,7 +239,10 @@ export function HomePage() {
               </span>
             </p>
           ) : (
-            <p className="text-sm text-rf-warning">{t('home.notSignedIn')}</p>
+            // Only once the accounts have been read. Until then nobody knows,
+            // and a warning about an answer still on its way is a false alarm
+            // at every start.
+            accountsLoaded && <p className="text-sm text-rf-warning">{t('home.notSignedIn')}</p>
           )}
         </div>
 
@@ -253,6 +251,7 @@ export function HomePage() {
           <div className="flex items-center gap-3">
             {selectedProfile && <ProfileAvatar profile={selectedProfile} size={40} />}
             <select
+              aria-label={t('home.profile')}
               value={selectedId ?? ''}
               onChange={(e) => selectProfile(e.target.value)}
               className="rounded-lg border border-rf-border bg-rf-surface px-4 py-2 text-sm text-rf-text outline-none focus:border-rf-accent-text min-w-[200px]"
@@ -265,7 +264,11 @@ export function HomePage() {
             </select>
           </div>
         ) : (
-          <p className="text-sm text-rf-text-muted">{t('home.noProfiles')}</p>
+          // Not said until the list has been read: "no profiles" about a list
+          // that is still on its way is the wrong thing to open on.
+          <p className="text-sm text-rf-text-muted">
+            {t(profilesLoaded ? 'home.noProfiles' : 'profiles.loading')}
+          </p>
         )}
 
         {/* Crash reporter */}
@@ -273,7 +276,7 @@ export function HomePage() {
           <div className="w-full max-w-lg">
             <CrashReporter
               crashInfo={crashInfo}
-              profileName={selectedProfile.name}
+              profile={selectedProfile}
               onDismiss={() => clearCrash(selectedProfile.id)}
             />
           </div>
@@ -302,70 +305,54 @@ export function HomePage() {
                 : t('home.play')}
         </Button>
 
-        {/* Only while preparing: once the game is up there is no download to stop. */}
-        {preparingNow && (
-          <Button variant="ghost" size="sm" icon={<X size={14} />} onClick={handleCancel}>
-            {t('home.cancelLaunch')}
+        {/* Only while preparing: once the game is up there is no download to
+            stop. It keeps turning until the launch has actually let go, which
+            is the moment Play can be pressed again. */}
+        {selectedId && preparingNow && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<X size={14} />}
+            loading={cancellingNow}
+            onClick={() => void cancelLaunch(selectedId)}
+          >
+            {cancellingNow ? t('home.cancelling') : t('home.cancelLaunch')}
           </Button>
         )}
 
         {/* And once it is up, the other half of the same offer. */}
-        {runningNow && !preparingNow && (
+        {selectedId && runningNow && !preparingNow && (
           <Button
             variant="ghost"
             size="sm"
             icon={<Square size={14} />}
-            loading={stopping}
-            disabled={stopping}
-            onClick={() => void handleStop()}
+            loading={stoppingNow}
+            onClick={() => void stop(selectedId)}
           >
-            {stopping ? t('home.stopping') : t('home.stopGame')}
+            {stoppingNow ? t('home.stopping') : t('home.stopGame')}
           </Button>
         )}
 
         {/* Say it before the click, not after the restart. Someone who presses
             Play and gets a relaunching launcher deserves to have been told. */}
-        {pendingUpdate && updateStage !== 'failed' && (
-          <p className="text-xs text-rf-accent-text">
-            {t('home.updateBeforePlay', { version: pendingUpdate.version })}
+        {pendingUpdate && updateFirst && (
+          <p className="max-w-md text-center text-xs text-rf-accent-text">
+            {t('home.updateBeforePlay', { version: pendingUpdate.version })}{' '}
+            <button onClick={postponeUpdate} className="underline hover:text-rf-text">
+              {t('home.updateNotNow')}
+            </button>
           </p>
         )}
         {updateStage === 'failed' && (
           <p className="text-xs text-rf-text-muted">
             {t('home.updateFailedPlayAnyway')}{' '}
-            <button onClick={dismissUpdate} className="underline hover:text-rf-text">
+            <button onClick={postponeUpdate} className="underline hover:text-rf-text">
               {t('common.dismiss')}
             </button>
           </p>
         )}
 
-        {/* No auto-dismiss, for the same reason as the offer below: most of
-            these sentences end with something to go and change, and eight
-            seconds is not long enough to read one and act on it. The next
-            launch clears it, and so does the ×. */}
-        {launchError && (
-          <div className="w-full max-w-xl">
-            <Banner type="urgent" dismissible onDismiss={() => setLaunchError(null)}>
-              {launchError}
-            </Banner>
-          </div>
-        )}
-
-        {/* No auto-dismiss: this one asks a question, and a banner that
-            disappears while being read cannot be answered. */}
-        {offlineOffer && (
-          <div className="flex max-w-md flex-col items-center gap-2 rounded-lg border border-rf-warning/40 bg-rf-warning/10 p-3">
-            <p className="text-xs text-rf-text-secondary">{t('home.authUnreachable')}</p>
-            <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => void handleLaunch(true)}>
-                {t('home.launchOffline')}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setOfflineOffer(false)}>
-                {t('common.cancel')}
-              </Button>
-            </div>
-          </div>
-        )}
+        {selectedId && <GameFailureNotice profileId={selectedId} />}
 
         {selectedProfile && (
           <p className="text-xs text-rf-text-muted">
@@ -406,13 +393,21 @@ export function HomePage() {
           <h2 className="text-sm font-display font-semibold text-rf-text-secondary uppercase tracking-wider">
             {t('home.news')}
           </h2>
-          <button
-            onClick={refreshNews}
-            aria-label={t('home.refreshNews')}
-            className="text-rf-text-muted hover:text-rf-text-secondary"
-          >
-            <RefreshCw size={14} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* `role="status"` so the outcome is announced, not only drawn. */}
+            <span role="status" className="text-xs text-rf-text-muted">
+              {refreshNote}
+            </span>
+            <button
+              onClick={() => void handleRefreshNews()}
+              disabled={refreshing}
+              aria-label={t('home.refreshNews')}
+              title={t('home.refreshNews')}
+              className="text-rf-text-muted hover:text-rf-text-secondary disabled:cursor-default"
+            >
+              <RefreshCw size={14} className={refreshing ? 'motion-safe:animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         {/* A feed that cannot be reached says so. Left silent, a dead or

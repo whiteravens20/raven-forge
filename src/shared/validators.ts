@@ -1,6 +1,9 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { z } from 'zod';
 import { DEFAULT_NEWS_FEED_URL, DEFAULT_ANNOUNCEMENT_FEED_URL } from './branding';
 import {
+  DEFAULT_RAM_MB,
   MAX_GAME_DIMENSION,
   MAX_RAM_MB,
   MIN_GAME_HEIGHT,
@@ -8,10 +11,11 @@ import {
   MIN_RAM_MB,
 } from './constants';
 import { isSafeFileName } from './manifest-schema';
+import { GAME_LANGUAGE_PATTERN } from './game-languages';
 
 // ── Runtime validators for IPC payloads ───────────────────
-// These schemas validate data at IPC boundaries.
-// Types are inferred from schemas via z.infer<typeof schema>.
+// These schemas validate data at IPC boundaries. The types they are checked
+// against are the hand-written ones in `./ipc/`, not inferred from here.
 
 /**
  * Whether a URL is safe to fetch content the launcher then *acts on* — a
@@ -33,10 +37,25 @@ export function isSecureContentUrl(value: string): boolean {
     return false;
   }
   if (u.protocol === 'https:') return true;
-  if (u.protocol === 'http:') {
-    return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(u.hostname);
-  }
+  if (u.protocol === 'http:') return LOOPBACK_HOSTS.includes(u.hostname);
   return false;
+}
+
+/** The names by which a computer addresses itself. */
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
+
+/**
+ * Whether an address is one on the player's own computer.
+ *
+ * Asked of a manifest's address before it is let name a file on this disk: see
+ * `assertLocalFilesAllowed` in the sync.
+ */
+export function isLoopbackUrl(value: string): boolean {
+  try {
+    return LOOPBACK_HOSTS.includes(new URL(value).hostname);
+  } catch {
+    return false;
+  }
 }
 
 /** Throwing form of {@link isSecureContentUrl}, for the fetch boundaries. */
@@ -49,6 +68,18 @@ export function assertSecureContentUrl(value: string): void {
   }
 }
 
+/**
+ * A trusted key as it is stored — which is looser than a key that can be added.
+ *
+ * `settings:add-trusted-key` takes only a key the verifier can use
+ * (`isEd25519PublicKey`). This shape reads back what is already in
+ * `settings.json`, and builds before that check stored whatever was pasted into
+ * the form. Such an entry verifies nothing, and its presence still switches
+ * enforcement on, so every third-party manifest is refused. It is kept as it
+ * is, and the Settings page says what is wrong with it: leaving it out on the
+ * way in would turn enforcement off behind the back of the person who had
+ * turned it on, and refusing it here would move the whole file aside.
+ */
 const trustedKeySchema = z.object({
   name: z.string().min(1),
   publicKey: z.string().min(1),
@@ -78,12 +109,12 @@ export const globalSettingsSchema = z.object({
   launcherBehaviorOnLaunch: z.enum(['close', 'minimize', 'keep-open']),
   // Validated rather than free text: an unparseable URL used to be accepted and
   // then silently ignored. Every scheme listed here has a dispatcher behind it —
-  // http/https through undici's ProxyAgent, socks through a connect hook — so
-  // nothing that saves cleanly can fail to take effect.
+  // http/https through undici's ProxyAgent, socks through a connect hook. That
+  // an address of one of these schemes can actually be used is asked where it
+  // is saved, by building the dispatcher: see `assertProxyUsable`.
   proxyUrl: z
     .string()
     .optional()
-    .or(z.literal(''))
     .refine(
       (v) => {
         if (!v) return true;
@@ -103,7 +134,6 @@ export const globalSettingsSchema = z.object({
   newsFeedUrl: z.string().url().or(z.literal('')).default(DEFAULT_NEWS_FEED_URL),
   announcementFeedUrl: z.string().url().or(z.literal('')).default(DEFAULT_ANNOUNCEMENT_FEED_URL),
   trustedPublicKeys: z.array(trustedKeySchema).default([]),
-  autoRemoveOrphanedMods: z.boolean().default(false),
   showLiveConsole: z.boolean().default(false),
   /**
    * Off unless asked for. It publishes what the player is doing to everyone who
@@ -162,11 +192,12 @@ export const profileSchema = z.object({
   /**
    * The game's window. All three degrade to "unset" instead of failing the
    * parse, and that is deliberate: this schema is not only the editor's gate —
-   * every play session ends in an `updateProfile` that runs the whole profile
-   * through it, so a file hand-edited to a resolution the game cannot make
-   * would otherwise become a profile whose play time can never be recorded
-   * again. Refusing to start over a window size would be the wrong trade; the
-   * editor is where a bad number gets argued with.
+   * every later change goes through `updateProfile`, which runs the whole
+   * profile through it, so a file hand-edited to a resolution the game cannot
+   * make would otherwise become a profile whose icon can never be changed and
+   * whose loader build a launch can never pin. Refusing all of that over a
+   * window size would be the wrong trade; the editor is where a bad number
+   * gets argued with.
    *
    * Width and height are still checked at launch, in `customResolution`, since
    * `profiles.json` is read back without going through this at all.
@@ -185,14 +216,105 @@ export const profileSchema = z.object({
     .max(MAX_GAME_DIMENSION)
     .optional()
     .catch(undefined),
-  /** Unset means "whatever the game last did" — see `applyFullscreen`. */
+  /** Unset means "whatever the game last did" — see `applyProfileOptions`. */
   fullscreen: z.boolean().optional().catch(undefined),
+  /** Unset means "whatever the game is set to" — see `applyProfileOptions`. */
+  gameLanguage: z.string().regex(GAME_LANGUAGE_PATTERN).optional().catch(undefined),
   notes: z.string().optional(),
   lastPlayed: z.string().optional(),
   totalPlayTimeMinutes: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+
+/** A stored field that is simply left out when it is not what it should be. */
+const storedText = z.string().optional().catch(undefined);
+const storedNumber = z.number().optional().catch(undefined);
+/** What stands in for a stored date that is not there. It is never shown as one. */
+const NO_DATE = new Date(0).toISOString();
+
+/**
+ * A profile as `profiles.json` holds it, read back.
+ *
+ * Looser than `profileSchema`, which is the gate a profile passes on its way
+ * in. What is stored was accepted once, by this build or an older one, or was
+ * edited by hand — and refusing it over a detail would take a profile, and the
+ * worlds behind it, off the list. So only three things make an entry not a
+ * profile: an id, a Minecraft version or a loader that cannot be used. They
+ * name a folder, a path and a branch of the code, nothing sensible stands in
+ * for them, and guessing a version or a loader is how a world gets opened by
+ * the wrong game.
+ *
+ * Every other field is held to its type alone, and one of the wrong type is
+ * left out or given a value that harms nothing. A string that is not an
+ * address, a port out of range, RAM below the floor all stay as they are: the
+ * editor is where a bad value gets argued with, and it can only show what the
+ * value was while it is still there.
+ *
+ * Fields this build does not know are kept. A newer build wrote them, and the
+ * list is written back whole whenever any profile in it changes.
+ */
+export const storedProfileSchema = z
+  .looseObject({
+    id: z.string().refine(isSafeFileName),
+    name: z.string().min(1).optional().catch(undefined),
+    iconPath: storedText,
+    iconUrl: storedText,
+    iconPreset: storedText,
+    minecraftVersion: profileSchema.shape.minecraftVersion,
+    modLoader: profileSchema.shape.modLoader,
+    // No build named is something a launch already puts right, by pinning one.
+    modLoaderVersion: profileSchema.shape.modLoaderVersion.catch(undefined),
+    manifestUrl: storedText,
+    serverIp: storedText,
+    serverPort: storedNumber,
+    javaArgs: storedText,
+    allocatedRamMb: z.number().positive().catch(DEFAULT_RAM_MB),
+    customJavaPath: storedText,
+    windowWidth: profileSchema.shape.windowWidth,
+    windowHeight: profileSchema.shape.windowHeight,
+    fullscreen: profileSchema.shape.fullscreen,
+    gameLanguage: profileSchema.shape.gameLanguage,
+    notes: storedText,
+    lastPlayed: storedText,
+    totalPlayTimeMinutes: storedNumber,
+    createdAt: z.string().catch(NO_DATE),
+    updatedAt: z.string().catch(NO_DATE),
+  })
+  // A profile nobody named is still the one its folder belongs to, and the id
+  // is the one thing about it that is certain to be there.
+  .transform((stored) => ({ ...stored, name: stored.name ?? stored.id }));
+
+/**
+ * An entry of `installed.lock`, or of the two lists kept the same way for
+ * shaders and resource packs, read back.
+ *
+ * Two things make an entry one: an id, and a file name that is a name in the
+ * folder and nothing else. The second is what every later step acts on — the
+ * file is looked for, renamed and deleted by it — so one that leads out of the
+ * folder is not something to tidy up and carry on with.
+ *
+ * Every other field is held to its kind, and one of the wrong kind is given a
+ * value that harms nothing: on, because it is the file's own name that is then
+ * looked for; the player's own, which no sync removes; from nowhere in
+ * particular. Fields this build does not know are kept, as in a profile.
+ */
+export const storedInstalledSchema = z
+  .looseObject({
+    id: z.string().min(1),
+    fileName: z.string().refine(isSafeFileName),
+    name: z.string().min(1).optional().catch(undefined),
+    projectId: storedText,
+    version: z.string().catch(''),
+    source: z.enum(['modrinth', 'url', 'local']).catch('local'),
+    enabled: z.boolean().catch(true),
+    fromManifest: z.boolean().catch(false),
+    updateAvailable: z
+      .object({ versionId: z.string(), versionNumber: z.string(), projectId: z.string() })
+      .optional()
+      .catch(undefined),
+  })
+  .transform((stored) => ({ ...stored, name: stored.name ?? stored.fileName }));
 
 export const newsItemSchema = z.object({
   id: z.string(),

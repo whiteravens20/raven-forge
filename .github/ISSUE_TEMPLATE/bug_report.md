@@ -36,7 +36,7 @@ Include the exact error message shown in the app, if any.
 
 | Field                        | Value                                                   |
 | ---------------------------- | ------------------------------------------------------- |
-| Raven Forge version          | e.g. 0.1.0 (Info page)                                  |
+| Raven Forge version          | e.g. 0.7.1 (Settings → Updates)                         |
 | Operating System             | e.g. Windows 11 24H2 / Debian 12 / Ubuntu 24.04         |
 | Install method               | installer (.exe) / .deb / .AppImage / built from source |
 | Node.js (source builds only) | e.g. 24.x                                               |

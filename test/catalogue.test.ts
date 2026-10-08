@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { listCataloguePacks } from '../src/core/packs/catalogue';
 
@@ -54,7 +56,6 @@ describe('listCataloguePacks', () => {
       minecraftVersion: '26.2',
       modLoader: 'fabric',
       recommendedRamMb: 4096,
-      serverIp: 'mc.example.net',
       modCount: 25,
       totalDownloadBytes: 30472224,
       manifestUrl: 'https://whiteravens20.github.io/raven-packs/ravenmc/manifest.json',
@@ -109,6 +110,30 @@ describe('listCataloguePacks', () => {
     expect((await listCataloguePacks()).map((p) => p.slug)).toEqual(['ok']);
   });
 
+  it('lists only manifests on the White Ravens packs site', async () => {
+    // The picker offers these as White Ravens' own, and the built-in key is
+    // only demanded of a first-party address. The catalogue is not signed, so
+    // an entry pointing elsewhere would be a manifest of somebody else's,
+    // installed under that heading with no signature asked for.
+    respondWith({
+      indexVersion: 1,
+      packs: [
+        entry({ slug: 'elsewhere', manifestUrl: 'https://example.test/pack/manifest.json' }),
+        entry({
+          slug: 'lookalike',
+          manifestUrl: 'https://whiteravens20.github.io.example.test/raven-packs/x/manifest.json',
+        }),
+        entry({
+          slug: 'other-repo',
+          manifestUrl: 'https://whiteravens20.github.io/something-else/manifest.json',
+        }),
+        entry({ slug: 'ours' }),
+      ],
+    });
+
+    expect((await listCataloguePacks()).map((p) => p.slug)).toEqual(['ours']);
+  });
+
   it('survives a catalogue that omits the optional fields', async () => {
     respondWith({
       indexVersion: 1,
@@ -119,7 +144,7 @@ describe('listCataloguePacks', () => {
           version: '0.1.0',
           minecraft: '1.21.4',
           loader: { type: 'fabric' },
-          manifestUrl: 'https://example.test/bare/manifest.json',
+          manifestUrl: 'https://whiteravens20.github.io/raven-packs/bare/manifest.json',
         },
       ],
     });
@@ -127,7 +152,39 @@ describe('listCataloguePacks', () => {
     const [pack] = await listCataloguePacks();
     expect(pack.summary).toBe('');
     expect(pack.modCount).toBe(0);
-    expect(pack.serverIp).toBeUndefined();
+    expect(pack.recommendedRamMb).toBeUndefined();
+  });
+
+  it('leaves a RAM figure that makes no sense off the pack, and keeps the pack', async () => {
+    respondWith({
+      indexVersion: 1,
+      packs: [
+        entry({ slug: 'huge', recommendedRamMb: 2 * 1024 * 1024 }),
+        entry({ slug: 'words', recommendedRamMb: 'plenty' }),
+        entry({ slug: 'fine', recommendedRamMb: 6144 }),
+      ],
+    });
+
+    const packs = await listCataloguePacks();
+    expect(packs.map((p) => [p.slug, p.recommendedRamMb])).toEqual([
+      ['huge', undefined],
+      ['words', undefined],
+      ['fine', 6144],
+    ]);
+  });
+
+  it('is not put off by fields it has no use for changing shape', async () => {
+    // Everything the picker does not show is the packs site's own business.
+    respondWith({
+      indexVersion: 1,
+      generatedAt: 20261006,
+      packs: [
+        entry({ server: 'mc.example.net', mrpackUrl: null, counts: { mods: 3, shaders: 'x' } }),
+      ],
+    });
+
+    const [pack] = await listCataloguePacks();
+    expect(pack.modCount).toBe(3);
   });
 
   it('refuses a catalogue whose shape it does not recognise', async () => {

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 /**
  * Every address this launcher ships pointing at White Ravens, in one file.
  *
@@ -115,8 +117,27 @@ export function isBuiltInKey(publicKey: string): boolean {
 /** The launcher's own source repository — About, and the bug-report links. */
 export const REPO_URL = 'https://github.com/whiteravens20/raven-forge';
 
+/** Where a build that cannot update itself is fetched from by hand. */
+export const RELEASES_URL = `${REPO_URL}/releases/latest`;
+
+/** The notes of one release: what an update brings, for whoever asks before taking it. */
+export function releaseNotesUrl(version: string): string {
+  return `${REPO_URL}/releases/tag/v${encodeURIComponent(version)}`;
+}
+
 /** The organisation behind it, for anyone who would rather not open a GitHub account. */
 export const ORG_URL = 'https://whiteravens.net';
+
+/**
+ * Who wrote the launcher and where its original source lives: the attribution
+ * the term in NOTICE asks every copy, and every work based on this one, to keep.
+ *
+ * The one pair in this file a fork leaves alone. `REPO_URL` above becomes the
+ * fork's own repository; these two go on naming the original, which is all the
+ * term is for. A fork may put "Based on" in front of the first.
+ */
+export const ATTRIBUTION = 'Raven Forge by White Ravens';
+export const ORIGINAL_SOURCE_URL = 'https://github.com/whiteravens20/raven-forge';
 
 /**
  * The published privacy policy, one file per UI language.

@@ -1,8 +1,11 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useState } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useT } from '@renderer/i18n';
 import type { ShaderLoaderOption } from '@shared/ipc-types';
+import { useDialogFocus } from '@hooks/use-dialog-focus';
 
 interface Props {
   options: ShaderLoaderOption[];
@@ -22,6 +25,7 @@ interface Props {
  */
 export function ShaderLoaderPicker({ options, busy, onInstall, onSkip }: Props) {
   const t = useT();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const [picked, setPicked] = useState(
     () => (options.find((o) => o.recommended) ?? options[0])?.id ?? '',
   );
@@ -40,7 +44,9 @@ export function ShaderLoaderPicker({ options, busy, onInstall, onSkip }: Props) 
       role="presentation"
     >
       <div
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl"
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-rf-border bg-rf-bg-secondary shadow-2xl outline-none"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={t('shaderLoader.title')}

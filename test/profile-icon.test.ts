@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -67,14 +69,17 @@ async function put(name: string, bytes: Buffer | number = png): Promise<string> 
   return file;
 }
 
+/** The profile's copy of the image, in the profile's own directory. */
+const iconFile = (name = 'icon.png') =>
+  path.join(process.env.RAVENFORGE_DATA_DIR!, 'profiles', profile.id, name);
+
 describe('setProfileIcon', () => {
-  it('copies the file in and points the profile at the copy', async () => {
+  it('copies the file in and has the profile name the copy', async () => {
     const updated = await icons.setProfileIcon(profile.id, await put('avatar.png'));
 
-    expect(updated.iconPath).toBe(
-      path.join(process.env.RAVENFORGE_DATA_DIR!, 'profiles', profile.id, 'icon.png'),
-    );
-    expect(await fs.readFile(updated.iconPath!)).toEqual(png);
+    // The name, not the path: a path is true of one place, and the data moves.
+    expect(updated.iconPath).toBe('icon.png');
+    expect(await fs.readFile(iconFile())).toEqual(png);
     // The original can go now — that is the point of copying.
     await fs.rm(path.join(source, 'avatar.png'));
     expect(await icons.getProfileIconDataUrl(profile.id)).toMatch(/^data:image\/png;base64,/);
@@ -147,8 +152,34 @@ describe('getProfileIconDataUrl', () => {
   it('reads a vanished file as "never had one" rather than failing', async () => {
     // Somebody cleaned out the profile directory by hand. The profile list
     // still has to render.
-    const updated = await icons.setProfileIcon(profile.id, await put('a.png'));
-    await fs.rm(updated.iconPath!);
+    await icons.setProfileIcon(profile.id, await put('a.png'));
+    await fs.rm(iconFile());
+    expect(await icons.getProfileIconDataUrl(profile.id)).toBeNull();
+  });
+
+  it('finds the image where the data is now, whatever path an older build stored', async () => {
+    // Older builds stored the whole path. After the data folder moved it named
+    // a file in the folder that had just been emptied, and the avatar was gone
+    // although the image had moved along with everything else.
+    await icons.setProfileIcon(profile.id, await put('a.png'));
+    for (const stored of [
+      path.join(root, 'where-the-data-used-to-be', 'profiles', profile.id, 'icon.png'),
+      `C:\\Users\\Somebody\\AppData\\Roaming\\Raven Forge Launcher\\profiles\\${profile.id}\\icon.png`,
+    ]) {
+      await mgr.updateProfile(profile.id, { iconPath: stored });
+      expect(await icons.getProfileIconDataUrl(profile.id), stored).toMatch(
+        /^data:image\/png;base64,/,
+      );
+    }
+  });
+
+  it('never reads outside the profile, whatever the stored value points at', async () => {
+    const outside = path.join(root, 'outside.png');
+    await fs.writeFile(outside, png);
+    await mgr.updateProfile(profile.id, { iconPath: outside });
+    expect(await icons.getProfileIconDataUrl(profile.id)).toBeNull();
+
+    await mgr.updateProfile(profile.id, { iconPath: '../../../outside.png' });
     expect(await icons.getProfileIconDataUrl(profile.id)).toBeNull();
   });
 

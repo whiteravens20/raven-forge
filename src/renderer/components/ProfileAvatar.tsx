@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { useEffect, useState } from 'react';
 import { PROFILE_PRESETS } from '@components/profile-presets';
 import type { Profile } from '@shared/ipc-types';
@@ -40,11 +42,11 @@ function initials(name: string): string {
 
 interface ProfileAvatarProps {
   profile: Profile;
-  size?: number;
-  className?: string;
+  /** The side of the square, in pixels. */
+  size: number;
 }
 
-export function ProfileAvatar({ profile, size = 40, className = '' }: ProfileAvatarProps) {
+export function ProfileAvatar({ profile, size }: ProfileAvatarProps) {
   const key = cacheKey(profile);
   const [icon, setIcon] = useState<string | null>(() => cache.get(key) ?? null);
 
@@ -64,6 +66,9 @@ export function ProfileAvatar({ profile, size = 40, className = '' }: ProfileAva
     let active = true;
     void api.profiles.getIcon(profile.id).then((result) => {
       const url = result.success ? (result.data ?? null) : null;
+      // The key carries the profile's last change, so every edit made a new
+      // entry and left the one before it: a whole picture kept per save.
+      invalidateAvatarCache(profile.id);
       cache.set(key, url);
       if (active) setIcon(url);
     });
@@ -84,7 +89,7 @@ export function ProfileAvatar({ profile, size = 40, className = '' }: ProfileAva
         src={src}
         alt=""
         style={dimensions}
-        className={`shrink-0 rounded-lg border border-rf-border object-cover ${className}`}
+        className="shrink-0 rounded-lg border border-rf-border object-cover"
       />
     );
   }
@@ -92,7 +97,7 @@ export function ProfileAvatar({ profile, size = 40, className = '' }: ProfileAva
   return (
     <div
       style={{ ...dimensions, fontSize: Math.round(size * 0.36) }}
-      className={`flex shrink-0 items-center justify-center rounded-lg border border-rf-border font-display font-semibold ${tintFor(profile.id)} ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-lg border border-rf-border font-display font-semibold ${tintFor(profile.id)}`}
       aria-hidden="true"
     >
       {initials(profile.name)}

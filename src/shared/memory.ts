@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { DEFAULT_RAM_MB, MAX_RAM_MB, MIN_RAM_MB, RAM_STEP_MB } from './constants';
 
 /**
@@ -50,6 +52,18 @@ export function recommendedRamMb(totalMb: number | undefined): number {
   const wanted =
     totalMb < 6 * 1024 ? 2048 : totalMb < 12 * 1024 ? 4096 : totalMb < 24 * 1024 ? 6144 : 8192;
   return Math.min(wanted, safeMaxRamMb(totalMb));
+}
+
+/**
+ * Whether a pack's own RAM figure is one to take seriously.
+ *
+ * It is written by whoever published the pack and ends up on a `-Xmx` line, so
+ * it gets bounds of its own: a whole number of megabytes between the least a
+ * modern game starts on and more than any pack has reason to ask for. A pack
+ * that says 2 TB has said nothing.
+ */
+export function isPlausiblePackRam(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 512 && value <= 65536;
 }
 
 /**

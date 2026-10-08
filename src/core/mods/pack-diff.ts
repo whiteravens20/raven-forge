@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import type { ModEntry } from '../../shared/manifest-schema';
 import type { InstalledMod } from '../../shared/ipc-types';
 
@@ -6,10 +8,11 @@ import type { InstalledMod } from '../../shared/ipc-types';
  *
  * The profile's badge used to be written only at the end of a sync, so
  * "Synced" meant "the last sync finished", not "this profile matches the pack".
- * A pack that moved twice since left the badge green and said nothing, and
- * nothing else would have said it either: launching a profile installs the
- * loader, Java and the client jar, but never reconciles mods. The player's only
- * hint that they were a version behind was pressing Sync and watching.
+ * A pack that moved twice since left the badge green and said nothing. A launch
+ * brings the profile up to its pack by now, but the badge is read long before
+ * anyone presses Play, and on a pack that cannot be reached the launch goes
+ * ahead on what is installed — so it is still the one place that says a
+ * profile is behind.
  *
  * Counting the difference is what lets the badge answer the question it appears
  * to answer. It is deliberately the same number a sync would act on, so the

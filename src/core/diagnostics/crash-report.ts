@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 // One file per crash, containing everything a bug report needs and nothing
 // that identifies the player. See `writeCrashReport` for what "nothing" means.
 
@@ -35,6 +37,26 @@ function escapeRegExp(value: string): string {
 }
 
 /**
+ * Every way a known value is written.
+ *
+ * An account's UUID comes from Minecraft Services without dashes and is printed
+ * by the game, and by most mods, with them. Matching only the spelling the
+ * launcher holds left the other one in the report.
+ */
+function spellings(secret: string): string[] {
+  const bare = secret.replace(/-/g, '');
+  if (!/^[0-9a-f]{32}$/i.test(bare)) return [secret];
+  const dashed = [
+    bare.slice(0, 8),
+    bare.slice(8, 12),
+    bare.slice(12, 16),
+    bare.slice(16, 20),
+    bare.slice(20),
+  ].join('-');
+  return [bare, dashed];
+}
+
+/**
  * Strip credentials and personal details out of anything before it is written.
  *
  * `secrets` are the values this launch is known to have used — the access
@@ -46,38 +68,74 @@ function escapeRegExp(value: string): string {
  * would otherwise redact a substring of every other word in the log and leave
  * behind something nobody can read.
  */
-export function redactSecrets(text: string, secrets: string[] = []): string {
+export function redactSecrets(
+  text: string,
+  secrets: string[] = [],
+  home: string = os.homedir(),
+): string {
   let out = text.replace(JWT_PATTERN, '<redacted>').replace(CREDENTIAL_ARG_PATTERN, '$1<redacted>');
 
-  for (const secret of secrets) {
+  for (const secret of secrets.flatMap(spellings)) {
     if (secret.length < 3) continue;
     out = out.replace(new RegExp(escapeRegExp(secret), 'gi'), '<redacted>');
   }
 
   // Windows puts the account name in every absolute path — `C:\Users\Jan
   // Kowalski\AppData\…` — and so does a Linux home directory. The paths still
-  // have to be readable to be useful, so only the home prefix goes.
-  const home = os.homedir();
+  // have to be readable to be useful, so only the home prefix goes. Java writes
+  // the same Windows path with forward slashes wherever it makes a URL of it,
+  // so that spelling goes too.
   if (home.length >= 3) {
-    out = out.replace(new RegExp(escapeRegExp(home), 'gi'), '~');
+    for (const prefix of new Set([home, home.replaceAll('\\', '/')])) {
+      out = out.replace(new RegExp(escapeRegExp(prefix), 'gi'), '~');
+    }
   }
 
   return out;
 }
 
+/**
+ * Take the session token out of a line of game output, and nothing else.
+ *
+ * `redactSecrets` is for a file that is about to be published. This is for what
+ * the launcher keeps and shows while the game runs — its own log, the live
+ * console, the tail an exit card quotes — where the player's name and their
+ * home directory are theirs to read, and the token is still nobody's business:
+ * Minecraft 1.8.9 prints `(Session ID is token:<token>:<uuid>)` on every start,
+ * and that line used to be copied into `main.log` as it came.
+ *
+ * The token itself is matched as well as the JWT shape, so that none of this
+ * rests on what a token happens to look like. The same length floor as above
+ * keeps the `0` an offline launch passes from blanking every zero in the output.
+ */
+export function redactTokens(line: string, accessToken: string): string {
+  const out = line.replace(JWT_PATTERN, '<redacted>');
+  return accessToken.length < 3 ? out : out.replaceAll(accessToken, '<redacted>');
+}
+
 export interface CrashReportInput {
   profile: Profile;
   exitCode: number;
+  /**
+   * The signal that killed the process, when one did. There is no exit code
+   * then, and `exitCode` holds only the placeholder the exit card is given.
+   */
+  signal?: NodeJS.Signals | null;
   playTimeMinutes: number;
-  /** `Date.now()` at spawn, so the game's own crash file can be matched to this run. */
-  startedAt: number;
   /** The game's last output, as `getLogTail` returned it. */
   logTail: string[];
   /** Set when the process never started at all, in which case it is the whole finding. */
   spawnError?: string;
+  /**
+   * False when the profile's loader build is not one the launcher offers for
+   * its Minecraft version — a build a pack named, as a rule. It is the first
+   * thing to know about a game that would not start, and nothing else in the
+   * report says it. Undefined when that could not be told.
+   */
+  loaderBuildOffered?: boolean;
   /** Where the game actually ran — a profile can point somewhere else entirely. */
   gameDir: string;
-  java: { path: string; version?: number; vendor?: string; managed?: boolean };
+  java: { path: string; version?: number; vendor?: string };
   accountType: string;
   /** Whether this particular launch went online, which is not the global setting. */
   offlineLaunch: boolean;
@@ -182,12 +240,8 @@ async function listMods(gameDir: string): Promise<string[]> {
   }
 }
 
-export function buildCrashReport(
-  input: CrashReportInput,
-  mods: string[],
-  minecraftCrash?: { file: string; content: string },
-): string {
-  const { profile } = input;
+export function buildCrashReport(input: CrashReportInput, mods: string[]): string {
+  const { profile, minecraftCrash } = input;
   const sections: string[] = [];
 
   sections.push(
@@ -218,7 +272,10 @@ export function buildCrashReport(
         'Mod loader',
         profile.modLoader === 'vanilla'
           ? 'vanilla'
-          : `${profile.modLoader} ${profile.modLoaderVersion ?? '(version not recorded)'}`,
+          : `${profile.modLoader} ${profile.modLoaderVersion ?? '(version not recorded)'}` +
+              (input.loaderBuildOffered === false
+                ? ' — not a build the launcher offers for this Minecraft version'
+                : ''),
       ),
       field(
         'Java',
@@ -238,7 +295,10 @@ export function buildCrashReport(
   sections.push(
     [
       '## Exit',
-      field('Exit code', input.exitCode),
+      field('Exit code', input.signal ? null : input.exitCode),
+      // Which signal is most of the diagnosis: SIGKILL is usually the kernel's
+      // out-of-memory killer, SIGSEGV and SIGABRT a native library or the JVM.
+      ...(input.signal ? [field('Killed by signal', input.signal)] : []),
       field('Played', `${input.playTimeMinutes} min`),
       ...(input.spawnError ? [field('The process never started', input.spawnError)] : []),
     ].join('\n'),
@@ -281,15 +341,29 @@ function stamp(at: number): string {
   return new Date(at).toISOString().replace(/[-:]/g, '').replace(/T/, '-').slice(0, 15);
 }
 
-/** Delete all but the newest `KEEP_REPORTS` files, so this never grows forever. */
+/** A name `writeCrashReport` gives a file, with the stamp it ends in captured. */
+const REPORT_NAME = /^crash-.*-(\d{8}-\d{6})\.txt$/;
+
+/**
+ * Delete all but the newest `KEEP_REPORTS` files, so this never grows forever.
+ *
+ * Newest by the stamp the name ends in, which sorts as text in the order it
+ * was written. Sorting the whole name does not: the profile comes first in it,
+ * so every report for "Classic" sorted before every one for "Raven Forge"
+ * whatever their dates, and with twenty of the second on disk the first crash
+ * of the other profile deleted its own report — the file just written, which
+ * the exit card was about to offer.
+ *
+ * A file that is not named this way was not put here by the launcher, and is
+ * neither counted nor removed.
+ */
 async function prune(dir: string): Promise<void> {
-  const entries = (await fs.readdir(dir)).filter(
-    (e) => e.startsWith('crash-') && e.endsWith('.txt'),
-  );
-  if (entries.length <= KEEP_REPORTS) return;
-  // The name ends in a sortable timestamp, so lexical order is chronological.
-  for (const stale of entries.sort().slice(0, entries.length - KEEP_REPORTS)) {
-    await fs.rm(path.join(dir, stale), { force: true });
+  const reports = (await fs.readdir(dir))
+    .map((name) => ({ name, stamp: REPORT_NAME.exec(name)?.[1] ?? '' }))
+    .filter((report) => report.stamp !== '')
+    .sort((a, b) => a.stamp.localeCompare(b.stamp));
+  for (const stale of reports.slice(0, Math.max(0, reports.length - KEEP_REPORTS))) {
+    await fs.rm(path.join(dir, stale.name), { force: true });
   }
 }
 
@@ -308,7 +382,7 @@ export async function writeCrashReport(input: CrashReportInput): Promise<string 
     const dir = paths.crashReportsDir;
     await fs.mkdir(dir, { recursive: true });
     const file = path.join(dir, `crash-${slug(input.profile.name)}-${stamp(Date.now())}.txt`);
-    await fs.writeFile(file, buildCrashReport(input, mods, input.minecraftCrash), 'utf-8');
+    await fs.writeFile(file, buildCrashReport(input, mods), 'utf-8');
     await prune(dir);
 
     log.info(`Wrote crash report for ${input.profile.name} to ${file}`);

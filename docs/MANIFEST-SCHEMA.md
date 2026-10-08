@@ -1,6 +1,6 @@
 # Server Mod Manifest — Schema v2
 
-Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher fetches it, validates it against the [Zod schema](../src/shared/manifest-schema.ts), checks its Ed25519 signature, and reconciles the listed mods/shaders/resource packs against the per-profile `installed.lock`.
+Server admins publish a JSON manifest at a stable HTTPS URL — plain HTTP is taken only from an address on the player's own computer, since a manifest fetched over it could be changed on the way. The launcher fetches it, validates it against the [Zod schema](../src/shared/manifest-schema.ts), checks its Ed25519 signature, and reconciles the listed mods/shaders/resource packs against the per-profile `installed.lock`.
 
 ## Top-level shape
 
@@ -20,6 +20,14 @@ Server admins publish a JSON manifest at a stable HTTP/HTTPS URL. The launcher f
 }
 ```
 
+`modLoaderVersion` is the loader's own build — `0.19.3` for Fabric, `47.4.10`
+for Forge, `21.1.248` for NeoForge — and never carries the Minecraft version in
+front of it. For the few Minecraft versions where Forge publishes a build with a
+branch after its number (`10.13.4.1614-1.7.10`), the number alone is enough: the
+launcher finds the build by it. Which Minecraft versions each loader can be
+installed for, and which of its builds start them, is in the
+[architecture notes](ARCHITECTURE.md#installing-a-mod-loader).
+
 `recommendedRamMb` is optional and bounded to 512–65536. It is applied **only
 when the profile is created**, so a later sync never overwrites a figure the
 player has since chosen; a manifest without one leaves the launcher's own
@@ -27,20 +35,32 @@ default alone.
 
 ## `mods[]` entries
 
-| Field       | Type                             | Required                            | Notes                                                                                                                                                                                                |
-| ----------- | -------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`        | string                           | yes                                 | Stable identifier — match across versions to enable update detection.                                                                                                                                |
-| `name`      | string                           | yes                                 | Display name.                                                                                                                                                                                        |
-| `version`   | string                           | yes                                 | Free-form version label, recorded in `installed.lock`.                                                                                                                                               |
-| `source`    | `"modrinth" \| "url" \| "local"` | yes                                 | Provenance. Also selects the resolver when no `url` is given.                                                                                                                                        |
-| `url`       | string (URL)                     | recommended                         | Direct download URL. **When present the launcher skips resolution entirely** — see below.                                                                                                            |
-| `fileName`  | string                           | no                                  | Exact filename to write — a bare name, with no `/`, `\\` or path segments. Defaults to the last path segment of `url`. A value carrying a path is rejected outright, and the whole manifest with it. |
-| `projectId` | string                           | when source = modrinth and no `url` | Modrinth project identifier, resolved against `version` at sync time.                                                                                                                                |
-| `localPath` | string                           | when source = local                 | Absolute path on the player's machine — niche, used for LAN / offline.                                                                                                                               |
-| `sha512`    | string (128 hex)                 | recommended                         | Preferred integrity check.                                                                                                                                                                           |
-| `sha256`    | string (64 hex)                  | alternative                         | Used when `sha512` is absent.                                                                                                                                                                        |
-| `required`  | boolean                          | default `true`                      | If `false`, the launcher installs but the user can disable.                                                                                                                                          |
-| `side`      | `"client" \| "server" \| "both"` | default `"client"`                  | `server`-only entries are skipped when syncing a client profile.                                                                                                                                     |
+| Field       | Type                             | Required                            | Notes                                                                                                                                                                                                                                                             |
+| ----------- | -------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`        | string                           | yes                                 | Stable identifier — match across versions to enable update detection.                                                                                                                                                                                             |
+| `name`      | string                           | yes                                 | Display name.                                                                                                                                                                                                                                                     |
+| `version`   | string                           | yes                                 | Free-form version label, recorded in `installed.lock`.                                                                                                                                                                                                            |
+| `source`    | `"modrinth" \| "url" \| "local"` | yes                                 | Provenance. Also selects the resolver when no `url` is given.                                                                                                                                                                                                     |
+| `url`       | string (URL)                     | recommended                         | Direct download URL. **When present the launcher skips resolution entirely** — see below.                                                                                                                                                                         |
+| `fileName`  | string                           | no                                  | Exact filename to write — a bare name, with no `/`, `\\` or path segments. Defaults to the last path segment of `url`. A value carrying a path is rejected outright, and the whole manifest with it.                                                              |
+| `projectId` | string                           | when source = modrinth and no `url` | Modrinth project identifier, resolved against `version` at sync time.                                                                                                                                                                                             |
+| `localPath` | string                           | when source = local                 | A file on the computer the launcher runs on. Read only from a manifest that computer serves itself (`http://localhost`), which is how a pack is tried while it is being built. From any other address an entry with `source: "local"` refuses the whole manifest. |
+| `sha512`    | string (128 hex)                 | recommended                         | Preferred integrity check.                                                                                                                                                                                                                                        |
+| `sha256`    | string (64 hex)                  | alternative                         | Used when `sha512` is absent.                                                                                                                                                                                                                                     |
+| `required`  | boolean                          | no                                  | Not read by the launcher. Every listed mod is installed, and the player may switch any of them off; a manifest that carries the field is taken as it is.                                                                                                          |
+| `side`      | `"client" \| "server" \| "both"` | default `"client"`                  | `server`-only entries are skipped when syncing a client profile.                                                                                                                                                                                                  |
+
+### A file on the player's own computer
+
+`source: "local"` names a file by its path instead of an address to fetch it
+from, and the launcher copies it in. It is for building a pack: the manifest is
+served from the author's own machine — `http://localhost` is the one plain-http
+address a manifest is taken from — and the jar being worked on is on the same
+disk. A manifest from anywhere else that carries such an entry is refused whole,
+a kept copy of one included. What is on a player's disk is not for a server to
+name: the entry would copy any file the launcher can read into `mods/`, and on
+Windows a path that begins with `\\` and a host's name would send the launcher to
+that host.
 
 ### Integrity
 
@@ -49,12 +69,19 @@ one present wins**, in that order. The asymmetry is deliberate: Modrinth's API
 returns `sha1` and `sha512` but never `sha256`, so a manifest generator that can
 publish `sha512` never has to download a jar purely to hash it. That is what
 makes large packs cheap to build. `sha1` is the floor, and exists because a
-`.mrpack` publishes it for every file. An entry with none of the three is
-accepted **without verification** — the launcher does not invent a hash to check
-against.
+`.mrpack` publishes it for every file.
 
-`installed.lock` always records `sha256` locally, whichever algorithm the
-manifest used.
+A hash the manifest states is the one its file is held to, for a mod, a shader
+or a resource pack alike, and whatever Modrinth says about the same build: it is
+the publisher's claim, and the one the manifest's signature covers.
+
+What an entry with none of the three gets depends on where its file comes from.
+A `modrinth` entry with no `url` is checked against the hash Modrinth publishes
+for that build. A mod given by `url` **must** declare one, and a manifest that
+lists one without is refused: nothing else pins a jar that is about to be loaded
+as code. A shader, a resource pack or a config file given by `url` with no hash
+is fetched without verification — the launcher does not invent a hash to check
+against.
 
 ### Resolution and the `url` fast path
 
@@ -65,7 +92,10 @@ Setting `source: "modrinth"` alongside `url` is still worthwhile: it preserves
 provenance for the UI.
 
 Without `url`, a `modrinth` entry resolves `projectId` through the API and
-matches `version` against `version_number` first, then the opaque version `id`.
+matches `version` against a build's `version_number` or its opaque version `id`.
+A `version` that names neither is an error: the sync stops and says which entry,
+rather than installing some other build in its place. `installed.lock` records
+the label as the manifest wrote it, which is what a later sync compares.
 
 **There is no `curseforge` source.** CurseForge's API key is issued per
 developer after a manual application and its terms make the key
@@ -90,7 +120,7 @@ Same shape — `id`, `name`, optional `version`, `source` (`modrinth | url | loc
 }
 ```
 
-Paths are resolved relative to the profile's `.minecraft` directory. The launcher overwrites the file on every sync if the hash does not match.
+Paths are resolved relative to the profile's `.minecraft` directory. A file is written when the profile does not have it, and again when the manifest's copy of it changes — recognised by its hash, so a file with no hash is written on every sync. One the player has changed since is otherwise left alone: a pack's config is a starting point, and the game itself rewrites `options.txt` every time it closes.
 
 ## Signing
 

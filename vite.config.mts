@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -24,7 +26,6 @@ export default defineConfig({
       '@components': path.resolve(__dirname, 'src/renderer/components'),
       '@hooks': path.resolve(__dirname, 'src/renderer/hooks'),
       '@stores': path.resolve(__dirname, 'src/renderer/stores'),
-      '@pages': path.resolve(__dirname, 'src/renderer/pages'),
     },
   },
   server: {

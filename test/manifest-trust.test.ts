@@ -1,3 +1,5 @@
+// Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
+
 import { describe, it, expect } from 'vitest';
 import nacl from 'tweetnacl';
 import { encodeBase64, decodeUTF8 } from 'tweetnacl-util';
@@ -10,8 +12,9 @@ import {
   BUILT_IN_KEYS,
   WHITE_RAVENS_PUBLIC_KEY,
   isFirstPartyManifestUrl,
+  trustedKeyRing,
 } from '../src/shared/branding';
-import { isSecureContentUrl } from '../src/shared/validators';
+import { isLoopbackUrl, isSecureContentUrl } from '../src/shared/validators';
 import type { TrustedKey } from '../src/shared/ipc-types';
 
 /**
@@ -94,13 +97,25 @@ describe('verifyManifestSignature', () => {
     expect(BUILT_IN_KEYS.map((k) => k.publicKey)).toContain(WHITE_RAVENS_PUBLIC_KEY);
   });
 
-  it('does not offer the publisher key twice when the user added it too', () => {
+  it('lists the publisher key once, under its own name, when the player added it too', () => {
     const mine: TrustedKey[] = [
       { name: 'Mine', publicKey: WHITE_RAVENS_PUBLIC_KEY, addedAt: '2026-01-01T00:00:00.000Z' },
     ];
-    const result = verifyManifestSignature(sign(manifest), mine);
-    // The user's name for it wins; the built-in copy is not consulted again.
-    expect(result).toMatchObject({ signed: true, valid: false });
+    expect(trustedKeyRing(mine)).toEqual(BUILT_IN_KEYS);
+  });
+
+  it('holds a first-party manifest to the built-in key, whatever else the player trusts', () => {
+    // Signed, and by a key in the player's own list — which is exactly what
+    // somebody who talked them into adding that key would present. For a pack
+    // from the White Ravens site only the key that ships with the launcher
+    // counts, and this is not it.
+    const signed = sign(manifest);
+    expect(verifyManifestSignature(signed, trusted('Somebody'))).toMatchObject({ valid: true });
+    expect(verifyManifestSignature(signed, trusted('Somebody'), true)).toMatchObject({
+      signed: true,
+      valid: false,
+      error: 'Signature does not match the White Ravens key',
+    });
   });
 });
 
@@ -200,5 +215,33 @@ describe('isSecureContentUrl', () => {
   it('rejects a non-web scheme', () => {
     expect(isSecureContentUrl('file:///etc/passwd')).toBe(false);
     expect(isSecureContentUrl('ftp://example.net/x')).toBe(false);
+  });
+});
+
+describe('isLoopbackUrl', () => {
+  it('knows this computer by each of its names, over either scheme', () => {
+    for (const address of [
+      'http://localhost:8080/manifest.json',
+      'https://localhost/manifest.json',
+      'http://127.0.0.1:3000/manifest.json',
+      'http://[::1]:3000/manifest.json',
+      'http://LOCALHOST/manifest.json',
+    ]) {
+      expect(isLoopbackUrl(address), address).toBe(true);
+    }
+  });
+
+  it('is not taken in by an address that only has one of those names in it', () => {
+    for (const address of [
+      'https://localhost.example.net/manifest.json',
+      'https://example.net/localhost/manifest.json',
+      'https://127.0.0.1.example.net/manifest.json',
+      'https://localhost@example.net/manifest.json',
+      'https://example.net/?from=http://localhost/',
+      'https://192.168.1.10/manifest.json',
+      'not an address',
+    ]) {
+      expect(isLoopbackUrl(address), address).toBe(false);
+    }
   });
 });
