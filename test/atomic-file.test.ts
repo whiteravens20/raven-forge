@@ -4,7 +4,18 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { writeFileAtomic, writeJsonAtomic } from '../src/core/util/atomic-file';
+import { flushToDisk, writeFileAtomic, writeJsonAtomic } from '../src/core/util/atomic-file';
+
+const { warnings } = vi.hoisted(() => ({ warnings: [] as string[] }));
+
+vi.mock('../src/main/logger', () => ({
+  log: {
+    warn: (message: string) => warnings.push(message),
+    info: () => {},
+    error: () => {},
+    debug: () => {},
+  },
+}));
 
 /**
  * The atomic write, over a real directory.
@@ -21,7 +32,21 @@ let dir: string;
 
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-atomic-'));
+  warnings.length = 0;
 });
+
+/** Have every flush in the next writes answer with this error instead of flushing. */
+async function flushAnswers(error: Error): Promise<{ restore: () => void }> {
+  const probe = await fs.open(path.join(dir, 'probe'), 'w');
+  const handles = Object.getPrototypeOf(probe) as { sync: () => Promise<void> };
+  await probe.close();
+  await fs.rm(path.join(dir, 'probe'));
+  const sync = vi.spyOn(handles, 'sync').mockRejectedValue(error);
+  return { restore: () => sync.mockRestore() };
+}
+
+const errno = (code: string) =>
+  Object.assign(new Error(`${code}: could not flush, fsync`), { code });
 
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true });
@@ -106,23 +131,77 @@ describe('writeFileAtomic', () => {
     expect(await fs.readFile(path.join(dir, 'state.json'), 'utf-8')).toBe('{"a":1}');
   });
 
-  it('leaves the file that was there when the bytes cannot be sent to the disk', async () => {
-    const file = path.join(dir, 'state.json');
-    await fs.writeFile(file, 'old');
-    const probe = await fs.open(path.join(dir, 'probe'), 'w');
-    const handles = Object.getPrototypeOf(probe) as { sync: () => Promise<void> };
-    await probe.close();
-    await fs.rm(path.join(dir, 'probe'));
-    const sync = vi.spyOn(handles, 'sync').mockRejectedValue(new Error('EIO: i/o error, fsync'));
+  it.each(['EIO', 'ENOSPC', 'EDQUOT', 'EROFS'])(
+    'leaves the file that was there when the disk will not take the bytes (%s)',
+    async (code) => {
+      const file = path.join(dir, 'state.json');
+      await fs.writeFile(file, 'old');
+      const flush = await flushAnswers(errno(code));
+
+      try {
+        await expect(writeFileAtomic(file, 'new')).rejects.toThrow(code);
+      } finally {
+        flush.restore();
+      }
+
+      expect(await fs.readFile(file, 'utf-8')).toBe('old');
+      expect(await fs.readdir(dir)).toEqual(['state.json']);
+    },
+  );
+
+  it.each(['EINVAL', 'ENOTSUP', 'ENOSYS', 'EISDIR'])(
+    'writes the file all the same where the filesystem cannot be told to flush (%s)',
+    async (code) => {
+      // Held to a flush there, the launcher could save nothing at all: no
+      // setting, no profile, no sign-in.
+      const file = path.join(dir, 'state.json');
+      await fs.writeFile(file, 'old');
+      const flush = await flushAnswers(errno(code));
+
+      try {
+        await writeFileAtomic(file, 'new');
+      } finally {
+        flush.restore();
+      }
+
+      expect(await fs.readFile(file, 'utf-8')).toBe('new');
+      expect(await fs.readdir(dir)).toEqual(['state.json']);
+    },
+  );
+
+  it('says so in the log, and says it once', async () => {
+    vi.resetModules();
+    const fresh = await import('../src/core/util/atomic-file');
+    const flush = await flushAnswers(errno('ENOTSUP'));
 
     try {
-      await expect(writeFileAtomic(file, 'new')).rejects.toThrow(/EIO/);
+      await fresh.writeFileAtomic(path.join(dir, 'one.json'), '1');
+      await fresh.writeFileAtomic(path.join(dir, 'two.json'), '2');
     } finally {
-      sync.mockRestore();
+      flush.restore();
     }
 
-    expect(await fs.readFile(file, 'utf-8')).toBe('old');
-    expect(await fs.readdir(dir)).toEqual(['state.json']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(dir);
+    expect(warnings[0]).toContain('ENOTSUP');
+  });
+
+  it('lets through what this system really answers for a place that cannot be flushed', async () => {
+    // Not a stand-in: the null device, asked by the system this runs on. Linux
+    // answers EINVAL. Whatever the answer is here, it has to be one of those
+    // the write goes on after — or there is nothing to go on after at all.
+    const nowhere = await fs.open(os.devNull, 'w');
+    try {
+      const answer = await nowhere.sync().then(
+        () => 'flushed',
+        (err: NodeJS.ErrnoException) => err.code ?? String(err),
+      );
+      console.log(`a flush of ${os.devNull} on ${process.platform}: ${answer}`);
+
+      await expect(flushToDisk(nowhere, os.devNull)).resolves.toBeUndefined();
+    } finally {
+      await nowhere.close();
+    }
   });
 
   it('removes the temporary file when the write cannot be renamed into place', async () => {
