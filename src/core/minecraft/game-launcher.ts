@@ -44,10 +44,13 @@ import {
 
 import type { LaunchOptions, GameLogLine, GameExitInfo, Profile } from '../../shared/ipc-types';
 import {
+  JOINS_BY_QUICK_PLAY,
   customResolution,
+  quickPlayAddress,
   resolveConditionalArgs,
   splitArguments,
   substituteVars,
+  takesQuickPlayMultiplayer,
 } from './launch-args';
 import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
@@ -197,17 +200,17 @@ function emitLogLine(profileId: string, rawLine: string): void {
  * Launcher features the version meta may gate arguments on. Anything absent
  * counts as false, which is what keeps unsupported modes switched off.
  *
- * Quick play stays off on purpose: this launcher does quick-connect the legacy
- * way, appending `--server`/`--port` below, and never writes the quick-play log
- * file that `--quickPlayPath` expects.
+ * Of quick play only the multiplayer half is ever on: it is how a version from
+ * 1.20 on is told which server to join. The log file `--quickPlayPath` asks for
+ * is something this launcher never reads, so it is never asked for.
  */
-function launchFeatures(profile: Profile): Record<string, boolean> {
+function launchFeatures(profile: Profile, joinsByQuickPlay: boolean): Record<string, boolean> {
   return {
     is_demo_user: false,
     has_custom_resolution: customResolution(profile.windowWidth, profile.windowHeight) !== null,
     has_quick_plays_support: false,
     is_quick_play_singleplayer: false,
-    is_quick_play_multiplayer: false,
+    [JOINS_BY_QUICK_PLAY]: joinsByQuickPlay,
     is_quick_play_realms: false,
   };
 }
@@ -516,6 +519,10 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
 
   // Build arguments
   const resolution = customResolution(profile.windowWidth, profile.windowHeight);
+  // The server a quick connect joins, and which of the two ways this version
+  // is told about it.
+  const server = options.quickConnect && profile.serverIp ? profile.serverIp : null;
+  const joinsByQuickPlay = server !== null && takesQuickPlayMultiplayer(meta.arguments?.game);
   const templateVars: Record<string, string> = {
     auth_player_name: username,
     // The Minecraft version, not the merged profile id. Forge and NeoForge
@@ -556,9 +563,11 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     // substituted into anything.
     resolution_width: String(resolution?.width ?? 854),
     resolution_height: String(resolution?.height ?? 480),
+    // Likewise unused unless the feature is on, which it is only with a server.
+    quickPlayMultiplayer: server === null ? '' : quickPlayAddress(server, profile.serverPort),
   };
 
-  const features = launchFeatures(profile);
+  const features = launchFeatures(profile, joinsByQuickPlay);
 
   // JVM args
   const jvmArgs: string[] = [
@@ -616,9 +625,11 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     }
   }
 
-  // Quick connect
-  if (options.quickConnect && profile.serverIp) {
-    gameArgs.push('--server', profile.serverIp);
+  // Quick connect on a version from before 1.20. A later one was told above,
+  // by the argument it lists for it, and would take these two without a word
+  // and join nothing.
+  if (server !== null && !joinsByQuickPlay) {
+    gameArgs.push('--server', server);
     if (profile.serverPort) {
       gameArgs.push('--port', String(profile.serverPort));
     }

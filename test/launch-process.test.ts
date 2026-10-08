@@ -179,7 +179,11 @@ async function writeGame(body: string): Promise<void> {
 }
 
 /** Press Play on a profile whose runtime is the stand-in, running `body`. */
-async function launch(body: string, profile: Partial<Profile> = {}): Promise<void> {
+async function launch(
+  body: string,
+  profile: Partial<Profile> = {},
+  options: { quickConnect?: boolean } = {},
+): Promise<void> {
   await writeGame(body);
   state.profile = {
     id: 'p1',
@@ -192,7 +196,7 @@ async function launch(body: string, profile: Partial<Profile> = {}): Promise<voi
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...profile,
   };
-  await launcher.launchGame({ profileId: 'p1' });
+  await launcher.launchGame({ profileId: 'p1', ...options });
 }
 
 const sentOn = (channel: string) =>
@@ -419,6 +423,74 @@ describe.skipIf(!posix)('a launch', () => {
     const err = await launch('exit 0').catch((e: unknown) => e);
 
     expect(refusalOf(err)).toEqual({ key: 'launchError.noAccount' });
+  });
+});
+
+/**
+ * Quick connect. Minecraft 1.20 replaced `--server` and `--port` with
+ * `--quickPlayMultiplayer` and dropped the old two; given them, a newer game
+ * says nothing, starts, and joins no server.
+ */
+describe.skipIf(!posix)('a quick connect', () => {
+  const server = { serverIp: 'mc.whiteravens.net', serverPort: 25570 };
+  const gameSide = async () => {
+    const args = await gameArgs();
+    return args.slice(args.indexOf('net.minecraft.client.main.Main') + 1);
+  };
+
+  /** The argument a version from 1.20 on lists for the server to join. */
+  const withQuickPlay = () => {
+    state.meta = {
+      ...state.meta!,
+      arguments: {
+        ...state.meta!.arguments!,
+        game: [
+          ...state.meta!.arguments!.game,
+          {
+            rules: [{ action: 'allow', features: { is_quick_play_multiplayer: true } }],
+            value: ['--quickPlayMultiplayer', '${quickPlayMultiplayer}'],
+          },
+        ],
+      },
+    };
+  };
+
+  it('tells a version from 1.20 on by the argument it lists for it', async () => {
+    withQuickPlay();
+    await launch('exit 0', server, { quickConnect: true });
+    await exitInfo();
+
+    const args = await gameSide();
+    expect(args.slice(-2)).toEqual(['--quickPlayMultiplayer', 'mc.whiteravens.net:25570']);
+    expect(args).not.toContain('--server');
+    expect(args).not.toContain('--port');
+  });
+
+  it('tells an older version by the server and the port it still takes', async () => {
+    await launch('exit 0', server, { quickConnect: true });
+    await exitInfo();
+
+    const args = await gameSide();
+    expect(args.slice(-4)).toEqual(['--server', 'mc.whiteravens.net', '--port', '25570']);
+    expect(args).not.toContain('--quickPlayMultiplayer');
+  });
+
+  it('names no server when Play was pressed and not quick connect', async () => {
+    withQuickPlay();
+    await launch('exit 0', server);
+    await exitInfo();
+
+    const args = await gameSide();
+    expect(args).not.toContain('--quickPlayMultiplayer');
+    expect(args).not.toContain('--server');
+  });
+
+  it('names no server for a profile that has none', async () => {
+    withQuickPlay();
+    await launch('exit 0', {}, { quickConnect: true });
+    await exitInfo();
+
+    expect(await gameSide()).not.toContain('--quickPlayMultiplayer');
   });
 });
 

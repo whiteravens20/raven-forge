@@ -3,11 +3,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   getMojangOsName,
+  quickPlayAddress,
+  resolveConditionalArgs,
   ruleMatches,
   rulesAllow,
-  resolveConditionalArgs,
   splitArguments,
   substituteVars,
+  takesQuickPlayMultiplayer,
   type RuleHost,
 } from '../src/core/minecraft/launch-args';
 import type { ConditionalArg } from '../src/core/minecraft/types';
@@ -186,5 +188,66 @@ describe('substituteVars', () => {
       '$notaplaceholder',
       '{also_not}',
     ]);
+  });
+});
+
+/**
+ * Minecraft 1.20 replaced `--server` and `--port` with `--quickPlayMultiplayer`
+ * and took the old pair out. The game does not complain about an option it does
+ * not know, so a quick connect went on starting every newer version and joining
+ * nothing.
+ */
+describe('takesQuickPlayMultiplayer', () => {
+  // As Mojang's own metadata lists it, from 1.20 to 26.3.
+  const sinceQuickPlay = [
+    '--username',
+    '${auth_player_name}',
+    { rules: [{ action: 'allow' as const, features: { is_demo_user: true } }], value: '--demo' },
+    {
+      rules: [{ action: 'allow' as const, features: { is_quick_play_multiplayer: true } }],
+      value: ['--quickPlayMultiplayer', '${quickPlayMultiplayer}'],
+    },
+  ];
+
+  it('is what a version that lists the argument does', () => {
+    expect(takesQuickPlayMultiplayer(sinceQuickPlay)).toBe(true);
+  });
+
+  it('is not what a version from before it does', () => {
+    // 1.13 to 1.19.4: conditional arguments, and none of them this one.
+    expect(takesQuickPlayMultiplayer(sinceQuickPlay.slice(0, 3))).toBe(false);
+    // Up to 1.12.2: one line of arguments and no list at all.
+    expect(takesQuickPlayMultiplayer(undefined)).toBe(false);
+  });
+
+  it('is switched on by exactly the feature the argument waits for', () => {
+    const on = resolveConditionalArgs(sinceQuickPlay, { is_quick_play_multiplayer: true });
+    expect(on.slice(-2)).toEqual(['--quickPlayMultiplayer', '${quickPlayMultiplayer}']);
+    expect(resolveConditionalArgs(sinceQuickPlay, {})).toEqual([
+      '--username',
+      '${auth_player_name}',
+    ]);
+  });
+});
+
+describe('quickPlayAddress', () => {
+  it('is the address alone when the profile names no port', () => {
+    expect(quickPlayAddress('mc.whiteravens.net', undefined)).toBe('mc.whiteravens.net');
+    expect(quickPlayAddress('::1', undefined)).toBe('::1');
+  });
+
+  it('carries the port after a colon', () => {
+    expect(quickPlayAddress('mc.whiteravens.net', 25570)).toBe('mc.whiteravens.net:25570');
+    expect(quickPlayAddress('192.168.2.20', 25565)).toBe('192.168.2.20:25565');
+  });
+
+  it('puts a bare IPv6 address in brackets before its port', () => {
+    expect(quickPlayAddress('2001:db8::20', 25565)).toBe('[2001:db8::20]:25565');
+    expect(quickPlayAddress('[2001:db8::20]', 25565)).toBe('[2001:db8::20]:25565');
+  });
+
+  it('leaves alone an address that came with a port of its own', () => {
+    expect(quickPlayAddress('mc.whiteravens.net:25570', 25565)).toBe('mc.whiteravens.net:25570');
+    expect(quickPlayAddress('[2001:db8::20]:25570', 25565)).toBe('[2001:db8::20]:25570');
   });
 });

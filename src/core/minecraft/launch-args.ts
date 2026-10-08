@@ -129,6 +129,47 @@ export function resolveConditionalArgs(
   return result;
 }
 
+/** The feature a version's own arguments keep `--quickPlayMultiplayer` behind. */
+export const JOINS_BY_QUICK_PLAY = 'is_quick_play_multiplayer';
+
+/**
+ * Whether a version is told which server to join with `--quickPlayMultiplayer`.
+ *
+ * Minecraft 1.20 brought that option in and took `--server` and `--port` out,
+ * and the game says nothing about an option it does not know. So the old pair,
+ * handed to a newer game, was a quick connect that started the game and joined
+ * nothing — on every version from 1.20 on.
+ *
+ * A version that takes the new option lists it among its own arguments, behind
+ * a feature a launcher switches on. The version is asked, then, and no table of
+ * release numbers is kept.
+ */
+export function takesQuickPlayMultiplayer(
+  args: Array<string | ConditionalArg> | undefined,
+): boolean {
+  return (args ?? []).some(
+    (arg) =>
+      typeof arg !== 'string' &&
+      arg.rules.some((rule) => rule.features?.[JOINS_BY_QUICK_PLAY] === true),
+  );
+}
+
+/**
+ * A server as the one argument `--quickPlayMultiplayer` takes: the address,
+ * and after a colon the port when the profile names one.
+ *
+ * An address that already ends in a port is left as it is. A bare IPv6 address
+ * is given its brackets first, without which the port would read as one more
+ * group of it.
+ */
+export function quickPlayAddress(host: string, port: number | undefined): string {
+  if (port === undefined) return host;
+  const colons = host.split(':').length - 1;
+  if (host.startsWith('[')) return host.includes(']:') ? host : `${host}:${port}`;
+  if (colons === 1) return host;
+  return colons > 1 ? `[${host}]:${port}` : `${host}:${port}`;
+}
+
 /**
  * Split a line of JVM arguments the way a shell would: on blanks, except inside
  * quotes, which group and are then dropped.
