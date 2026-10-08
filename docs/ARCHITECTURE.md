@@ -37,7 +37,7 @@ raven-forge/
 ├── .github/workflows/
 │   ├── build.yml                 # PR / push CI — lint, typecheck, test, build
 │   ├── codeql.yml                # CodeQL analysis
-│   ├── package.yml               # nightly: install the built packages on a clean box
+│   ├── package.yml               # nightly: package, then install what was built — Ubuntu and Windows
 │   ├── release.yml               # tag-triggered, builds + drafts the release
 │   └── security.yml              # npm audit + Trivy secret & config scan
 └── src/
@@ -543,6 +543,35 @@ them, and the fact that a checking pass never reports a finished download.
 The suite is held to what it checks: `npm run lint` and `npm run typecheck` both
 cover `test/` (`tsconfig.test.json`), and a test may not be left `.only`, which
 ESLint refuses.
+
+The installers are tried as well, each night, by the packaging job
+(`package.yml`). The `.deb` is installed and started on a clean Ubuntu. The
+Windows installer is run on the Windows runner by
+`.github/scripts/verify-windows-install.ps1`, which uses the launcher as a
+player does and holds it to what it sees:
+
+- a first install, and a first start from the shortcut on the desktop: a
+  window, the settings saved, the launcher gone when its window is closed;
+- the two fuses and the debugger switches, by what the installed program does —
+  with the 0.7.1 release, which does open a debugger, asked in the same words
+  beside it, so that the silence is known to mean something there;
+- the installer run over a launcher that is open, which it has to close itself;
+- secrets of several lengths lifted out of `auth.json` into the Credential
+  Manager, which is where the 2,560 bytes above come from;
+- an update from 0.7.1 run the way the updater runs it — the last release that
+  kept the program and its data under the product's name, spaces and all — with
+  the data folder renamed at the next start and a world in it found again;
+- the installer's and the uninstaller's pages gone through as somebody at the
+  machine goes through them, each question read and answered: the folder the
+  page names, the folder the uninstaller says the data is in, and the data
+  kept or deleted as answered.
+
+It knows a page by what is on it and not by its wording, and presses a button
+by telling the dialog so, with no pointer and no key. The screen is kept as a
+picture at each step, for seven days, with the launcher's logs. Two things it
+cannot show: it is the machine that built the installer, so a library the
+launcher needs and does not bring would not be missed there; and nobody signs
+in, so what a real account's tokens are like is not seen.
 
 What needs a real JVM, a real Microsoft account or a published release is out of
 scope and verified by hand; the gap list below records what was proven that way

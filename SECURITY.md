@@ -142,9 +142,9 @@ download.
   it: the packaged launcher takes both off its command line as the first thing
   it does, before the browser has read them (`refuseRemoteDebugging` in
   `src/main/security.ts`), and the packaging job starts the installed program
-  with the switch to see that nothing answers. All of this limits what the
-  launcher can be started as; it is not a defence against a program that
-  already runs as the player.
+  with the switch, on Linux and on Windows, to see that nothing answers. All of
+  this limits what the launcher can be started as; it is not a defence against
+  a program that already runs as the player.
 
 ### Supply chain
 

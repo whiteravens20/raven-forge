@@ -474,7 +474,7 @@ platform's uninstaller removes, and what happens to your profiles and worlds.
 - **Push or PR to `main`/`dev`, plus weekly** → CodeQL ([codeql.yml](.github/workflows/codeql.yml)) and the dependency, secret and pinned-action gates ([security.yml](.github/workflows/security.yml))
 - **Push to `dev`, plus weekly** → the OpenSSF Scorecard behind the badge at the top ([scorecard.yml](.github/workflows/scorecard.yml))
 - **Daily** → a check that branch protection is still what it is meant to be ([branch-protection-audit.yml](.github/workflows/branch-protection-audit.yml))
-- **Nightly and on demand** → the full electron-builder run for both platforms ([package.yml](.github/workflows/package.yml)), so a packaging regression surfaces on a weekday rather than during a release
+- **Nightly and on demand** → the full electron-builder run for both platforms ([package.yml](.github/workflows/package.yml)), so a packaging regression surfaces on a weekday rather than during a release. What was built is then used: the `.deb` is started on a clean Ubuntu, and the Windows installer is run on Windows — installed, started, updated from 0.7.1 and uninstalled
 - **Push a tag `vMAJOR.MINOR.PATCH`** (e.g. `git tag v0.1.0 && git push --tags`) → builds installers, signs (if certs configured), and creates a draft GitHub Release ([release.yml](.github/workflows/release.yml)). The pattern is exact — a suffixed tag like `v0.1.0-beta` triggers nothing
 
 Required checks, repository secrets and the supply-chain rules behind these are written down in [.github/CICD.md](.github/CICD.md).
