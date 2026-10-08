@@ -5,7 +5,11 @@ import { initLogger, log } from './logger';
 import { establishAppHome } from './home';
 import type { AppHome } from '../core/config/app-home';
 import { createMainWindow, getMainWindow } from './window';
-import { installContentSecurityPolicy, installPermissionPolicy } from './security';
+import {
+  installContentSecurityPolicy,
+  installPermissionPolicy,
+  refuseRemoteDebugging,
+} from './security';
 import { holdHandlersUntil, registerAllIpcHandlers } from './ipc-handlers';
 import { loadSettings } from '../core/config/settings-manager';
 import { ensureDataDirectories } from './init';
@@ -178,7 +182,11 @@ function registerAppLifecycle(home: AppHome): void {
   });
 }
 
-// Where the launcher lives is settled first: the single-instance lock below is
+// Ahead of everything, in the turn the script starts in: by the end of it the
+// browser has read its command line.
+refuseRemoteDebugging();
+
+// Where the launcher lives is settled next: the single-instance lock below is
 // kept in that directory, so it has to be the right one by the time it is asked
 // for.
 const home = establishAppHome();

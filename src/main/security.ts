@@ -1,8 +1,38 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { session, type IpcMainInvokeEvent, type WebContents } from 'electron';
+import { app, session, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { log } from './logger';
 import { getMainWindow } from './window';
+
+/**
+ * The switches by which the embedded browser opens a debugger of its own: on a
+ * port, and on a pair of pipes handed to it by whatever started it.
+ */
+const REMOTE_DEBUGGING_SWITCHES = ['remote-debugging-port', 'remote-debugging-pipe'];
+
+/**
+ * Take the embedded browser's debugger off a packaged launcher's command line.
+ *
+ * Started with `--remote-debugging-port`, Chromium serves its debugging
+ * protocol to whatever connects, and through it every window the launcher has
+ * — the Microsoft sign-in among them — can be read and driven from outside.
+ * Electron's own two ways of making the program into something else are
+ * switched off in the binary, as fuses (electron-builder.config.js). This one
+ * is Chromium's and has no fuse, so it is refused here.
+ *
+ * It is the first thing the main script does, and has to be: the browser reads
+ * its command line once that script has run, before the app is ready, and a
+ * switch taken off any later has already been obeyed. Seen both ways on
+ * Electron 44.
+ *
+ * Only in a packaged launcher, which is where the fuses are as well. `npm run
+ * dev` runs the Electron in node_modules, and a debugger on that one is the
+ * developer's own.
+ */
+export function refuseRemoteDebugging(): void {
+  if (!app.isPackaged) return;
+  for (const name of REMOTE_DEBUGGING_SWITCHES) app.commandLine.removeSwitch(name);
+}
 
 /**
  * The renderer's Content-Security-Policy.

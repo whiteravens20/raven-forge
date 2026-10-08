@@ -84,6 +84,10 @@ const config = {
   // player behind a proxy that re-signs HTTPS can tell the launcher about the
   // proxy's certificate.
   //
+  // The browser inside has a debugger as well, `--remote-debugging-port`, and
+  // for that one there is no fuse: the launcher takes it off its own command
+  // line as it starts — `refuseRemoteDebugging` in src/main/security.ts.
+  //
   // `npm run dev` and the tests run the Electron in node_modules, which this
   // does not touch.
   electronFuses: {
