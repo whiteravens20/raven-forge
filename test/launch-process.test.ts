@@ -13,7 +13,7 @@ import type {
   Profile,
 } from '../src/shared/ipc-types';
 import type { VersionMeta } from '../src/core/minecraft/types';
-import { standInJava } from './helpers/stand-in-java';
+import { STAND_IN_BUILD_MS, standInJava } from './helpers/stand-in-java';
 
 /**
  * A whole launch, from Play to the exit card, with a stand-in for Java.
@@ -1076,10 +1076,10 @@ describe.skipIf(posix)('a game that is running, on Windows', () => {
 
   beforeAll(async () => {
     standIn = await standInJava();
-  });
+  }, STAND_IN_BUILD_MS);
 
   afterAll(async () => {
-    await fs.rm(path.dirname(standIn), { recursive: true, force: true });
+    if (standIn) await fs.rm(path.dirname(standIn), { recursive: true, force: true });
   });
 
   /** Press Play on a profile whose runtime is the stand-in, and wait for it to say it is up. */
@@ -1111,6 +1111,8 @@ describe.skipIf(posix)('a game that is running, on Windows', () => {
     );
   }
 
+  // With room for a window that is slow to come up: the wait for it is longer
+  // than the five seconds a test is given.
   it('is asked to close through its window, and leaves of its own accord', async () => {
     await start('window', /The window is up/);
 
@@ -1120,7 +1122,7 @@ describe.skipIf(posix)('a game that is running, on Windows', () => {
     // exit code of its own to give.
     expect(await exitInfo()).toMatchObject({ exitCode: 0, crashed: false });
     expect(launcher.isGameRunning('p1')).toBe(false);
-  });
+  }, 40_000);
 
   it('is ended outright when it has no window to be asked through', async () => {
     // `taskkill` reports nothing wrong about a program with no window: it has
