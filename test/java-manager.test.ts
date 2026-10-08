@@ -8,8 +8,10 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { AddressInfo } from 'node:net';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type { ProgressEvent } from '../src/shared/ipc-types';
+import { standInJava } from './helpers/stand-in-java';
+import { ZipWriter } from './helpers/zip';
 
 /**
  * The managed Java runtime: found, judged, installed.
@@ -26,9 +28,11 @@ import type { ProgressEvent } from '../src/shared/ipc-types';
  * step nothing else was checking — that the archive is verified *before* it is
  * unpacked and run, and that a mismatch leaves nothing behind.
  *
- * POSIX only: the fixtures are shell scripts, and the Windows branch downloads
- * a `.zip` it unpacks with bsdtar. Both are the platform's business rather than
- * this module's, and neither can be staged from here.
+ * Most of it is POSIX only: the fixtures are shell scripts. The install path is
+ * run on Windows as well, because it is a different one there — a `.zip`, which
+ * Windows' own `tar` unpacks — and nothing but a Windows can show that it
+ * works. The stand-in for Java there is a small program: see
+ * `helpers/stand-in-java.ts`.
  */
 
 const posix = process.platform !== 'win32';
@@ -111,6 +115,17 @@ async function buildJreArchive(version: string): Promise<Buffer> {
   return bytes;
 }
 
+/**
+ * The same for Windows: a `.zip`, as Adoptium serves one there, with a program
+ * for `bin\java.exe`.
+ */
+async function buildJreZip(): Promise<Buffer> {
+  const zip = new ZipWriter();
+  zip.add('jdk-21.0.3+9-jre/bin/java.exe', await fs.readFile(await standInJava()));
+  zip.add('jdk-21.0.3+9-jre/release', 'JAVA_VERSION="21.0.3"\n');
+  return zip.toBuffer();
+}
+
 function sha256(data: Buffer): string {
   return crypto.createHash('sha256').update(data).digest('hex');
 }
@@ -130,19 +145,17 @@ beforeEach(async () => {
   events.length = 0;
   archiveHits = [];
 
-  if (!posix) return;
-
-  archiveBytes = await buildJreArchive('21.0.3');
+  archiveBytes = posix ? await buildJreArchive('21.0.3') : await buildJreZip();
   server = http.createServer((req, res) => {
     archiveHits.push(req.url ?? '');
     res.writeHead(200, {
-      'content-type': 'application/gzip',
+      'content-type': posix ? 'application/gzip' : 'application/zip',
       'content-length': String(archiveBytes.length),
     });
     res.end(archiveBytes);
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  archiveUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/OpenJDK21U-jre.tar.gz`;
+  archiveUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/OpenJDK21U-jre.${posix ? 'tar.gz' : 'zip'}`;
   adoptium = () => assetsFor(archiveUrl, sha256(archiveBytes));
 
   const realFetch = globalThis.fetch;
@@ -450,6 +463,56 @@ describe('windowsJavaCandidates', () => {
   it('answers with nothing for a folder that is not there', async () => {
     const { windowsJavaCandidates } = await loadModule();
     expect(await windowsJavaCandidates(path.join(root, 'absent'))).toEqual([]);
+  });
+});
+
+/**
+ * The install on Windows, where it is another archive and another program that
+ * unpacks it: `tar.exe` from System32, started by that path. Under wine there
+ * is no such program, so this is the only place the Windows half of the
+ * install has ever been run.
+ */
+describe.skipIf(posix)('ensureJavaVersion, on Windows', () => {
+  const managed = (...parts: string[]) => path.join(root, 'java', 'jre-21', ...parts);
+
+  afterAll(async () => {
+    await fs.rm(path.dirname(await standInJava()), { recursive: true, force: true });
+  });
+
+  it('downloads the zip, checks it, unpacks it with Windows’ own tar and proves the runtime starts', async () => {
+    const { ensureJavaVersion } = await loadModule();
+
+    const result = await ensureJavaVersion(21);
+
+    expect(archiveHits).toHaveLength(1);
+    expect(result).toEqual({
+      version: 21,
+      path: managed('bin', 'java.exe'),
+      vendor: 'Adoptium Temurin',
+    });
+    // Without its top folder, which is what `--strip-components=1` is for.
+    expect((await fs.stat(managed('bin', 'java.exe'))).isFile()).toBe(true);
+    expect(await fs.readFile(managed('release'), 'utf-8')).toContain('21.0.3');
+    // And it is a program that starts, which is the one thing that counts.
+    const { stderr } = await execFileAsync(result.path, ['-version']);
+    expect(stderr).toContain('21.0.3');
+  });
+
+  it('unpacks nothing from a zip that is not the one Adoptium described', async () => {
+    const { ensureJavaVersion } = await loadModule();
+    adoptium = () => assetsFor(archiveUrl, sha256(Buffer.from('some other archive')));
+
+    await expect(ensureJavaVersion(21)).rejects.toThrow(/sha256 mismatch/);
+    await expect(fs.stat(managed())).rejects.toThrow();
+  });
+
+  it('uses a runtime that is already there without asking anybody', async () => {
+    const { ensureJavaVersion } = await loadModule();
+    await fs.mkdir(managed('bin'), { recursive: true });
+    await fs.copyFile(await standInJava(), managed('bin', 'java.exe'));
+
+    expect((await ensureJavaVersion(21)).path).toBe(managed('bin', 'java.exe'));
+    expect(archiveHits).toEqual([]);
   });
 });
 

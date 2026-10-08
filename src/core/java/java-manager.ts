@@ -15,6 +15,7 @@ import { downloadToFile } from '../net/download';
 import { throwIfCancelled, withTimeout } from '../util/cancellation';
 import { forEachConcurrently } from '../util/concurrency';
 import { serializeByKey } from '../util/serialize';
+import { systemTool } from '../util/system-tool';
 import type { JavaInstallation, ProgressEvent } from '../../shared/ipc-types';
 
 const execFileAsync = promisify(execFile);
@@ -403,7 +404,8 @@ async function extractArchive(
 
   try {
     // `tar` handles the zip too: Windows 10 1803 and later ship bsdtar, which
-    // reads zip archives. The `else` is not decoration — without it an extension
+    // reads zip archives — and it is that one which is started, by where
+    // Windows keeps it: see `systemTool`. The `else` is not decoration — without it an extension
     // this does not recognise made the whole function a silent no-op, and the
     // failure surfaced several steps later as "installed JRE but failed to
     // verify", which points at the wrong thing entirely.
@@ -415,10 +417,14 @@ async function extractArchive(
     if (!unpack) {
       throw new Error(`Cannot extract ${path.basename(archivePath)}: unrecognised archive type`);
     }
-    await execFileAsync('tar', [unpack, archivePath, '-C', staging, '--strip-components=1'], {
-      signal,
-      windowsHide: true,
-    });
+    await execFileAsync(
+      systemTool('tar'),
+      [unpack, archivePath, '-C', staging, '--strip-components=1'],
+      {
+        signal,
+        windowsHide: true,
+      },
+    );
 
     // Ensure bin/java is executable
     try {

@@ -55,6 +55,7 @@ import {
 import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
 import { isServerPort } from '../../shared/profile-draft';
+import { systemTool } from '../util/system-tool';
 import { applyProfileOptions, languageCodeFor } from './options-file';
 import { RefusedError } from '../util/refusal';
 import { errorText } from '../util/error-text';
@@ -884,7 +885,8 @@ function requestStop(child: ChildProcess): void {
     child.kill('SIGTERM');
     return;
   }
-  execFile('taskkill', ['/PID', String(child.pid)], { windowsHide: true }, (err) => {
+  // By where Windows keeps it, not by name: see `systemTool`.
+  execFile(systemTool('taskkill'), ['/PID', String(child.pid)], { windowsHide: true }, (err) => {
     if (err) child.kill();
   });
 }

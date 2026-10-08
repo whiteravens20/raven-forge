@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type {
   GameExitInfo,
   GameLogLine,
@@ -13,6 +13,7 @@ import type {
   Profile,
 } from '../src/shared/ipc-types';
 import type { VersionMeta } from '../src/core/minecraft/types';
+import { standInJava } from './helpers/stand-in-java';
 
 /**
  * A whole launch, from Play to the exit card, with a stand-in for Java.
@@ -34,7 +35,9 @@ import type { VersionMeta } from '../src/core/minecraft/types';
  * metadata, which is handed over as a fixture instead of fetched.
  *
  * POSIX only, for the same reason as `java-manager.test.ts`: the stand-in is a
- * shell script.
+ * shell script. The exception is at the very end — stopping a game, which on
+ * Windows is another program's doing and is run there with a stand-in that is
+ * a program too.
  */
 
 const posix = process.platform !== 'win32';
@@ -144,7 +147,7 @@ let launcher: Launcher;
 
 const cacheDir = () => path.join(root, 'data', 'cache');
 const gameDir = () => path.join(root, 'data', 'profiles', 'p1', '.minecraft');
-const javaBin = () => path.join(root, 'runtime', 'bin', 'java');
+const javaBin = () => path.join(root, 'runtime', 'bin', posix ? 'java' : 'java.exe');
 
 /** Never fetched: every file a launch checks is already on disk and correct. */
 const NOT_FETCHED = 'http://127.0.0.1:9/not-fetched';
@@ -1056,5 +1059,77 @@ describe.skipIf(!posix)('a game that is running', () => {
     await launcher.killGame('p1');
 
     expect((await exitInfo()).crashed).toBe(false);
+  });
+});
+
+/**
+ * Stopping a game on Windows, which has no signal to ask with.
+ *
+ * Stop there is `taskkill` without `/F`: the request a click on the X in the
+ * game's window makes. The launcher starts it by the path Windows keeps it at,
+ * and whether that works is something only a Windows shows — so these two run
+ * there and nowhere else, against a stand-in that has a window, and one that
+ * has none.
+ */
+describe.skipIf(posix)('a game that is running, on Windows', () => {
+  let standIn: string;
+
+  beforeAll(async () => {
+    standIn = await standInJava();
+  });
+
+  afterAll(async () => {
+    await fs.rm(path.dirname(standIn), { recursive: true, force: true });
+  });
+
+  /** Press Play on a profile whose runtime is the stand-in, and wait for it to say it is up. */
+  async function start(does: 'window' | 'wait', says: RegExp): Promise<void> {
+    await fs.mkdir(path.dirname(javaBin()), { recursive: true });
+    await fs.copyFile(standIn, javaBin());
+    await fs.writeFile(`${javaBin()}.does`, does);
+    state.profile = {
+      id: 'p1',
+      name: 'Survival',
+      minecraftVersion: '1.21.4',
+      modLoader: 'vanilla',
+      allocatedRamMb: 1024,
+      customJavaPath: javaBin(),
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    await launcher.launchGame({ profileId: 'p1' });
+    await vi.waitFor(
+      () =>
+        expect(
+          gameLines()
+            .map((l) => l.message)
+            .join('\n'),
+        ).toMatch(says),
+      {
+        timeout: 20_000,
+      },
+    );
+  }
+
+  it('is asked to close through its window, and leaves of its own accord', async () => {
+    await start('window', /The window is up/);
+
+    await launcher.killGame('p1');
+
+    // Zero is the game closing its own window. One that had to be ended has no
+    // exit code of its own to give.
+    expect(await exitInfo()).toMatchObject({ exitCode: 0, crashed: false });
+    expect(launcher.isGameRunning('p1')).toBe(false);
+  });
+
+  it('is ended outright when it has no window to be asked through', async () => {
+    await start('wait', /Staying, with no window/);
+
+    await launcher.killGame('p1');
+
+    const ended = await exitInfo();
+    expect(ended.crashed).toBe(false);
+    expect(ended.exitCode).not.toBe(0);
+    expect(launcher.isGameRunning('p1')).toBe(false);
   });
 });
