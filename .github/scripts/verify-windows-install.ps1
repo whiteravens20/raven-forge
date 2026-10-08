@@ -953,6 +953,11 @@ try {
   $met = Step-Through -Whose { if ($setup.HasExited) { @() } else { @($setup.Id) } } -Answers @{ $AsksToClose = $Reply.OK } -RunAfter $true -Pictures 'installer-over-the-release-before'
   Expect-Pages $met 'the licence', 'for whom', 'the folder', 'the end'
   Expect ($met.Folder -eq $Folder.Now) "the folder page names $($Folder.Now)" "it names '$($met.Folder)'"
+  # Whether it asks before it closes the older launcher is not held to
+  # either way. Its own look for a launcher that is open is in the folder it
+  # is about to install into, where the older one is not; the older release's
+  # uninstaller, which it runs without pages, is what finds and closes it.
+  if ($met.Questions.Count -eq 0) { Note 'it asked nothing' }
   foreach ($asked in $met.Questions) { Note "it asked: $asked" }
   Expect ($setup.ExitCode -eq 0) 'the installer ends well' "it ended with $($setup.ExitCode)"
   Expect ($older.WaitForExit(5000)) 'the older launcher, which was open, has been closed'
