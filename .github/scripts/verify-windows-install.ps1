@@ -855,6 +855,11 @@ try {
   $sessionKept = $kept.mcSessions.'probe-session'
   Expect ($inVault -eq $session -and -not $sessionKept.PSObject.Properties['accessToken']) 'a game session is moved the same way' "$inVault bytes of it in the Credential Manager"
   Expect ($sessionKept.expiresAt -eq 1) 'and when it runs out stays in the file, which is no secret'
+  # Windows says of a secret it will not keep only that "the stub received bad
+  # data". What was wrong with it is for the launcher's log to say.
+  $why = @(Get-Said $Data.Now 'bytes and the Windows Credential Manager takes')
+  Expect ($why.Count -eq 2) 'of each of the two secrets Windows refused, its log says how long it was and how long one may be' "it says so $($why.Count) times"
+  foreach ($line in $why) { Note "its log: $line" }
 
   foreach ($name in @($lengths | ForEach-Object { "msRefresh:probe-$_" }) + 'mcAccess:probe-session') {
     $null = & cmdkey.exe "/delete:$Vault/$name" 2>&1
