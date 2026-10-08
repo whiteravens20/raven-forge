@@ -336,7 +336,13 @@ export function SettingsPage() {
 
       <div className="pt-4 border-t border-rf-border">
         <ConfirmButton
-          question={t('settings.confirmReset')}
+          // The keys are settings too, and go back to none: said here as it is
+          // said when the last of them is removed by hand.
+          question={
+            settings.trustedPublicKeys.length > 0
+              ? t('settings.confirmResetKeys')
+              : t('settings.confirmReset')
+          }
           confirmLabel={t('settings.reset')}
           onConfirm={() => void reset()}
         >

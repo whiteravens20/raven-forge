@@ -700,6 +700,8 @@ export const pl: Translations = {
   'settings.showLogs': 'Pokaż logi',
   'settings.reset': 'Resetuj ustawienia',
   'settings.confirmReset': 'Zresetować wszystkie ustawienia do domyślnych?',
+  'settings.confirmResetKeys':
+    'Zresetować wszystkie ustawienia do domyślnych? Zniknie też każdy dodany przez Ciebie klucz, a podpis przestanie być wymagany od paczek spoza White Ravens.',
 
   // ── Log viewer ───────────────────────────────────────────
   'logs.title': 'Logi launchera',

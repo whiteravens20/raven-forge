@@ -664,6 +664,8 @@ export const en = {
   'settings.showLogs': 'Show logs',
   'settings.reset': 'Reset settings',
   'settings.confirmReset': 'Reset all settings to their defaults?',
+  'settings.confirmResetKeys':
+    'Reset all settings to their defaults? Every key you added goes with them, and signatures will no longer be required of packs from outside White Ravens.',
 
   // ── Data folder ──────────────────────────────────────────
   'dataRoot.title': 'Move the data folder',
