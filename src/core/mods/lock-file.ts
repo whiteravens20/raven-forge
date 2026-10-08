@@ -2,9 +2,11 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { log } from '../../main/logger';
 import { paths } from '../config/paths';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
+import { storedInstalledSchema } from '../../shared/validators';
 import type { InstalledMod } from '../../shared/ipc-types';
 
 /**
@@ -16,17 +18,62 @@ import type { InstalledMod } from '../../shared/ipc-types';
  * these four functions is a second set of rules to keep in step.
  */
 
-export async function readLockFile(profileId: string): Promise<InstalledMod[]> {
-  // Resolved outside the `try`, deliberately. A file that is absent or will not
-  // parse means "nothing installed" and is a normal state; an id that is not a
-  // path component means somebody sent one that was never a profile, and
-  // answering that with an empty list would hide it behind a plausible reply.
-  const file = paths.profileLockFile(profileId);
+/** The files already said, this session, to hold something that is not an entry. */
+const saidAbout = new Set<string>();
+
+function sayOnce(file: string, what: string): void {
+  if (saidAbout.has(file)) return;
+  saidAbout.add(file);
+  log.warn(`${file}: ${what}`);
+}
+
+/**
+ * Read a list of installed files — `installed.lock`, or one of the two kept
+ * the same way for shaders and resource packs — an entry at a time.
+ *
+ * A file that is absent or will not parse means "nothing installed", and so
+ * does one that parses to something other than a list: handed on as it was, an
+ * object where the list should be failed every operation on the profile's mods
+ * with `find is not a function`. An entry that is not one is left out, and the
+ * log says which by its place in the file.
+ *
+ * Left out and not kept, unlike an entry of the profile list. A profile that
+ * cannot be read may be the only record of the worlds in its folder; an entry
+ * here records a file that is still in its folder, and that a sync, or adding
+ * the file again, puts back on the list.
+ */
+export async function readInstalledList(file: string): Promise<InstalledMod[]> {
+  let parsed: unknown;
   try {
-    return JSON.parse(await fs.readFile(file, 'utf-8')) as InstalledMod[];
+    parsed = JSON.parse(await fs.readFile(file, 'utf-8'));
   } catch {
     return [];
   }
+  if (!Array.isArray(parsed)) {
+    sayOnce(file, 'not a list of installed files, and read as an empty one');
+    return [];
+  }
+
+  const entries: InstalledMod[] = [];
+  const leftOut: number[] = [];
+  for (const [index, entry] of parsed.entries()) {
+    const read = storedInstalledSchema.safeParse(entry);
+    if (read.success) entries.push(read.data);
+    else leftOut.push(index + 1);
+  }
+  if (leftOut.length > 0) {
+    sayOnce(file, `not an installed file, and left out of the list — entry ${leftOut.join(', ')}`);
+  }
+  return entries;
+}
+
+export async function readLockFile(profileId: string): Promise<InstalledMod[]> {
+  // Resolved here and not inside the reader's `try`, deliberately. A file that
+  // is absent or will not parse means "nothing installed" and is a normal
+  // state; an id that is not a path component means somebody sent one that was
+  // never a profile, and answering that with an empty list would hide it
+  // behind a plausible reply.
+  return readInstalledList(paths.profileLockFile(profileId));
 }
 
 async function writeLockFile(profileId: string, mods: InstalledMod[]): Promise<void> {

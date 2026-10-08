@@ -438,7 +438,7 @@ Settings and Privacy pages.
 
 ### What is believed of a stored file
 
-None of the three state files is believed as it parses. One that is there and
+None of the state files is believed as it parses. One that is there and
 cannot be read is never taken for an empty one, so nothing is saved over it.
 One that is not JSON, or not the kind of document it should be, is moved aside
 as `<name>.broken-<time>` and the launcher starts without it.
@@ -458,6 +458,19 @@ the one record of a folder that may hold worlds; that folder is not offered as
 leftover files. An entry of the account list that is not an account is left out
 and not written back, since signing in again restores everything it held
 (`readStored` in `core/auth/token-store.ts`).
+
+What a profile keeps about its own files is read the same way. `installed.lock`
+and the two lists beside it for shaders and resource packs hold an entry for
+each installed file: an entry needs an id and a file name that is a name in its
+folder and nothing else, since that name is what is then looked for, renamed and
+deleted; any other field of the wrong kind is given the value that harms nothing
+— on, the player's own, from nowhere in particular. One that is not an entry is
+left out and named in the log by its place in the file, and so is a file that
+holds something other than a list (`readInstalledList` in `core/mods/lock-file.ts`).
+The record a sync leaves is held to its fields too, and a tag in it that could
+not be sent as a request header is not sent: the request would fail before it
+left, and a sync that cannot reach the pack runs against the copy it kept
+(`syncStateSchema` in `core/mods/mod-sync.ts`).
 
 ## Security posture
 

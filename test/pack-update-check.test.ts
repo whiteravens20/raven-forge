@@ -55,7 +55,8 @@ vi.mock('../src/core/config/paths', () => ({
   },
 }));
 
-const { checkForPackUpdates } = await import('../src/core/mods/mod-sync');
+const { checkForPackUpdates, getProfileSyncStatus, getLastManifestVerification } =
+  await import('../src/core/mods/mod-sync');
 
 function manifest(mods: { id: string; version: string }[]): ModManifest {
   return {
@@ -231,5 +232,106 @@ describe('checkForPackUpdates', () => {
     const state = await readState();
     expect(state.status).toBe('synced');
     expect(state.errorMessage).toBeUndefined();
+  });
+});
+
+/**
+ * What a sync left behind about a profile, read back.
+ *
+ * It was believed as it parsed, like the lists were. Most of what a damaged one
+ * did was harmless and odd — a status the page has no word for, a count that
+ * was a sentence. One thing was not: a tag that could not be sent as a header
+ * made the request for the manifest fail before it left, which reads as "no
+ * network", so every sync after it ran against the kept copy and the profile
+ * never heard of another release.
+ */
+describe('a sync state that is not what it should be', () => {
+  const stateFile = () => path.join(root, 'sync-state.json');
+
+  it.each([
+    ['a list', '[]'],
+    ['a word', '"synced"'],
+    ['nothing', 'null'],
+    ['not JSON', '{ nope'],
+  ])('reads as never synced when it is %s', async (_what, contents) => {
+    await fs.writeFile(stateFile(), contents);
+
+    expect(await getProfileSyncStatus('p1')).toEqual({
+      profileId: 'p1',
+      pendingUpdates: 0,
+      status: 'never-synced',
+    });
+  });
+
+  it('gives a field of the wrong kind a value that harms nothing', async () => {
+    await fs.writeFile(
+      stateFile(),
+      JSON.stringify({
+        status: 'half-done',
+        pendingUpdates: 'three',
+        errorMessage: { code: 7 },
+        verification: 'yes',
+        appliedConfigs: ['config/a.toml'],
+      }),
+    );
+
+    expect(await getProfileSyncStatus('p1')).toEqual({
+      profileId: 'p1',
+      pendingUpdates: 0,
+      status: 'never-synced',
+    });
+    expect(await getLastManifestVerification('p1')).toEqual({
+      signed: false,
+      valid: false,
+      neverSynced: true,
+    });
+  });
+
+  it('keeps what is right in a state where something else is not', async () => {
+    await fs.writeFile(
+      stateFile(),
+      JSON.stringify({
+        status: 'updates-available',
+        pendingUpdates: 2,
+        lastSyncedAt: 20261008,
+        verification: { signed: true, valid: true, signerName: 'White Ravens' },
+      }),
+    );
+
+    expect(await getProfileSyncStatus('p1')).toMatchObject({
+      status: 'updates-available',
+      pendingUpdates: 2,
+    });
+    expect(await getLastManifestVerification('p1')).toMatchObject({ signed: true, valid: true });
+  });
+
+  it('does not ask with a tag that could not be sent, and so still asks', async () => {
+    await fs.writeFile(path.join(root, 'installed.lock'), JSON.stringify(lock([])));
+    await fs.writeFile(
+      stateFile(),
+      JSON.stringify({
+        lastSyncedAt: '2026-08-04T07:39:36.785Z',
+        manifestEtag: '"v1"\r\nX-Injected: yes',
+        pendingUpdates: 0,
+        status: 'synced',
+      }),
+    );
+    const asked: Array<Record<string, string>> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: { headers?: Record<string, string> }) => {
+        asked.push(init?.headers ?? {});
+        return new Response(JSON.stringify(manifest([{ id: 'jei', version: '30.17' }])), {
+          status: 200,
+          headers: { etag: '"v2"' },
+        });
+      }),
+    );
+
+    await checkForPackUpdates('p1');
+
+    // Asked, without the tag, and answered: the release is seen.
+    expect(asked).toEqual([{}]);
+    expect(await readState()).toMatchObject({ status: 'updates-available', pendingUpdates: 1 });
   });
 });

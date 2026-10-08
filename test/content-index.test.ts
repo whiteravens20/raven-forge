@@ -479,6 +479,28 @@ describe('addContentFromFile', () => {
   });
 });
 
+describe('an index that is not what it should be', () => {
+  // The same reader as `installed.lock`, which is where the rule is gone through
+  // in full; this is that it is the one in use here.
+  it('reads as an empty one when it is not a list, and leaves out what is not an entry', async () => {
+    await fs.mkdir(path.dirname(indexFile('shaders.lock')), { recursive: true });
+    await fs.writeFile(indexFile('shaders.lock'), JSON.stringify({ shaders: [] }));
+    await fs.writeFile(
+      indexFile('resourcepacks.lock'),
+      JSON.stringify([
+        { id: 'a', name: 'A', version: '1', source: 'local', fileName: 'A.zip', enabled: true },
+        { id: 'escape', name: 'Escape', fileName: '../../outside.zip' },
+        'not an entry',
+      ]),
+    );
+
+    expect(await content.listContent('shaders', PROFILE)).toEqual([]);
+    expect((await content.listContent('resourcepacks', PROFILE)).map((i) => i.fileName)).toEqual([
+      'A.zip',
+    ]);
+  });
+});
+
 describe('removeContent', () => {
   it('takes the file with the entry and updates options.txt', async () => {
     const installed = await content.installContent(

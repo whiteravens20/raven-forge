@@ -12,7 +12,7 @@ import { getProfile } from '../profiles/profile-manager';
 import { downloadToFile } from '../net/download';
 import { applyResourcePackOrder } from '../minecraft/options-file';
 import { fileMatches, pinnedHashes, type HashedEntry } from './integrity';
-import { isSameModFile } from './lock-file';
+import { isSameModFile, readInstalledList } from './lock-file';
 import type { ContentKind, InstalledMod } from '../../shared/ipc-types';
 import {
   fileNameFromUrl,
@@ -35,15 +35,11 @@ function indexPath(kind: ContentKind, profileId: string): string {
   return path.join(paths.profileDir(profileId), fileName);
 }
 
-async function readIndex(kind: ContentKind, profileId: string): Promise<InstalledMod[]> {
-  // Outside the `try`, for the same reason as `readLockFile`: a missing file is
-  // an ordinary empty state, an id that is not a path component is not.
-  const file = indexPath(kind, profileId);
-  try {
-    return JSON.parse(await fs.readFile(file, 'utf-8')) as InstalledMod[];
-  } catch {
-    return [];
-  }
+function readIndex(kind: ContentKind, profileId: string): Promise<InstalledMod[]> {
+  // The same reader as `installed.lock`, and the same rule about the path: a
+  // missing file is an ordinary empty state, an id that is not a path component
+  // is not, and is refused by `indexPath` before anything is read.
+  return readInstalledList(indexPath(kind, profileId));
 }
 
 async function writeIndex(

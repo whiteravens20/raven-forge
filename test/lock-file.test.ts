@@ -33,6 +33,17 @@ vi.mock('../src/core/config/paths', async () => {
   };
 });
 
+const { warnings } = vi.hoisted(() => ({ warnings: [] as string[] }));
+
+vi.mock('../src/main/logger', () => ({
+  log: {
+    warn: (message: string) => warnings.push(message),
+    info: () => {},
+    error: () => {},
+    debug: () => {},
+  },
+}));
+
 const { readLockFile, mutateLockFile } = await import('../src/core/mods/lock-file');
 
 const mod = (id: string): InstalledMod => ({
@@ -47,7 +58,11 @@ const mod = (id: string): InstalledMod => ({
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-lock-'));
+  warnings.length = 0;
 });
+
+const store = (contents: unknown) =>
+  fs.writeFile(path.join(root, 'p1.lock'), JSON.stringify(contents));
 
 afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true });
@@ -68,6 +83,98 @@ describe('readLockFile', () => {
     // that could never name one is a different thing and must not hide inside
     // a plausible answer.
     await expect(readLockFile('../../etc')).rejects.toThrow();
+  });
+});
+
+/**
+ * The file is believed an entry at a time, not as it parses.
+ *
+ * It used to be handed on as whatever `JSON.parse` returned. A file that held
+ * something other than a list failed every operation on the profile's mods
+ * with "find is not a function"; an entry with no file name failed whichever
+ * one reached it; and an entry whose file name led out of the folder was a
+ * path the next removal would delete.
+ */
+describe('a list that is not what it should be', () => {
+  it('reads as nothing installed when it is not a list at all, and can be added to', async () => {
+    await store({ mods: [mod('a')] });
+
+    expect(await readLockFile('p1')).toEqual([]);
+
+    await mutateLockFile('p1', (mods) => mods.push(mod('b')));
+    expect((await readLockFile('p1')).map((m) => m.id)).toEqual(['b']);
+  });
+
+  it('leaves out what is not an entry and reads the entries beside it', async () => {
+    await store([
+      mod('a'),
+      'a string',
+      null,
+      { id: 'no-file', name: 'No file' },
+      { ...mod('no-id'), id: '' },
+      mod('b'),
+    ]);
+
+    expect((await readLockFile('p1')).map((m) => m.id)).toEqual(['a', 'b']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('entry 2, 3, 4, 5');
+  });
+
+  it('says so once for a file, however often the file is read', async () => {
+    await store([mod('a'), 7]);
+
+    await readLockFile('p1');
+    await readLockFile('p1');
+
+    expect(warnings).toHaveLength(1);
+  });
+
+  it.each(['../../outside.jar', '..', 'mods/nested.jar', 'a\\b.jar', ''])(
+    'leaves out an entry whose file name is %j, which is not a name in the folder',
+    async (fileName) => {
+      await store([{ ...mod('escape'), fileName }, mod('a')]);
+
+      expect((await readLockFile('p1')).map((m) => m.id)).toEqual(['a']);
+    },
+  );
+
+  it('gives a field of the wrong kind a value that harms nothing', async () => {
+    await store([
+      {
+        id: 'odd',
+        fileName: 'odd.jar',
+        version: 3,
+        source: 'somewhere-new',
+        enabled: 'yes',
+        fromManifest: 1,
+        projectId: ['p'],
+        updateAvailable: 'soon',
+      },
+    ]);
+
+    expect(await readLockFile('p1')).toEqual([
+      {
+        id: 'odd',
+        fileName: 'odd.jar',
+        // Nobody named it, so it goes by its file.
+        name: 'odd.jar',
+        version: '',
+        source: 'local',
+        // Listed is on: it is the file's own name that is looked for.
+        enabled: true,
+        // The player's own, which no sync takes away.
+        fromManifest: false,
+      },
+    ]);
+  });
+
+  it('keeps what a newer build wrote beside the fields it knows', async () => {
+    await store([{ ...mod('a'), installedBy: 'a newer build' }]);
+
+    await mutateLockFile('p1', (mods) => mods.push(mod('b')));
+
+    const written = JSON.parse(await fs.readFile(path.join(root, 'p1.lock'), 'utf-8'));
+    expect(written[0]).toMatchObject({ id: 'a', installedBy: 'a newer build' });
   });
 });
 

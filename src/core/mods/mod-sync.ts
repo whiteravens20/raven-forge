@@ -2,6 +2,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { z } from 'zod';
 import { log } from '../../main/logger';
 import {
   beginJob,
@@ -93,13 +94,47 @@ interface SyncState {
   appliedConfigs?: Record<string, string>;
 }
 
+/** Text a request header can carry: what a recorded ETag has to be made of. */
+const HEADER_TEXT = /^[\x20-\x7e]+$/;
+
+/**
+ * The state as it is read back: each field held to its kind, and one that is
+ * not given the value a profile that was never synced has.
+ *
+ * It used to be believed as it parsed. Most of what a damaged one did was odd
+ * and harmless. A tag that could not be sent as a header was neither: the
+ * request for the manifest failed before it left, which reads as "no network",
+ * so every sync after it ran against the kept copy and the profile never heard
+ * of another release.
+ */
+const syncStateSchema: z.ZodType<SyncState> = z.object({
+  lastSyncedAt: z.string().optional().catch(undefined),
+  manifestEtag: z.string().regex(HEADER_TEXT).optional().catch(undefined),
+  pendingUpdates: z.number().int().nonnegative().catch(0),
+  status: z.enum(['synced', 'updates-available', 'error', 'never-synced']).catch('never-synced'),
+  errorMessage: z.string().optional().catch(undefined),
+  verification: z
+    .object({
+      signed: z.boolean(),
+      valid: z.boolean(),
+      signerName: z.string().optional(),
+      error: z.string().optional(),
+      neverSynced: z.boolean().optional(),
+    })
+    .optional()
+    .catch(undefined),
+  appliedConfigs: z.record(z.string(), z.string()).optional().catch(undefined),
+});
+
 async function readSyncState(profileId: string): Promise<SyncState> {
   try {
     const raw = await fs.readFile(paths.profileSyncStateFile(profileId), 'utf-8');
-    return JSON.parse(raw) as SyncState;
+    const read = syncStateSchema.safeParse(JSON.parse(raw));
+    if (read.success) return read.data;
   } catch {
-    return { pendingUpdates: 0, status: 'never-synced' };
+    /* absent, or not JSON: the same answer as a state that is not one */
   }
+  return { pendingUpdates: 0, status: 'never-synced' };
 }
 
 async function writeSyncState(profileId: string, state: SyncState): Promise<void> {

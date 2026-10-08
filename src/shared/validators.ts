@@ -285,6 +285,37 @@ export const storedProfileSchema = z
   // is the one thing about it that is certain to be there.
   .transform((stored) => ({ ...stored, name: stored.name ?? stored.id }));
 
+/**
+ * An entry of `installed.lock`, or of the two lists kept the same way for
+ * shaders and resource packs, read back.
+ *
+ * Two things make an entry one: an id, and a file name that is a name in the
+ * folder and nothing else. The second is what every later step acts on — the
+ * file is looked for, renamed and deleted by it — so one that leads out of the
+ * folder is not something to tidy up and carry on with.
+ *
+ * Every other field is held to its kind, and one of the wrong kind is given a
+ * value that harms nothing: on, because it is the file's own name that is then
+ * looked for; the player's own, which no sync removes; from nowhere in
+ * particular. Fields this build does not know are kept, as in a profile.
+ */
+export const storedInstalledSchema = z
+  .looseObject({
+    id: z.string().min(1),
+    fileName: z.string().refine(isSafeFileName),
+    name: z.string().min(1).optional().catch(undefined),
+    projectId: storedText,
+    version: z.string().catch(''),
+    source: z.enum(['modrinth', 'url', 'local']).catch('local'),
+    enabled: z.boolean().catch(true),
+    fromManifest: z.boolean().catch(false),
+    updateAvailable: z
+      .object({ versionId: z.string(), versionNumber: z.string(), projectId: z.string() })
+      .optional()
+      .catch(undefined),
+  })
+  .transform((stored) => ({ ...stored, name: stored.name ?? stored.fileName }));
+
 export const newsItemSchema = z.object({
   id: z.string(),
   title: z.string(),
