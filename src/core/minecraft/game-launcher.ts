@@ -54,6 +54,7 @@ import {
 } from './launch-args';
 import { log4jConfigArgument } from './log4j-config';
 import { requiredJavaFor } from './java-requirement';
+import { isServerPort } from '../../shared/profile-draft';
 import { applyProfileOptions, languageCodeFor } from './options-file';
 import { RefusedError } from '../util/refusal';
 import { errorText } from '../util/error-text';
@@ -525,8 +526,15 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   // Build arguments
   const resolution = customResolution(profile.windowWidth, profile.windowHeight);
   // The server a quick connect joins, and which of the two ways this version
-  // is told about it.
-  const server = options.quickConnect && profile.serverIp ? profile.serverIp : null;
+  // is told about it. The address is taken without the blanks it may have been
+  // pasted with, which the game would look up as part of the name; and a port
+  // only when it is one, since the profile list is read back without the
+  // editor's say and both ways of telling the game hand it on as it stands.
+  const server = (options.quickConnect && profile.serverIp?.trim()) || null;
+  const serverPort =
+    profile.serverPort !== undefined && isServerPort(profile.serverPort)
+      ? profile.serverPort
+      : undefined;
   const joinsByQuickPlay = server !== null && takesQuickPlayMultiplayer(meta.arguments?.game);
   const templateVars: Record<string, string> = {
     auth_player_name: username,
@@ -569,7 +577,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     resolution_width: String(resolution?.width ?? 854),
     resolution_height: String(resolution?.height ?? 480),
     // Likewise unused unless the feature is on, which it is only with a server.
-    quickPlayMultiplayer: server === null ? '' : quickPlayAddress(server, profile.serverPort),
+    quickPlayMultiplayer: server === null ? '' : quickPlayAddress(server, serverPort),
   };
 
   const features = launchFeatures(profile, joinsByQuickPlay);
@@ -635,8 +643,8 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   // and join nothing.
   if (server !== null && !joinsByQuickPlay) {
     gameArgs.push('--server', server);
-    if (profile.serverPort) {
-      gameArgs.push('--port', String(profile.serverPort));
+    if (serverPort !== undefined) {
+      gameArgs.push('--port', String(serverPort));
     }
   }
 

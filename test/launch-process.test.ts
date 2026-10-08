@@ -497,6 +497,43 @@ describe.skipIf(!posix)('a quick connect', () => {
     expect(args).not.toContain('--quickPlayMultiplayer');
   });
 
+  it('takes an address as it was pasted, without the blanks around it', async () => {
+    withQuickPlay();
+    await launch('exit 0', { ...server, serverIp: ' mc.whiteravens.net ' }, { quickConnect: true });
+    await exitInfo();
+
+    expect((await gameSide()).slice(-2)).toEqual([
+      '--quickPlayMultiplayer',
+      'mc.whiteravens.net:25570',
+    ]);
+  });
+
+  it('leaves out a port that no server could be listening on', async () => {
+    // The editor refuses one; a profile list edited by hand does not go through it.
+    withQuickPlay();
+    await launch('exit 0', { ...server, serverPort: 70000 }, { quickConnect: true });
+    await exitInfo();
+
+    expect((await gameSide()).slice(-2)).toEqual(['--quickPlayMultiplayer', 'mc.whiteravens.net']);
+  });
+
+  it('leaves it out for an older version as well', async () => {
+    await launch('exit 0', { ...server, serverPort: -5 }, { quickConnect: true });
+    await exitInfo();
+
+    const args = await gameSide();
+    expect(args.slice(-2)).toEqual(['--server', 'mc.whiteravens.net']);
+    expect(args).not.toContain('--port');
+  });
+
+  it('names no server for an address that is nothing but blanks', async () => {
+    withQuickPlay();
+    await launch('exit 0', { ...server, serverIp: '   ' }, { quickConnect: true });
+    await exitInfo();
+
+    expect(await gameSide()).not.toContain('--quickPlayMultiplayer');
+  });
+
   it('names no server when Play was pressed and not quick connect', async () => {
     withQuickPlay();
     await launch('exit 0', server);
