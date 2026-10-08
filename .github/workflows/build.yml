@@ -40,6 +40,37 @@ jobs:
       - name: Test
         run: npm test
 
+  # The launcher is run on Windows more than anywhere, and until this job its
+  # tests were not run there at all. Most of them are about logic that is the
+  # same on every system. The ones this is for are not: Windows' own `tar`
+  # unpacking the Java runtime, its `taskkill` asking a game to close, a file
+  # flushed and renamed on NTFS. Nothing but a Windows can run those, and wine,
+  # which stands in for it elsewhere, has no `tar` at all.
+  #
+  # Allowed to fail while it is new: the suite has never been run here, and what
+  # it turns up is being gone through. Held to passing once it has.
+  test-windows:
+    needs: lint-and-typecheck
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      # Before the checkout. The tests read some of the repository's own files,
+      # and are written against the line endings those are committed with.
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test
+
   build-linux:
     needs: lint-and-typecheck
     runs-on: ubuntu-latest
