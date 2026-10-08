@@ -112,8 +112,18 @@ async function writeSyncState(profileId: string, state: SyncState): Promise<void
 // The ETag alone is not enough state to work with. A 304 means "you already
 // have this" — but without the body there is nothing to reconcile the profile
 // against, so the sync used to return early and report success while a jar the
-// player deleted by hand stayed missing. Caching the last body that validated
-// fixes that, and is also what makes a sync possible with no network at all.
+// player deleted by hand stayed missing. Keeping the body fixes that, and is
+// also what makes a sync possible with no network at all.
+//
+// The copy and the recorded ETag are one statement — "the manifest this profile
+// was last brought in line with, and what the server called it" — so they are
+// written together, by a sync that finished, and by nothing else. The copy used
+// to be written as soon as a manifest arrived: by the update check, which
+// installs nothing, and by a sync that then failed. Either left a newer release
+// here under the older one's tag. A server answering 304 to that tag — the
+// publisher having taken the release back — was then answered with the release
+// that had been withdrawn, and with no network a profile that had only seen a
+// new release was synced against files it could not fetch.
 //
 // What is cached is the *raw* document, not the schema's output. Zod drops keys
 // it does not know about, so caching its result would canonicalize to different
@@ -436,6 +446,9 @@ function parseManifest(body: unknown, profileName: string): ModManifest {
  * used, before this returns. That is the whole point of doing it here rather
  * than beside the UI badge: there is no window between the bytes being approved
  * and the bytes being installed, because they are the same bytes.
+ *
+ * Nothing is kept here. A document that came from the server is handed back as
+ * `fetched`, and it is the sync that keeps it, once it has installed it.
  */
 async function obtainManifest(
   profileId: string,
@@ -448,6 +461,8 @@ async function obtainManifest(
   manifest: ModManifest;
   etag: string | undefined;
   verification: ManifestVerification;
+  /** The raw document, when it came from the server and not from the copy. */
+  fetched?: unknown;
 }> {
   const headers: Record<string, string> = {};
   if (knownEtag) headers['If-None-Match'] = knownEtag;
@@ -502,11 +517,9 @@ async function obtainManifest(
   const raw = await readJsonCapped(res, 'The manifest');
   const loaded: LoadedManifest = { raw, manifest: parseManifest(raw, profileName) };
 
-  // Approved before it is cached: a manifest the policy rejects must not become
-  // the copy a later offline sync falls back to.
-  const approved = approve(loaded, res.headers.get('etag') ?? knownEtag);
-  await writeCachedManifest(profileId, raw);
-  return approved;
+  // Approved before it is handed back to be kept: a manifest the policy rejects
+  // must not become the copy a later offline sync falls back to.
+  return { ...approve(loaded, res.headers.get('etag') ?? knownEtag), fetched: raw };
 }
 
 /**
@@ -556,11 +569,20 @@ async function runSync(profileId: string, supplied?: ModManifest): Promise<void>
     // A supplied manifest was built here from a file the user chose, so there is
     // no publisher to have signed it and nothing for the badge to claim.
     let verification: ManifestVerification | undefined;
+    // What the server sent, kept at the end and only if this sync gets there.
+    let fromServer: unknown;
     if (pack) {
+      // Kept at once, unlike a fetched one: with no address to ask, this copy
+      // is the only thing a later sync has to finish the install from.
       manifest = pack;
       await writeCachedManifest(profileId, pack);
     } else {
-      ({ manifest, etag, verification } = await obtainManifest(
+      ({
+        manifest,
+        etag,
+        verification,
+        fetched: fromServer,
+      } = await obtainManifest(
         profileId,
         profile.name,
         profile.manifestUrl!,
@@ -864,6 +886,9 @@ async function runSync(profileId: string, supplied?: ModManifest): Promise<void>
       return { synced, dropped: stale };
     });
 
+    // The copy first and its tag after it. Cut short between the two, the
+    // profile is left asking with the older tag, and is sent the manifest again.
+    if (fromServer !== undefined) await writeCachedManifest(profileId, fromServer);
     await writeSyncState(profileId, {
       lastSyncedAt: new Date().toISOString(),
       manifestEtag: etag ?? undefined,

@@ -139,6 +139,12 @@ per profile: one conditional GET, diffed against `installed.lock`, written to th
 sync state and pushed to the UI. It installs nothing and it never stores the ETag
 it fetched — the recorded one means "the manifest this profile was reconciled
 against", and keeping it is what lets the next real sync still see the update.
+It does not keep the manifest it fetched either. The copy a profile holds and
+the recorded ETag are written together, by a sync that finished: a server that
+answers 304 to that ETag is answered with that copy, and with no network the
+copy is what a sync runs against — so it has to be the manifest that was
+installed, not one that was only looked at or that a failed sync got half-way
+through.
 It also refuses to report failure: a check nobody asked for turning a working
 profile red would be worse than saying nothing, and pressing Sync reports
 properly. Before this, `status` was only ever written when a sync ended, so a
