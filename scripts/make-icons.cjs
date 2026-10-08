@@ -122,6 +122,18 @@ async function render(html, width, height) {
 
   await win.loadURL(`data:text/html;base64,${Buffer.from(html).toString('base64')}`);
   const frame = await painted;
+  // A window is no taller or wider than the display it is on, shown or not.
+  // On one smaller than what is asked for here the frame comes back short, the
+  // page inside it has grown scrollbars, and scaling that to size made icons
+  // that were squashed, with a scrollbar down one side — and nothing said so.
+  const got = frame.getSize();
+  if (got.width * height !== got.height * width) {
+    win.destroy();
+    throw new Error(
+      `asked for ${width}x${height} and was given ${got.width}x${got.height}: ` +
+        'the display is too small for the window the icons are rendered in',
+    );
+  }
   const sized =
     frame.getSize().width === width ? frame : frame.resize({ width, height, quality: 'best' });
   win.destroy();
