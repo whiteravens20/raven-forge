@@ -44,6 +44,29 @@ function keytar(): Keytar | null {
 }
 
 /**
+ * The most bytes the Windows Credential Manager keeps under one name — its
+ * `CRED_MAX_CREDENTIAL_BLOB_SIZE`, and what the packaging job measures on a
+ * Windows: 2560 go in, 2561 do not.
+ */
+export const WINDOWS_SECRET_LIMIT = 2560;
+
+/**
+ * What to add to the warning about a write the keychain refused.
+ *
+ * Windows refuses a secret that is too long for it with "The stub received bad
+ * data", which tells whoever reads the log nothing. This says the size and the
+ * limit beside it — in bytes, which is what Windows counts. Nothing for a
+ * secret that fits, and nothing on another system: what went wrong there is
+ * something else, and the keychain's own words are all that is known of it.
+ */
+export function tooLongNote(value: string, platform: NodeJS.Platform): string {
+  if (platform !== 'win32') return '';
+  const bytes = Buffer.byteLength(value, 'utf8');
+  if (bytes <= WINDOWS_SECRET_LIMIT) return '';
+  return ` — the secret is ${bytes} bytes and the Windows Credential Manager takes ${WINDOWS_SECRET_LIMIT}`;
+}
+
+/**
  * Store a secret.
  *
  * @returns `true` when it reached the keychain. `false` means the caller is
@@ -56,7 +79,7 @@ export async function setSecret(key: string, value: string): Promise<boolean> {
     await kt.setPassword(SERVICE, key, value);
     return true;
   } catch (err) {
-    log.warn(`OS keychain write failed for "${key}":`, err);
+    log.warn(`OS keychain write failed for "${key}"${tooLongNote(value, process.platform)}:`, err);
     return false;
   }
 }
