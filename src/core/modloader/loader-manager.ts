@@ -7,9 +7,10 @@ import {
   getForgeVersions,
   getNeoForgeVersions,
   installForgeLike,
+  isWorkingForgeLikeBuild,
   type LoaderInstallOptions,
 } from './forge-installer';
-import { loaderProfilePath, readLoaderProfile } from './loader-profile';
+import { isLoaderProfileComplete, loaderProfilePath, readLoaderProfile } from './loader-profile';
 import { withTimeout } from '../util/cancellation';
 import { writeJsonAtomic } from '../util/atomic-file';
 import {
@@ -17,6 +18,9 @@ import {
   defaultLoaderVersion,
   isPrerelease,
 } from '../../shared/loader-version';
+import { getCachedVersionMeta } from '../minecraft/version-manifest';
+import { requiredJavaFor } from '../minecraft/java-requirement';
+import { startsMinecraft, type LoaderEntry, type MetaLoader } from './loader-fit';
 import type { ModLoaderType, ProgressEvent, LoaderVersion } from '../../shared/ipc-types';
 
 function emitLoaderProgress(event: ProgressEvent): void {
@@ -27,12 +31,10 @@ function emitLoaderProgress(event: ProgressEvent): void {
 // The two publish the same thing at the same kind of address: a list of loader
 // builds per Minecraft version, and for each a ready-made version profile.
 
-const META_LOADERS = {
+const META_LOADERS: Record<MetaLoader, { api: string; label: string }> = {
   fabric: { api: FABRIC_META_API, label: 'Fabric' },
   quilt: { api: QUILT_META_API, label: 'Quilt' },
-} as const;
-
-type MetaLoader = keyof typeof META_LOADERS;
+};
 
 async function getMetaLoaderVersions(
   loader: MetaLoader,
@@ -42,12 +44,27 @@ async function getMetaLoaderVersions(
   const res = await fetch(`${api}/versions/loader/${mcVersion}`, {
     signal: AbortSignal.timeout(10000),
   });
+  // Neither answers a Minecraft version it has nothing for with an empty list:
+  // Fabric says 400 and Quilt 404. That is an answer, not a failure, and it is
+  // the one every release before 1.14 gets — reported as a failure, the editor
+  // said the list could not be loaded and offered a box to type a build into.
+  if (res.status === 400 || res.status === 404) {
+    log.info(`${label} has no builds for Minecraft ${mcVersion}`);
+    return [];
+  }
   if (!res.ok) throw new Error(`${label} API error: ${res.status}`);
 
-  const data = (await res.json()) as Array<{ loader: { version: string; stable?: boolean } }>;
+  const data = (await res.json()) as LoaderEntry[];
+
+  // What the service lists is every build there is, whatever the Minecraft
+  // version; what is offered is the ones that start this one. The Java is what
+  // Mojang's metadata says when a launch has already fetched it, and what the
+  // release number says otherwise — nobody is asked just to draw a list.
+  const java = requiredJavaFor(mcVersion, await getCachedVersionMeta(mcVersion));
 
   return (
     data
+      .filter((entry) => startsMinecraft(loader, entry, mcVersion, java))
       .map((entry) => ({
         version: entry.loader.version,
         stable: !isPrerelease(entry.loader.version),
@@ -120,6 +137,45 @@ export async function getLoaderVersions(
 }
 
 /**
+ * Whether a build is one this launcher would offer for a Minecraft version —
+ * worked out from what is on this machine, with nobody asked.
+ *
+ * A profile can hold a build that was never chosen from a list: a pack names
+ * the one it wants, and it is installed as asked. When such a profile then
+ * fails to start, this is what says the build may be why. It is the rules the
+ * lists are drawn by, put to a single build: Forge and NeoForge are judged by
+ * the build's name, Fabric and Quilt by the libraries their installed profile
+ * lists as well. A Fabric or Quilt build that is not installed has only its
+ * number to go by, and a build nobody ever published passes — neither is
+ * something to tell a player their profile is wrong about.
+ */
+export async function loaderBuildStarts(
+  loader: ModLoaderType,
+  loaderVersion: string,
+  mcVersion: string,
+): Promise<boolean> {
+  switch (loader) {
+    case 'vanilla':
+      return true;
+    case 'forge':
+    case 'neoforge':
+      return isWorkingForgeLikeBuild(loader, loaderVersion, mcVersion);
+    case 'fabric':
+    case 'quilt': {
+      const profile = await readLoaderProfile(loader, loaderVersion, mcVersion);
+      const java = requiredJavaFor(mcVersion, await getCachedVersionMeta(mcVersion));
+      const entry: LoaderEntry = {
+        loader: { version: loaderVersion },
+        launcherMeta: { libraries: { common: profile?.libraries ?? [] } },
+      };
+      return startsMinecraft(loader, entry, mcVersion, java);
+    }
+    default:
+      throw new Error(`Unknown loader: ${loader}`);
+  }
+}
+
+/**
  * The build to use for a loader nobody pinned a version of, or undefined when
  * the loader publishes nothing for this Minecraft version.
  */
@@ -164,7 +220,8 @@ export async function installLoader(
 
 /**
  * Whether a loader build is installed — which is to say, whether the version
- * profile its install leaves behind is there and usable.
+ * profile its install leaves behind is there and usable, with the files only
+ * that install could have made.
  *
  * Asked of the profile's contents and not merely of the file's existence. The
  * launch reinstalls whatever this says is missing, so a profile that will not
@@ -177,5 +234,5 @@ export async function isLoaderInstalled(
   mcVersion: string,
 ): Promise<boolean> {
   if (loader === 'vanilla') return true;
-  return (await readLoaderProfile(loader, loaderVersion, mcVersion)) !== null;
+  return isLoaderProfileComplete(loader, loaderVersion, mcVersion);
 }

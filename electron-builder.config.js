@@ -15,10 +15,36 @@
  *   See docs/SIGNING.md for OV/EV certificate setup
  */
 
+/**
+ * Which platform this run packages for: the one named on the command line, or,
+ * with none named, the one it runs on.
+ *
+ * Asked because the product goes by two names. electron-builder builds the
+ * `.deb`'s install folder out of the product name and offers no other lever, so
+ * "Raven Forge Launcher" put the program in `/opt/Raven Forge Launcher` — a
+ * path with spaces, which every script and every `ldd` then has to quote. On
+ * Linux the product is therefore named like the package, as the binary, the
+ * desktop entry and the data folder already are; what the player reads is the
+ * desktop entry's own `Name`, set further down, and is unchanged. Windows keeps
+ * the spaced name for the installer's title and the uninstall entry, and gets
+ * its folder from build/installer.nsh.
+ *
+ * One platform per run, then: a run for both would give one of them the other's
+ * name.
+ */
+const args = process.argv.slice(2);
+const named = (...flags) => args.some((arg) => flags.includes(arg));
+const linuxNamed = named('--linux', '-l');
+const otherNamed = named('--win', '--windows', '-w', '--mac', '--macos', '-m', '-o');
+if (linuxNamed && otherNamed) {
+  throw new Error('Package one platform per run: the product is named differently on Linux.');
+}
+const forLinux = linuxNamed || (!otherNamed && process.platform === 'linux');
+
 /** @type {import('electron-builder').Configuration} */
 const config = {
   appId: 'com.ravenforge.launcher',
-  productName: 'Raven Forge Launcher',
+  productName: forLinux ? 'raven-forge-launcher' : 'Raven Forge Launcher',
   copyright: 'Copyright © 2026 White Ravens',
 
   directories: {

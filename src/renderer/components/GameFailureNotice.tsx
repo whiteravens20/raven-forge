@@ -2,7 +2,9 @@
 
 import { Button } from '@components/ui/Button';
 import { Banner } from '@components/ui/Banner';
+import { LoaderBuildHint } from '@components/LoaderBuildHint';
 import { useGameStore, type GameFailure } from '@stores/game-store';
+import { useProfileStore } from '@stores/profile-store';
 import { useT, type TFunction } from '@renderer/i18n';
 
 /** A failure with nothing to offer but its explanation. */
@@ -35,6 +37,7 @@ function describe(
 export function GameFailureNotice({ profileId }: { profileId: string }) {
   const t = useT();
   const failure = useGameStore((s) => s.failures[profileId]);
+  const profile = useProfileStore((s) => s.profiles.find((p) => p.id === profileId));
   const launch = useGameStore((s) => s.launch);
   const clearFailure = useGameStore((s) => s.clearFailure);
 
@@ -66,6 +69,11 @@ export function GameFailureNotice({ profileId }: { profileId: string }) {
     <div className="w-full max-w-xl">
       <Banner type="urgent" dismissible onDismiss={() => clearFailure(profileId)}>
         {describe(t, failure)}
+        {/* Only beside a diagnostic. A refusal already says what to change, and
+            a build that will not start has nothing to do with a failed stop. */}
+        {failure.kind === 'launch-failed' && profile && (
+          <LoaderBuildHint profile={profile} className="mt-1 block text-xs" />
+        )}
       </Banner>
     </div>
   );

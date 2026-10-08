@@ -49,7 +49,6 @@ let mod: LoaderProfile;
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-loader-'));
   process.env.RAVENFORGE_DATA_DIR = root;
-  getVersionMeta.mockClear();
 
   vi.resetModules();
   const { reloadDataRoot } = await import('../src/core/config/data-root');

@@ -283,3 +283,49 @@ describe('stopping a game', () => {
     expect(store.getState().running.has('a')).toBe(true);
   });
 });
+
+describe('a game that went down', () => {
+  const crash = { profileId: 'a', exitCode: 1, crashed: true, playTimeMinutes: 0 };
+
+  it('is kept under its profile, for whichever page shows that profile', async () => {
+    // Two pages draw the crash card, and a game is not always looked for on the
+    // page it was started from: the record is the profile's, not a page's.
+    const store = await loadStore();
+    api.emit('game:started', 'a');
+
+    api.emit('game:exited', crash);
+
+    expect(store.getState().getCrashInfo('a')).toEqual(crash);
+    expect(store.getState().getCrashInfo('b')).toBeUndefined();
+  });
+
+  it('is not what a game that simply closed leaves', async () => {
+    const store = await loadStore();
+    api.emit('game:started', 'a');
+
+    api.emit('game:exited', { ...crash, exitCode: 0, crashed: false });
+
+    expect(store.getState().getCrashInfo('a')).toBeUndefined();
+  });
+
+  it('is put away by dismissing it, on every page at once', async () => {
+    const store = await loadStore();
+    api.emit('game:exited', crash);
+
+    store.getState().clearCrash('a');
+
+    expect(store.getState().getCrashInfo('a')).toBeUndefined();
+  });
+
+  it('is put away by the next launch of that profile, and by no other', async () => {
+    api.call('game', 'launch').mockResolvedValue({ success: true });
+    const store = await loadStore();
+    api.emit('game:exited', crash);
+
+    await store.getState().launch('b');
+    expect(store.getState().getCrashInfo('a')).toEqual(crash);
+
+    await store.getState().launch('a');
+    expect(store.getState().getCrashInfo('a')).toBeUndefined();
+  });
+});

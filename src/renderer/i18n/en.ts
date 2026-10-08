@@ -159,6 +159,10 @@ export const en = {
     'This profile allocates {allocated} of RAM and this machine has {total}. Minecraft cannot start with more memory than the machine has — lower it in the profile editor, where {recommended} suits this one.',
   'launchError.loaderVersionUnknown':
     'Could not work out which {loader} build to use for Minecraft {version}. Check the connection, or pick a loader version in the profile editor.',
+  'launchError.loaderFileMissing':
+    "The mod loader's file {file} is missing or damaged, and only the loader's installer can make it. Start the profile again with a connection — the loader is then installed again.",
+  'launchError.loaderBuildTooOld':
+    '{loader} is a build from before the kind of install this launcher can do. Pick a newer build of the loader in the profile editor.',
   'launchError.javaNotRuntime':
     'This profile is set to launch with {path}, and that is not a Java runtime this machine can run. Point it somewhere else in the profile editor, or clear the field to use the runtime the launcher installs itself.',
   'launchError.javaTooOld':
@@ -210,6 +214,13 @@ export const en = {
     'A crash report was saved on this computer — nothing was sent anywhere. Access tokens and your account details are already removed from it.',
   'crash.openReport': 'Open report',
   'crash.reportBug': 'Report a bug',
+
+  // Under a crash or a failed launch, when the profile holds a loader build
+  // the editor's list would not have offered.
+  'loaderHint.notOffered':
+    '{loader} is not a build this launcher offers for Minecraft {mcVersion}: it is among those not expected to start it. That may be the reason — choose another build in the profile editor.',
+  'loaderHint.notOfferedPack':
+    "{loader} is not a build this launcher offers for Minecraft {mcVersion}: it is among those not expected to start it. That may be the reason — the pack names this build, so it is the pack's author who can change it.",
 
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profiles',
@@ -401,7 +412,7 @@ export const en = {
   'profileForm.versionsLoading': 'Loading versions…',
   'profileForm.versionsFailed': 'Could not load the version list — type it manually',
   'profileForm.noLoaderBuilds':
-    '{loader} has no builds for Minecraft {mcVersion} — pick another version or loader',
+    '{loader} has no builds for Minecraft {mcVersion} that this launcher can run — pick another version or loader',
   'profileForm.loaderUnstable': 'prerelease',
   'profileForm.loaderRecommended': 'recommended',
   'profileForm.loaderVersion': 'Loader version',

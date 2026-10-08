@@ -126,7 +126,6 @@ beforeEach(async () => {
   fetched.length = 0;
   beforeDownload = () => {};
   afterDownload = async () => {};
-  updateProfile.mockClear();
   profile = {
     id: 'p1',
     name: 'White Ravens Forge',

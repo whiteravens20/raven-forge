@@ -126,6 +126,13 @@ export interface CrashReportInput {
   logTail: string[];
   /** Set when the process never started at all, in which case it is the whole finding. */
   spawnError?: string;
+  /**
+   * False when the profile's loader build is not one the launcher offers for
+   * its Minecraft version — a build a pack named, as a rule. It is the first
+   * thing to know about a game that would not start, and nothing else in the
+   * report says it. Undefined when that could not be told.
+   */
+  loaderBuildOffered?: boolean;
   /** Where the game actually ran — a profile can point somewhere else entirely. */
   gameDir: string;
   java: { path: string; version?: number; vendor?: string };
@@ -265,7 +272,10 @@ export function buildCrashReport(input: CrashReportInput, mods: string[]): strin
         'Mod loader',
         profile.modLoader === 'vanilla'
           ? 'vanilla'
-          : `${profile.modLoader} ${profile.modLoaderVersion ?? '(version not recorded)'}`,
+          : `${profile.modLoader} ${profile.modLoaderVersion ?? '(version not recorded)'}` +
+              (input.loaderBuildOffered === false
+                ? ' — not a build the launcher offers for this Minecraft version'
+                : ''),
       ),
       field(
         'Java',

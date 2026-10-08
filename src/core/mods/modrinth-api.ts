@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { MODRINTH_API_BASE, isClientModLoader } from '../../shared/constants';
+import { MODRINTH_API_BASE, acceptedLoaders, isClientModLoader } from '../../shared/constants';
 import { modrinthUserAgent } from '../net/user-agent';
 import { isSafeFileName } from '../../shared/manifest-schema';
 import type {
@@ -119,7 +119,15 @@ export async function searchMods(filters: ModSearchFilters): Promise<ModSearchPa
   // A loader facet only means anything for mods and for packs of them. Resource
   // packs have no loader, and shaders are categorised by the shader loader that
   // runs them (iris, optifine) — facetting those on `fabric` returns nothing.
-  if (filters.loader && (projectType === 'mod' || projectType === 'modpack')) {
+  if (filters.loader && projectType === 'mod') {
+    // Every loader whose mods this one runs, as one group, which Modrinth ORs.
+    // Quilt runs Fabric's, and three in four of those are tagged for Fabric
+    // alone: asked for `quilt` by name, a Quilt profile's search had neither
+    // Fabric API nor Sodium in it — both of which it then installs happily.
+    const loaders = acceptedLoaders(filters.loader);
+    if (loaders.length > 0) facets.push(loaders.map((loader) => `categories:${loader}`));
+  } else if (filters.loader && projectType === 'modpack') {
+    // A pack is built for one loader, and the profile it makes is that one.
     facets.push([`categories:${filters.loader}`]);
   }
   // Each category becomes its own facet group, which Modrinth ANDs: asking for

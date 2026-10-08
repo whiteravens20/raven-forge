@@ -33,7 +33,7 @@ raven-forge/
 ├── tsconfig.json                 # base of tsconfig.test.json, and an editor's map from a file to its project
 ├── tsconfig.main.json            # main + preload + core + shared (Node ESM)
 ├── tsconfig.renderer.json        # renderer (DOM)
-├── vite.config.ts                # renderer build + path aliases
+├── vite.config.mts               # renderer build + path aliases
 ├── .github/workflows/
 │   ├── build.yml                 # PR / push CI — lint, typecheck, test, build
 │   ├── codeql.yml                # CodeQL analysis
@@ -187,6 +187,108 @@ so its updates are found, what it requires is installed with it, and a mod that
 depends on it later sees that it is there. A file Modrinth does not know, or
 cannot be asked about, is listed as a local file and works the same in every
 way that does not need a project id.
+
+## Installing a mod loader
+
+Four loaders, and three quite different things called installing
+(`core/modloader/`). Whatever the kind, the result is the same one file — a
+version profile under `loaders/<loader>/<minecraft>-<build>/` — which a launch
+merges over Mojang's own metadata to get the main class, the extra libraries and
+the arguments the loader adds.
+
+- **Fabric and Quilt** publish that profile ready-made. It is fetched from the
+  loader's metadata service and written down. Fabric starts at Minecraft 1.14
+  and Quilt at 1.14.4; asked about an older version the two services answer with
+  an error status rather than an empty list, and that is read as "no builds".
+- **Forge from 1.12.2's last builds on, and NeoForge**, ship an installer that
+  has to be run: it downloads libraries and patches the game's jar on the
+  player's machine. It is fetched, held to the checksum the repository publishes
+  beside it, and run with `--installClient` against the launcher's cache, so
+  what it writes lands where a launch already looks. One at a time, on the Java
+  the game itself needs.
+- **Forge for 1.7.10 up to 1.12.2's earlier builds** has an installer with
+  nothing to run. Its work is copying the Forge jar into the libraries folder
+  and writing a profile that names it, so that is done here directly: the game
+  patches itself as it starts. Such a profile names its libraries by Maven
+  coordinates alone — Mojang's library host unless it says otherwise, and a list
+  of checksums of which any one may be the file's.
+- **Forge for anything older than 1.7.10** is not offered. Up to 1.5.1 Forge had
+  no installer at all, and the ones for 1.5.2 to 1.7.2 carry a profile that
+  stands alone instead of extending the game's.
+
+**What counts as installed** is the profile _and_ every library it lists with a
+hash and no address — which is how a profile says "the installer made this".
+Those cannot be downloaded, so a launch that finds one missing installs the
+loader again instead of trying. Most of what a Forge or NeoForge installer makes
+is listed nowhere, though, and only the installer can vouch for it: on the
+launch after a crash it is run again over the existing install, where it checks
+each of its files and makes again the ones that are wrong. That takes seconds
+when nothing is, and a launch goes ahead without it when the installer cannot be
+reached.
+
+**Only builds that can be installed and started are offered.** What a loader
+lists for a Minecraft version and what works on it are not the same list, and a
+build that is chosen and then refused, or installed and then dead in the loader,
+is worse than one that was never there:
+
+- _Forge_ lists builds back to Minecraft 1.1. Nothing is offered below 1.7.10,
+  and a short table says where a version's working builds begin when that is
+  not at its first (`workingForgeBuilds`): 1.7.10 from `10.13.3.1388`, the first
+  whose installer carries a profile that can be used; the first build or two of
+  four lines that never started; 1.16.5 from `36.2.26` and 1.16.4 not at all,
+  because the builds before that call a constructor Java 8u321 removed, and the
+  Java fetched here is the current one; 1.17.1 from `37.0.29`, because the
+  earlier builds either tell the game's jar by the name Mojang's launcher gives
+  it, which is not its name here, or drop every library whose path has `forge-`
+  in it, which the launcher's own folder does.
+- _NeoForge_ lists the builds it made for the snapshots and pre-releases of a
+  version under the release's own number, marked only by what follows a `+`;
+  those are left out, as are one build of its 1.20.1 line that was published
+  without an installer and one of 1.20.4 whose installer does not run.
+- _Fabric and Quilt_ list every build they have for every Minecraft version,
+  and serve a profile for any pair (`loader-fit.ts`). Three things take a build
+  off the list: its ASM cannot read the class files of the Java that Minecraft
+  version is compiled for, which both services publish enough to work out; its
+  profile sends for a library over plain http, which the launcher does not
+  fetch; or it is older than the floor a short table gives for that version,
+  found by starting the game because nothing published says where it is. For
+  26.3 that leaves 18 of Fabric's 253 builds and 16 of Quilt's 307.
+
+Every floor in those tables came from starting the game: the oldest build still
+offered was installed and started on every release each loader has builds for —
+48 for Fabric, 44 for Quilt, 56 for Forge, 23 for NeoForge — and where it did
+not start, the first one that does was searched for. For Fabric and Quilt a
+floor found on one release is kept for the ones after it, until one of them
+needs a newer build still, and a Minecraft version newer than the table keeps
+its newest floor. That can keep an old build from a release it would have
+started; it never offers one older than a build that was seen to start. A Forge
+or NeoForge build is made for one version, so a new version starts out with
+every build offered.
+
+A build that is not offered can still be named by a pack. It is installed as the
+pack asks, and not refused: the lists cannot see everything that decides whether
+a build starts — a profile with a Java of its own starts builds the fetched one
+does not. What the launcher does instead is say so when it matters. When the
+launch of such a profile fails, or its game crashes, the line beside the failure
+says that the build is not one the launcher offers and may be the reason, and
+who can change it — the player in the profile editor, or the pack's author when
+the profile follows a pack. The crash report says the same on its `Mod loader`
+line. It is the lists' own rules put to one build (`loaderBuildStarts`),
+answered from the build's name and from the libraries its installed profile
+lists, so nothing is fetched to explain a failure that a missing network may
+have caused.
+
+**A build has more than one name.** Forge's list spells some builds with a
+branch after the number — `10.13.4.1614-1.7.10` — while its own recommendation
+feed, and every pack on Modrinth, give the number alone. The recommendation is
+matched by number; a profile holding the short name has it looked up on the
+list when the installer is not found under it, and the editor shows the list's
+spelling rather than treating the build as unknown.
+
+**Quilt runs Fabric's mods**, and most of them are tagged for Fabric alone, so
+everything that asks Modrinth on a Quilt profile's behalf — search, install,
+dependencies, updates — asks for either (`acceptedLoaders` in
+`shared/constants.ts`). NeoForge is not given Forge's: that holds on 1.20.1 only.
 
 ## Microsoft auth chain
 
@@ -391,7 +493,7 @@ and when.
 ## Open implementation gaps
 
 Last checked against the code on **2026-08-20**, and the self-update entry on
-**2026-09-27**. Keep it that way — a stale gap list is worse than none, because
+**2026-10-07**. Keep it that way — a stale gap list is worse than none, because
 it sends people looking for problems that were fixed and hides the ones that
 were not.
 
@@ -413,10 +515,15 @@ were not.
   from a rejection, the renderer offered offline play, and accepting the offer
   took the `offline && type === 'microsoft'` branch and launched the game with
   the `0` token sentinel.
-- **Self-update is proven on Windows only.** An installed release has updated
-  itself to the next one through the published feed. The AppImage takes the same
-  path but nobody has exercised it yet, and a `.deb` install leaves updates to
-  the package manager on purpose.
+- **Self-update is proven on Windows and for the AppImage.** An installed
+  Windows release has updated itself to the next one through the published feed.
+  The 0.7.0 AppImage has done the same to 0.7.1: the old file is removed, the new
+  one is left beside where it was under the new version's name, and the profiles
+  and the account are as they were. A `.deb` install leaves updates to the
+  package manager on purpose. What an update leaves in the updater's cache is
+  cleared the first time a check finds nothing newer — a download that was
+  fetched and then never installed, because the new version arrived another way,
+  used to stay there until the release after it.
 - **Crash reports are now proven against a real exit.** A Windows 26.2/Fabric
   session produced one end to end: `readMinecraftCrash` found Mojang's own file,
   quoted it, and the redaction replaced the token, the account UUID, the player

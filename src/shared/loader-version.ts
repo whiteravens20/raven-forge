@@ -52,6 +52,41 @@ export function compareLoaderVersionsDesc(a: string, b: string): number {
 }
 
 /**
+ * A Forge build's number, without the branch some of them carry after it.
+ *
+ * `10.13.4.1614-1.7.10` and `10.13.4.1614` are one build. Forge's own list
+ * spells it the first way for a handful of Minecraft versions — 1.7.10, 1.8.9
+ * and 1.9.4 among them — while its promotions feed and every pack on Modrinth
+ * spell it the second, so the number is what the two are matched on.
+ *
+ * Forge only. For the others what follows a hyphen is a prerelease tag, and
+ * `0.30.1-beta.4` is not `0.30.1`.
+ */
+export function forgeBuildNumber(version: string): string {
+  return version.split('-')[0];
+}
+
+/**
+ * The entry of a loader's list that a profile's build names, if it names one.
+ *
+ * By its own spelling, or — for Forge — by its number: a profile made from a
+ * pack holds `11.15.1.1902`, and the list calls that build
+ * `11.15.1.1902-1.8.9`. Read as a build that is not on the list, it was
+ * replaced with the default the first time the profile was opened in the
+ * editor, and saving any change at all then moved the pack to another Forge.
+ */
+export function listedLoaderVersion(
+  versions: readonly LoaderVersion[],
+  held: string | undefined,
+  loader: string,
+): string | undefined {
+  if (!held) return undefined;
+  if (versions.some((v) => v.version === held)) return held;
+  if (loader !== 'forge') return undefined;
+  return versions.find((v) => forgeBuildNumber(v.version) === forgeBuildNumber(held))?.version;
+}
+
+/**
  * The loader build a profile gets when nobody has chosen one.
  *
  * The build its loader recommends, where the loader says — Fabric and Forge

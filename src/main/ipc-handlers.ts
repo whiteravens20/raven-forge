@@ -77,7 +77,7 @@ import {
 import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater/launcher-updater';
 import { detectSystemJava, probeJava } from '../core/java/java-manager';
 import { requiredJavaFor } from '../core/minecraft/java-requirement';
-import { getLoaderVersions } from '../core/modloader/loader-manager';
+import { getLoaderVersions, loaderBuildStarts } from '../core/modloader/loader-manager';
 import {
   launchGame,
   killGame,
@@ -1096,6 +1096,13 @@ export function registerAllIpcHandlers(): void {
       return ok(await getLoaderVersions(loader, mcVersion));
     } catch (err) {
       return fail(`Failed to get loader versions: ${reason(err)}`);
+    }
+  });
+  handle('loaders:build-starts', async (_event, loader, loaderVersion, mcVersion) => {
+    try {
+      return ok(await loaderBuildStarts(loader, loaderVersion, mcVersion));
+    } catch (err) {
+      return fail(`Failed to check the loader build: ${reason(err)}`);
     }
   });
 

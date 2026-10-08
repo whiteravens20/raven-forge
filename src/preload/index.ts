@@ -97,6 +97,8 @@ const api: RavenForgeAPI = {
   loaders: {
     getVersions: (loader, mcVersion) =>
       ipcRenderer.invoke('loaders:get-versions', loader, mcVersion),
+    buildStarts: (loader, loaderVersion, mcVersion) =>
+      ipcRenderer.invoke('loaders:build-starts', loader, loaderVersion, mcVersion),
   },
   game: {
     launch: (options) => ipcRenderer.invoke('game:launch', options),

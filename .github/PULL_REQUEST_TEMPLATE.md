@@ -12,6 +12,7 @@
 - [ ] Performance
 - [ ] Refactor
 - [ ] Dependencies
+- [ ] CI, build or tooling
 
 ## Related Issue
 

@@ -201,7 +201,16 @@
     SetShellVarContext current
   ${endif}
 
+  ; Where the data went, in a variable of its own and not in the register the
+  ; macro hands it back in. electron-builder writes a test for each of its
+  ; command-line flags — `${isUpdated}` is one — and every one of them leaves
+  ; its answer in $R9: "true" or "false". The path used to be kept there across
+  ; `${isUpdated}` below, so from the first build that followed a move the
+  ; question named a folder called `false`, for everybody, and a folder the
+  ; data had been moved to was never deleted when the answer was "delete".
+  Var /GLOBAL ravenForgeDataRoot
   !insertmacro readRavenForgeDataRoot
+  StrCpy $ravenForgeDataRoot $R9
 
   ; `--delete-app-data` is what the docs give people for a silent uninstall that
   ; removes the data, and the stock template's own handling of it only knows
@@ -211,8 +220,8 @@
   ClearErrors
   ${GetOptions} $R7 "--delete-app-data" $R6
   ${IfNot} ${Errors}
-  ${AndIf} $R9 != ""
-    !insertmacro deleteRavenForgeData "$R9"
+  ${AndIf} $ravenForgeDataRoot != ""
+    !insertmacro deleteRavenForgeData "$ravenForgeDataRoot"
   ${EndIf}
 
   ; Two paths must never see a dialog. An auto-update runs this uninstaller as
@@ -224,8 +233,8 @@
   ${AndIfNot} ${isUpdated}
     ; The path the message quotes is the one the data is really in, so the
     ; sentence stays true after a move and the "delete" button keeps its word.
-    ${If} $R9 != ""
-      StrCpy $R3 "$R9"
+    ${If} $ravenForgeDataRoot != ""
+      StrCpy $R3 "$ravenForgeDataRoot"
     ${ElseIf} ${FileExists} "$APPDATA\${APP_FILENAME}\*.*"
       StrCpy $R3 "$APPDATA\${APP_FILENAME}"
     ${Else}
@@ -249,8 +258,8 @@
 
       ; The moved directory first: it holds everything the dialog just listed,
       ; and it is the one the block below would not reach.
-      ${If} $R9 != ""
-        !insertmacro deleteRavenForgeData "$R9"
+      ${If} $ravenForgeDataRoot != ""
+        !insertmacro deleteRavenForgeData "$ravenForgeDataRoot"
       ${EndIf}
 
       ; The launcher's own folder under %APPDATA%, by both the names it has
@@ -259,14 +268,23 @@
       ; embedded browser's files.
       RMDir /r "$APPDATA\${APP_FILENAME}"
       RMDir /r "$APPDATA\${APP_PRODUCT_FILENAME}"
-      ; electron-updater's download cache — `updaterCacheDirName` in
-      ; app-update.yml, which electron-builder derives from package.json `name`.
-      ; Nothing else ever clears it and it holds a full installer of the version
-      ; being removed. Only on this branch: the other one has just promised to
-      ; keep the player's files, so it touches nothing at all.
-      RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}-updater"
 
     keepRavenForgeData:
+  ${EndIf}
+
+  ; electron-updater's download cache — `updaterCacheDirName` in app-update.yml,
+  ; which electron-builder derives from package.json `name`. The installer puts
+  ; a whole copy of itself there to work out later updates from, a hundred
+  ; megabytes of it, and nothing else ever clears it. It goes with the program
+  ; whatever was answered above: it is the installer's own and none of the
+  ; player's files, and it used to be what "keep my data" left behind on a
+  ; machine the launcher was no longer on.
+  ;
+  ; Not when this is an update. The old version's uninstaller is run for one as
+  ; well — by the updater, and by an installer started by hand over an existing
+  ; install — and the folder then holds the installer that is running.
+  ${IfNot} ${isUpdated}
+    RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}-updater"
   ${EndIf}
 
   ${if} $installMode == "all"

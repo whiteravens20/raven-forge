@@ -163,6 +163,23 @@ describe('buildCrashReport', () => {
     expect(report).toContain('crash-2026-08-07_15.46.31-client.txt');
   });
 
+  it('says when the loader build is one the launcher does not offer', () => {
+    // The first thing to know about a game that would not start, and the one
+    // thing in the report that nothing else in it would have said.
+    const report = buildCrashReport({ ...input, loaderBuildOffered: false }, []);
+    expect(report).toContain(
+      'Mod loader: fabric 0.16.9 — not a build the launcher offers for this Minecraft version',
+    );
+  });
+
+  it('adds nothing about a build that is offered, or one it could not tell about', () => {
+    for (const loaderBuildOffered of [true, undefined]) {
+      const report = buildCrashReport({ ...input, loaderBuildOffered }, []);
+      expect(report).toContain('Mod loader: fabric 0.16.9\n');
+      expect(report).not.toContain('not a build the launcher offers');
+    }
+  });
+
   it('says the process never started, when that is what happened', () => {
     const report = buildCrashReport({ ...input, spawnError: 'spawn java ENOENT' }, []);
     expect(report).toContain('spawn java ENOENT');

@@ -18,6 +18,8 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { log } from '../../main/logger';
@@ -29,21 +31,28 @@ import {
   NEOFORGE_MAVEN_ROOT,
 } from '../../shared/constants';
 import { getVersionMeta } from '../minecraft/version-manifest';
-import type { HashAlgorithm, HashedEntry } from '../mods/integrity';
+import { hashFile, type HashAlgorithm, type HashedEntry } from '../mods/integrity';
 import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
-import { ensureClientJar } from '../minecraft/asset-downloader';
+import { ensureClientJar, parseMavenCoords } from '../minecraft/asset-downloader';
 import { loaderCacheDir } from './loader-paths';
-import { loaderProfilePath, readLoaderProfile } from './loader-profile';
+import { isLoaderProfileComplete, loaderProfilePath } from './loader-profile';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
-import { readZipEntry } from '../util/zip-read';
+import { RefusedError } from '../util/refusal';
+import { resolveWithin } from '../util/safe-path';
+import { STOP, eachEntry, openEntry, readZipEntry } from '../util/zip-read';
 import { downloadToFile } from '../net/download';
 import { getSettings } from '../config/settings-manager';
 import { CancelledError, throwIfCancelled, withTimeout } from '../util/cancellation';
 import { requiredJavaFor } from '../minecraft/java-requirement';
-import { compareLoaderVersionsDesc, isPrerelease } from '../../shared/loader-version';
+import {
+  compareLoaderVersionsDesc,
+  forgeBuildNumber,
+  isPrerelease,
+} from '../../shared/loader-version';
+import { isReleaseAtLeast } from '../../shared/minecraft-version';
 import type { LoaderVersion, ProgressMessage } from '../../shared/ipc-types';
-import type { VersionMeta } from '../minecraft/types';
+import type { Library, VersionMeta } from '../minecraft/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -102,7 +111,14 @@ export function neoForgePrefix(mcVersion: string): string {
 
 export function neoForgeVersionsFor(all: string[], mcVersion: string): string[] {
   const prefix = neoForgePrefix(mcVersion);
-  return all.filter((v) => v.startsWith(prefix));
+  // A `+` names what the build was really made for: `26.1.0.0-alpha.15+pre-3`
+  // is NeoForge for the third pre-release of 26.1, and its installer says so.
+  // It has the release's prefix all the same, and was offered for 26.1 — where
+  // installing it sets up the pre-release under the release's name.
+  const made = all.filter((v) => v.startsWith(prefix) && !v.includes('+'));
+  // Whole, not by number: what follows a hyphen in a NeoForge version is a
+  // prerelease tag, and `20.4.1-beta` is a different build from `20.4.1`.
+  return fromFirstWorking(made, FIRST_WORKING_NEOFORGE.get(mcVersion), (build) => build);
 }
 
 /** NeoForge marks unfinished builds in the version string itself. */
@@ -129,9 +145,112 @@ async function forgeRecommended(mcVersion: string): Promise<string | undefined> 
   }
 }
 
+/**
+ * Whether Forge publishes anything for this Minecraft version that this
+ * launcher can install.
+ *
+ * Forge is older than its installer. Up to Minecraft 1.5.1 it was a zip to be
+ * merged into the game's own jar by hand. What it published after that, up to
+ * 1.7.2, is an installer whose version profile stands alone: it lists the
+ * game's libraries as well as Forge's, the way the launcher of 2013 wanted them
+ * named. A profile that says which version it extends and adds only what is
+ * Forge's — the form everything here reads — first appears part of the way
+ * through 1.7.10; see {@link workingForgeBuilds} for where.
+ *
+ * Its builds for the older versions are still on the list Forge serves — 133
+ * of them for 1.3.2. Offered here, each was a profile that could be made and
+ * never started.
+ */
+export function forgeInstallsOn(mcVersion: string): boolean {
+  // An id that is not a release number has no Forge builds to ask about.
+  return isReleaseAtLeast(mcVersion, '1.7.10') ?? true;
+}
+
+/**
+ * The first build of a Minecraft version that installs and starts here, for
+ * the versions where that is not simply the first build there is — and null
+ * for one where no build does.
+ *
+ * Found by doing it. Every one of the 4,090 builds Forge lists from 1.7.10 up
+ * has an installer; the installers for 1.7.10 were read for the kind of profile
+ * they carry; and on each of the 56 releases the oldest build offered was
+ * installed and started, with the first one that works searched for wherever
+ * it was not that one. What that turned up, and why:
+ *
+ * - `1.7.10` — the 125 builds before 10.13.3.1388 carry the stand-alone
+ *   profile described above; every one from that build on extends the game's.
+ * - `1.10.2`, `1.12`, `1.14.2`, `1.14.4` — the first build or two of the line
+ *   do not start: one dies on a null, two name a library that is on no server
+ *   they point to, three look for one of the game's own libraries under a name
+ *   it no longer has.
+ * - `1.16.4`, and `1.16.5` before 36.2.26 — these call a constructor that Java
+ *   took away in 8u321. Mojang's launcher still runs them on a Java from 2015;
+ *   the one fetched here is the current Java 8, and none of 1.16.4's 55 builds
+ *   was ever fixed.
+ * - `1.17.1` before 37.0.29 — two things, and both come of how this launcher
+ *   is laid out. Up to 37.0.12 a build keeps the game's own jar off the module
+ *   path by the name it has in Mojang's launcher, which makes a copy for every
+ *   Forge version and calls it after that one; here there is a single jar,
+ *   called after the Minecraft version. From 37.0.13 a build leaves out every
+ *   library whose *path* contains one of a list of words. `forge-` is on the
+ *   list, and this launcher's own folder is called `raven-forge-launcher`.
+ *
+ * A line that starts was taken to go on starting: the builds before a floor
+ * were not each tried, and none of them is offered.
+ */
+const FIRST_WORKING_FORGE: ReadonlyMap<string, string | null> = new Map([
+  ['1.7.10', '10.13.3.1388'],
+  ['1.10.2', '12.18.0.2002'],
+  ['1.12', '14.21.0.2322'],
+  ['1.14.2', '26.0.2'],
+  ['1.14.4', '28.0.3'],
+  ['1.16.4', null],
+  ['1.16.5', '36.2.26'],
+  ['1.17.1', '37.0.29'],
+]);
+
+/**
+ * The same for NeoForge, whose 23 releases were gone through the same way: the
+ * installer of the very first build for 1.20.4 fails on its own arguments.
+ */
+const FIRST_WORKING_NEOFORGE: ReadonlyMap<string, string | null> = new Map([
+  ['1.20.4', '20.4.1-beta'],
+]);
+
+/** The builds from a version's first working one on, in the order given. */
+function fromFirstWorking(
+  builds: string[],
+  first: string | null | undefined,
+  numberOf: (build: string) => string,
+): string[] {
+  if (first === undefined) return builds;
+  if (first === null) return [];
+  return builds.filter((build) => compareLoaderVersionsDesc(numberOf(build), first) <= 0);
+}
+
+/**
+ * The builds of a Minecraft version that this launcher can install and start:
+ * what is offered to choose from, so that nothing chosen is then refused or
+ * found dead on arrival.
+ */
+export function workingForgeBuilds(builds: string[], mcVersion: string): string[] {
+  if (!forgeInstallsOn(mcVersion)) return [];
+  // By number: the list writes a floor like 1388 as `10.13.3.1388-1.7.10`,
+  // which compared whole sorts as a prerelease of the bare one, and so before it.
+  return fromFirstWorking(builds, FIRST_WORKING_FORGE.get(mcVersion), forgeBuildNumber);
+}
+
 export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion[]> {
+  if (!forgeInstallsOn(mcVersion)) {
+    log.info(`Forge for Minecraft ${mcVersion} is older than what this launcher installs`);
+    return [];
+  }
+
   const xml = await fetchText(`${FORGE_MAVEN_ROOT}/maven-metadata.xml`, 'Forge Maven');
-  const versions = forgeVersionsFor(parseMavenVersions(xml), mcVersion);
+  const versions = workingForgeBuilds(
+    forgeVersionsFor(parseMavenVersions(xml), mcVersion),
+    mcVersion,
+  );
   if (versions.length === 0) {
     log.info(`Forge has no builds for Minecraft ${mcVersion}`);
     return [];
@@ -151,7 +270,10 @@ export async function getForgeVersions(mcVersion: string): Promise<LoaderVersion
     // is one promoted build per Minecraft version, which is the one to default
     // to. The rest are builds that happen to exist, not unstable ones.
     stable: true,
-    recommended: version === recommended,
+    // By its number, which is all the promotions feed gives. The list carries
+    // some builds with a branch after it — `10.13.4.1614-1.7.10` — and compared
+    // whole, Forge recommended nothing for 1.7.10, 1.8.9 or 1.9.4.
+    recommended: recommended !== undefined && forgeBuildNumber(version) === recommended,
   }));
 }
 
@@ -168,6 +290,24 @@ export function isLegacyNeoForge(loaderVersion: string, mcVersion: string): bool
   return !loaderVersion.startsWith(neoForgePrefix(mcVersion));
 }
 
+/**
+ * Builds NeoForge lists and publishes no installer for.
+ *
+ * One, out of 1,846: the repository was asked about every build on 2026-10-06.
+ * It is the second build of the 1.20.1 line, and offered to choose from it was
+ * a profile that could be made and never installed.
+ */
+const NEOFORGE_WITHOUT_INSTALLER: ReadonlySet<string> = new Set(['47.1.7']);
+
+/**
+ * The builds of NeoForge's 1.20.1 line for a Minecraft version — its first
+ * release, still published under the pre-rename `forge` artifact with
+ * Forge-style `<mc>-<build>` names.
+ */
+function legacyNeoForgeVersionsFor(all: string[], mcVersion: string): string[] {
+  return forgeVersionsFor(all, mcVersion).filter((build) => !NEOFORGE_WITHOUT_INSTALLER.has(build));
+}
+
 export async function getNeoForgeVersions(mcVersion: string): Promise<LoaderVersion[]> {
   const xml = await fetchText(`${NEOFORGE_MAVEN_ROOT}/maven-metadata.xml`, 'NeoForge Maven');
   const versions = neoForgeVersionsFor(parseMavenVersions(xml), mcVersion);
@@ -177,23 +317,43 @@ export async function getNeoForgeVersions(mcVersion: string): Promise<LoaderVers
   }
 
   // Nothing under the modern artifact. Before reporting none, check the 1.20.1
-  // line — NeoForge's first release, still published under the pre-rename
-  // `forge` artifact with Forge-style `<mc>-<build>` versions. Only reached when
-  // the modern lookup came up empty, so it costs a request on a miss and nothing
-  // otherwise.
+  // line. Only reached when the modern lookup came up empty, so it costs a
+  // request on a miss and nothing otherwise.
   const legacyXml = await fetchText(
     `${NEOFORGE_LEGACY_MAVEN_ROOT}/maven-metadata.xml`,
     'NeoForge (1.20.1) Maven',
   );
-  const legacy = forgeVersionsFor(parseMavenVersions(legacyXml), mcVersion);
+  const legacy = legacyNeoForgeVersionsFor(parseMavenVersions(legacyXml), mcVersion);
   if (legacy.length === 0) {
     log.info(`NeoForge has no builds for Minecraft ${mcVersion}`);
     return [];
   }
 
   log.info(`NeoForge ${mcVersion}: ${legacy.length} build(s) from the legacy artifact`);
-  // That line never shipped a prerelease under this artifact.
-  return legacy.reverse().map((version) => ({ version, stable: true }));
+  // That line never shipped a prerelease under this artifact. Sorted, because
+  // its two oldest builds are listed the wrong way round.
+  return legacy.sort(compareLoaderVersionsDesc).map((version) => ({ version, stable: true }));
+}
+
+/**
+ * Whether a build would be on the list offered for a Minecraft version, going
+ * by its name alone.
+ *
+ * Each of the lists above, given a list of one and nothing fetched: a build
+ * their rules leave out is left out here, and every other name passes — one no
+ * repository has ever published included, because that is not something a name
+ * says.
+ */
+export function isWorkingForgeLikeBuild(
+  loader: ForgeLikeLoader,
+  build: string,
+  mcVersion: string,
+): boolean {
+  if (loader === 'forge') return workingForgeBuilds([build], mcVersion).length > 0;
+  const listed = isLegacyNeoForge(build, mcVersion)
+    ? legacyNeoForgeVersionsFor([`${mcVersion}-${build}`], mcVersion)
+    : neoForgeVersionsFor([build], mcVersion);
+  return listed.length > 0;
 }
 
 // ── Installation ───────────────────────────────────────────
@@ -251,6 +411,28 @@ async function mavenChecksum(url: string, signal?: AbortSignal): Promise<HashedE
   return null;
 }
 
+/** The repository was asked for an installer and has no such file. */
+class NotPublishedError extends Error {}
+
+/**
+ * The build on Forge's own list that a profile's Forge version names, when it
+ * is not spelled the way the list spells it.
+ *
+ * A pack names a Forge build by its number, `10.13.4.1614`. For a handful of
+ * Minecraft versions the build is published with a branch after it —
+ * `1.7.10-10.13.4.1614-1.7.10` — and the installer's address is made of that
+ * whole name. One pack in a few writes the whole coordinate instead, Minecraft
+ * version first, which is read the same way.
+ */
+async function forgeBuildOnList(given: string, mcVersion: string): Promise<string | undefined> {
+  const prefix = `${mcVersion}-`;
+  const number = forgeBuildNumber(given.startsWith(prefix) ? given.slice(prefix.length) : given);
+  const xml = await fetchText(`${FORGE_MAVEN_ROOT}/maven-metadata.xml`, 'Forge Maven');
+  return forgeVersionsFor(parseMavenVersions(xml), mcVersion).find(
+    (build) => forgeBuildNumber(build) === number,
+  );
+}
+
 /** Whether the repository has the file at all — asked only when it has no checksum for it. */
 async function isPublished(url: string, signal?: AbortSignal): Promise<boolean> {
   try {
@@ -275,7 +457,7 @@ async function downloadInstaller(
   // A build that does not exist has no checksum either, and must not be
   // answered with advice about unverified installers.
   if (!expected && !(await isPublished(url, signal))) {
-    throw new Error(`${label} does not publish this build: ${url} was not found`);
+    throw new NotPublishedError(`${label} does not publish this build: ${url} was not found`);
   }
 
   // Refused before a byte is fetched. This jar is executed as a Java process a
@@ -346,11 +528,130 @@ async function ensureVanillaClientForInstaller(
   await ensureClientJar(versionsDir, mcVersion, meta.downloads.client, { signal });
 }
 
+/** What a Forge installer up to 1.12.2 carries where a later one has `version.json`. */
+interface LegacyInstallProfile {
+  install: {
+    /** Maven coordinates the Forge jar is to be known by. */
+    path: string;
+    /** The name that jar has inside the installer. */
+    filePath: string;
+  };
+  versionInfo: Partial<VersionMeta>;
+}
+
+async function readLegacyProfile(installerPath: string): Promise<LegacyInstallProfile | null> {
+  const raw = await readZipEntry(installerPath, 'install_profile.json');
+  if (!raw) return null;
+  try {
+    const { install, versionInfo } = JSON.parse(
+      raw.toString('utf-8'),
+    ) as Partial<LegacyInstallProfile>;
+    if (typeof install?.path !== 'string' || typeof install.filePath !== 'string') return null;
+    if (typeof versionInfo?.mainClass !== 'string') return null;
+    return { install, versionInfo };
+  } catch {
+    return null;
+  }
+}
+
+/** Copy one entry of the installer out, whole or not at all, and say what it hashes to. */
+async function extractEntry(
+  installerPath: string,
+  entryName: string,
+  dest: string,
+): Promise<{ sha1: string; size: number } | null> {
+  const part = `${dest}.part`;
+  let found = false;
+  try {
+    await eachEntry(installerPath, async (zip, entry) => {
+      if (entry.fileName !== entryName) return;
+      await pipeline(await openEntry(zip, entry), createWriteStream(part));
+      found = true;
+      return STOP;
+    });
+    if (!found) return null;
+    const made = { sha1: await hashFile(part, 'sha1'), size: (await fs.stat(part)).size };
+    await fs.rename(part, dest);
+    return made;
+  } finally {
+    await fs.rm(part, { force: true });
+  }
+}
+
+/**
+ * Install a Forge build from the years before its installer had anything to run.
+ *
+ * Up to 1.12.2 installing Forge on a client came to two things: the Forge jar
+ * copied out of the installer into the libraries folder, and a version profile
+ * that names it. There is nothing to patch ahead of time — the game does that
+ * to itself as it starts — so there is no Java process here either, and no
+ * wait. The installer's own way of doing those two things is a window with a
+ * button on it, which is why it is not simply run like the later ones.
+ */
+async function installLegacy(
+  loader: ForgeLikeLoader,
+  loaderVersion: string,
+  mcVersion: string,
+  installerPath: string,
+  { install, versionInfo }: LegacyInstallProfile,
+  label: string,
+): Promise<void> {
+  // A profile that extends nothing is the form before 1.7.10, and some of that
+  // version's first builds still have it. It names every library of the game
+  // itself, in a way that no longer says where to get them.
+  if (!versionInfo.inheritsFrom) {
+    throw new RefusedError(
+      { key: 'launchError.loaderBuildTooOld', vars: { loader: `${label} ${loaderVersion}` } },
+      `${label} ${loaderVersion} has a version profile from before profiles extended one another`,
+    );
+  }
+
+  const coords = parseMavenCoords(install.path);
+  if (!coords) throw new Error(`${label} installer names its jar as ${install.path}`);
+
+  await fs.mkdir(paths.librariesDir, { recursive: true });
+  const jar = await resolveWithin(paths.librariesDir, coords.path);
+  const made = await extractEntry(installerPath, install.filePath, jar);
+  if (!made) throw new Error(`${label} installer does not contain ${install.filePath}`);
+
+  let named = false;
+  const libraries = (versionInfo.libraries ?? []).map((library): Library => {
+    if (library.name !== install.path) {
+      // The oldest of these still say `http://`, for hosts that have long
+      // answered on https; the downloader takes a library over nothing else.
+      return library.url?.startsWith('http://')
+        ? { ...library, url: `https://${library.url.slice('http://'.length)}` }
+        : library;
+    }
+    named = true;
+    // Its own jar, as the later installers list theirs: a hash, a size, and no
+    // address, because the only place it comes from is the installer. That is
+    // what has the launch look for it rather than fetch it, and install Forge
+    // again when it has gone.
+    return { name: library.name, downloads: { artifact: { path: coords.path, url: '', ...made } } };
+  });
+  if (!named) throw new Error(`${label} installer's profile does not list ${install.path}`);
+
+  await writeJsonAtomic(loaderProfilePath(loader, loaderVersion, mcVersion), {
+    ...versionInfo,
+    libraries,
+  });
+}
+
 /** What an install may be told beyond which build it is. */
 export interface LoaderInstallOptions {
   signal?: AbortSignal;
   /** The Java the profile names, when it names one: the installer runs on it too. */
   javaPath?: string;
+  /**
+   * Run the installer over a build that already counts as installed.
+   *
+   * It is the one thing that can vouch for what it made: run again, it checks
+   * every file against its own list and makes again the ones that are missing
+   * or wrong, in seconds when none is. Most of those files appear in no version
+   * profile, so nothing else here can so much as tell they have gone.
+   */
+  repair?: boolean;
 }
 
 /**
@@ -374,7 +675,8 @@ export function installForgeLike(
   // the same files.
   return serializeByKey('forge-like-install', async () => {
     // Whoever held the turn before may have installed this very build.
-    if (await readLoaderProfile(loader, loaderVersion, mcVersion)) return;
+    if (!options.repair && (await isLoaderProfileComplete(loader, loaderVersion, mcVersion)))
+      return;
     await runInstaller(loader, loaderVersion, mcVersion, onProgress, options);
   });
 }
@@ -397,20 +699,46 @@ async function runInstaller(
   onProgress(0.05, { key: 'progress.msg.installerDownloading', vars: { loader: label } });
   const installerPath = path.join(destDir, 'installer.jar');
   throwIfCancelled(signal, 'Loader install');
-  await downloadInstaller(
-    installerUrl(loader, loaderVersion, mcVersion),
-    installerPath,
-    label,
-    signal,
-  );
+  const fetchInstaller = (build: string) =>
+    downloadInstaller(installerUrl(loader, build, mcVersion), installerPath, label, signal);
+  try {
+    await fetchInstaller(loaderVersion);
+  } catch (err) {
+    // Not there under the name the profile has for it. Before saying so, see
+    // whether Forge's list has the build under a longer one: only now, so that
+    // the list is not fetched for the builds found at the first address, which
+    // is nearly all of them.
+    if (!(err instanceof NotPublishedError) || loader !== 'forge') throw err;
+    const listed = await forgeBuildOnList(loaderVersion, mcVersion).catch(() => undefined);
+    if (!listed || listed === loaderVersion) throw err;
+    log.info(`Forge ${loaderVersion} is published as ${listed}`);
+    await fetchInstaller(listed);
+  }
+
+  const installed = async (versionId: string) => {
+    // The installer jar is 4–8 MB and has done its job.
+    await fs.rm(installerPath, { force: true });
+    onProgress(1, {
+      key: 'progress.msg.loaderInstalled',
+      vars: { loader: `${label} ${loaderVersion}` },
+    });
+    log.info(`Installed ${label} ${loaderVersion} for MC ${mcVersion} (version id ${versionId})`);
+  };
 
   // Read the profile out of the installer before running it: it names the
   // version id the installer is about to produce, so nothing below has to guess.
   const embedded = await readZipEntry(installerPath, 'version.json');
   if (!embedded) {
-    throw new Error(
-      `${label} ${loaderVersion} installer contains no version.json — it is not a client installer this launcher can use.`,
-    );
+    const legacy = await readLegacyProfile(installerPath);
+    if (!legacy) {
+      throw new Error(
+        `${label} ${loaderVersion} installer contains no version.json — it is not a client installer this launcher can use.`,
+      );
+    }
+    onProgress(0.9, { key: 'progress.msg.savingProfile' });
+    await installLegacy(loader, loaderVersion, mcVersion, installerPath, legacy, label);
+    await installed(legacy.versionInfo.id ?? `${mcVersion}-${loader}-${loaderVersion}`);
+    return;
   }
   const embeddedProfile = JSON.parse(embedded.toString('utf-8')) as Partial<VersionMeta>;
   const versionId = embeddedProfile.id;
@@ -505,12 +833,5 @@ async function runInstaller(
     JSON.parse(profileJson) as unknown,
   );
 
-  // The installer jar is 4–8 MB and has done its job.
-  await fs.rm(installerPath, { force: true });
-
-  onProgress(1, {
-    key: 'progress.msg.loaderInstalled',
-    vars: { loader: `${label} ${loaderVersion}` },
-  });
-  log.info(`Installed ${label} ${loaderVersion} for MC ${mcVersion} (version id ${versionId})`);
+  await installed(versionId);
 }

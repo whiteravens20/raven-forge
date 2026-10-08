@@ -310,6 +310,26 @@ describe('mods:add-from-file', () => {
   });
 });
 
+describe('loaders:build-starts', () => {
+  it('answers for a build without the page having to know the rules', async () => {
+    expect(await call<boolean>('loaders:build-starts', 'forge', '36.2.20', '1.16.5')).toEqual({
+      success: true,
+      data: false,
+    });
+    expect((await call<boolean>('loaders:build-starts', 'forge', '36.2.34', '1.16.5')).data).toBe(
+      true,
+    );
+  });
+
+  it('fails, and does not throw, on a version that is not a file name', async () => {
+    // A Fabric build is looked up among the installed profiles by its version.
+    const result = await call<boolean>('loaders:build-starts', 'fabric', '../../escape', '1.21.4');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Failed to check the loader build');
+  });
+});
+
 describe('settings:update', () => {
   it('does not write down a proxy address that could never be used', async () => {
     // A URL as far as the schema can tell, and not one a proxy can be made

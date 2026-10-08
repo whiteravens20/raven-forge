@@ -19,6 +19,7 @@ import { ensureJavaVersion, resolveChosenJava } from '../java/java-manager';
 import {
   installLoader,
   isLoaderInstalled,
+  loaderBuildStarts,
   resolveDefaultLoaderVersion,
 } from '../modloader/loader-manager';
 import { resolveLaunchMeta } from '../modloader/loader-profile';
@@ -127,6 +128,23 @@ export function detectLogLevel(line: string): GameLogLine['level'] {
   if (level === 'ERROR' || level === 'FATAL') return 'error';
   if (level === 'WARN') return 'warn';
   return 'info';
+}
+
+/**
+ * A line of game output without the colour codes some loaders write into it.
+ *
+ * Forge 28 on Minecraft 1.14.4 colours its console whether or not it is one, so
+ * every line arrives as `ESC[32m[12:00:00] [main/INFO] …`. Nothing that reads
+ * the output here is a terminal: the console, the launcher's log and the crash
+ * report all showed the codes as text.
+ *
+ * Built from the character code because a control character written into a
+ * pattern is what the linter is there to catch.
+ */
+const COLOUR_CODE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
+
+export function withoutColourCodes(line: string): string {
+  return line.replace(COLOUR_CODE, '');
 }
 
 /** How long lines are gathered before the console is sent them. */
@@ -395,7 +413,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   // Resolve paths
   const gameDir = paths.profileGameDir(profile.id);
   const versionsDir = path.join(paths.cacheDir, 'versions');
-  const librariesDir = path.join(paths.cacheDir, 'libraries');
+  const librariesDir = paths.librariesDir;
   const assetsDir = path.join(paths.cacheDir, 'assets');
   const nativesDir = path.join(paths.cacheDir, 'natives', profile.minecraftVersion);
 
@@ -405,21 +423,41 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   // Fetch vanilla version metadata
   const vanillaMeta = await getVersionMeta(profile.minecraftVersion);
 
+  // Read back by hash rather than by size when the last run of this profile
+  // crashed: a file that went bad on disk is one of the things that crash can
+  // have been.
+  const recheck = recheckMarker(profile.id);
+  const files: GameFileOptions = { signal, thorough: await exists(recheck) };
+  if (files.thorough) log.info(`${profile.name} crashed last time — checking every game file`);
+
   // Ensure the profile's mod loader is installed before we resolve the launch
   // meta — the loader profile JSON is what supplies mainClass and the mod
   // loader's own libraries.
   if (profile.modLoader !== 'vanilla' && profile.modLoaderVersion) {
-    const installed = await isLoaderInstalled(
-      profile.modLoader,
-      profile.modLoaderVersion,
-      profile.minecraftVersion,
-    );
-    if (!installed) {
-      log.info(`Loader ${profile.modLoader} ${profile.modLoaderVersion} missing — installing...`);
-      await installLoader(profile.modLoader, profile.modLoaderVersion, profile.minecraftVersion, {
+    const { modLoader, modLoaderVersion, minecraftVersion } = profile;
+    const install = (repair: boolean) =>
+      installLoader(modLoader, modLoaderVersion, minecraftVersion, {
         signal,
         javaPath: profile.customJavaPath,
+        repair,
       });
+
+    if (!(await isLoaderInstalled(modLoader, modLoaderVersion, minecraftVersion))) {
+      log.info(`Loader ${modLoader} ${modLoaderVersion} missing — installing...`);
+      await install(false);
+    } else if (files.thorough && (modLoader === 'forge' || modLoader === 'neoforge')) {
+      // The check below reads back what a version profile lists. A Forge or
+      // NeoForge installer leaves a good deal more than that — the patched
+      // client and what it was made from, on most versions — and only the
+      // installer can say whether those are still right, so it is asked.
+      try {
+        await install(true);
+      } catch (err) {
+        if (isCancellation(err)) throw err;
+        // Not a reason to refuse the launch: the installer may simply be out of
+        // reach, and a loader that was fine starts without it.
+        log.warn(`Could not check the ${loaderLabel(modLoader)} install again: ${errorText(err)}`);
+      }
     }
   }
 
@@ -436,13 +474,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     ? await resolveChosenJava(profile.customJavaPath, javaVersion)
     : await ensureJavaVersion(javaVersion, signal);
 
-  // Download game files. Read back by hash rather than by size when the last
-  // run of this profile crashed: a file that went bad on disk is one of the
-  // things that crash can have been.
-  const recheck = recheckMarker(profile.id);
-  const files: GameFileOptions = { signal, thorough: await exists(recheck) };
-  if (files.thorough) log.info(`${profile.name} crashed last time — checking every game file`);
-
+  // Download game files.
   log.info('Ensuring client jar...');
   const clientJar = await ensureClientJar(
     versionsDir,
@@ -542,6 +574,15 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   const log4jConfig = await log4jConfigArgument(path.join(paths.cacheDir, 'log4j'), meta.libraries);
   if (log4jConfig) jvmArgs.push(log4jConfig);
 
+  // Forge's first builds on its own bootstrap — both there are for 1.20.3, and
+  // the first for 1.20.4 — look for the libraries in a `libraries` folder under
+  // wherever they were started, unless this says otherwise. Mojang's launcher
+  // starts the game in the folder that has one; here the game is started in the
+  // profile's own, and those builds stopped on "Library directory: `libraries`
+  // does not exist". Every other Forge profile sets the property itself, to the
+  // same place, and being later on the line that is the one that counts.
+  if (profile.modLoader === 'forge') jvmArgs.push(`-DlibraryDirectory=${librariesDir}`);
+
   if (meta.arguments?.jvm) {
     const resolved = resolveConditionalArgs(meta.arguments.jvm, features);
     jvmArgs.push(...substituteVars(resolved, templateVars));
@@ -618,7 +659,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
 
   // Both ways out of here end the same way: with a file the player can attach to
   // a bug report without first having to learn where the launcher keeps its logs.
-  const reportCrash = (
+  const reportCrash = async (
     ended: Pick<CrashReportInput, 'exitCode' | 'signal' | 'minecraftCrash' | 'spawnError'>,
     playTimeMinutes: number,
     logTail: string[],
@@ -628,6 +669,15 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
       ...ended,
       playTimeMinutes,
       logTail,
+      // Asked now and not before the start: only a game that went down needs it.
+      // Not being able to tell is no reason to go without the report.
+      loaderBuildOffered: profile.modLoaderVersion
+        ? await loaderBuildStarts(
+            profile.modLoader,
+            profile.modLoaderVersion,
+            profile.minecraftVersion,
+          ).catch(() => undefined)
+        : undefined,
       gameDir,
       java,
       accountType: account.type,
@@ -693,7 +743,7 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
     readline.createInterface({ input: stream, crlfDelay: Infinity }).on('line', (raw) => {
       // Before anything holds on to it: the log, the ring buffer the console
       // and the exit card read, and the renderer all get the line from here.
-      const line = redactTokens(raw, accessToken);
+      const line = redactTokens(withoutColourCodes(raw), accessToken);
       if (!line) return;
       record(`[MC:${profile.name}] ${line}`);
       emitLogLine(profile.id, line);

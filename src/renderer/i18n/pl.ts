@@ -147,6 +147,10 @@ export const pl: Translations = {
     'Ten profil ma przydzielone {allocated} RAM, a ten komputer ma {total}. Minecraft nie wystartuje z większą ilością pamięci, niż fizycznie jest — zmniejsz ją w edytorze profilu, gdzie {recommended} pasuje do tej maszyny.',
   'launchError.loaderVersionUnknown':
     'Nie udało się ustalić wersji {loader} dla Minecraft {version}. Sprawdź połączenie albo wybierz wersję loadera w edytorze profilu.',
+  'launchError.loaderFileMissing':
+    'Brakuje pliku loadera {file} albo jest on uszkodzony, a wytworzyć go może tylko instalator loadera. Uruchom profil jeszcze raz, mając połączenie z siecią — loader zainstaluje się wtedy ponownie.',
+  'launchError.loaderBuildTooOld':
+    '{loader} to wydanie starsze niż te, które ten launcher potrafi zainstalować. Wybierz nowsze wydanie loadera w edytorze profilu.',
   'launchError.javaNotRuntime':
     'Ten profil ma startować przez {path}, a to nie jest środowisko Java, które ten komputer potrafi uruchomić. Wskaż w edytorze profilu coś innego albo wyczyść to pole, żeby wrócić do środowiska instalowanego przez launcher.',
   'launchError.javaTooOld':
@@ -201,6 +205,11 @@ export const pl: Translations = {
     'Raport z awarii zapisano na tym komputerze — nic nie zostało nigdzie wysłane. Token dostępu i dane konta zostały z niego usunięte.',
   'crash.openReport': 'Otwórz raport',
   'crash.reportBug': 'Zgłoś błąd',
+
+  'loaderHint.notOffered':
+    '{loader} to wydanie, którego launcher nie oferuje dla Minecraft {mcVersion}: należy do tych, które najpewniej tej wersji nie uruchomią. To może być przyczyna — wybierz inne wydanie w edytorze profilu.',
+  'loaderHint.notOfferedPack':
+    '{loader} to wydanie, którego launcher nie oferuje dla Minecraft {mcVersion}: należy do tych, które najpewniej tej wersji nie uruchomią. To może być przyczyna — to wydanie wskazuje paczka, więc zmienić je może jej autor.',
 
   // ── Profiles ─────────────────────────────────────────────
   'profiles.title': 'Profile',
@@ -430,7 +439,7 @@ export const pl: Translations = {
   'profileForm.versionsLoading': 'Wczytywanie wersji…',
   'profileForm.versionsFailed': 'Nie udało się pobrać listy wersji — wpisz ręcznie',
   'profileForm.noLoaderBuilds':
-    '{loader} nie ma wydań dla Minecraft {mcVersion} — wybierz inną wersję lub loader',
+    '{loader} nie ma dla Minecraft {mcVersion} wydań, które ten launcher potrafi uruchomić — wybierz inną wersję lub loader',
   'profileForm.loaderUnstable': 'wersja testowa',
   'profileForm.loaderRecommended': 'zalecana',
   'profileForm.loaderVersion': 'Wersja loadera',

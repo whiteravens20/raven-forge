@@ -4,7 +4,9 @@ import { describe, it, expect } from 'vitest';
 import {
   compareLoaderVersionsDesc,
   defaultLoaderVersion,
+  forgeBuildNumber,
   isPrerelease,
+  listedLoaderVersion,
 } from '../src/shared/loader-version';
 
 /**
@@ -140,5 +142,45 @@ describe('isPrerelease', () => {
     expect(isPrerelease('21.1.209')).toBe(false);
     // Forge's own build numbering, which has a hyphen-free dotted form.
     expect(isPrerelease('54.1.6')).toBe(false);
+  });
+});
+
+describe('forgeBuildNumber', () => {
+  it('is the build without the branch Forge’s list puts after some of them', () => {
+    expect(forgeBuildNumber('10.13.4.1614-1.7.10')).toBe('10.13.4.1614');
+    expect(forgeBuildNumber('12.16.1.1938-1.9.0')).toBe('12.16.1.1938');
+    expect(forgeBuildNumber('47.4.10')).toBe('47.4.10');
+  });
+});
+
+describe('listedLoaderVersion', () => {
+  const forge189 = [
+    { version: '11.15.1.2318-1.8.9', stable: true, recommended: true },
+    { version: '11.15.1.1902-1.8.9', stable: true },
+    { version: '11.15.1.1875', stable: true },
+  ];
+
+  it('finds a build under its own name', () => {
+    expect(listedLoaderVersion(forge189, '11.15.1.1875', 'forge')).toBe('11.15.1.1875');
+  });
+
+  it('finds the Forge build a pack names by its number alone', () => {
+    // What a Modrinth pack for 1.8.9 says, and what Forge calls that build.
+    expect(listedLoaderVersion(forge189, '11.15.1.1902', 'forge')).toBe('11.15.1.1902-1.8.9');
+  });
+
+  it('finds nothing for a build that is not there, or for no build at all', () => {
+    expect(listedLoaderVersion(forge189, '11.15.1.1', 'forge')).toBeUndefined();
+    expect(listedLoaderVersion(forge189, undefined, 'forge')).toBeUndefined();
+  });
+
+  it('does not take a release for its own beta on a loader where that is what a hyphen means', () => {
+    const quilt = [
+      { version: '0.30.1', stable: true },
+      { version: '0.30.1-beta.4', stable: false },
+    ];
+
+    expect(listedLoaderVersion(quilt, '0.30.1-beta.3', 'quilt')).toBeUndefined();
+    expect(listedLoaderVersion(quilt, '0.30.1-beta.4', 'quilt')).toBe('0.30.1-beta.4');
   });
 });

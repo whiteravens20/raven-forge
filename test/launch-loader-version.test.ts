@@ -51,7 +51,6 @@ const { refusalOf } = await import('../src/core/util/refusal');
 
 beforeEach(() => {
   resolveDefaultLoaderVersion.mockReset();
-  updateProfile.mockClear();
 });
 
 describe('withLoaderVersion', () => {

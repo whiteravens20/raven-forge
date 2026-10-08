@@ -2,6 +2,15 @@
   <img src="assets/brand/logo.svg" alt="Raven Forge — Minecraft: Java Edition launcher" width="640">
 </p>
 
+<p align="center">
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/build.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/build.yml/badge.svg?branch=dev" alt="CI"></a>
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/package.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/package.yml/badge.svg" alt="Packaging"></a>
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/release.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/codeql.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/security.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/security.yml/badge.svg" alt="Security scan"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/whiteravens20/raven-forge"><img src="https://api.securityscorecards.dev/projects/github.com/whiteravens20/raven-forge/badge" alt="OpenSSF Scorecard"></a>
+</p>
+
 > **🧪 TESTING & DEVELOPMENT — Raven Forge is usable today, but it is still in testing and active development. Some features are still landing, a few edges are rough, and details may change between releases. Bug reports, feedback and contributions are very welcome!**
 
 Custom Minecraft: Java Edition launcher with mod management, auto-sync from server manifests, and server profiles.
@@ -26,7 +35,7 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 - **Data Folder You Choose** — profiles, assets and the managed JREs are gigabytes; point them at another drive from Settings and the launcher carries what is already there, or picks up a folder it used before. `RAVENFORGE_DATA_DIR` decides instead for a portable install
 - **RAM That Fits The Machine** — the allocation slider is bounded by the memory this computer actually has, recommends a size for it, and the launcher refuses a heap the machine cannot back rather than failing later
 - **Bilingual UI** — Polish and English, switchable in Settings
-- **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla
+- **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla. Each from the first Minecraft version it can be installed for — Fabric 1.14, Quilt 1.14.4, Forge 1.7.10, NeoForge 1.20.1 — through to the newest release. Only the loader builds that start the chosen Minecraft version are offered for it; a profile that holds another, because a pack named it, is told so when it fails to start; and a loader install that has lost files is put right at the next launch
 - **Microsoft Auth** — full OAuth 2.0 → Xbox Live → Minecraft JWT chain + offline mode
 - **Java Management** — auto-download the Adoptium Temurin JRE the game actually asks for; Mojang's version metadata names the major (Java 25 for 26.2, 21 for 1.21, and so on), with a table covering versions old enough not to state one. A profile may name a JVM of its own instead — picked from the ones found on this machine or from a file — and the launcher checks it says what it needs to before the game gets it
 - **The Window The Game Starts In** — a size and a windowed/fullscreen choice per profile, both optional. Fullscreen is written into the game's own settings rather than passed as an argument, so switching it back off works as well as switching it on
@@ -457,9 +466,13 @@ platform's uninstaller removes, and what happens to your profiles and worlds.
 ### CI/CD (GitHub Actions)
 
 - **Push or PR to `main`/`dev`** → lint, typecheck, tests, format check, and build on Linux + Windows ([build.yml](.github/workflows/build.yml))
-- **Push or PR to `main`/`dev`, plus weekly** → CodeQL ([codeql.yml](.github/workflows/codeql.yml)) and the dependency/secret gates ([security.yml](.github/workflows/security.yml))
+- **Push or PR to `main`/`dev`, plus weekly** → CodeQL ([codeql.yml](.github/workflows/codeql.yml)) and the dependency, secret and pinned-action gates ([security.yml](.github/workflows/security.yml))
+- **Push to `dev`, plus weekly** → the OpenSSF Scorecard behind the badge at the top ([scorecard.yml](.github/workflows/scorecard.yml))
+- **Daily** → a check that branch protection is still what it is meant to be ([branch-protection-audit.yml](.github/workflows/branch-protection-audit.yml))
 - **Nightly and on demand** → the full electron-builder run for both platforms ([package.yml](.github/workflows/package.yml)), so a packaging regression surfaces on a weekday rather than during a release
 - **Push a tag `vMAJOR.MINOR.PATCH`** (e.g. `git tag v0.1.0 && git push --tags`) → builds installers, signs (if certs configured), and creates a draft GitHub Release ([release.yml](.github/workflows/release.yml)). The pattern is exact — a suffixed tag like `v0.1.0-beta` triggers nothing
+
+Required checks, repository secrets and the supply-chain rules behind these are written down in [.github/CICD.md](.github/CICD.md).
 
 ### Code Signing
 
@@ -495,7 +508,37 @@ Contributions are welcome — bug fixes, macOS support, accessibility and transl
 
 `dev` is the working branch; `main` is a release snapshot synced from it by the maintainer. Fork and open your PR against `dev`, never `main`. Commits follow [Conventional Commits](https://www.conventionalcommits.org/), one topic per commit, subject line only. There is **no `CHANGELOG.md`** — release notes are generated by GitHub from everything that landed since the previous tag, grouped by [`.github/release.yml`](.github/release.yml).
 
-> **Found a security bug?** Do not open a public issue — use [private vulnerability reporting](https://github.com/whiteravens20/raven-forge/security/advisories/new). And redact access tokens from any log you attach.
+---
+
+## Security
+
+Found a vulnerability? Do not open a public issue — use [private vulnerability reporting](https://github.com/whiteravens20/raven-forge/security/advisories/new), and redact access tokens from any log you attach. [SECURITY.md](SECURITY.md) says what to include and how soon to expect an answer, and describes the security model and its known gaps.
+
+---
+
+## How the code is written and checked
+
+Raven Forge is built by one maintainer using AI coding tools. The tools write most of the code, tests and documentation; the maintainer decides what gets built and is responsible for everything that lands here. There is no second human reviewer, and the launcher is still in testing.
+
+**What a change goes through**
+
+- Every push and pull request runs lint, type checking, a format check and the test suite, then builds the launcher for Linux and for Windows ([build.yml](.github/workflows/build.yml)). The parts where a mistake does real damage have tests of their own: the launch path, the hash check on downloads, manifest signature verification and the token store.
+- CodeQL, `npm audit`, package signature checks and a Trivy scan for secrets and misconfiguration run on every push and pull request, and again every week ([codeql.yml](.github/workflows/codeql.yml), [security.yml](.github/workflows/security.yml)).
+- Commits are signed, and the [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/whiteravens20/raven-forge) results are public.
+
+**What the maintainer decided and read**
+
+- The architecture was decided by the maintainer: the stack, the IPC protocol between the window and the main process, and the sign-in chain.
+- White Ravens' own signing key is compiled into the launcher rather than fetched from where the manifests are, so a pack published by White Ravens is checked against a key that cannot be swapped along with the manifest ([docs/SIGNING.md](docs/SIGNING.md)).
+- Generated code is reviewed and tested by the maintainer in the session that produces it. Changes to the sign-in chain and the token store, manifest signature verification, the hash check on downloads and the launch path are read line by line.
+
+**Before a release**
+
+- The installers themselves are run, not only the tests: the Windows installer and uninstaller, the `.deb` on a clean Debian and the AppImage, including the update from the previous version.
+- A release is created as a draft, which the auto-updater ignores, and is published by hand once its signature, checksums and SBOM have been checked.
+- What was run and what is still open is tracked in [the road to 1.0.0](https://github.com/whiteravens20/raven-forge/issues/15). [SECURITY.md](SECURITY.md#security-model) describes the security model and its known gaps.
+
+If something looks wrong, open an issue. For a vulnerability, use [private vulnerability reporting](https://github.com/whiteravens20/raven-forge/security/advisories/new).
 
 ---
 
@@ -506,24 +549,3 @@ Contributions are welcome — bug fixes, macOS support, accessibility and transl
 You are free to use, modify, and share this software. Anyone who distributes it, or a version based on it, has to do so under the same licence with the source code available, and has to keep the attribution "Raven Forge by White Ravens" together with the address of this repository.
 
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
-
----
-
-## Built with AI — How We Fight AI Slop
-
-This project was built with the help of **AI coding assistants**. We believe in transparency about AI involvement and in keeping quality high despite using AI tools.
-
-### What "AI slop" is and how we fight it
-
-"AI slop" is low-quality, bloated, copy-paste code that AI generates when used carelessly — dead code, unnecessary abstractions, hallucinated APIs, cargo-culted patterns, and verbose boilerplate nobody asked for. It's the software equivalent of SEO spam articles.
-
-Here's how this project stays above that bar:
-
-1. **Human-driven architecture** — Every design decision (tech stack, folder structure, IPC protocol, auth chain) was made by a human. AI executed the plan, not the other way around.
-2. **Strict compilation gates** — Every generated file must pass `tsc --noEmit` (zero type errors) and `eslint` (zero lint errors) before being accepted. No "it looks right" — it compiles or it doesn't ship.
-3. **No dead code policy** — Unused imports, unreachable branches, and placeholder stubs are caught by linting rules (`no-unused-vars`, `no-explicit-any`) and removed immediately.
-4. **Minimal abstraction** — No premature DRY, no "just in case" wrappers, no 5-layer indirection for a simple function call. Code is as simple as the task requires.
-5. **Real implementations over stubs** — Where a feature is implemented, it's a real working implementation (OAuth chain, Adoptium JRE download, Modrinth search, Mojang asset pipeline). Where it's not ready, it's explicitly marked as a stub with a clear error message — never a silent no-op.
-6. **Iterative review** — AI output is reviewed, tested, and corrected in the same session. Bugs introduced by AI are fixed immediately, not left for "later."
-
-If you spot AI slop in this codebase — dead code, nonsensical comments, hallucinated APIs, over-engineered abstractions — please open an issue. Keeping code clean is a shared responsibility.

@@ -28,6 +28,14 @@ vi.mock('../src/core/config/settings-manager', () => ({
   getSettings: async () => ({ downloadConcurrency: 4 }),
 }));
 
+// Mojang's library host, stood in for by a folder of the local server.
+vi.mock('../src/shared/constants', async (original) => ({
+  ...(await original<typeof import('../src/shared/constants')>()),
+  get MOJANG_LIBRARIES() {
+    return `${base}/mojang`;
+  },
+}));
+
 const { ensureLibraries, ensureAssets, nativesClassifier } =
   await import('../src/core/minecraft/asset-downloader');
 const { ZipWriter } = await import('../src/core/packs/zip-writer');
@@ -199,6 +207,108 @@ describe('a file that is already there', () => {
 
     expect(await fs.readFile(lib.file, 'utf-8')).toBe('short');
     expect(await fs.readdir(path.dirname(lib.file))).toEqual([path.basename(lib.file)]);
+  });
+});
+
+describe('a library named the way a Forge profile up to 1.12.2 names it', () => {
+  const at = (repoPath: string) => path.join(libs(), repoPath);
+
+  it('is fetched from Mojang when it names no repository at all', async () => {
+    // All such a profile says about the class the game is started through.
+    const repoPath = 'net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar';
+    served[`/mojang/${repoPath}`] = Buffer.from('launchwrapper');
+
+    const classpath = await ensureLibraries(
+      libs(),
+      metaOf([{ name: 'net.minecraft:launchwrapper:1.12' }]),
+    );
+
+    // Skipped without a word, it left the game to start without it.
+    expect(classpath).toEqual([at(repoPath)]);
+    expect(await fs.readFile(at(repoPath), 'utf-8')).toBe('launchwrapper');
+  });
+
+  it('is taken when any one of the hashes listed for it is the file’s', async () => {
+    // Two, because the same jar was also served packed and came out different.
+    const repoPath = 'org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar';
+    served[`/forge/${repoPath}`] = Buffer.from('scala, as served');
+    const scala: Library = {
+      name: 'org.scala-lang:scala-library:2.11.1',
+      url: `${base}/forge/`,
+      checksums: [sha1('scala, unpacked'), sha1('scala, as served')],
+    };
+
+    await ensureLibraries(libs(), metaOf([scala]));
+
+    expect(await fs.readdir(path.dirname(at(repoPath)))).toEqual(['scala-library-2.11.1.jar']);
+
+    // And read back the same way: neither hash alone is "the" hash.
+    hits.length = 0;
+    await ensureLibraries(libs(), metaOf([scala]), undefined, { thorough: true });
+    expect(hits).toEqual([]);
+  });
+
+  it('is refused when none of them is, and leaves nothing behind', async () => {
+    const repoPath = 'org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar';
+    served[`/forge/${repoPath}`] = Buffer.from('something else');
+    const scala: Library = {
+      name: 'org.scala-lang:scala-library:2.11.1',
+      url: `${base}/forge/`,
+      checksums: [sha1('scala, unpacked'), sha1('scala, as served')],
+    };
+
+    await expect(ensureLibraries(libs(), metaOf([scala]))).rejects.toThrow(/sha1 mismatch/);
+
+    expect(await fs.readdir(path.dirname(at(repoPath)))).toEqual([]);
+  });
+
+  it('is left off the classpath when all it names is natives', async () => {
+    const classpath = await ensureLibraries(
+      libs(),
+      metaOf([
+        { name: 'org.lwjgl.lwjgl:lwjgl-platform:2.9.0', natives: { linux: 'natives-linux' } },
+      ]),
+    );
+
+    expect(classpath).toEqual([]);
+    expect(hits).toEqual([]);
+  });
+});
+
+describe('a library only a loader’s installer can make', () => {
+  const made = (body: string): Library & { file: string } => {
+    const repoPath = 'net/minecraftforge/forge/1.21.1-52.1.0/forge-1.21.1-52.1.0-client.jar';
+    return {
+      file: path.join(libs(), repoPath),
+      name: 'net.minecraftforge:forge:1.21.1-52.1.0:client',
+      downloads: {
+        artifact: { path: repoPath, url: '', sha1: sha1(body), size: Buffer.byteLength(body) },
+      },
+    };
+  };
+
+  it('is looked for, not fetched', async () => {
+    const client = made('the patched client');
+    await fs.mkdir(path.dirname(client.file), { recursive: true });
+    await fs.writeFile(client.file, 'the patched client');
+
+    expect(await ensureLibraries(libs(), metaOf([client]))).toEqual([client.file]);
+    expect(hits).toEqual([]);
+  });
+
+  it('refuses the launch when it is not there, before anything else is fetched', async () => {
+    const { refusalOf } = await import('../src/core/util/refusal');
+    const other = library('guava', 'the real bytes');
+
+    const err = await ensureLibraries(libs(), metaOf([other, made('the patched client')])).catch(
+      (e: unknown) => e,
+    );
+
+    expect(refusalOf(err)).toEqual({
+      key: 'launchError.loaderFileMissing',
+      vars: { file: 'forge-1.21.1-52.1.0-client.jar' },
+    });
+    expect(hits).toEqual([]);
   });
 });
 

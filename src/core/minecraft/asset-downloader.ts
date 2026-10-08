@@ -6,11 +6,12 @@ import { createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { log } from '../../main/logger';
 import { CancelledError, isCancellation, throwIfCancelled } from '../util/cancellation';
+import { RefusedError } from '../util/refusal';
 import { forEachConcurrently } from '../util/concurrency';
 import { serializeByKey } from '../util/serialize';
 import { eachEntry, openEntry } from '../util/zip-read';
 import { downloadToFile } from '../net/download';
-import { MOJANG_RESOURCES } from '../../shared/constants';
+import { MOJANG_LIBRARIES, MOJANG_RESOURCES } from '../../shared/constants';
 import { hashFile } from '../mods/integrity';
 import { getSettings } from '../config/settings-manager';
 import { emitProgress } from '../util/progress';
@@ -50,7 +51,7 @@ export interface GameFileOptions {
  */
 async function fileExistsAndValid(
   filePath: string,
-  expectedSha1: string | undefined,
+  expectedSha1: ExpectedSha1,
   expectedSize: number | undefined,
   thorough: boolean,
 ): Promise<boolean> {
@@ -60,11 +61,26 @@ async function fileExistsAndValid(
       if (stat.size !== expectedSize) return false;
       if (!thorough) return true;
     }
-    if (expectedSha1) return (await hashFile(filePath, 'sha1')) === expectedSha1;
+    const accepted = acceptedSha1(expectedSha1);
+    if (accepted.length > 0) return accepted.includes(await hashFile(filePath, 'sha1'));
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * What a file's SHA-1 has to be: one value, or any one of several.
+ *
+ * Several is how Forge's profiles up to 1.12.2 describe a library — a list of
+ * `checksums`, because the same jar was also served packed, and came out of
+ * that with different bytes. Either was the library.
+ */
+type ExpectedSha1 = string | readonly string[] | undefined;
+
+function acceptedSha1(expected: ExpectedSha1): readonly string[] {
+  if (expected === undefined) return [];
+  return typeof expected === 'string' ? [expected] : expected;
 }
 
 // ── Download with retry ────────────────────────────────────
@@ -87,18 +103,26 @@ const DOWNLOAD_ATTEMPTS = 3;
 async function downloadFile(
   url: string,
   dest: string,
-  sha1: string | undefined,
+  sha1: ExpectedSha1,
   signal: AbortSignal | undefined,
 ): Promise<void> {
+  const accepted = acceptedSha1(sha1);
   for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt++) {
     throwIfCancelled(signal, 'Download');
     try {
+      if (accepted.length > 1) {
+        await downloadAnyOf(url, dest, accepted, signal);
+        return;
+      }
       // Libraries and natives are loaded straight into the JVM, so the bytes
       // come down https and are held to the published sha1 when there is one.
       await downloadToFile(url, dest, {
         signal,
         secure: true,
-        verify: sha1 ? { hashes: { sha1 }, label: path.basename(dest) } : undefined,
+        verify:
+          accepted.length === 1
+            ? { hashes: { sha1: accepted[0] }, label: path.basename(dest) }
+            : undefined,
       });
       return;
     } catch (err) {
@@ -114,12 +138,42 @@ async function downloadFile(
   }
 }
 
+/**
+ * Fetch a file that any one of several hashes vouches for.
+ *
+ * The downloader checks against one hash, so this receives the file under a
+ * name of its own and gives it the real one only when it has matched — the same
+ * promise as everywhere else here, that nothing sits at its final name
+ * unchecked.
+ */
+async function downloadAnyOf(
+  url: string,
+  dest: string,
+  accepted: readonly string[],
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  const unchecked = `${dest}.unchecked`;
+  try {
+    await downloadToFile(url, unchecked, { signal, secure: true });
+    const actual = await hashFile(unchecked, 'sha1');
+    if (!accepted.includes(actual)) {
+      throw new Error(
+        `sha1 mismatch for ${path.basename(dest)}: expected one of ${accepted.join(', ')}, got ${actual}`,
+      );
+    }
+    await fs.rename(unchecked, dest);
+  } catch (err) {
+    await fs.rm(unchecked, { force: true });
+    throw err;
+  }
+}
+
 // ── Parallel download helper ───────────────────────────────
 
 interface DownloadTask {
   url: string;
   dest: string;
-  sha1?: string;
+  sha1?: ExpectedSha1;
   size?: number;
 }
 
@@ -275,7 +329,7 @@ interface MavenCoords {
   path: string;
 }
 
-function parseMavenCoords(name: string): MavenCoords | null {
+export function parseMavenCoords(name: string): MavenCoords | null {
   // group:artifact:version[:classifier][@ext]
   const [coords, extFromAt] = name.split('@');
   const parts = coords.split(':');
@@ -370,6 +424,7 @@ export async function ensureLibraries(
   const settings = await getSettings();
   const concurrency = settings.downloadConcurrency;
   const tasks: DownloadTask[] = [];
+  const installerMade: DownloadTask[] = [];
   const classpath: string[] = [];
   const nativeJars: Array<{ jarPath: string; exclude: string[] }> = [];
 
@@ -383,16 +438,32 @@ export async function ensureLibraries(
       // arguments point them at, so a copy made here was never the one loaded.
       const artifact = lib.downloads.artifact;
       const dest = path.join(librariesDir, artifact.path);
-      tasks.push({ url: artifact.url, dest, sha1: artifact.sha1, size: artifact.size });
+      const task = { url: artifact.url, dest, sha1: artifact.sha1, size: artifact.size };
+      // No address means a loader's installer made the file on this machine:
+      // there is nothing to fetch, only something to find.
+      (artifact.url === '' ? installerMade : tasks).push(task);
       classpath.push(dest);
-    } else if (lib.url) {
-      // Maven-style entry from a loader profile — no hashes are guaranteed, but
-      // Fabric does publish sha1 alongside the coordinates when it has one.
+    } else if (lib.url || !lib.natives) {
+      // Maven-style entry from a loader profile: coordinates, and the repository
+      // they are in unless that is Mojang's. No hashes are guaranteed — Fabric
+      // publishes a sha1 beside the coordinates when it has one, an old Forge
+      // profile a list of them, Quilt nothing.
+      //
+      // An entry with neither `downloads` nor `url` used to be skipped without a
+      // word, and the game then started without that library. One that names
+      // only natives still is: those are unpacked below, never put on the
+      // classpath.
       const coords = parseMavenCoords(lib.name);
       if (coords) {
         const dest = path.join(librariesDir, coords.path);
-        const baseUrl = lib.url.endsWith('/') ? lib.url : `${lib.url}/`;
-        tasks.push({ url: `${baseUrl}${coords.path}`, dest, sha1: lib.sha1, size: lib.size });
+        const repository = lib.url ?? MOJANG_LIBRARIES;
+        const baseUrl = repository.endsWith('/') ? repository : `${repository}/`;
+        tasks.push({
+          url: `${baseUrl}${coords.path}`,
+          dest,
+          sha1: lib.sha1 ?? lib.checksums,
+          size: lib.size,
+        });
         classpath.push(dest);
       }
     }
@@ -410,7 +481,20 @@ export async function ensureLibraries(
     }
   }
 
-  log.info(`Ensuring ${tasks.length} libraries...`);
+  // Before anything is fetched: a launch that cannot be started is better
+  // refused now than after its downloads. Asked to download one of these, the
+  // launcher tried an empty address three times and reported what the
+  // downloader says about addresses that are not https.
+  const thorough = options.thorough ?? false;
+  for (const { dest, sha1, size } of installerMade) {
+    if (await fileExistsAndValid(dest, sha1, size, thorough)) continue;
+    throw new RefusedError(
+      { key: 'launchError.loaderFileMissing', vars: { file: path.basename(dest) } },
+      `${dest} is made by the loader's installer and is missing or damaged`,
+    );
+  }
+
+  log.info(`Ensuring ${tasks.length + installerMade.length} libraries...`);
   await downloadBatch(tasks, concurrency, {
     ...options,
     operationId: `libraries-${meta.id}`,
