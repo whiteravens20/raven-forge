@@ -248,7 +248,13 @@ export function registerAllIpcHandlers(): void {
     }
   });
   handle('system:relaunch', () => {
-    app.relaunch();
+    // An AppImage is one file that mounts itself for the length of a run, and
+    // the program Electron would start again is the copy inside that mount —
+    // gone by the time this process has left, which is what a relaunch waits
+    // for. The launcher closed and did not come back, after a move of the data
+    // above all. `APPIMAGE` names the file itself, and that is what is started.
+    const image = process.env.APPIMAGE;
+    app.relaunch(image ? { execPath: image } : undefined);
     app.quit();
   });
   handle('system:open-url', async (_event, url: string) => {
