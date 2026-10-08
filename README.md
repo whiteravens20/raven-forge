@@ -327,14 +327,19 @@ somewhere else.
 
 | Target         | File                                       | Size    | Runs on                                    |
 | -------------- | ------------------------------------------ | ------- | ------------------------------------------ |
-| NSIS installer | `Raven-Forge-Launcher-Setup-<version>.exe` | ~96 MB  | **Windows 11** and Windows 10 (1809+), x64 |
-| Debian package | `raven-forge-launcher_<version>_amd64.deb` | ~90 MB  | **Debian 11+**, **Ubuntu 20.04+**, x64     |
-| AppImage       | `Raven-Forge-Launcher-<version>.AppImage`  | ~115 MB | Any x64 Linux with glibc ≥ 2.25            |
+| NSIS installer | `Raven-Forge-Launcher-Setup-<version>.exe` | ~109 MB | **Windows 11** and Windows 10 (1809+), x64 |
+| Debian package | `raven-forge-launcher_<version>_amd64.deb` | ~98 MB  | **Debian 12+**, **Ubuntu 22.04+**, x64     |
+| AppImage       | `Raven-Forge-Launcher-<version>.AppImage`  | ~123 MB | Any x64 Linux with glibc ≥ 2.25            |
 
 The Linux floor is the Electron binary's own: it links `GLIBC_2.25`, which the
 `.deb` declares as `libc6 (>= 2.25)` so apt refuses the install rather than
 letting it fail at startup. Windows 7/8/8.1 are not supported; Electron dropped
 them.
+
+The `.deb` is installed and started on Debian 12, Ubuntu 22.04 and Ubuntu 24.04.
+Nothing older is claimed: Electron supports a release of a distribution for as
+long as its maker does, and on Ubuntu 20.04 the package does not install at all
+— one of the libraries it asks for goes by another name there.
 
 **The `.deb` carries the full dependency list; the AppImage cannot.** `fpm` — the
 tool electron-builder builds Debian packages with — does not run
