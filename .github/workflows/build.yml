@@ -47,12 +47,13 @@ jobs:
   # flushed and renamed on NTFS. Nothing but a Windows can run those, and wine,
   # which stands in for it elsewhere, has no `tar` at all.
   #
-  # Allowed to fail while it is new: the suite has never been run here, and what
-  # it turns up is being gone through. Held to passing once it has.
+  # The first time it ran it turned up two things no other machine could have:
+  # a state file that failed to save when two writes of it met, and a pack's
+  # file written through a link. Both are held here now, with the tests that
+  # stage a file somebody else has open the way Windows comes by one.
   test-windows:
     needs: lint-and-typecheck
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       # Before the checkout. The tests read some of the repository's own files,
       # and are written against the line endings those are committed with.
