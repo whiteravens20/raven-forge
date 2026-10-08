@@ -124,6 +124,14 @@ download.
 - External links open in the **system browser**, never in an Electron window, and
   only for `http://`/`https://` URLs — both at the window-open handler and at the
   `system:open-url` IPC boundary.
+- The packaged program is the launcher and nothing else. Electron's binary can
+  be told to be a plain Node.js that runs any script it is handed
+  (`ELECTRON_RUN_AS_NODE`), and to open a debugger on the main process
+  (`--inspect`); both are switched off in the binary itself, as fuses
+  (`electronFuses` in `electron-builder.config.js`), and read back off it by the
+  packaging job and by every release. The embedded browser's own
+  `--remote-debugging-port` is not a fuse and still answers: what it reaches is
+  the window, which has no Node access and nothing but the IPC surface above.
 
 ### Supply chain
 
