@@ -2,6 +2,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { z } from 'zod';
 import { paths } from '../config/paths';
 import { FILE_AUTH } from '../../shared/constants';
 import { writeJsonAtomic } from '../util/atomic-file';
@@ -89,8 +90,71 @@ function warnFallback(): void {
  * no longer written — and taking only what is named here is what makes the next
  * write leave it out of a file that still has it.
  */
-function asKept({ id, uuid, username, type, skinUrl }: MinecraftAccount): MinecraftAccount {
-  return { id, uuid, username, type, ...(skinUrl === undefined ? {} : { skinUrl }) };
+const storedAccountSchema = z.object({
+  id: z.string().min(1),
+  uuid: z.string().min(1),
+  username: z.string().min(1),
+  type: z.enum(['microsoft', 'offline']),
+  skinUrl: z.string().optional().catch(undefined),
+});
+
+const storedSessionSchema = z.object({
+  expiresAt: z.number(),
+  accessToken: z.string().optional().catch(undefined),
+});
+
+let warnedAboutEntries = false;
+
+/** The entries of a stored map, or none when what is stored is not a map. */
+function entriesOf(value: unknown): [string, unknown][] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return [];
+  return Object.entries(value);
+}
+
+/**
+ * What a parsed `auth.json` holds, taken a part at a time.
+ *
+ * The whole of it used to be believed as it parsed. An account with no name —
+ * a file edited by hand — was handed to the Accounts page, which had nothing to
+ * draw then but the error screen; an entry that was not an object at all made
+ * the store unreadable, and with it every account beside it. What is not an
+ * account, a token or a session is now left out and named in the log.
+ *
+ * Left out and not kept, unlike an entry of the profile list: nothing hangs on
+ * an account's record that signing in again does not put back, and a Microsoft
+ * account comes back under the id its secrets are already stored by.
+ */
+function readStored(parsed: Record<string, unknown>, file: string): AuthStoreData {
+  const accounts: MinecraftAccount[] = [];
+  const leftOut: number[] = [];
+  const listed = Array.isArray(parsed.accounts) ? parsed.accounts : [];
+  for (const [index, entry] of listed.entries()) {
+    const read = storedAccountSchema.safeParse(entry);
+    if (read.success) accounts.push(read.data);
+    else leftOut.push(index + 1);
+  }
+  // Once, because every use of the store reads the file again; and by position,
+  // never by content, because this is the one file that may hold a token.
+  if (leftOut.length > 0 && !warnedAboutEntries) {
+    warnedAboutEntries = true;
+    log.warn(`${file}: not an account, and left out of the list — entry ${leftOut.join(', ')}`);
+  }
+
+  const refreshTokens: Record<string, string> = {};
+  for (const [accountId, token] of entriesOf(parsed.refreshTokens)) {
+    if (typeof token === 'string') refreshTokens[accountId] = token;
+  }
+
+  let mcSessions: Record<string, StoredMcSession> | undefined;
+  for (const [accountId, session] of entriesOf(parsed.mcSessions)) {
+    const read = storedSessionSchema.safeParse(session);
+    if (read.success) mcSessions = { ...mcSessions, [accountId]: read.data };
+  }
+
+  // An active account that is not on the list is nobody signed in, with
+  // accounts sitting right there: the first one is, as when one is removed.
+  const active = accounts.find((account) => account.id === parsed.activeAccountId) ?? accounts[0];
+  return { accounts, activeAccountId: active?.id ?? null, refreshTokens, mcSessions };
 }
 
 function readRaw(): Promise<AuthStoreData> {
@@ -118,13 +182,7 @@ function readRaw(): Promise<AuthStoreData> {
       return { accounts: [], activeAccountId: null, refreshTokens: {} };
     }
 
-    const stored = parsed as Partial<AuthStoreData>;
-    return {
-      accounts: (stored.accounts ?? []).map(asKept),
-      activeAccountId: stored.activeAccountId ?? null,
-      refreshTokens: stored.refreshTokens ?? {},
-      mcSessions: stored.mcSessions,
-    };
+    return readStored(parsed as Record<string, unknown>, file);
   });
 }
 

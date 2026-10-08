@@ -341,6 +341,96 @@ describe('reading auth.json', () => {
   });
 });
 
+/**
+ * The store used to be believed whole, as it parsed. An account with no name —
+ * a file somebody edited by hand — reached the Accounts page, which then had
+ * nothing to draw but the error screen; an entry that was not an object made
+ * the store unreadable, and every account in it with it.
+ */
+describe('a part of auth.json that is not what it should be', () => {
+  const withFile = async (stored: unknown): Promise<Store> => {
+    await fs.writeFile(authFile(), JSON.stringify(stored), { mode: 0o600 });
+    return loadModule();
+  };
+
+  it('leaves out what is not an account and reads the accounts beside it', async () => {
+    const store = await withFile({
+      accounts: [
+        { id: 'a1', uuid: 'a1', type: 'offline' },
+        null,
+        'a string',
+        { id: 'a2', uuid: 'a2', username: 'Raven', type: 'somebody' },
+        account('a3', 'Gracz'),
+      ],
+      activeAccountId: 'a1',
+      refreshTokens: {},
+    });
+
+    const state = await store.getAuthState();
+    expect(state.accounts).toEqual([account('a3', 'Gracz')]);
+    // The account that was active is not one; the one that is there is.
+    expect(state.activeAccountId).toBe('a3');
+    expect(await store.getAccount('a1')).toBeUndefined();
+  });
+
+  it('reads a list that is not a list as nobody signed in, and can be signed into', async () => {
+    const store = await withFile({ accounts: { a1: account('a1') }, activeAccountId: 7 });
+
+    expect(await store.getAuthState()).toMatchObject({ accounts: [], activeAccountId: null });
+    await store.saveAccount(account('a2'), 'r2');
+    expect((await store.getAuthState()).accounts).toEqual([account('a2')]);
+    expect(await keptAside()).toEqual([]);
+  });
+
+  it('writes none of it back', async () => {
+    const store = await withFile({
+      accounts: [{ id: 'a1', type: 'offline' }, account('a2')],
+      activeAccountId: 'a2',
+      refreshTokens: {},
+    });
+
+    await store.saveAccount(account('a3'));
+
+    expect((await readAuth()).accounts).toEqual([account('a2'), account('a3')]);
+  });
+
+  it('takes no token or session that is not one', async () => {
+    // With no keychain these are read straight from the file, and with one
+    // they are what the first read moves into it.
+    const store = await withFile({
+      accounts: [account('a1'), account('a2')],
+      activeAccountId: 'a1',
+      refreshTokens: { a1: 'r1', a2: 42 },
+      mcSessions: {
+        a1: { expiresAt: 1_900_000_000_000, accessToken: 'mc1' },
+        a2: null,
+      },
+    });
+
+    expect((await store.getAuthState()).accounts).toHaveLength(2);
+    expect(await store.getRefreshToken('a1')).toBe('r1');
+    expect(await store.getRefreshToken('a2')).toBeUndefined();
+    expect(await store.getMcSession('a1')).toEqual({
+      accessToken: 'mc1',
+      expiresAt: 1_900_000_000_000,
+    });
+    expect(await store.getMcSession('a2')).toBeUndefined();
+    expect([...keychain!.keys()].sort()).toEqual(['mcAccess:a1', 'msRefresh:a1']);
+  });
+
+  it('puts nothing in the keychain from maps that are not maps', async () => {
+    const store = await withFile({
+      accounts: [account('a1')],
+      activeAccountId: 'a1',
+      refreshTokens: ['r0'],
+      mcSessions: 'none',
+    });
+
+    expect((await store.getAuthState()).accounts).toEqual([account('a1')]);
+    expect(keychain!.size).toBe(0);
+  });
+});
+
 describe('overlapping writes', () => {
   it('does not let two saves in flight lose each other', async () => {
     // Every writer here reads the whole store, awaits a keychain round trip,
