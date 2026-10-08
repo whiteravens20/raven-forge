@@ -33,7 +33,7 @@ const { handlers, mainFrame, running, picked } = vi.hoisted(() => ({
   /** Profiles this suite says have a game up; nothing is ever spawned. */
   running: new Set<string>(),
   /** What the next "choose a file" dialog answers; nothing is a closed dialog. */
-  picked: { files: [] as string[], asked: 0 },
+  picked: { files: [] as string[], asked: 0, options: [] as Array<{ defaultPath?: string }> },
 }));
 
 let root: string;
@@ -48,8 +48,9 @@ vi.mock('electron', () => ({
     handle: (channel: string, listener: Listener) => handlers.set(channel, listener),
   },
   dialog: {
-    showOpenDialog: async () => {
+    showOpenDialog: async (_window: unknown, options: { defaultPath?: string }) => {
       picked.asked += 1;
+      picked.options.push(options);
       return { canceled: picked.files.length === 0, filePaths: picked.files };
     },
   },
@@ -93,6 +94,7 @@ beforeEach(async () => {
   running.clear();
   picked.files = [];
   picked.asked = 0;
+  picked.options = [];
   const { reloadDataRoot } = await import('../src/core/config/data-root');
   reloadDataRoot();
   const { registerAllIpcHandlers } = await import('../src/main/ipc-handlers');
@@ -327,6 +329,28 @@ describe('loaders:build-starts', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Failed to check the loader build');
+  });
+});
+
+/**
+ * Where a dialog opens when it is told nothing is Electron's to decide, and it
+ * changed its mind: up to 42 the folder the system remembered, from 43 always
+ * Downloads. Every dialog that picks a file therefore says where it starts.
+ */
+describe('a dialog that picks a file', () => {
+  it.each([
+    ['any file the page asks for', 'system:select-file', []],
+    ['a profile file to import', 'profiles:import', []],
+    ['a mod', 'mods:add-from-file', ['profile']],
+    ['a resource pack', 'content:add-from-file', ['profile', 'resourcepacks']],
+  ] as const)('names the folder it starts in — %s', async (_what, channel, args) => {
+    const { id } = (await call<Profile>('profiles:create', newProfile('Dialogs'))).data!;
+
+    // Closed without a choice: only the question matters here.
+    await call(channel, ...args.map((arg) => (arg === 'profile' ? id : arg)));
+
+    expect(picked.options).toHaveLength(1);
+    expect(picked.options[0].defaultPath).toBe(path.join(root, 'userData'));
   });
 });
 

@@ -270,6 +270,10 @@ export function registerAllIpcHandlers(): void {
       if (!win) return fail('No window available');
       const result = await dialog.showOpenDialog(win, {
         properties: ['openFile'],
+        // Named, like every other "pick a file" here, and not left to whatever
+        // the Electron in use starts a dialog in: up to 42 that was the folder
+        // the system remembered, and from 43 it is this one.
+        defaultPath: app.getPath('downloads'),
         filters: filters ?? [{ name: 'All Files', extensions: ['*'] }],
       });
       if (result.canceled || result.filePaths.length === 0) return ok(null);
@@ -697,6 +701,7 @@ export function registerAllIpcHandlers(): void {
       // works for as long as the page itself happens to be a `file://` one.
       const chosen = await dialog.showOpenDialog(win, {
         properties: ['openFile'],
+        defaultPath: app.getPath('downloads'),
         filters: [{ name: 'Raven Forge profile', extensions: ['json'] }],
       });
       if (chosen.canceled || chosen.filePaths.length === 0) return ok(null);
