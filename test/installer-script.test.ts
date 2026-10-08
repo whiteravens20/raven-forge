@@ -69,3 +69,80 @@ describe('the uninstaller’s own script', () => {
     expect(lines.filter((line) => /\$\{is[A-Z]\w*\}/.test(line))).toEqual([]);
   });
 });
+
+/**
+ * The folder page of the installer, where an install made by an older build is
+ * offered under its old name.
+ *
+ * The installer has always moved such an install to the new name, one step
+ * after the page — so the page showed one folder and the files went to
+ * another. The page is put right by `.onVerifyInstDir`, which NSIS calls with
+ * whatever the page's field holds. That it does what it should was seen by
+ * running it; what is held here is what it rests on, because the packaging job
+ * that would notice a broken script runs nightly and not on a push.
+ */
+describe('the installer’s folder page', () => {
+  const templates = path.join(root, 'node_modules/app-builder-lib/templates/nsis');
+
+  /** The lines of the function a macro defines, from its name to its end. */
+  const functionIn = (lines: string[], name: string): string[] => {
+    const start = lines.indexOf(`Function ${name}`);
+    const end = lines.indexOf('FunctionEnd', start);
+    if (start < 0 || end < 0) throw new Error(`no function called ${name}`);
+    return lines.slice(start + 1, end);
+  };
+
+  it('answers a question the template does not answer itself', async () => {
+    // Two functions of one name do not compile.
+    const files = await fs.readdir(templates, { recursive: true });
+    const scripts = files.filter((file) => /\.ns[hi]$/.test(file));
+    expect(scripts.length).toBeGreaterThan(10);
+    for (const file of scripts) {
+      const text = await fs.readFile(path.join(templates, file), 'utf-8');
+      expect(text, file).not.toContain('.onVerifyInstDir');
+    }
+  });
+
+  it('is put right in a macro the template expands in the installer alone, after the page', async () => {
+    const lines = (await fs.readFile(path.join(templates, 'assistedInstaller.nsh'), 'utf-8'))
+      .split('\n')
+      .map((line) => line.trim());
+    const page = lines.indexOf('!insertmacro MUI_PAGE_DIRECTORY');
+    const ours = lines.indexOf('!insertmacro customPageAfterChangeDir');
+    const uninstallerHalf = lines.indexOf('!else');
+
+    expect(lines.indexOf('!ifndef BUILD_UNINSTALLER')).toBeLessThan(page);
+    expect(page).toBeGreaterThan(-1);
+    expect(ours).toBeGreaterThan(page);
+    expect(uninstallerHalf).toBeGreaterThan(ours);
+    expect(await macro('customPageAfterChangeDir')).toContain('Function .onVerifyInstDir');
+  });
+
+  it('renames with the one rule the step after the page uses', async () => {
+    const lines = await macro('customPageAfterChangeDir');
+    for (const name of ['ravenForgeNameInstallFolder', '.onVerifyInstDir']) {
+      expect(functionIn(lines, name), name).toContain('!insertmacro ravenForgeInstallFolder');
+    }
+  });
+
+  it('leaves a silent install where it is', async () => {
+    // An update runs silently and is asked about its folder as well, once. It
+    // stays in the folder it is in.
+    const body = functionIn(await macro('customPageAfterChangeDir'), '.onVerifyInstDir');
+    expect(body[0]).toBe('${IfNot} ${Silent}');
+    expect(body.at(-1)).toBe('${EndIf}');
+  });
+
+  it('hands back every register it borrows', async () => {
+    // It is called in the middle of whatever the page was doing.
+    const body = functionIn(await macro('customPageAfterChangeDir'), '.onVerifyInstDir');
+    const of = (word: string) =>
+      body.filter((line) => line.startsWith(`${word} `)).map((line) => line.slice(word.length + 1));
+    const used = new Set(body.flatMap((line) => line.match(/\$R\d/g) ?? []));
+    // The rule itself works in $R0 to $R2.
+    for (const register of ['$R0', '$R1', '$R2']) used.add(register);
+
+    expect(of('Push').sort()).toEqual([...used].sort());
+    expect(of('Pop')).toEqual(of('Push').reverse());
+  });
+});

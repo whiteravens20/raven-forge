@@ -61,11 +61,47 @@
 ; when the installer starts: the "for whom" page sets the folder from the
 ; registry again as it is left, which undoes anything settled before it. A page
 ; with nothing on it — the function names the folder and skips itself.
+;
+; That alone left the directory page showing one folder and the installer
+; using another: the old name was on the page, and the new one was settled
+; after the page had been left. So the page is put right as well. NSIS calls
+; `.onVerifyInstDir` with whatever its field holds — when the page opens, and
+; at every change, a browse or a keystroke — and a folder that ends in the old
+; name is written back into the field under the new one, which is what the
+; installer then reads. The field is found by its id in the page's dialog
+; (1019, NSIS's own directory box); on any other page there is no such control
+; and nothing is sent.
+;
+; Not when the installer runs silently. It is asked about the folder then too,
+; once, and an update must stay where it is.
+;
+; Both live in this macro because it is the one place the template gives that
+; is in the installer only and comes after its includes.
 !macro customPageAfterChangeDir
   Page custom ravenForgeNameInstallFolder
   Function ravenForgeNameInstallFolder
     !insertmacro ravenForgeInstallFolder
     Abort
+  FunctionEnd
+
+  Function .onVerifyInstDir
+    ${IfNot} ${Silent}
+      Push $R0
+      Push $R1
+      Push $R2
+      Push $R3
+      StrCpy $R3 $INSTDIR
+      !insertmacro ravenForgeInstallFolder
+      ${If} $INSTDIR != $R3
+        FindWindow $R3 "#32770" "" $HWNDPARENT
+        GetDlgItem $R3 $R3 1019
+        SendMessage $R3 ${WM_SETTEXT} 0 "STR:$INSTDIR"
+      ${EndIf}
+      Pop $R3
+      Pop $R2
+      Pop $R1
+      Pop $R0
+    ${EndIf}
   FunctionEnd
 !macroend
 
