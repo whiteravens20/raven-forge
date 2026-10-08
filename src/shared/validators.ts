@@ -37,10 +37,25 @@ export function isSecureContentUrl(value: string): boolean {
     return false;
   }
   if (u.protocol === 'https:') return true;
-  if (u.protocol === 'http:') {
-    return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(u.hostname);
-  }
+  if (u.protocol === 'http:') return LOOPBACK_HOSTS.includes(u.hostname);
   return false;
+}
+
+/** The names by which a computer addresses itself. */
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
+
+/**
+ * Whether an address is one on the player's own computer.
+ *
+ * Asked of a manifest's address before it is let name a file on this disk: see
+ * `assertLocalFilesAllowed` in the sync.
+ */
+export function isLoopbackUrl(value: string): boolean {
+  try {
+    return LOOPBACK_HOSTS.includes(new URL(value).hostname);
+  } catch {
+    return false;
+  }
 }
 
 /** Throwing form of {@link isSecureContentUrl}, for the fetch boundaries. */

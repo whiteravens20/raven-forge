@@ -75,6 +75,11 @@ download.
   no other: it must verify, on every install, whatever is in Settings. Any other
   manifest is checked against the keys the player has added under Settings →
   Trusted keys, which apply to every profile.
+- **A manifest from the network cannot name a file on the player's computer.**
+  An entry that gives a path instead of an address (`source: "local"`) is read
+  only from a manifest the same computer serves, which is where a pack is
+  built; from any other address it refuses the whole manifest, before anything
+  is copied or fetched (`assertLocalFilesAllowed` in `src/core/mods/mod-sync.ts`).
 - Signature verification is only as strong as the key distribution. With no key
   added, a manifest from anywhere else gets no signature guarantee at all, only
   hashes.

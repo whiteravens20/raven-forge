@@ -35,7 +35,7 @@ import { pendingChanges } from './pack-diff';
 import { getMainWindow } from '../../main/window';
 import { verifyManifestSignature, assertManifestTrusted } from '../updater/manifest-verify';
 import { isFirstPartyManifestUrl } from '../../shared/branding';
-import { assertSecureContentUrl } from '../../shared/validators';
+import { assertSecureContentUrl, isLoopbackUrl } from '../../shared/validators';
 import { resolveWithin } from '../util/safe-path';
 import type { SignedManifest } from '../updater/canonical';
 import {
@@ -416,6 +416,36 @@ async function fetchModEntry(
 
 // ── Manifest sync ──────────────────────────────────────────
 
+/**
+ * Refuse a manifest from somewhere else that names a file on this computer.
+ *
+ * `source: "local"` has a mod copied in from a path instead of fetched. It is
+ * for somebody building a pack, who serves the manifest from their own machine
+ * and has the jar they are working on beside it. A manifest from any other
+ * address has no business knowing what is on this disk: such an entry had the
+ * launcher copy any file it could read into `mods/`, and on Windows a path that
+ * begins `\\host\` sent it to that host to ask — at the sync, before the
+ * player had started anything.
+ *
+ * `addresses` is every address the manifest has to do with: the one it was
+ * asked for at and, when it has just arrived, the one that answered. All of
+ * them have to be this computer's. One that is not means a redirect, in one
+ * direction or the other, and neither makes it this computer's own manifest.
+ */
+function assertLocalFilesAllowed(
+  manifest: ModManifest,
+  addresses: string[],
+  profileName: string,
+): void {
+  if (addresses.every(isLoopbackUrl)) return;
+  const local = manifest.mods.find((entry) => entry.source === 'local');
+  if (!local) return;
+  throw new Error(
+    `Refusing to install the manifest for ${profileName}: it names a file on this computer ` +
+      `(${local.name}), which only a manifest served from this computer may do.`,
+  );
+}
+
 function parseManifest(body: unknown, profileName: string): ModManifest {
   const parsed = modManifestSchema.safeParse(body);
   if (parsed.success) return parsed.data;
@@ -467,13 +497,18 @@ async function obtainManifest(
   const firstParty = isFirstPartyManifestUrl(manifestUrl);
 
   /** Apply the trust policy, then hand back what the caller may install. */
-  const approve = (loaded: LoadedManifest, etag: string | undefined) => {
+  const approve = (loaded: LoadedManifest, etag: string | undefined, answeredBy?: string) => {
     const verification = verifyManifestSignature(
       loaded.raw as SignedManifest,
       trustedKeys,
       firstParty,
     );
     assertManifestTrusted(verification, trustedKeys, profileName, firstParty);
+    assertLocalFilesAllowed(
+      loaded.manifest,
+      answeredBy ? [manifestUrl, answeredBy] : [manifestUrl],
+      profileName,
+    );
     return { manifest: loaded.manifest, etag, verification };
   };
 
@@ -512,7 +547,7 @@ async function obtainManifest(
 
   // Approved before it is handed back to be kept: a manifest the policy rejects
   // must not become the copy a later offline sync falls back to.
-  return { ...approve(loaded, res.headers.get('etag') ?? knownEtag), fetched: raw };
+  return { ...approve(loaded, res.headers.get('etag') ?? knownEtag, res.url), fetched: raw };
 }
 
 /**

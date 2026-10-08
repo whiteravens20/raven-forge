@@ -14,7 +14,7 @@ import {
   isFirstPartyManifestUrl,
   trustedKeyRing,
 } from '../src/shared/branding';
-import { isSecureContentUrl } from '../src/shared/validators';
+import { isLoopbackUrl, isSecureContentUrl } from '../src/shared/validators';
 import type { TrustedKey } from '../src/shared/ipc-types';
 
 /**
@@ -215,5 +215,33 @@ describe('isSecureContentUrl', () => {
   it('rejects a non-web scheme', () => {
     expect(isSecureContentUrl('file:///etc/passwd')).toBe(false);
     expect(isSecureContentUrl('ftp://example.net/x')).toBe(false);
+  });
+});
+
+describe('isLoopbackUrl', () => {
+  it('knows this computer by each of its names, over either scheme', () => {
+    for (const address of [
+      'http://localhost:8080/manifest.json',
+      'https://localhost/manifest.json',
+      'http://127.0.0.1:3000/manifest.json',
+      'http://[::1]:3000/manifest.json',
+      'http://LOCALHOST/manifest.json',
+    ]) {
+      expect(isLoopbackUrl(address), address).toBe(true);
+    }
+  });
+
+  it('is not taken in by an address that only has one of those names in it', () => {
+    for (const address of [
+      'https://localhost.example.net/manifest.json',
+      'https://example.net/localhost/manifest.json',
+      'https://127.0.0.1.example.net/manifest.json',
+      'https://localhost@example.net/manifest.json',
+      'https://example.net/?from=http://localhost/',
+      'https://192.168.1.10/manifest.json',
+      'not an address',
+    ]) {
+      expect(isLoopbackUrl(address), address).toBe(false);
+    }
   });
 });
