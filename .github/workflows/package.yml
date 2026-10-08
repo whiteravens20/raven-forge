@@ -220,10 +220,15 @@ jobs:
       # box to borrow, and the runner is one: the installer that was just built
       # is run on it and the launcher used as a player uses it — installed,
       # started, installed over while it is open, updated from the release
-      # before, uninstalled. The rest of what is known about the Windows build
-      # was seen under wine, which answers some of this in its own way: what
-      # becomes of a file that is in use, whether an installer can close a
-      # launcher that is open, how long a secret the Credential Manager takes.
+      # before, uninstalled, without the installer's pages and through them.
+      # The rest of what is known about the Windows build was seen under wine,
+      # which answers some of this in its own way: what becomes of a file that
+      # is in use, whether an installer can close a launcher that is open, how
+      # long a secret the Credential Manager takes.
+      #
+      # It is the machine that built the installer, so a library the launcher
+      # needs and does not bring would not be missed here as it would on the
+      # clean Ubuntu.
       #
       # v0.7.1 by name and by digest. It is the last release that kept the
       # program and its data in folders named after the product, spaces and
@@ -242,11 +247,8 @@ jobs:
             exit 1
           }
 
-      # Allowed to miss until it has held on a runner once: what it finds
-      # first is to be read, and is no reason yet to call the packaging broken.
       - name: Install and use the launcher on Windows
         if: runner.os == 'Windows'
-        continue-on-error: true
         timeout-minutes: 20
         shell: pwsh
         run: |
