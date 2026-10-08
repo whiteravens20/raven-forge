@@ -48,6 +48,43 @@ export async function flushToDisk(handle: FileHandle, file: string): Promise<voi
   }
 }
 
+/** What Windows answers a rename with while something has the file being replaced open. */
+const HELD_BY_SOMETHING = new Set(['EPERM', 'EACCES', 'EBUSY']);
+
+/** How long a rename Windows refused is waited on before the next try, in turn. */
+const RENAME_WAITS_MS = [5, 10, 20, 40, 80, 160, 320, 640, 1280];
+
+/**
+ * Give a finished file its name, in place of whatever has that name now.
+ *
+ * On Windows this is refused for as long as anything has the file being
+ * replaced open: another write that is replacing it at this very moment, an
+ * antivirus reading what was written a moment ago. Such a refusal is over in
+ * milliseconds, and it used to fail the write — thirty saves of one file at
+ * once, which is a test this launcher has always had, lost several of them to
+ * `EPERM` the first time it was run on a Windows. So there the rename is asked
+ * again, for about two and a half seconds in all, before the write is called
+ * failed. The waits are unequal on purpose: writers that collided once would
+ * otherwise come back in step and collide again.
+ *
+ * Everywhere else a rename is not refused for that reason, and what it is
+ * refused for does not pass by itself.
+ */
+export async function renameIntoPlace(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fs.rename(from, to);
+      return;
+    } catch (err) {
+      const wait = RENAME_WAITS_MS[attempt];
+      const code = (err as NodeJS.ErrnoException).code;
+      if (process.platform !== 'win32' || wait === undefined || !code) throw err;
+      if (!HELD_BY_SOMETHING.has(code)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, wait * (0.5 + Math.random())));
+    }
+  }
+}
+
 /**
  * Write a file so that a crash cannot leave half of one behind.
  *
@@ -104,7 +141,7 @@ export async function writeFileAtomic(
     // The mode is applied only when the file is created, and a leftover tmp
     // from a previous run would keep its old permissions without this.
     if (mode !== undefined) await fs.chmod(tmp, mode);
-    await fs.rename(tmp, file);
+    await renameIntoPlace(tmp, file);
   } catch (err) {
     await fs.rm(tmp, { force: true }).catch(() => undefined);
     throw err;

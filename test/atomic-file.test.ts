@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { flushToDisk, writeFileAtomic, writeJsonAtomic } from '../src/core/util/atomic-file';
+import { heldByAnotherProgram } from './helpers/hold-file';
 
 const { warnings } = vi.hoisted(() => ({ warnings: [] as string[] }));
 
@@ -214,4 +215,51 @@ describe('writeFileAtomic', () => {
     const left = (await fs.readdir(dir)).filter((name) => name.endsWith('.tmp'));
     expect(left).toEqual([]);
   });
+
+  /**
+   * Windows will not let a file be replaced while anything has it open, and
+   * says so with an error where every other system says nothing. What has it
+   * open is as a rule gone in a moment — an antivirus reading the file, another
+   * write replacing it — so the write waits for that moment. These two run on a
+   * Windows and nowhere else: a file held by another program is not something
+   * that can be staged anywhere it does not matter.
+   */
+  describe.skipIf(process.platform !== 'win32')(
+    'on Windows, a file something else has open',
+    () => {
+      it('is waited for, and replaced once it is let go', async () => {
+        const file = path.join(dir, 'state.json');
+        await fs.writeFile(file, 'old');
+        const letGo = await heldByAnotherProgram(file);
+
+        let written = false;
+        const write = writeFileAtomic(file, 'new').then(() => {
+          written = true;
+        });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        // Still held, so still waiting: nothing was forced and nothing failed.
+        expect(written).toBe(false);
+        await letGo();
+        await write;
+
+        expect(await fs.readFile(file, 'utf-8')).toBe('new');
+        expect(await fs.readdir(dir)).toEqual(['state.json']);
+      }, 30_000);
+
+      it('is left as it was when it is never let go, and the write says so', async () => {
+        const file = path.join(dir, 'state.json');
+        await fs.writeFile(file, 'old');
+        const letGo = await heldByAnotherProgram(file);
+
+        try {
+          await expect(writeFileAtomic(file, 'new')).rejects.toThrow(/EPERM|EBUSY|EACCES/);
+        } finally {
+          await letGo();
+        }
+
+        expect(await fs.readFile(file, 'utf-8')).toBe('old');
+        expect(await fs.readdir(dir)).toEqual(['state.json']);
+      }, 30_000);
+    },
+  );
 });

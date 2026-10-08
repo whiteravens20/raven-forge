@@ -7,7 +7,7 @@ import { constants as fsConstants } from 'node:fs';
 import { assertSecureContentUrl, isSecureContentUrl } from '../../shared/validators';
 import { expectedHash, type HashedEntry } from '../mods/integrity';
 import { serializeByKey } from '../util/serialize';
-import { flushToDisk } from '../util/atomic-file';
+import { flushToDisk, renameIntoPlace } from '../util/atomic-file';
 
 /** No data for this long means the transfer is dead, not merely slow. */
 const STALL_TIMEOUT_MS = 45_000;
@@ -216,7 +216,7 @@ async function receive(url: string, dest: string, options: DownloadOptions): Pro
       }
     }
 
-    await fs.rename(part, dest);
+    await renameIntoPlace(part, dest);
   } catch (err) {
     await fs.rm(part, { force: true });
     // A cancelled download and a dead one abort identically; only the caller's
