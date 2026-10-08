@@ -210,6 +210,51 @@ describe('a file that is already there', () => {
   });
 });
 
+/**
+ * A fetched file is sent to the disk before it is given its name, unless the
+ * next launch will look at it again anyway. Which of the game's files that is
+ * depends on what the version profile says about each.
+ */
+describe('a game file that has just been fetched', () => {
+  /** Count the flushes made while `work` runs. */
+  async function flushesDuring(work: () => Promise<unknown>): Promise<number> {
+    const probe = await fs.open(path.join(dir, 'probe'), 'w');
+    const handles = Object.getPrototypeOf(probe) as { sync: () => Promise<void> };
+    await probe.close();
+    const flushed = handles.sync;
+    let count = 0;
+    const sync = vi.spyOn(handles, 'sync').mockImplementation(function (this: unknown) {
+      count++;
+      return flushed.call(this);
+    });
+    try {
+      await work();
+    } finally {
+      sync.mockRestore();
+    }
+    return count;
+  }
+
+  it('is not also sent to the disk when it has a size and a hash to be held to', async () => {
+    const guava = library('guava', 'the real bytes');
+
+    expect(await flushesDuring(() => ensureLibraries(libs(), metaOf([guava])))).toBe(0);
+    expect(await fs.readFile(guava.file, 'utf-8')).toBe('the real bytes');
+  });
+
+  it('is sent to the disk when nothing was published to hold it to', async () => {
+    // Quilt names its libraries by coordinates and a repository, and nothing
+    // more. Such a file is taken on sight at every later launch, so the one
+    // moment it can be made sure of is now.
+    const repoPath = 'org/quiltmc/quilt-loader/0.20.0/quilt-loader-0.20.0.jar';
+    served[`/quilt/${repoPath}`] = Buffer.from('the loader');
+    const quilt = { name: 'org.quiltmc:quilt-loader:0.20.0', url: `${base}/quilt/` };
+
+    expect(await flushesDuring(() => ensureLibraries(libs(), metaOf([quilt])))).toBe(1);
+    expect(await fs.readFile(path.join(libs(), repoPath), 'utf-8')).toBe('the loader');
+  });
+});
+
 describe('a library named the way a Forge profile up to 1.12.2 names it', () => {
   const at = (repoPath: string) => path.join(libs(), repoPath);
 

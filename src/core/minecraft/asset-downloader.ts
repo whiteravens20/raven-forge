@@ -106,8 +106,14 @@ async function downloadFile(
   dest: string,
   sha1: ExpectedSha1,
   signal: AbortSignal | undefined,
+  size?: number,
 ): Promise<void> {
   const accepted = acceptedSha1(sha1);
+  // With a size or a hash to hold it to, `fileExistsAndValid` looks at this
+  // file again before every launch, so it is not also sent to the disk here:
+  // see `checkedAgain`. A library with neither is taken on sight from then on,
+  // and is.
+  const checkedAgain = size !== undefined || accepted.length > 0;
   for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt++) {
     throwIfCancelled(signal, 'Download');
     try {
@@ -120,6 +126,7 @@ async function downloadFile(
       await downloadToFile(url, dest, {
         signal,
         secure: true,
+        checkedAgain,
         verify:
           accepted.length === 1
             ? { hashes: { sha1: accepted[0] }, label: path.basename(dest) }
@@ -155,7 +162,8 @@ async function downloadAnyOf(
 ): Promise<void> {
   const unchecked = `${dest}.unchecked`;
   try {
-    await downloadToFile(url, unchecked, { signal, secure: true });
+    // Hashed below and again before every launch: see `checkedAgain`.
+    await downloadToFile(url, unchecked, { signal, secure: true, checkedAgain: true });
     const actual = await hashFile(unchecked, 'sha1');
     if (!accepted.includes(actual)) {
       throw new Error(
@@ -276,7 +284,7 @@ async function downloadBatch(
   if (pending.length > 0) reportDownload();
 
   await forEachConcurrently(pending, concurrency, async (task) => {
-    await downloadFile(task.url, task.dest, task.sha1, signal);
+    await downloadFile(task.url, task.dest, task.sha1, signal, task.size);
     completed++;
     reportDownload();
   });
@@ -305,7 +313,7 @@ export async function ensureClientJar(
   }
 
   log.info(`Downloading client jar for ${versionId}...`);
-  await downloadFile(clientDl.url, jarPath, clientDl.sha1, signal);
+  await downloadFile(clientDl.url, jarPath, clientDl.sha1, signal, clientDl.size);
   return jarPath;
 }
 

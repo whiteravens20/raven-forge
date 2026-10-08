@@ -7,6 +7,7 @@ import { constants as fsConstants } from 'node:fs';
 import { assertSecureContentUrl, isSecureContentUrl } from '../../shared/validators';
 import { expectedHash, type HashedEntry } from '../mods/integrity';
 import { serializeByKey } from '../util/serialize';
+import { flushToDisk } from '../util/atomic-file';
 
 /** No data for this long means the transfer is dead, not merely slow. */
 const STALL_TIMEOUT_MS = 45_000;
@@ -57,6 +58,19 @@ export interface DownloadOptions {
    */
   verify?: { hashes: HashedEntry; label: string };
   /**
+   * Whoever asked for this file looks at it again — its size, or its hash —
+   * every time it is about to be used.
+   *
+   * A file is sent to the disk before it is given its name, for the reason a
+   * state file is: the rename records the name, and a power cut in the seconds
+   * after it can leave that name on an empty file. For a mod, a pack or a
+   * library nobody published a hash for, nothing would ever notice. The game's
+   * own files are another matter — a launch checks each against Mojang's list
+   * before it starts, and there are four thousand of them in a first install —
+   * so the one caller that fetches those says so here and goes without.
+   */
+  checkedAgain?: boolean;
+  /**
    * Called as the body arrives, with what has been written so far and what the
    * server declared — `undefined` when it declared nothing. Here rather than in
    * a caller's own copy of this loop: a progress bar was the only reason the JRE
@@ -74,8 +88,8 @@ export interface DownloadOptions {
  * a normal connection aborts halfway every time. What actually indicates a dead
  * transfer is silence, so the deadline resets on every chunk.
  *
- * The body is received into `<dest>.part` and renamed onto the destination once
- * it is whole and, where a hash was given, correct. Writing straight to the
+ * The body is received into `<dest>.part`, sent to the disk, and renamed onto
+ * the destination once it is whole and, where a hash was given, correct. Writing straight to the
  * destination meant a download that failed took the file already there with
  * it: a pack whose new `options.txt` answered 503 deleted the player's own. A
  * failure now leaves the destination exactly as it was, and nothing half
@@ -106,7 +120,7 @@ async function isSymlink(file: string): Promise<boolean> {
 }
 
 async function receive(url: string, dest: string, options: DownloadOptions): Promise<void> {
-  const { signal, maxBytes, noFollow, onProgress, secure, verify } = options;
+  const { signal, maxBytes, noFollow, onProgress, secure, verify, checkedAgain } = options;
 
   if (noFollow && (await isSymlink(dest))) {
     throw new Error(`Refusing to replace a symlink: ${dest}`);
@@ -187,6 +201,7 @@ async function receive(url: string, dest: string, options: DownloadOptions): Pro
         await handle.write(value);
         onProgress?.(received, declared > 0 ? declared : undefined);
       }
+      if (!checkedAgain) await flushToDisk(handle, dest);
     } finally {
       await handle.close();
     }

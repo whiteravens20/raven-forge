@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { downloadToFile } from '../src/core/net/download';
 
 /**
@@ -249,6 +249,105 @@ describe('downloadToFile', () => {
       ]);
 
       expect([bodies['/a'], bodies['/b']]).toContain(await fs.readFile(dest, 'utf-8'));
+    });
+  });
+
+  /**
+   * A rename orders names and says nothing of what is behind them: a power cut
+   * in the seconds after it can leave the name on an empty file. A state file
+   * is sent to the disk before it gets its name for that reason, and a
+   * download is too — unless whoever asked for it looks at its size or its hash
+   * again every time it is about to be used, as a launch does with the game's
+   * own files, thousands at a time.
+   */
+  describe('getting the bytes to the disk', () => {
+    /** Watch every flush and every rename, and say in what order they came. */
+    async function watching(flush?: () => Promise<void>) {
+      const probe = await fs.open(path.join(dir, 'probe'), 'w');
+      const handles = Object.getPrototypeOf(probe) as { sync: () => Promise<void> };
+      await probe.close();
+      await fs.rm(path.join(dir, 'probe'));
+      const order: string[] = [];
+      const flushed = handles.sync;
+      const sync = vi.spyOn(handles, 'sync').mockImplementation(function (this: unknown) {
+        order.push('bytes sent to the disk');
+        return flush ? flush() : flushed.call(this);
+      });
+      const renamed = fs.rename;
+      const rename = vi.spyOn(fs, 'rename').mockImplementation((from, to) => {
+        order.push('file given its name');
+        return renamed(from, to);
+      });
+      return {
+        order,
+        restore: () => {
+          sync.mockRestore();
+          rename.mockRestore();
+        },
+      };
+    }
+
+    const refusing = (code: string) => () =>
+      Promise.reject(Object.assign(new Error(`${code}: could not flush, fsync`), { code }));
+
+    it('is done before the file is given its name', async () => {
+      handler = (_req, res) => res.end('a mod');
+      const dest = path.join(dir, 'mod.jar');
+      const seen = await watching();
+
+      try {
+        await downloadToFile(`${base}/x`, dest);
+      } finally {
+        seen.restore();
+      }
+
+      expect(seen.order).toEqual(['bytes sent to the disk', 'file given its name']);
+      expect(await fs.readFile(dest, 'utf-8')).toBe('a mod');
+    });
+
+    it('is left out for a file the caller checks again before every use', async () => {
+      handler = (_req, res) => res.end('an asset');
+      const dest = path.join(dir, 'asset');
+      const seen = await watching();
+
+      try {
+        await downloadToFile(`${base}/x`, dest, { checkedAgain: true });
+      } finally {
+        seen.restore();
+      }
+
+      expect(seen.order).toEqual(['file given its name']);
+      expect(await fs.readFile(dest, 'utf-8')).toBe('an asset');
+    });
+
+    it('does not stop a file arriving where the filesystem cannot be told to flush', async () => {
+      handler = (_req, res) => res.end('a mod');
+      const dest = path.join(dir, 'mod.jar');
+      const seen = await watching(refusing('EINVAL'));
+
+      try {
+        await downloadToFile(`${base}/x`, dest);
+      } finally {
+        seen.restore();
+      }
+
+      expect(await fs.readFile(dest, 'utf-8')).toBe('a mod');
+    });
+
+    it('leaves the file that was there when the disk will not take the new one', async () => {
+      handler = (_req, res) => res.end('the new build');
+      const dest = path.join(dir, 'mod.jar');
+      await fs.writeFile(dest, 'the old build');
+      const seen = await watching(refusing('EIO'));
+
+      try {
+        await expect(downloadToFile(`${base}/x`, dest)).rejects.toThrow(/EIO/);
+      } finally {
+        seen.restore();
+      }
+
+      expect(await fs.readFile(dest, 'utf-8')).toBe('the old build');
+      expect(await fs.readdir(dir)).toEqual(['mod.jar']);
     });
   });
 
