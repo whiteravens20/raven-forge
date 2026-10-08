@@ -246,6 +246,17 @@ describe('writeFileAtomic', () => {
         expect(await fs.readdir(dir)).toEqual(['state.json']);
       }, 30_000);
 
+      it('is not waited for when it is a folder, which lets go of nothing', async () => {
+        const file = path.join(dir, 'blocked');
+        await fs.mkdir(file);
+        const began = Date.now();
+
+        await expect(writeFileAtomic(file, 'x')).rejects.toThrow();
+
+        // The waits for a held file come to a couple of seconds. This is not one.
+        expect(Date.now() - began).toBeLessThan(1000);
+      });
+
       it('is left as it was when it is never let go, and the write says so', async () => {
         const file = path.join(dir, 'state.json');
         await fs.writeFile(file, 'old');

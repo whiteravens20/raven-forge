@@ -54,6 +54,12 @@ const HELD_BY_SOMETHING = new Set(['EPERM', 'EACCES', 'EBUSY']);
 /** How long a rename Windows refused is waited on before the next try, in turn. */
 const RENAME_WAITS_MS = [5, 10, 20, 40, 80, 160, 320, 640, 1280];
 
+const isFolder = (target: string): Promise<boolean> =>
+  fs.stat(target).then(
+    (found) => found.isDirectory(),
+    () => false,
+  );
+
 /**
  * Give a finished file its name, in place of whatever has that name now.
  *
@@ -80,6 +86,10 @@ export async function renameIntoPlace(from: string, to: string): Promise<void> {
       const code = (err as NodeJS.ErrnoException).code;
       if (process.platform !== 'win32' || wait === undefined || !code) throw err;
       if (!HELD_BY_SOMETHING.has(code)) throw err;
+      // A folder standing where the file goes is refused with the same word,
+      // and is not something that lets go: waiting on it only made the answer
+      // two and a half seconds late.
+      if (await isFolder(to)) throw err;
       await new Promise((resolve) => setTimeout(resolve, wait * (0.5 + Math.random())));
     }
   }
