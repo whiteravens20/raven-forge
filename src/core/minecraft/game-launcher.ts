@@ -499,8 +499,6 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   const cpSep = process.platform === 'win32' ? ';' : ':';
   const classpath = [...libClasspath, clientJar].join(cpSep);
 
-  const { username, uuid } = account;
-
   // Offline is a per-launch decision with a global default. `undefined` means
   // "use the setting"; an explicit `false` is a deliberate "go online this
   // once" and must not be collapsed into the same thing.
@@ -511,11 +509,18 @@ async function runLaunch(options: LaunchOptions, job: LaunchJob): Promise<void> 
   // or near expiry. Offline accounts — and any account launched offline — use
   // the sentinel the game accepts for singleplayer/LAN.
   let accessToken = '0';
+  // Who the game is started as. The account was read when Play was pressed; a
+  // token that had run out is got by signing in again, and that brings back the
+  // name the profile has now. Started under the one it had then, with a token
+  // for the other, the game is turned away by every online server.
+  let player = account;
   if (account.type === 'microsoft' && !offline) {
     accessToken = await getMinecraftAccessToken(account.id);
+    player = (await getAuthState()).accounts.find((a) => a.id === account.id) ?? account;
   } else if (offline && account.type === 'microsoft') {
     log.info(`Offline launch for ${profile.name} — not contacting the auth servers.`);
   }
+  const { username, uuid } = player;
 
   // Build arguments
   const resolution = customResolution(profile.windowWidth, profile.windowHeight);

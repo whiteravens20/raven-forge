@@ -50,6 +50,8 @@ const { state } = vi.hoisted(() => ({
     settings: {} as Partial<GlobalSettings>,
     account: {} as MinecraftAccount,
     noActiveAccount: false,
+    /** The name the account turns out to have when it is signed in again for a token. */
+    renamedTo: undefined as string | undefined,
     profile: undefined as Profile | undefined,
     meta: undefined as VersionMeta | undefined,
     played: [] as Array<{ profileId: string; minutes: number }>,
@@ -91,7 +93,12 @@ vi.mock('../src/core/auth/microsoft-auth', () => ({
     accounts: [state.account],
     activeAccountId: state.noActiveAccount ? null : state.account.id,
   }),
-  getMinecraftAccessToken: async () => TOKEN,
+  getMinecraftAccessToken: async () => {
+    // A token that had run out is got by signing in again, and what comes back
+    // from that is saved over the account — a new object, as the store's is.
+    if (state.renamedTo) state.account = { ...state.account, username: state.renamedTo };
+    return TOKEN;
+  },
 }));
 
 vi.mock('../src/core/profiles/profile-manager', () => ({
@@ -225,6 +232,7 @@ beforeEach(async () => {
   state.installs.length = 0;
   state.installer = undefined;
   state.noActiveAccount = false;
+  state.renamedTo = undefined;
   state.settings = {
     downloadConcurrency: 4,
     offlineMode: false,
@@ -411,6 +419,20 @@ describe.skipIf(!posix)('a launch', () => {
     expect(args).toContain('-XX:+UseG1GC');
     // What used to happen: the second half went where the main class belongs.
     expect(args).not.toContain('Forge"');
+  });
+
+  it('starts the game under the name the account has after signing in again for it', async () => {
+    // The account is read when Play is pressed and the token is fetched last,
+    // minutes later. A profile renamed since the last sign-in was started under
+    // its old name with a token for the new one, and every online server then
+    // turned the player away: the name it was told is not the one Mojang vouches for.
+    state.renamedTo = 'RavenRenamed';
+
+    await launch('exit 0');
+    await exitInfo();
+
+    const args = await gameArgs();
+    expect(args[args.indexOf('--username') + 1]).toBe('RavenRenamed');
   });
 
   it('asks for an account before it fetches anything', async () => {
