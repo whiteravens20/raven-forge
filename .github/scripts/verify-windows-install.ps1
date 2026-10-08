@@ -605,10 +605,11 @@ try {
   Save-Screen 'after-the-update'
   $launcher = Get-Launcher
   if ($launcher) { Expect-Closed (Close-Launcher $launcher) }
-  # Only what this build wrote: everything from its first line, which is the
-  # one about the rename. What is above it is the older release's.
+  # Only what this build wrote. The log came over with the folder, the older
+  # release's lines in it, and this build's begin where it last said that it
+  # was starting.
   $log = @(Get-Log $Data.Now)
-  $from = [Array]::FindIndex([string[]] $log, [Predicate[string]] { param($line) $line.Contains('Renamed the home from') })
+  $from = [Array]::FindLastIndex([string[]] $log, [Predicate[string]] { param($line) $line.Contains('starting...') })
   $mine = if ($from -ge 0) { @($log[$from..($log.Count - 1)]) } else { $log }
   $errors = @($mine | Where-Object { $_.Contains('] [error]') })
   Expect ($errors.Count -eq 0) 'its log holds no error' ($errors -join ' | ')
