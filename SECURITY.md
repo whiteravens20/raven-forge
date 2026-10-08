@@ -112,7 +112,10 @@ download.
   launcher degrades to a `0600` `auth.json` rather than refusing to log in. That
   is a deliberate, documented trade-off, not an oversight — and it is surfaced in
   the app rather than only logged, because the person whose refresh token is in a
-  plaintext file is the one who gets to decide whether that is acceptable.
+  plaintext file is the one who gets to decide whether that is acceptable. A
+  single secret the keychain refuses is kept the same way: on Windows that is
+  one longer than the 2,560 bytes the Credential Manager takes, a limit the
+  packaging job measures on Windows itself.
 - **No credential ever leaves the machine** except to Microsoft's and Mojang's own
   endpoints as part of the OAuth chain.
 

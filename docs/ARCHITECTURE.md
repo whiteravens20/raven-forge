@@ -351,6 +351,11 @@ the failure and `token-store.ts` writes the secret to `auth.json` instead, with
 the file forced to mode `0600` and a warning in the log. This is a deliberate
 downgrade, not an accident; on a healthy install `refreshTokens` stays `{}`.
 
+The same is done with a single secret the keychain will not take. Windows'
+Credential Manager keeps at most 2,560 bytes under one name — measured there,
+by the packaging job, each night — and refuses a longer one with "The stub
+received bad data", which is what the log then quotes.
+
 Upgrading from a pre-keychain build migrates automatically on first read:
 plaintext secrets move into the keychain and are stripped from the file. Any
 entry the keychain rejects is left untouched, so a failed migration never costs
