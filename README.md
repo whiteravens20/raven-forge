@@ -540,6 +540,7 @@ Raven Forge is built using AI coding tools. The tools write most of the code, te
 **Before a release**
 
 - The installers themselves are run, not only the tests: the Windows installer and uninstaller, the `.deb` on a clean Debian and the AppImage, including the update from the previous version.
+- Before a release is published, a group of human testers tries the release candidate at the maintainer's request and reports what they find.
 - A release is created as a draft, which the auto-updater ignores, and is published by hand once its signature, checksums and SBOM have been checked.
 - What was run and what is still open is tracked in [the road to 1.0.0](https://github.com/whiteravens20/raven-forge/issues/15). [SECURITY.md](SECURITY.md#security-model) describes the security model and its known gaps.
 
