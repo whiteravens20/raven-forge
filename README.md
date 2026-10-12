@@ -523,7 +523,7 @@ Found a vulnerability? Do not open a public issue — use [private vulnerability
 
 ## How the code is written and checked
 
-Raven Forge is built using AI coding tools. The tools write most of the code, tests and documentation; the maintainer decides what gets built and is responsible for everything that lands here. The launcher is still in testing.
+Raven Forge is built using AI coding tools. The tools write most of the code, tests and documentation; the maintainer decides what gets built and is responsible for everything that lands here. The launcher is still in testing, and before a release is published a group of human testers tries the release candidate at the maintainer's request.
 
 **What a change goes through**
 
@@ -536,13 +536,6 @@ Raven Forge is built using AI coding tools. The tools write most of the code, te
 - The architecture was decided by the maintainer: the stack, the IPC protocol between the window and the main process, and the sign-in chain.
 - White Ravens' own signing key is compiled into the launcher rather than fetched from where the manifests are, so a pack published by White Ravens is checked against a key that cannot be swapped along with the manifest ([docs/SIGNING.md](docs/SIGNING.md)).
 - Generated code is reviewed and tested by the maintainer in the session that produces it. Changes to the sign-in chain and the token store, manifest signature verification, the hash check on downloads and the launch path are read line by line.
-
-**Before a release**
-
-- The installers themselves are run, not only the tests: the Windows installer and uninstaller, the `.deb` on a clean Debian and the AppImage, including the update from the previous version.
-- Before a release is published, a group of human testers tries the release candidate at the maintainer's request and reports what they find.
-- A release is created as a draft, which the auto-updater ignores, and is published by hand once its signature, checksums and SBOM have been checked.
-- What was run and what is still open is tracked in [the road to 1.0.0](https://github.com/whiteravens20/raven-forge/issues/15). [SECURITY.md](SECURITY.md#security-model) describes the security model and its known gaps.
 
 If something looks wrong, open an issue. For a vulnerability, use [private vulnerability reporting](https://github.com/whiteravens20/raven-forge/security/advisories/new).
 
