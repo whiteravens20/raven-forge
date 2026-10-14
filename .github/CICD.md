@@ -11,7 +11,7 @@
 | `scorecard.yml`               | Push to `dev`; weekly                 | OpenSSF Scorecard, published for the README badge                                                                                                                                                                                                                                                            |
 | `branch-protection-audit.yml` | Daily; manual                         | Fails when the protection on `main` or `dev` has drifted from what is written in the workflow                                                                                                                                                                                                                |
 | `dependabot-auto-merge.yml`   | Dependabot pull requests              | Queues a patch bump to merge once the required checks pass; labels a major for review                                                                                                                                                                                                                        |
-| `release.yml`                 | Push tag `vX.Y.Z` that is on `main`   | Builds, signs and checksums the installers, reads the fuses back off them, writes the SBOM and the provenance attestation, and creates a **draft** release                                                                                                                                                   |
+| `release.yml`                 | Push tag `vX.Y.Z` that is on `main`   | Builds, signs and checksums the installers, reads the fuses back off them, writes the SBOM and the provenance attestation, audits the dependencies that ship and their signatures, and only when that passed creates a **draft** release                                                                                                                                                   |
 
 `package.yml` is deliberately not on push or pull request: a full packaging run
 takes minutes and says nothing about a change to the docs. It runs every night
@@ -52,6 +52,11 @@ git push origin v1.2.3
 `release.yml` refuses a tag that is not on `main`, and one that does not match
 the `version` in `package.json` — electron-builder names every file, and writes
 the update feed, from that field.
+
+Before the draft is made, the dependencies that end up inside the installer are
+audited the way `security.yml` audits them (`audit-check.mjs` on the production tree,
+at moderate, with the allowlist) and their registry signatures verified; the draft
+waits for that.
 
 What it produces is a **draft**. electron-updater ignores drafts, so nothing
 reaches an installed launcher until the draft is published by hand, which leaves
