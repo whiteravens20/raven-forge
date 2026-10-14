@@ -287,10 +287,41 @@ jobs:
           path: sbom.cdx.json
           if-no-files-found: error
 
-  # ── Job 4: publish one draft release with everything attached ──────────────
+  # ── Job 4: scan what ships, before anything is released ────────────────────
+  # The dependencies that end up inside the installer are audited the way the
+  # Security workflow audits them (audit-check.mjs: production at moderate, with
+  # the allowlist's justifications and expiries), and every tarball's registry
+  # signature is verified. The draft release waits for it, so no artefact of a
+  # tag is published past a known hole.
+  scan:
+    name: Scan what ships
+    needs: [check-branch, check-version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Audit production dependencies (moderate)
+        run: node .github/scripts/audit-check.mjs --omit=dev --audit-level moderate
+
+      # --ignore-scripts: no keytar rebuild and no Electron download, neither of
+      # which changes a tarball's signature.
+      - name: Install (for signature audit)
+        run: npm ci --ignore-scripts
+
+      - name: Verify package signatures
+        run: npm audit signatures
+
+  # ── Job 5: publish one draft release with everything attached ──────────────
   release:
     name: Publish draft release
-    needs: [check-branch, build, sbom]
+    needs: [check-branch, build, sbom, scan]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release
