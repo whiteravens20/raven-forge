@@ -258,7 +258,7 @@ State in the PR description what you actually ran. "Typechecks" is not a test re
 
 ### AI-assisted code
 
-Most of this project is written with AI coding tools, as the [README](README.md#how-the-code-is-written-and-checked) describes, and the same rule applies to contributions:
+This project is built using AI coding tools, as the [README](README.md#how-the-code-is-written-and-checked) describes, and the same rule applies to contributions:
 
 - AI-generated code **must be reviewed line by line** before you submit it.
 - Do not submit code you cannot explain and defend in review.

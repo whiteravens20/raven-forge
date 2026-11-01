@@ -523,7 +523,7 @@ Found a vulnerability? Do not open a public issue — use [private vulnerability
 
 ## How the code is written and checked
 
-Raven Forge is built using AI coding tools. The tools write most of the code, tests and documentation; the maintainer decides what gets built and is responsible for everything that lands here. The launcher is still in testing, and before a release is published a group of human testers tries the release candidate at the maintainer's request.
+Raven Forge is built using AI coding tools. The maintainer decides what gets built and is responsible for everything that lands here. The launcher is still in testing, and before a release is published a group of human testers tries the release candidate at the maintainer's request.
 
 **What a change goes through**
 
