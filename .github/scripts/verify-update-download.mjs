@@ -143,7 +143,8 @@ async function inspect(child, port) {
   const waiting = new Map();
   socket.onmessage = (message) => {
     const answer = JSON.parse(message.data);
-    waiting.get(answer.id)?.(answer);
+    const asked = waiting.get(answer.id);
+    if (typeof asked === 'function') asked(answer);
     waiting.delete(answer.id);
   };
   const main = (expression) =>
