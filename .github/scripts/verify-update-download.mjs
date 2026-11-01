@@ -244,16 +244,25 @@ async function withLauncher(program, home, settings, test) {
       ...settings,
     }),
   );
+  const folders = Object.fromEntries(
+    ['config', 'cache', 'share'].map((name) => {
+      const folder = path.join(home, name);
+      fs.mkdirSync(folder, { recursive: true });
+      return [name, folder];
+    }),
+  );
   const env = {
     ...process.env,
     RAVENFORGE_DATA_DIR: data,
-    HOME: home,
-    USERPROFILE: home,
-    APPDATA: path.join(home, 'roaming'),
-    LOCALAPPDATA: path.join(home, 'cache'),
-    XDG_CONFIG_HOME: path.join(home, 'config'),
-    XDG_CACHE_HOME: path.join(home, 'cache'),
-    XDG_DATA_HOME: path.join(home, 'share'),
+    // Where electron-updater keeps what it downloads, on each system.
+    LOCALAPPDATA: folders.cache,
+    XDG_CACHE_HOME: folders.cache,
+    // Not `USERPROFILE` on Windows: the system works out the folders it knows
+    // from it, and Electron stops on a dialog when the one for `appData` is not
+    // there. The data has a place of its own above, and the runner is thrown away.
+    ...(WINDOWS
+      ? {}
+      : { HOME: home, XDG_CONFIG_HOME: folders.config, XDG_DATA_HOME: folders.share }),
   };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.DBUS_SESSION_BUS_ADDRESS;
@@ -379,8 +388,12 @@ async function theDownload(program, home, feed) {
     await launcher.waitFor('finished download', (page) => page.includes('Update ready'), 60000);
     await launcher.shot('ready');
     const pendingDir = path.join(home, 'cache', 'raven-forge-launcher-updater', 'pending');
-    const whole = fs.readFileSync(path.join(pendingDir, UPDATE_FILE));
-    expect(whole.equals(feed.update), 'what arrived is what was served');
+    const arrived = pendingFiles(home).filter(
+      (name) => !name.startsWith('temp-') && name !== 'update-info.json',
+    );
+    expect(arrived.length === 1, 'one file has arrived', arrived.join(', '));
+    const whole = fs.readFileSync(path.join(pendingDir, arrived[0]));
+    expect(whole.equals(feed.update), 'and it is what was served');
     const others = pendingFiles(home).filter((name) => name.startsWith('temp-'));
     expect(others.length === 0, 'and no partial file is beside it', others.join(', '));
   });
@@ -414,7 +427,13 @@ try {
 } finally {
   feed?.server.close();
   feed?.server.closeAllConnections();
-  fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+  // What a killed launcher still held may take a moment to let go, and nothing
+  // about the update depends on it.
+  try {
+    fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+  } catch (err) {
+    console.log(`  note  ${scratch} stays: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 if (misses > 0) process.exit(1);
 console.log('The update did what it should.');
