@@ -425,6 +425,20 @@ const STRATA_A = [332, 300, 348, 316, 360, 308, 340, 324];
 const STRATA_B = [560, 528, 592, 544, 604, 536, 576, 552];
 const FLOOR_STEPS = [864, 840, 876, 852, 884, 846, 868, 856, 872, 844, 880, 858];
 
+/** One step of the floor is this wide. */
+const FLOOR_STEP = 160;
+
+/** The rail climbs to the right, away from the floor, so timber holds it up from here on. */
+const TRESTLE_XS = [640, 820, 1000, 1180, 1360, 1540, 1720, 1900];
+
+/** Where the underside of the sleepers is, in the scene's own coordinates. */
+const railUnderside = (x: number) => 818 - (x - 962) * 0.0612;
+
+/** How long a wheel of the cart takes to turn: its rim, at the speed the cart rolls. */
+const CART_SPEED = 82;
+const WHEEL_RADIUS = 11;
+const WHEEL_TURN_S = (2 * Math.PI * WHEEL_RADIUS) / CART_SPEED;
+
 export function CaveScene() {
   return (
     <g>
@@ -481,11 +495,19 @@ export function CaveScene() {
 
       {/* Blocky floor line behind the rails. */}
       {FLOOR_STEPS.map((y, i) => (
-        <rect key={`f${i}`} x={i * 160} y={y} width="160" height={1080 - y} fill="#0b1120" />
+        <rect
+          key={`f${i}`}
+          x={i * FLOOR_STEP}
+          y={y}
+          width={FLOOR_STEP}
+          height={1080 - y}
+          fill="#0b1120"
+        />
       ))}
 
-      {/* Amethyst geode — the cave's brand moment, in a stepped pocket. */}
-      <g>
+      {/* Amethyst geode — the cave's brand moment, in a stepped pocket, clear
+          of the rail that passes under it. */}
+      <g transform="translate(0 -70)">
         <rect x="1370" y="620" width="300" height="170" fill="#0a0e1c" />
         <rect x="1410" y="588" width="220" height="34" fill="#0a0e1c" />
         <rect x="1410" y="788" width="220" height="34" fill="#0a0e1c" />
@@ -518,8 +540,8 @@ export function CaveScene() {
       {oreBlock('d1', 358, 738, 'url(#rfbd-cyan-glow)', '#67e8f9')}
       {oreBlock('d1b', 402, 762, 'url(#rfbd-cyan-glow)', '#67e8f9')}
       {oreBlock('d2', 760, 500, 'url(#rfbd-cyan-glow)', '#67e8f9')}
-      {oreBlock('g1', 1018, 778, 'url(#rfbd-lava-glow)', '#fbbf24')}
-      {oreBlock('g1b', 1062, 754, 'url(#rfbd-lava-glow)', '#fbbf24')}
+      {oreBlock('g1', 1018, 672, 'url(#rfbd-lava-glow)', '#fbbf24')}
+      {oreBlock('g1b', 1062, 648, 'url(#rfbd-lava-glow)', '#fbbf24')}
       {oreBlock('g2', 200, 458, 'url(#rfbd-lava-glow)', '#fbbf24')}
       {oreBlock('a1', 1728, 478, 'url(#rfbd-crystal-halo)', '#d8b4fe')}
 
@@ -533,48 +555,74 @@ export function CaveScene() {
           <rect x={x - 12} y={y - 14} width="24" height="28" rx="2" fill="#78350f" />
           <rect x={x - 8} y={y - 10} width="16" height="20" fill="#fbbf24" opacity="0.95" />
           <rect x={x - 4} y={y - 20} width="8" height="6" fill="#78350f" />
+          <rect x={x - 14} y={y - 26} width="28" height="6" fill="#3a3444" />
         </g>
       ))}
+
+      {/* Mineshaft timber under the rail, where it has left the floor. */}
+      {TRESTLE_XS.map((x) => {
+        const top = railUnderside(x);
+        const floor = FLOOR_STEPS[Math.min(Math.floor(x / FLOOR_STEP), FLOOR_STEPS.length - 1)];
+        return (
+          <g key={x}>
+            <rect x={x - 6} y={top} width="12" height={floor - top + 2} fill="#2c2836" />
+            <rect x={x - 20} y={top - 3} width="40" height="6" fill="#3a3444" />
+          </g>
+        );
+      })}
 
       {/* The rail line, slightly downhill, with a loaded cart rolling out.
           It sits above the news strip's cover line so the cart stays visible. */}
       <g transform="rotate(-3.5 960 780)">
         <rect x="-60" y="798" width="2100" height="10" fill="#0a0e1a" />
         {Array.from({ length: 24 }, (_, i) => (
-          <rect key={i} x={-40 + i * 90} y="788" width="14" height="30" rx="2" fill="#1e2a44" />
+          <rect key={i} x={-40 + i * 90} y="778" width="14" height="40" rx="2" fill="#1e2a44" />
         ))}
         <rect x="-60" y="780" width="2100" height="5" fill="#334b73" />
         <rect x="-60" y="812" width="2100" height="5" fill="#2a3d5e" />
         <g className="rf-bd-cart">
+          {/* Its load, in blocks like everything else down here, a glint on each. */}
+          {(
+            [
+              [2, 703, 20, '#0e7490', '#67e8f9'],
+              [22, 697, 24, '#7c5ce0', '#d8b4fe'],
+              [46, 703, 20, '#b45309', '#fbbf24'],
+            ] as const
+          ).map(([x, y, size, ore, glint], i) => (
+            <g key={x}>
+              <rect x={x} y={y} width={size} height={size} rx="2" fill={ore} />
+              <rect
+                className="rf-bd-glint"
+                x={x + 4}
+                y={y + 4}
+                width="7"
+                height="7"
+                fill={glint}
+                style={{ animationDelay: `${-i * 1.1}s` } as CSSProperties}
+              />
+            </g>
+          ))}
           <rect
             x="-10"
-            y="736"
+            y="719"
             width="86"
             height="44"
             rx="5"
             fill="#1b2438"
-            stroke="#31456b"
+            stroke="#3a5280"
             strokeWidth="2"
           />
-          <circle cx="12" cy="786" r="11" fill="#31456b" />
-          <circle cx="54" cy="786" r="11" fill="#31456b" />
-          <circle className="rf-bd-glint" cx="18" cy="734" r="6" fill="#67e8f9" />
-          <circle
-            className="rf-bd-glint"
-            cx="38"
-            cy="728"
-            r="7"
-            fill="#d8b4fe"
-            style={{ animationDelay: '-1.2s' } as CSSProperties}
-          />
-          <circle
-            className="rf-bd-glint"
-            cx="58"
-            cy="734"
-            r="6"
-            fill="#fbbf24"
-            style={{ animationDelay: '-2.1s' } as CSSProperties}
-          />
+          <rect x="-10" y="737" width="86" height="4" fill="#31456b" />
+          {/* The wheels stand on the rail, and turn as fast as the cart rolls. */}
+          {[12, 54].map((x) => (
+            <g key={x} transform={`translate(${x} ${780 - WHEEL_RADIUS})`}>
+              <circle r={WHEEL_RADIUS} fill="#31456b" />
+              <g className="rf-bd-spin" style={{ animationDuration: `${WHEEL_TURN_S}s` }}>
+                <rect x="-8" y="-1.5" width="16" height="3" fill="#0e1526" />
+                <rect x="-1.5" y="-8" width="3" height="16" fill="#0e1526" />
+              </g>
+            </g>
+          ))}
         </g>
       </g>
 

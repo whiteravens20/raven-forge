@@ -377,7 +377,8 @@ p.text-rf-danger {
   transform-origin: 0 0;
 }
 
-/* Mine cart rolling through and off the frame; the reset happens offscreen. */
+/* Mine cart rolling through and off the frame; the reset happens offscreen.
+   CART_SPEED in backdrop-scenes.tsx is the distance over the time. */
 .rf-backdrop .rf-bd-cart {
   animation: rf-bd-cart 30s linear infinite;
 }
