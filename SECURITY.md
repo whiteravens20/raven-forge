@@ -210,8 +210,9 @@ Listed on purpose. An honest list beats a clean-looking one.
   named_; it cannot tell you that file is safe. Only add manifest sources you
   trust. A pack from a file or a link that brings code Modrinth has not published
   shows you those files before anything is installed. That is a question and not
-  a check of what they do, and a manifest you accepted can bring more at a later
-  sync without asking.
+  a check of what they do. A manifest you accepted can bring more at a later sync
+  without asking, and an address typed into a profile's form is not asked about
+  at all.
 - **No reproducible builds.** You cannot currently verify that a published binary
   corresponds to the tagged source.
 
