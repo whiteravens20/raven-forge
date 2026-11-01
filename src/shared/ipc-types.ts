@@ -69,7 +69,12 @@ import type {
 } from './ipc/settings';
 import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
-import type { ManifestVerification, UpdateCheck, UpdateInfo } from './ipc/updater';
+import type {
+  ManifestVerification,
+  UpdateCheck,
+  UpdateDownloadEnd,
+  UpdateInfo,
+} from './ipc/updater';
 import type { LogTail, StorageReport, SystemInfo } from './ipc/system';
 
 // Naming convention: "domain:action"
@@ -344,7 +349,8 @@ export interface InvokeChannels {
   // -- Updater --
   'updater:check': () => Promise<IpcResult<UpdateCheck>>;
   'updater:get-pending': () => Promise<IpcResult<UpdateInfo | null>>;
-  'updater:download': () => Promise<IpcResult<void>>;
+  'updater:download': () => Promise<IpcResult<UpdateDownloadEnd>>;
+  'updater:cancel-download': () => Promise<IpcResult<void>>;
   'updater:install': () => Promise<IpcResult<void>>; // quits and installs
 
   // -- System --
@@ -529,6 +535,7 @@ export interface RavenForgeAPI {
     check: InvokeChannels['updater:check'];
     getPending: InvokeChannels['updater:get-pending'];
     download: InvokeChannels['updater:download'];
+    cancelDownload: InvokeChannels['updater:cancel-download'];
     install: InvokeChannels['updater:install'];
   };
   system: {

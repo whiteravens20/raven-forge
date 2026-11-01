@@ -46,7 +46,7 @@ The whole list. The [README](../README.md) keeps the short one.
 - **Everything It Writes, Listed** — Settings → Data shows every place the launcher writes to, with its size measured on disk and a button that opens it, and says what is kept in the system's credential store
 - **RAM That Fits The Machine** — the allocation slider is bounded by the memory this computer actually has, recommends a size for it, and the launcher refuses a heap the machine cannot back rather than failing later
 - **World Backups** — copy a profile's worlds aside, restore them again, and get asked before a Minecraft version change touches them
-- **Auto-Update** — launcher self-updates via GitHub Releases (electron-updater)
+- **Auto-Update** — launcher self-updates via GitHub Releases (electron-updater). It asks at every start unless you switch that off, downloads when you say so, and the download can be cancelled
 - **A Proxy For Everything** — HTTP, HTTPS or SOCKS4/5, for every connection the launcher makes: downloads, sign-in and images
 - **No Telemetry** — nothing is measured, nothing is reported back; the app itself lists what it stores and every server it contacts ([privacy policy](PRIVACY.md))
 

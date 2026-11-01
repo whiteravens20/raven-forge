@@ -77,6 +77,7 @@ import {
   reorderResourcePacks,
 } from '../core/mods/content-manager';
 import {
+  cancelUpdateDownload,
   checkForUpdates,
   downloadUpdate,
   getPendingUpdate,
@@ -1223,13 +1224,16 @@ export function registerAllIpcHandlers(): void {
   handle('updater:get-pending', async () => ok(getPendingUpdate()));
   handle('updater:download', async () => {
     try {
-      await downloadUpdate();
-      return ok(undefined);
+      return ok(await downloadUpdate());
     } catch (err) {
       // The page says what it was doing, in the player's language, and quotes
       // this after it.
       return fail(reason(err), undefined, noConnection(err));
     }
+  });
+  handle('updater:cancel-download', async () => {
+    cancelUpdateDownload();
+    return ok(undefined);
   });
   handle('updater:install', async () => {
     quitAndInstall();

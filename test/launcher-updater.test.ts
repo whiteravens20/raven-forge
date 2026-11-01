@@ -6,7 +6,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
  * What the launcher asks of electron-updater, and what it makes of the answer.
  *
  * electron-updater itself is stood in for: what is pinned here is that the
- * question at a start obeys the setting.
+ * question at a start obeys the setting, and that a cancel reaches the download
+ * that is running, comes back as a cancel and not as a failure, and leaves the
+ * next attempt free to run.
  */
 
 const updater = vi.hoisted(() => ({
@@ -42,6 +44,20 @@ vi.mock('../src/main/window', () => ({
 vi.mock('../src/core/config/settings-manager', () => ({ getSettings: async () => settings }));
 vi.mock('../src/core/updater/update-cache', () => ({ clearPendingUpdate: async () => {} }));
 
+/** A download that goes on until it is told how it ended, as a real one does. */
+function runningDownload() {
+  let fail: (err: Error) => void = () => {};
+  let finish: () => void = () => {};
+  updater.downloadUpdate.mockImplementationOnce(
+    () =>
+      new Promise<string[]>((resolve, reject) => {
+        fail = reject;
+        finish = () => resolve([]);
+      }),
+  );
+  return { fail: (err: Error) => fail(err), finish: () => finish() };
+}
+
 /** Each test gets the module afresh: what it holds is the download under way. */
 async function load() {
   vi.resetModules();
@@ -49,6 +65,9 @@ async function load() {
   updaterModule.initUpdater();
   return updaterModule;
 }
+
+const tokenOf = (call: number) =>
+  updater.downloadUpdate.mock.calls[call]?.[0] as { cancelled: boolean } | undefined;
 
 beforeEach(() => {
   updater.listeners.clear();
@@ -118,5 +137,116 @@ describe('what the check found', () => {
 
     updater.listeners.get('update-not-available')?.();
     expect(getPendingUpdate()).toBeNull();
+  });
+});
+
+describe('cancelling the update download', () => {
+  it('reaches the download that is running, and comes back as a cancel', async () => {
+    const download = runningDownload();
+    const { downloadUpdate, cancelUpdateDownload } = await load();
+
+    const ended = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(1));
+    expect(tokenOf(0)?.cancelled).toBe(false);
+
+    cancelUpdateDownload();
+    expect(tokenOf(0)?.cancelled).toBe(true);
+
+    // electron-updater ends it with an error of its own, which is no failure.
+    download.fail(new Error('cancelled'));
+    await expect(ended).resolves.toBe('cancelled');
+  });
+
+  it('takes down the bar the download had put up', async () => {
+    const download = runningDownload();
+    const { downloadUpdate, cancelUpdateDownload } = await load();
+
+    const ended = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(1));
+    updater.listeners.get('download-progress')?.({ percent: 40, transferred: 40, total: 100 });
+
+    cancelUpdateDownload();
+    download.fail(new Error('cancelled'));
+    await ended;
+
+    expect(sent).toContainEqual(['progress:abandoned', 'launcher-update']);
+  });
+
+  it('still reports a download that failed by itself as the failure it is', async () => {
+    const download = runningDownload();
+    const { downloadUpdate } = await load();
+
+    const ended = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(1));
+    download.fail(new Error('socket hang up'));
+
+    await expect(ended).rejects.toThrow('socket hang up');
+  });
+
+  it('says it downloaded when it did', async () => {
+    const download = runningDownload();
+    const { downloadUpdate } = await load();
+
+    const ended = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(1));
+    download.finish();
+
+    await expect(ended).resolves.toBe('downloaded');
+  });
+
+  it('leaves the next attempt a token that is not cancelled already', async () => {
+    const first = runningDownload();
+    const { downloadUpdate, cancelUpdateDownload } = await load();
+
+    const cancelled = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(1));
+    cancelUpdateDownload();
+    first.fail(new Error('cancelled'));
+    await cancelled;
+
+    const second = runningDownload();
+    const ended = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(2));
+    expect(tokenOf(1)?.cancelled).toBe(false);
+    second.finish();
+    await expect(ended).resolves.toBe('downloaded');
+  });
+
+  it('has a second request join the first, so that a cancel reaches both', async () => {
+    const download = runningDownload();
+    const { downloadUpdate, cancelUpdateDownload } = await load();
+
+    const first = downloadUpdate();
+    const second = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(1));
+    cancelUpdateDownload();
+    download.fail(new Error('cancelled'));
+
+    await expect(first).resolves.toBe('cancelled');
+    await expect(second).resolves.toBe('cancelled');
+    expect(updater.downloadUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when nothing is running', async () => {
+    const { cancelUpdateDownload } = await load();
+    expect(() => cancelUpdateDownload()).not.toThrow();
+  });
+
+  it('does not spoil the download after one that has ended', async () => {
+    const first = runningDownload();
+    const { downloadUpdate, cancelUpdateDownload } = await load();
+
+    const ended = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(1));
+    first.finish();
+    await ended;
+    cancelUpdateDownload();
+
+    const second = runningDownload();
+    const next = downloadUpdate();
+    await vi.waitFor(() => expect(updater.downloadUpdate).toHaveBeenCalledTimes(2));
+    expect(tokenOf(1)?.cancelled).toBe(false);
+    second.finish();
+    await next;
   });
 });

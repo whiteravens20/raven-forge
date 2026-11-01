@@ -25,6 +25,9 @@ export interface UpdateInfo {
   version: string;
 }
 
+/** How a download of an update ended, short of failing. */
+export type UpdateDownloadEnd = 'downloaded' | 'cancelled';
+
 /**
  * The outcome of an update check, as four distinct things rather than one
  * nullable one.

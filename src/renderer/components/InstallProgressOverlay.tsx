@@ -3,16 +3,19 @@
 import { useEffect } from 'react';
 import { useProgressStore } from '@stores/progress-store';
 import { useGameStore } from '@stores/game-store';
+import { useUpdaterStore } from '@stores/updater-store';
 import { formatBytes } from '@renderer/format';
 import { useT, type TFunction, type TranslationKey } from '@renderer/i18n';
 import type { ProgressMessage } from '@shared/ipc-types';
+
+const UPDATE_CHANNEL = 'progress:launcher-update';
 
 const CHANNEL_LABELS: Record<string, TranslationKey> = {
   'progress:mod-sync': 'progress.modSync',
   'progress:loader-install': 'progress.loaderInstall',
   'progress:java-download': 'progress.javaDownload',
   'progress:game-assets': 'progress.gameAssets',
-  'progress:launcher-update': 'progress.launcherUpdate',
+  [UPDATE_CHANNEL]: 'progress.launcherUpdate',
 };
 
 /**
@@ -36,6 +39,7 @@ export function InstallProgressOverlay() {
   const hasActive = useProgressStore((s) => s.hasActive);
   const installing = useProgressStore((s) => s.installing);
   const launching = useGameStore((s) => s.preparing.size > 0);
+  const cancelUpdateDownload = useUpdaterStore((s) => s.cancelDownload);
 
   useEffect(() => {
     init();
@@ -76,7 +80,15 @@ export function InstallProgressOverlay() {
               <span className="truncate text-rf-text-secondary">
                 {CHANNEL_LABELS[item.channel] ? t(CHANNEL_LABELS[item.channel]) : item.channel}
               </span>
-              <span className="shrink-0 text-rf-text-muted">
+              <span className="flex shrink-0 items-center gap-2 text-rf-text-muted">
+                {item.channel === UPDATE_CHANNEL && (
+                  <button
+                    onClick={cancelUpdateDownload}
+                    className="underline-offset-2 transition-colors hover:text-rf-text hover:underline"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                )}
                 {Math.round(item.progress * 100)}%
               </span>
             </div>

@@ -491,6 +491,7 @@ function UpdateRow({
   const stage = useUpdaterStore((s) => s.stage);
   const updateError = useUpdaterStore((s) => s.error);
   const downloadUpdate = useUpdaterStore((s) => s.download);
+  const cancelUpdateDownload = useUpdaterStore((s) => s.cancelDownload);
   const installUpdate = useUpdaterStore((s) => s.install);
 
   useEffect(() => {
@@ -532,6 +533,11 @@ function UpdateRow({
         {available && stage !== 'ready' && (
           <Button size="sm" loading={stage === 'downloading'} onClick={() => void downloadUpdate()}>
             {t('settings.downloadUpdate')}
+          </Button>
+        )}
+        {stage === 'downloading' && (
+          <Button size="sm" variant="ghost" onClick={cancelUpdateDownload}>
+            {t('common.cancel')}
           </Button>
         )}
         {stage === 'ready' && (

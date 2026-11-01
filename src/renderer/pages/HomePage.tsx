@@ -112,8 +112,8 @@ export function HomePage() {
     // failed or never-completed check leaves `available` null and play proceeds.
     if (updateFirst) {
       const ready = await downloadUpdate();
-      // Quits and relaunches into the new version — unless it could not, and
-      // being unable to update is not a reason to be unable to play.
+      // Quits and relaunches into the new version — unless it could not, or the
+      // download was cancelled, and neither is a reason to be unable to play.
       if (ready && (await installUpdate())) return;
     }
 

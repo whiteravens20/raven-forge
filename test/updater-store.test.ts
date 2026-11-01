@@ -205,3 +205,54 @@ describe('a download that fails', () => {
     expect(store.getState().error).toBeTruthy();
   });
 });
+
+describe('cancelling the download', () => {
+  it('goes back to offering the update, with nothing held against it', async () => {
+    const store = await loadStore();
+    api.emit('updater:update-available', update());
+    api.call('updater', 'download').mockResolvedValueOnce({ success: true, data: 'cancelled' });
+
+    await expect(store.getState().download()).resolves.toBe(false);
+
+    expect(store.getState()).toMatchObject({
+      available: update(),
+      stage: 'idle',
+      percent: 0,
+      error: null,
+    });
+  });
+
+  it('asks the main process to stop, and leaves the outcome to the download', async () => {
+    const store = await loadStore();
+    api.emit('updater:update-available', update());
+    let finish = (_value: { success: boolean; data: string }) => {};
+    api.call('updater', 'download').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+
+    const downloading = store.getState().download();
+    store.getState().cancelDownload();
+
+    expect(api.call('updater', 'cancelDownload')).toHaveBeenCalledTimes(1);
+    expect(store.getState().stage).toBe('downloading');
+
+    finish({ success: true, data: 'cancelled' });
+    await downloading;
+    expect(store.getState().stage).toBe('idle');
+  });
+
+  it('lets the same update be downloaded again', async () => {
+    const store = await loadStore();
+    api.emit('updater:update-available', update());
+    api.call('updater', 'download').mockResolvedValueOnce({ success: true, data: 'cancelled' });
+    await store.getState().download();
+
+    api.call('updater', 'download').mockResolvedValueOnce({ success: true, data: 'downloaded' });
+
+    await expect(store.getState().download()).resolves.toBe(true);
+    expect(store.getState().stage).toBe('ready');
+  });
+});

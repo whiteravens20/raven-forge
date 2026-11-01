@@ -34,6 +34,8 @@ interface UpdaterStore {
 
   /** Download the pending update. Resolves true once it is ready to install. */
   download: () => Promise<boolean>;
+  /** Stop that download. It is offered again, as if it had not been started. */
+  cancelDownload: () => void;
   /** Restart into the update. Resolves false, with `error` set, when that failed. */
   install: () => Promise<boolean>;
   postpone: () => void;
@@ -62,6 +64,10 @@ export const useUpdaterStore = create<UpdaterStore>((set, get) => ({
           set({ stage: 'failed', error: failureText(result, '') || null });
           return false;
         }
+        if (result.data === 'cancelled') {
+          set({ stage: 'idle', percent: 0, error: null });
+          return false;
+        }
         // `update-downloaded` also sets this; setting it here too means a caller
         // awaiting this promise does not race the event.
         set({ stage: 'ready', percent: 100 });
@@ -71,6 +77,10 @@ export const useUpdaterStore = create<UpdaterStore>((set, get) => ({
         downloading = null;
       });
     return downloading;
+  },
+
+  cancelDownload: () => {
+    void api.updater.cancelDownload();
   },
 
   install: async () => {

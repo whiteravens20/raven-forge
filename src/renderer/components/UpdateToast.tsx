@@ -3,6 +3,7 @@
 import { Download, RotateCw, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useUpdaterStore } from '@stores/updater-store';
+import { useProgressStore } from '@stores/progress-store';
 import { releaseNotesUrl } from '@shared/branding';
 import { openLink } from '@renderer/open';
 import { useT } from '@renderer/i18n';
@@ -23,13 +24,19 @@ export function UpdateToast() {
   const error = useUpdaterStore((s) => s.error);
   const postponed = useUpdaterStore((s) => s.postponed);
   const download = useUpdaterStore((s) => s.download);
+  const cancelDownload = useUpdaterStore((s) => s.cancelDownload);
   const install = useUpdaterStore((s) => s.install);
   const postpone = useUpdaterStore((s) => s.postpone);
-
-  if (!info || postponed) return null;
+  const barIsUp = useProgressStore((s) =>
+    [...s.entries.values()].some((entry) => entry.channel === 'progress:launcher-update'),
+  );
 
   const ready = stage === 'ready';
   const downloading = stage === 'downloading';
+
+  // The progress panel opens in this corner and says all of this, with a cancel
+  // of its own. Underneath it, this could be neither read nor pressed.
+  if (!info || postponed || (downloading && barIsUp)) return null;
 
   return (
     <div
@@ -71,9 +78,15 @@ export function UpdateToast() {
               style={{ width: `${percent}%` }}
             />
           </div>
-          <p className="mt-1 text-[11px] text-rf-text-muted">
-            {t('update.downloading', { percent })}
-          </p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="text-[11px] text-rf-text-muted">{t('update.downloading', { percent })}</p>
+            <button
+              onClick={cancelDownload}
+              className="text-[11px] text-rf-text-muted underline-offset-2 transition-colors hover:text-rf-text hover:underline"
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
         </div>
       )}
 
