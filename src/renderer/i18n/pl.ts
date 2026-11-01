@@ -173,6 +173,8 @@ export const pl: Translations = {
     'Paczka shaderów leży w tym archiwum wewnątrz folderu ({folder}), a jest wczytywana tylko wtedy, gdy jej folder shaders jest na najwyższym poziomie. Spakuj zawartość tego folderu, a nie sam folder.',
   'contentError.ownedByPack':
     '{name} już tu jest — pochodzi z modpacka, za którym podąża ten profil. Synchronizacja i tak przywróciłaby wersję z modpacka.',
+  'error.noConnection':
+    'Nie udało się połączyć. Sprawdź połączenie z internetem i, jeśli go używasz, proxy w Ustawieniach, a potem spróbuj ponownie.',
   'home.showConsole': 'Pokaż konsolę',
   'home.hideConsole': 'Ukryj konsolę',
   'home.news': 'Aktualności',
@@ -187,7 +189,7 @@ export const pl: Translations = {
   'home.newsNewer': 'Nowsze aktualności',
   'home.newsStale': 'Nie udało się odświeżyć kanału — to ostatnie wczytane wpisy.',
   'home.newsUnavailable':
-    'Nie udało się wczytać kanału aktualności. Sprawdź adres kanału w Ustawieniach.',
+    'Nie udało się wczytać aktualności. Sprawdź połączenie albo adres kanału w Ustawieniach.',
   'news.openInBrowser': 'Otwórz w przeglądarce',
   'news.noBody': 'Ten wpis nie ma dalszej treści.',
   'home.ram': '{mb} MB RAM',

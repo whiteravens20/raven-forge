@@ -111,6 +111,7 @@ import type {
   ShaderLoaderResult,
 } from '../shared/ipc-types';
 import { AuthServersUnreachableError } from '../core/auth/auth-errors';
+import { isConnectionFailure } from '../core/net/connection-failure';
 import { refusalOf } from '../core/util/refusal';
 import { trustedKeyRing } from '../shared/branding';
 import { isEd25519PublicKey } from '../shared/trusted-key';
@@ -144,6 +145,21 @@ function fail<T>(error: string, code?: IpcErrorCode, errorMessage?: ErrorMessage
  * part somebody can act on.
  */
 const reason = errorText;
+
+/**
+ * A handler's failure, from what it was doing and what stopped it.
+ *
+ * The English is what gets logged and quoted, with the reason in it. When the
+ * reason is that nothing could be reached, the player is told that in their own
+ * language: `getaddrinfo EAI_AGAIN api.modrinth.com` is the same news as a
+ * cable pulled out, in words only the log needs.
+ */
+function failed<T>(doing: string, err: unknown, refusal?: ErrorMessage): IpcResult<T> {
+  const noConnection: ErrorMessage | undefined = isConnectionFailure(err)
+    ? { key: 'error.noConnection' }
+    : undefined;
+  return fail(`${doing}: ${reason(err)}`, undefined, refusal ?? noConnection);
+}
 
 /** Settled once the launcher has finished starting — see {@link holdHandlersUntil}. */
 let started: Promise<unknown> = Promise.resolve();
@@ -245,7 +261,7 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await measureStorage());
     } catch (err) {
-      return fail(`Failed to measure the launcher's files: ${reason(err)}`);
+      return failed(`Failed to measure the launcher's files`, err);
     }
   });
   handle('system:relaunch', () => {
@@ -260,7 +276,7 @@ export function registerAllIpcHandlers(): void {
       await shell.openExternal(url);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to open URL: ${reason(err)}`);
+      return failed(`Failed to open URL`, err);
     }
   });
   handle(
@@ -329,7 +345,7 @@ export function registerAllIpcHandlers(): void {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         return ok({ lines: [], size: 0, reset: true });
       }
-      return fail(`Failed to read log: ${reason(err)}`);
+      return failed(`Failed to read log`, err);
     } finally {
       await handle?.close();
     }
@@ -340,7 +356,7 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await getSettings());
     } catch (err) {
-      return fail(`Failed to load settings: ${reason(err)}`);
+      return failed(`Failed to load settings`, err);
     }
   });
   handle('settings:update', async (_event, updates: Partial<GlobalSettings>) => {
@@ -352,7 +368,7 @@ export function registerAllIpcHandlers(): void {
       await applyProxySettings(settings);
       return ok(settings);
     } catch (err) {
-      return fail(`Failed to update settings: ${reason(err)}`);
+      return failed(`Failed to update settings`, err);
     }
   });
   handle('settings:reset', async () => {
@@ -365,7 +381,7 @@ export function registerAllIpcHandlers(): void {
       await applyProxySettings(settings);
       return ok(settings);
     } catch (err) {
-      return fail(`Failed to reset settings: ${reason(err)}`);
+      return failed(`Failed to reset settings`, err);
     }
   });
   handle('settings:add-trusted-key', async (_event, key: TrustedKey) => {
@@ -389,7 +405,7 @@ export function registerAllIpcHandlers(): void {
         }),
       );
     } catch (err) {
-      return fail(`Failed to add trusted key: ${reason(err)}`);
+      return failed(`Failed to add trusted key`, err);
     }
   });
   handle('settings:remove-trusted-key', async (_event, publicKey: string) => {
@@ -401,7 +417,7 @@ export function registerAllIpcHandlers(): void {
         }),
       );
     } catch (err) {
-      return fail(`Failed to remove trusted key: ${reason(err)}`);
+      return failed(`Failed to remove trusted key`, err);
     }
   });
 
@@ -416,7 +432,7 @@ export function registerAllIpcHandlers(): void {
         ...pathConcerns(paths.root),
       });
     } catch (err) {
-      return fail(`Failed to read the data directory: ${reason(err)}`);
+      return failed(`Failed to read the data directory`, err);
     }
   });
   handle('settings:choose-data-root', async () => {
@@ -430,14 +446,14 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await planDataRootChange(result.filePaths[0]));
     } catch (err) {
-      return fail(`Failed to inspect ${result.filePaths[0]}: ${reason(err)}`);
+      return failed(`Failed to inspect ${result.filePaths[0]}`, err);
     }
   });
   handle('settings:plan-data-root', async (_event, target: string) => {
     try {
       return ok(await planDataRootChange(target));
     } catch (err) {
-      return fail(`Failed to inspect ${target}: ${reason(err)}`);
+      return failed(`Failed to inspect ${target}`, err);
     }
   });
   /**
@@ -459,7 +475,7 @@ export function registerAllIpcHandlers(): void {
         }),
       );
     } catch (err) {
-      return fail(`Failed to move the data directory: ${reason(err)}`);
+      return failed(`Failed to move the data directory`, err);
     }
   });
   handle('settings:forget-data-root', async () => {
@@ -470,7 +486,7 @@ export function registerAllIpcHandlers(): void {
       await writeDataRootPointer(null);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to forget the data directory: ${reason(err)}`);
+      return failed(`Failed to forget the data directory`, err);
     }
   });
 
@@ -479,28 +495,28 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await fetchNews());
     } catch (err) {
-      return fail(`Failed to fetch news: ${reason(err)}`);
+      return failed(`Failed to fetch news`, err);
     }
   });
   handle('news:refresh', async () => {
     try {
       return ok(await fetchNews(true));
     } catch (err) {
-      return fail(`Failed to refresh news: ${reason(err)}`);
+      return failed(`Failed to refresh news`, err);
     }
   });
   handle('announcements:get', async () => {
     try {
       return ok(await fetchAnnouncements());
     } catch (err) {
-      return fail(`Failed to fetch announcements: ${reason(err)}`);
+      return failed(`Failed to fetch announcements`, err);
     }
   });
   handle('announcements:refresh', async () => {
     try {
       return ok(await fetchAnnouncements(true));
     } catch (err) {
-      return fail(`Failed to refresh announcements: ${reason(err)}`);
+      return failed(`Failed to refresh announcements`, err);
     }
   });
 
@@ -512,14 +528,14 @@ export function registerAllIpcHandlers(): void {
       // Closing the sign-in window is an answer, not an error.
       if (isCancellation(err)) return fail('Sign-in was called off', 'CANCELLED');
       log.error('Microsoft login failed:', err);
-      return fail(`Login failed: ${reason(err)}`);
+      return failed(`Login failed`, err);
     }
   });
   handle('auth:login-offline', async (_event, username: string) => {
     try {
       return ok(await loginOffline(username));
     } catch (err) {
-      return fail(`Offline login failed: ${reason(err)}`);
+      return failed(`Offline login failed`, err);
     }
   });
   handle('auth:logout', async (_event, accountId: string) => {
@@ -527,14 +543,14 @@ export function registerAllIpcHandlers(): void {
       await logoutAccount(accountId);
       return ok(undefined);
     } catch (err) {
-      return fail(`Logout failed: ${reason(err)}`);
+      return failed(`Logout failed`, err);
     }
   });
   handle('auth:get-state', async () => {
     try {
       return ok(await getAuthState());
     } catch (err) {
-      return fail(`Failed to get auth state: ${reason(err)}`);
+      return failed(`Failed to get auth state`, err);
     }
   });
   handle('auth:set-active', async (_event, accountId: string) => {
@@ -542,7 +558,7 @@ export function registerAllIpcHandlers(): void {
       await setActiveAccount(accountId);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to set active account: ${reason(err)}`);
+      return failed(`Failed to set active account`, err);
     }
   });
 
@@ -551,21 +567,21 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await getAllProfiles());
     } catch (err) {
-      return fail(`Failed to get profiles: ${reason(err)}`);
+      return failed(`Failed to get profiles`, err);
     }
   });
   handle('profiles:create', async (_event, profile) => {
     try {
       return ok(await createProfile(profile));
     } catch (err) {
-      return fail(`Failed to create profile: ${reason(err)}`);
+      return failed(`Failed to create profile`, err);
     }
   });
   handle('profiles:update', async (_event, profileId: string, updates) => {
     try {
       return ok(await updateProfile(profileId, updates));
     } catch (err) {
-      return fail(`Failed to update profile: ${reason(err)}`);
+      return failed(`Failed to update profile`, err);
     }
   });
   handle('profiles:delete', async (_event, profileId: string, deleteFiles: boolean) => {
@@ -581,28 +597,28 @@ export function registerAllIpcHandlers(): void {
       await deleteProfile(profileId, deleteFiles);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to delete profile: ${reason(err)}`);
+      return failed(`Failed to delete profile`, err);
     }
   });
   handle('profiles:get-file-summary', async (_event, profileId: string) => {
     try {
       return ok(await summarizeProfileFiles(profileId));
     } catch (err) {
-      return fail(`Failed to inspect profile files: ${reason(err)}`);
+      return failed(`Failed to inspect profile files`, err);
     }
   });
   handle('profiles:list-orphaned', async () => {
     try {
       return ok(await listOrphanedProfiles());
     } catch (err) {
-      return fail(`Failed to list kept profile files: ${reason(err)}`);
+      return failed(`Failed to list kept profile files`, err);
     }
   });
   handle('profiles:adopt-orphaned', async (_event, profileId: string) => {
     try {
       return ok(await adoptOrphanedProfile(profileId));
     } catch (err) {
-      return fail(`Failed to restore that profile: ${reason(err)}`);
+      return failed(`Failed to restore that profile`, err);
     }
   });
   handle('profiles:discard-orphaned', async (_event, profileId: string) => {
@@ -610,14 +626,14 @@ export function registerAllIpcHandlers(): void {
       await discardOrphanedProfile(profileId);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to delete those files: ${reason(err)}`);
+      return failed(`Failed to delete those files`, err);
     }
   });
   handle('profiles:unreadable-entries', async () => {
     try {
       return ok(await getUnreadableProfileEntries());
     } catch (err) {
-      return fail(`Failed to read the profile list: ${reason(err)}`);
+      return failed(`Failed to read the profile list`, err);
     }
   });
   handle('profiles:duplicate', async (_event, profileId: string, name?: string) => {
@@ -629,7 +645,7 @@ export function registerAllIpcHandlers(): void {
       }
       return ok(await duplicateProfile(profileId, name));
     } catch (err) {
-      return fail(`Failed to duplicate profile: ${reason(err)}`);
+      return failed(`Failed to duplicate profile`, err);
     }
   });
   handle('profiles:open-folder', async (_event, profileId: string) => {
@@ -649,14 +665,14 @@ export function registerAllIpcHandlers(): void {
       if (failure) return fail(failure);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to open profile folder: ${reason(err)}`);
+      return failed(`Failed to open profile folder`, err);
     }
   });
   handle('profiles:export', async (_event, profileId: string) => {
     try {
       return ok(await exportProfile(profileId));
     } catch (err) {
-      return fail(`Failed to export profile: ${reason(err)}`);
+      return failed(`Failed to export profile`, err);
     }
   });
   handle(
@@ -687,7 +703,7 @@ export function registerAllIpcHandlers(): void {
           }),
         );
       } catch (err) {
-        return fail(`Could not export that profile as a pack: ${reason(err)}`);
+        return failed(`Could not export that profile as a pack`, err);
       }
     },
   );
@@ -707,14 +723,14 @@ export function registerAllIpcHandlers(): void {
       if (chosen.canceled || chosen.filePaths.length === 0) return ok(null);
       return ok(await importProfileFile(chosen.filePaths[0]));
     } catch (err) {
-      return fail(`Failed to import profile: ${reason(err)}`);
+      return failed(`Failed to import profile`, err);
     }
   });
   handle('profiles:get-sync-status', async (_event, profileId: string) => {
     try {
       return ok(await getProfileSyncStatus(profileId));
     } catch (err) {
-      return fail(`Failed to get sync status: ${reason(err)}`);
+      return failed(`Failed to get sync status`, err);
     }
   });
   handle('profiles:set-icon', async (_event, profileId: string, sourcePath: string | null) => {
@@ -724,14 +740,14 @@ export function registerAllIpcHandlers(): void {
         : await clearProfileIcon(profileId);
       return ok(profile);
     } catch (err) {
-      return fail(`Failed to set icon: ${reason(err)}`);
+      return failed(`Failed to set icon`, err);
     }
   });
   handle('profiles:get-icon', async (_event, profileId: string) => {
     try {
       return ok(await getProfileIconDataUrl(profileId));
     } catch (err) {
-      return fail(`Failed to read icon: ${reason(err)}`);
+      return failed(`Failed to read icon`, err);
     }
   });
 
@@ -739,14 +755,14 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await listWorlds(profileId));
     } catch (err) {
-      return fail(`Failed to list worlds: ${reason(err)}`);
+      return failed(`Failed to list worlds`, err);
     }
   });
   handle('profiles:list-backups', async (_event, profileId: string) => {
     try {
       return ok(await listBackups(profileId));
     } catch (err) {
-      return fail(`Failed to list backups: ${reason(err)}`);
+      return failed(`Failed to list backups`, err);
     }
   });
   handle('profiles:backup-worlds', async (_event, profileId: string, why?: WorldBackupReason) => {
@@ -762,7 +778,7 @@ export function registerAllIpcHandlers(): void {
       // deliberate copy, which is the choice that keeps files.
       return ok(await backupWorlds(profileId, why === 'version-change' ? why : 'manual'));
     } catch (err) {
-      return fail(`Could not back up the worlds: ${reason(err)}`);
+      return failed(`Could not back up the worlds`, err);
     }
   });
   handle('profiles:restore-backup', async (_event, profileId: string, backupId: string) => {
@@ -772,7 +788,7 @@ export function registerAllIpcHandlers(): void {
       }
       return ok(await restoreBackup(profileId, backupId));
     } catch (err) {
-      return fail(`Could not restore that backup: ${reason(err)}`);
+      return failed(`Could not restore that backup`, err);
     }
   });
   handle('profiles:delete-backup', async (_event, profileId: string, backupId: string) => {
@@ -780,7 +796,7 @@ export function registerAllIpcHandlers(): void {
       await deleteBackup(profileId, backupId);
       return ok(undefined);
     } catch (err) {
-      return fail(`Could not delete that backup: ${reason(err)}`);
+      return failed(`Could not delete that backup`, err);
     }
   });
 
@@ -789,35 +805,35 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await listCataloguePacks());
     } catch (err) {
-      return fail(`Could not load the pack list: ${reason(err)}`);
+      return failed(`Could not load the pack list`, err);
     }
   });
   handle('packs:create-from-manifest', async (_event, url: string) => {
     try {
       return ok(await createProfileFromManifest(url));
     } catch (err) {
-      return fail(`Could not create a profile from that manifest: ${reason(err)}`);
+      return failed(`Could not create a profile from that manifest`, err);
     }
   });
   handle('packs:create-from-url', async (_event, url: string) => {
     try {
       return ok(await createProfileFromUrl(url));
     } catch (err) {
-      return fail(`Could not create a profile from that link: ${reason(err)}`);
+      return failed(`Could not create a profile from that link`, err);
     }
   });
   handle('packs:import-mrpack', async (_event, filePath: string) => {
     try {
       return ok(await importMrpack(filePath));
     } catch (err) {
-      return fail(`Could not import that pack: ${reason(err)}`);
+      return failed(`Could not import that pack`, err);
     }
   });
   handle('packs:install-modrinth', async (_event, pack, wanted) => {
     try {
       return ok(await installModrinthPack(pack, wanted));
     } catch (err) {
-      return fail(`Could not install that pack: ${reason(err)}`);
+      return failed(`Could not install that pack`, err);
     }
   });
 
@@ -835,7 +851,7 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await getInstalledMods(profileId));
     } catch (err) {
-      return fail(`Failed to get installed mods: ${reason(err)}`);
+      return failed(`Failed to get installed mods`, err);
     }
   });
   handle('mods:sync-manifest', async (_event, profileId: string) => {
@@ -847,7 +863,7 @@ export function registerAllIpcHandlers(): void {
       // Stopping a sync is something the player did, not something that went
       // wrong; the profile's state says it was left as it was.
       if (isCancellation(err)) return ok(undefined);
-      return fail(`Mod sync failed: ${reason(err)}`);
+      return failed(`Mod sync failed`, err);
     }
   });
   handle('mods:install-from-search', async (_event, profileId, mod, version) => {
@@ -855,7 +871,7 @@ export function registerAllIpcHandlers(): void {
       if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       return ok(await installModFromSearch(profileId, mod, version));
     } catch (err) {
-      return fail(`Failed to install mod: ${reason(err)}`);
+      return failed(`Failed to install mod`, err);
     }
   });
   handle('mods:add-from-file', async (_event, profileId: string) => {
@@ -884,7 +900,7 @@ export function registerAllIpcHandlers(): void {
       if (!profile) return fail(`Profile ${profileId} not found`);
       return ok(await planModInstall(profile, mod, await getInstalledMods(profileId)));
     } catch (err) {
-      return fail(`Could not check compatibility: ${reason(err)}`);
+      return failed(`Could not check compatibility`, err);
     }
   });
   handle('mods:uninstall', async (_event, profileId: string, modId: string) => {
@@ -893,7 +909,7 @@ export function registerAllIpcHandlers(): void {
       await uninstallMod(profileId, modId);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to uninstall mod: ${reason(err)}`);
+      return failed(`Failed to uninstall mod`, err);
     }
   });
   handle(
@@ -904,7 +920,7 @@ export function registerAllIpcHandlers(): void {
         await toggleModEnabled(profileId, modId, enabled);
         return ok(undefined);
       } catch (err) {
-        return fail(`Failed to toggle mod: ${reason(err)}`);
+        return failed(`Failed to toggle mod`, err);
       }
     },
   );
@@ -912,7 +928,7 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await checkModUpdates(profileId));
     } catch (err) {
-      return fail(`Could not check for mod updates: ${reason(err)}`);
+      return failed(`Could not check for mod updates`, err);
     }
   });
   handle('mods:update', async (_event, profileId: string, modIds: string[]) => {
@@ -920,14 +936,14 @@ export function registerAllIpcHandlers(): void {
       if (isGameBusy(profileId)) return fail(GAME_IS_UP);
       return ok(await updateMods(profileId, modIds));
     } catch (err) {
-      return fail(`Failed to update mods: ${reason(err)}`);
+      return failed(`Failed to update mods`, err);
     }
   });
   handle('mods:search', async (_event, filters) => {
     try {
       return ok(await searchMods(filters));
     } catch (err) {
-      return fail(`Mod search failed: ${reason(err)}`);
+      return failed(`Mod search failed`, err);
     }
   });
   handle('mods:get-details', async (_event, ids: unknown) => {
@@ -937,14 +953,14 @@ export function registerAllIpcHandlers(): void {
       const keys = Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
       return ok(await getProjectDetails(keys.slice(0, 2000)));
     } catch (err) {
-      return fail(`Could not load descriptions: ${reason(err)}`);
+      return failed(`Could not load descriptions`, err);
     }
   });
   handle('mods:get-facets', async (_event, projectType) => {
     try {
       return ok(await getSearchFacets(projectType));
     } catch (err) {
-      return fail(`Could not load filters: ${reason(err)}`);
+      return failed(`Could not load filters`, err);
     }
   });
 
@@ -953,14 +969,14 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await listContent('shaders', profileId));
     } catch (err) {
-      return fail(`Failed to list shaders: ${reason(err)}`);
+      return failed(`Failed to list shaders`, err);
     }
   });
   handle('content:get-resourcepacks', async (_event, profileId: string) => {
     try {
       return ok(await listContent('resourcepacks', profileId));
     } catch (err) {
-      return fail(`Failed to list resource packs: ${reason(err)}`);
+      return failed(`Failed to list resource packs`, err);
     }
   });
   handle(
@@ -971,7 +987,7 @@ export function registerAllIpcHandlers(): void {
         await installContent('shaders', profileId, projectId, version);
         return ok(undefined);
       } catch (err) {
-        return fail(`Failed to install shader: ${reason(err)}`);
+        return failed(`Failed to install shader`, err);
       }
     },
   );
@@ -981,7 +997,7 @@ export function registerAllIpcHandlers(): void {
       if (!profile) return fail(`Profile ${profileId} not found`);
       return ok(await planContentInstall(profile, item));
     } catch (err) {
-      return fail(`Could not check compatibility: ${reason(err)}`);
+      return failed(`Could not check compatibility`, err);
     }
   });
   handle('content:get-shader-loader-state', async (_event, profileId: string) => {
@@ -990,7 +1006,7 @@ export function registerAllIpcHandlers(): void {
       if (!profile) return fail(`Profile ${profileId} not found`);
       return ok(await getShaderLoaderState(profileId, profile.minecraftVersion, profile.modLoader));
     } catch (err) {
-      return fail(`Failed to check the shader loader: ${reason(err)}`);
+      return failed(`Failed to check the shader loader`, err);
     }
   });
   handle('content:install-shader-loader', async (_event, profileId: string, projectId: string) => {
@@ -1021,7 +1037,7 @@ export function registerAllIpcHandlers(): void {
         await installContent('resourcepacks', profileId, projectId, version);
         return ok(undefined);
       } catch (err) {
-        return fail(`Failed to install resource pack: ${reason(err)}`);
+        return failed(`Failed to install resource pack`, err);
       }
     },
   );
@@ -1031,7 +1047,7 @@ export function registerAllIpcHandlers(): void {
       await removeContent('shaders', profileId, id);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to remove shader: ${reason(err)}`);
+      return failed(`Failed to remove shader`, err);
     }
   });
   handle('content:remove-resourcepack', async (_event, profileId: string, id: string) => {
@@ -1040,7 +1056,7 @@ export function registerAllIpcHandlers(): void {
       await removeContent('resourcepacks', profileId, id);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to remove resource pack: ${reason(err)}`);
+      return failed(`Failed to remove resource pack`, err);
     }
   });
   handle(
@@ -1051,7 +1067,7 @@ export function registerAllIpcHandlers(): void {
         await reorderResourcePacks(profileId, orderedIds);
         return ok(undefined);
       } catch (err) {
-        return fail(`Failed to reorder resource packs: ${reason(err)}`);
+        return failed(`Failed to reorder resource packs`, err);
       }
     },
   );
@@ -1085,7 +1101,7 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await detectSystemJava());
     } catch (err) {
-      return fail(`Failed to detect system Java: ${reason(err)}`);
+      return failed(`Failed to detect system Java`, err);
     }
   });
   handle('java:probe', async (_event, binPath: string, minecraftVersion: string) => {
@@ -1099,7 +1115,7 @@ export function registerAllIpcHandlers(): void {
         requiredVersion: requiredJavaFor(minecraftVersion, meta),
       });
     } catch (err) {
-      return fail(`Failed to check ${binPath}: ${reason(err)}`);
+      return failed(`Failed to check ${binPath}`, err);
     }
   });
 
@@ -1108,14 +1124,14 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await getLoaderVersions(loader, mcVersion));
     } catch (err) {
-      return fail(`Failed to get loader versions: ${reason(err)}`);
+      return failed(`Failed to get loader versions`, err);
     }
   });
   handle('loaders:build-starts', async (_event, loader, loaderVersion, mcVersion) => {
     try {
       return ok(await loaderBuildStarts(loader, loaderVersion, mcVersion));
     } catch (err) {
-      return fail(`Failed to check the loader build: ${reason(err)}`);
+      return failed(`Failed to check the loader build`, err);
     }
   });
 
@@ -1133,7 +1149,7 @@ export function registerAllIpcHandlers(): void {
       }
       // A refusal carries the same sentence twice: English here for the log,
       // and a key the renderer says in the player's language.
-      return fail(`Failed to launch game: ${reason(err)}`, undefined, refusalOf(err));
+      return failed(`Failed to launch game`, err, refusalOf(err));
     }
   });
   handle('game:kill', async (_event, profileId: string) => {
@@ -1141,7 +1157,7 @@ export function registerAllIpcHandlers(): void {
       await killGame(profileId);
       return ok(undefined);
     } catch (err) {
-      return fail(`Failed to kill game: ${reason(err)}`);
+      return failed(`Failed to kill game`, err);
     }
   });
   /**
@@ -1159,21 +1175,21 @@ export function registerAllIpcHandlers(): void {
       const profiles = await getAllProfiles();
       return ok(profiles.map((profile) => profile.id).filter(isGameRunning));
     } catch (err) {
-      return fail(`Failed to list running games: ${reason(err)}`);
+      return failed(`Failed to list running games`, err);
     }
   });
   handle('game:get-log-tail', async (_event, profileId: string) => {
     try {
       return ok(getLogLines(profileId));
     } catch (err) {
-      return fail(`Failed to read game log: ${reason(err)}`);
+      return failed(`Failed to read game log`, err);
     }
   });
   handle('game:cancel', async (_event, profileId: string) => {
     try {
       return ok(cancelJob(profileId));
     } catch (err) {
-      return fail(`Failed to cancel: ${reason(err)}`);
+      return failed(`Failed to cancel`, err);
     }
   });
   handle('game:get-versions', async (_event, includeSnapshots?: boolean) => {
@@ -1184,7 +1200,7 @@ export function registerAllIpcHandlers(): void {
       // version strings, which no comparator gets right across MC's history.
       return ok(manifest.versions.filter((v) => wanted.includes(v.type)).map((v) => v.id));
     } catch (err) {
-      return fail(`Failed to list Minecraft versions: ${reason(err)}`);
+      return failed(`Failed to list Minecraft versions`, err);
     }
   });
 
@@ -1193,7 +1209,7 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await checkForUpdates());
     } catch (err) {
-      return fail(`Update check failed: ${reason(err)}`);
+      return failed(`Update check failed`, err);
     }
   });
   handle('updater:download', async () => {
@@ -1201,7 +1217,7 @@ export function registerAllIpcHandlers(): void {
       await downloadUpdate();
       return ok(undefined);
     } catch (err) {
-      return fail(`Update download failed: ${reason(err)}`);
+      return failed(`Update download failed`, err);
     }
   });
   handle('updater:install', async () => {
@@ -1214,7 +1230,7 @@ export function registerAllIpcHandlers(): void {
     try {
       return ok(await getLastManifestVerification(profileId));
     } catch (err) {
-      return fail(`Manifest verification failed: ${reason(err)}`);
+      return failed(`Manifest verification failed`, err);
     }
   });
 

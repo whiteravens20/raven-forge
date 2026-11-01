@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useSettingsStore } from '../stores/settings-store';
-import type { Locale } from '@shared/ipc-types';
+import type { ErrorMessage, Locale } from '@shared/ipc-types';
 import { en, type PluralKey, type TranslationKey, type Translations } from './en';
 import { pl } from './pl';
 
@@ -121,4 +121,18 @@ export function useT(): TFunction {
  */
 export function t(key: TranslationKey, vars?: TranslationVars): string {
   return translate(asLocale(useSettingsStore.getState().settings?.language), key, vars);
+}
+
+/**
+ * What a failed call to the main process says to the player: in their language
+ * when the failure comes with a key, and otherwise in the English the log holds,
+ * or in the page's own words when it gave none.
+ */
+export function failureText(
+  result: { error?: string; errorMessage?: ErrorMessage },
+  fallback: string,
+): string {
+  return result.errorMessage
+    ? t(result.errorMessage.key, result.errorMessage.vars)
+    : (result.error ?? fallback);
 }

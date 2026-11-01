@@ -14,7 +14,7 @@ import { LogViewer } from '@components/LogViewer';
 import { DataFolderCard } from '@components/DataFolderCard';
 import { StorageMap } from '@components/StorageMap';
 import { Spinner } from '@components/ui/Spinner';
-import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
+import { failureText, LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
 import { RELEASES_URL, isBuiltInKey, releaseNotesUrl, trustedKeyRing } from '@shared/branding';
 import { EXAMPLE_PUBLIC_KEY, isEd25519PublicKey } from '@shared/trusted-key';
 import type { ThemeMode, LauncherBehaviorOnLaunch, UpdateCheck } from '@shared/ipc-types';
@@ -498,7 +498,7 @@ function UpdateRow() {
         setResult(r.data);
         setVersion(r.data.currentVersion);
       } else {
-        setError(r.error ?? t('settings.updateCheckFailed'));
+        setError(failureText(r, t('settings.updateCheckFailed')));
       }
     } finally {
       setChecking(false);

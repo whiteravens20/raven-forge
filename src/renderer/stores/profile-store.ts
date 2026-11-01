@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import type { IpcResult, Profile } from '@shared/ipc-types';
-import { t } from '../i18n';
+import { failureText, t } from '../i18n';
 import { useNoticeStore } from './notice-store';
 
 const api = window.ravenforge;
@@ -79,7 +79,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
       // Said, and the list left as it was: profiles that could not be read are
       // not profiles that are gone.
       set({ loaded: true });
-      useNoticeStore.getState().show(result.error ?? t('profiles.loadFailed'));
+      useNoticeStore.getState().show(failureText(result, t('profiles.loadFailed')));
       return;
     }
     const profiles = result.data;

@@ -12,7 +12,7 @@ import { Input } from '@components/ui/Input';
 import { Switch } from '@components/ui/Switch';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
-import { useT } from '@renderer/i18n';
+import { failureText, useT } from '@renderer/i18n';
 import {
   SearchFilters,
   EMPTY_FILTERS,
@@ -109,7 +109,7 @@ export function ModsPage() {
     const result = await api.mods.getInstalled(selectedId);
     if (result.success && result.data) setInstalled(result.data);
     // Said, and the list left as it was: an unread list is not an empty one.
-    else setError(result.error ?? t('mods.listFailed'));
+    else setError(failureText(result, t('mods.listFailed')));
   }, [selectedId, t]);
 
   const handleSearch = () => {
@@ -145,7 +145,7 @@ export function ModsPage() {
     await working([mod.id], async () => {
       const check = await api.mods.checkInstall(selectedId, mod);
       if (!check.success || !check.data) {
-        setError(check.error ?? t('mods.installFailed', { name: mod.name }));
+        setError(failureText(check, t('mods.installFailed', { name: mod.name })));
         return;
       }
       // Nothing to decide when nothing is wrong — a dialog confirming that an
@@ -177,7 +177,7 @@ export function ModsPage() {
         setError(
           result.errorMessage
             ? t(result.errorMessage.key, result.errorMessage.vars)
-            : (result.error ?? t('mods.addFileFailed')),
+            : failureText(result, t('mods.addFileFailed')),
         );
       } else if (result.data) {
         const { name, dependencies } = result.data;
@@ -201,7 +201,7 @@ export function ModsPage() {
     if (!selectedId) return;
     const result = await api.mods.installFromSearch(selectedId, mod, versionId);
     if (!result.success || !result.data) {
-      setError(result.error ?? t('mods.installFailed', { name: mod.name }));
+      setError(failureText(result, t('mods.installFailed', { name: mod.name })));
     } else if (result.data.dependencies.length > 0) {
       // Files appeared in the profile that nobody asked for. Say which.
       setNote(
@@ -229,7 +229,7 @@ export function ModsPage() {
     try {
       const result = await api.mods.checkUpdates(selectedId);
       if (!result.success || !result.data) {
-        setError(result.error ?? t('mods.checkUpdatesFailed'));
+        setError(failureText(result, t('mods.checkUpdatesFailed')));
         return;
       }
       setUpdateCheck(result.data);
@@ -249,7 +249,7 @@ export function ModsPage() {
     await working(modIds, async () => {
       const result = await api.mods.update(selectedId, modIds);
       if (!result.success || !result.data) {
-        setError(result.error ?? t('mods.updateNotDone'));
+        setError(failureText(result, t('mods.updateNotDone')));
         return;
       }
       // Both halves get said. A run that updated nine mods and lost one is not
@@ -282,7 +282,7 @@ export function ModsPage() {
     await working([mod.id], async () => {
       const result = await api.mods.toggleEnabled(selectedId, mod.id, enabled);
       if (!result.success) {
-        setError(result.error ?? t('mods.toggleFailed', { name: mod.name }));
+        setError(failureText(result, t('mods.toggleFailed', { name: mod.name })));
       }
       await loadInstalled();
     });
@@ -294,7 +294,7 @@ export function ModsPage() {
     await working([mod.id], async () => {
       const result = await api.mods.uninstall(selectedId, mod.id);
       if (!result.success) {
-        setError(result.error ?? t('mods.removeFailed', { name: mod.name }));
+        setError(failureText(result, t('mods.removeFailed', { name: mod.name })));
       }
       await loadInstalled();
     });

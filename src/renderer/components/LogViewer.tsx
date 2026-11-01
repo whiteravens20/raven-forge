@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardCheck, Copy, FileText, FolderOpen, RefreshCw, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
-import { useT } from '@renderer/i18n';
+import { failureText, useT } from '@renderer/i18n';
 import { openPath } from '@renderer/open';
 import { useDialogFocus } from '@hooks/use-dialog-focus';
 
@@ -85,7 +85,7 @@ export function LogViewer({ onClose }: LogViewerProps) {
   const refresh = useCallback(async () => {
     const result = await api.system.readLog(undefined, cursor.current);
     if (!result.success || !result.data) {
-      setError(result.error ?? t('logs.readFailed'));
+      setError(failureText(result, t('logs.readFailed')));
       setLoading(false);
       return;
     }

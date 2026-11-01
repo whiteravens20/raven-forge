@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import type { AuthState } from '@shared/ipc-types';
-import { t } from '../i18n';
+import { failureText, t } from '../i18n';
 import { useNoticeStore } from './notice-store';
 
 const api = window.ravenforge;
@@ -43,7 +43,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Said, and the list left as it was: accounts that could not be read are
       // not accounts that were signed out.
       set({ loaded: true });
-      useNoticeStore.getState().show(result.error ?? t('accounts.loadFailed'));
+      useNoticeStore.getState().show(failureText(result, t('accounts.loadFailed')));
       return;
     }
     set({
@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const result = await api.auth.loginMicrosoft();
       // Closing the sign-in window is not a failure to report.
       if (result.code === 'CANCELLED') return null;
-      if (!result.success) return result.error ?? '';
+      if (!result.success) return failureText(result, '');
       await get().load();
       return null;
     } finally {
@@ -73,7 +73,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ isAuthenticating: true });
     try {
       const result = await api.auth.loginOffline(username);
-      if (!result.success) return result.error ?? '';
+      if (!result.success) return failureText(result, '');
       await get().load();
       return null;
     } finally {
@@ -86,7 +86,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Read back either way: a sign-out that failed half-way has still changed
     // something, and the list has to show what is actually there.
     await get().load();
-    return result.success ? null : (result.error ?? '');
+    return result.success ? null : failureText(result, '');
   },
 
   setActive: async (accountId: string) => {
@@ -94,7 +94,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Only once main has agreed. It used to be marked active here whatever the
     // answer, so a refusal left the page showing an account the launcher was
     // not going to play as.
-    if (!result.success) return result.error ?? '';
+    if (!result.success) return failureText(result, '');
     set({ activeAccountId: accountId });
     return null;
   },

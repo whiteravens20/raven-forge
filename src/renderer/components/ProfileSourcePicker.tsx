@@ -7,7 +7,7 @@ import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
-import { localized, useLocale, useT } from '@renderer/i18n';
+import { failureText, localized, useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import { formatRamGb, ramAdvice, safeMaxRamMb } from '@shared/memory';
 import type { CataloguePack, IpcResult, PackInstall, Profile } from '@shared/ipc-types';
@@ -76,7 +76,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
       if (r.success && r.data) setPacks(r.data);
       else {
         setListFailed(true);
-        setError(r.error ?? t('packs.listFailed'));
+        setError(failureText(r, t('packs.listFailed')));
       }
     });
     return () => {
@@ -125,7 +125,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     setError(null);
     const result = await api.profiles.import();
     setBusy(null);
-    if (!result.success) setError(result.error ?? t('packs.profileFileFailed'));
+    if (!result.success) setError(failureText(result, t('packs.profileFileFailed')));
     else if (result.data) onCreated(result.data.profile, { dropped: result.data.dropped });
   };
 

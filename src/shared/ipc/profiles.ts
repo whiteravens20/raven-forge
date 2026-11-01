@@ -59,6 +59,8 @@ export interface ProfileSyncStatus {
   pendingUpdates: number;
   status: 'synced' | 'updates-available' | 'error' | 'never-synced';
   errorMessage?: string;
+  /** The failure above is that nothing could be reached, and is said as that. */
+  noConnection?: boolean;
   /**
    * Set for a profile made from a pack file rather than from an address. It
    * follows nothing, so there is never an update to fetch — but the pack it was

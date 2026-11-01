@@ -6,7 +6,7 @@ import { Button } from '@components/ui/Button';
 import { ProfileAvatar, invalidateAvatarCache } from '@components/ProfileAvatar';
 import { PROFILE_PRESETS, PROFILE_PRESET_IDS } from '@components/profile-presets';
 import { useProfileStore } from '@stores/profile-store';
-import { useT, type TranslationKey } from '@renderer/i18n';
+import { failureText, useT, type TranslationKey } from '@renderer/i18n';
 import type { Profile } from '@shared/ipc-types';
 
 const api = window.ravenforge;
@@ -34,7 +34,7 @@ export function ProfileIconPicker({ profile }: { profile: Profile }) {
       if (sourcePath) await update(profile.id, { iconPreset: undefined });
       await reload();
     } else {
-      setError(result.error ?? t('profileIcon.failed'));
+      setError(failureText(result, t('profileIcon.failed')));
     }
     setBusy(false);
   };
@@ -57,7 +57,7 @@ export function ProfileIconPicker({ profile }: { profile: Profile }) {
     if (profile.iconPath) {
       const cleared = await api.profiles.setIcon(profile.id, null);
       if (!cleared.success) {
-        setError(cleared.error ?? t('profileIcon.failed'));
+        setError(failureText(cleared, t('profileIcon.failed')));
         setBusy(false);
         return;
       }
@@ -66,7 +66,7 @@ export function ProfileIconPicker({ profile }: { profile: Profile }) {
     const saved = await update(profile.id, {
       iconPreset: profile.iconPreset === id ? undefined : id,
     });
-    if (!saved.success) setError(saved.error ?? t('profileIcon.failed'));
+    if (!saved.success) setError(failureText(saved, t('profileIcon.failed')));
     setBusy(false);
   };
 

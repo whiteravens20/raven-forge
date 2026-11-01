@@ -5,7 +5,7 @@ import { Banner } from '@components/ui/Banner';
 import { LoaderBuildHint } from '@components/LoaderBuildHint';
 import { useGameStore, type GameFailure } from '@stores/game-store';
 import { useProfileStore } from '@stores/profile-store';
-import { useT, type TFunction } from '@renderer/i18n';
+import { failureText, useT, type TFunction } from '@renderer/i18n';
 
 /** A failure with nothing to offer but its explanation. */
 function describe(
@@ -16,9 +16,9 @@ function describe(
     case 'refused':
       return t(failure.message.key, failure.message.vars);
     case 'launch-failed':
-      return failure.error ?? t('home.launchFailed');
+      return failureText(failure, t('home.launchFailed'));
     case 'stop-failed':
-      return failure.error ?? t('home.stopFailed');
+      return failureText(failure, t('home.stopFailed'));
   }
 }
 

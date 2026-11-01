@@ -65,7 +65,8 @@ export type ErrorKey =
   | 'contentError.nestedResourcePack'
   | 'contentError.notShaderPack'
   | 'contentError.nestedShaderPack'
-  | 'contentError.ownedByPack';
+  | 'contentError.ownedByPack'
+  | 'error.noConnection';
 
 /** A failure the renderer can say in the user's language. */
 export interface ErrorMessage {

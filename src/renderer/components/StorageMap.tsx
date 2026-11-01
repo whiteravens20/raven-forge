@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { FolderOpen, RefreshCw } from 'lucide-react';
-import { useT, type TranslationKey } from '@renderer/i18n';
+import { failureText, useT, type TranslationKey } from '@renderer/i18n';
 import { formatBytes } from '@renderer/format';
 import type { StorageEntry, StorageId, StorageReport } from '@shared/ipc-types';
 
@@ -68,7 +68,7 @@ export function StorageMap() {
     try {
       const result = await api.system.getStorage();
       if (result.success && result.data) setReport(result.data);
-      else setFailed(result.error ?? t('storage.failed'));
+      else setFailed(failureText(result, t('storage.failed')));
     } finally {
       setMeasuring(false);
     }
@@ -82,7 +82,7 @@ export function StorageMap() {
     setOpenError(null);
     const result = await api.system.openPath(entry.path);
     if (!result.success) {
-      setOpenError({ id: entry.id, message: result.error ?? t('storage.openFailed') });
+      setOpenError({ id: entry.id, message: failureText(result, t('storage.openFailed')) });
     }
   };
 

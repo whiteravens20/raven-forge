@@ -185,6 +185,8 @@ export const en = {
     'The shader pack is inside a folder ({folder}) in that archive, and it is only read when its shaders folder is at the top level. Zip what is in that folder, not the folder itself.',
   'contentError.ownedByPack':
     '{name} is already here, put there by the modpack this profile follows. A sync would put the modpack’s copy back.',
+  'error.noConnection':
+    'Could not connect. Check your internet connection and, if you use one, the proxy in Settings, then try again.',
   'home.showConsole': 'Show console',
   'home.hideConsole': 'Hide console',
   'home.news': 'News',
@@ -196,7 +198,8 @@ export const en = {
   'home.newsOlder': 'Older news',
   'home.newsNewer': 'Newer news',
   'home.newsStale': 'Could not refresh the feed — these are the last entries loaded.',
-  'home.newsUnavailable': 'Could not load the news feed. Check the feed address in Settings.',
+  'home.newsUnavailable':
+    'Could not load the news feed. Check your connection, or the feed address in Settings.',
   'news.openInBrowser': 'Open in browser',
   'news.noBody': 'This entry carries no further text.',
   'home.ram': '{mb} MB RAM',
