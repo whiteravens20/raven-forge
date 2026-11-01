@@ -114,3 +114,11 @@ api.on('updater:update-downloaded', (info) => {
 api.on('progress:launcher-update', (event) => {
   useUpdaterStore.setState({ percent: Math.round(event.progress * 100) });
 });
+
+// Asked once the events above are being heard: the start-up check may have
+// answered before this module loaded, with nobody listening.
+void api.updater.getPending().then((result) => {
+  if (result.success && result.data && !useUpdaterStore.getState().available) {
+    useUpdaterStore.setState({ available: result.data });
+  }
+});

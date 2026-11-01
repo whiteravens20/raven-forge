@@ -135,6 +135,15 @@ export async function checkForUpdates(): Promise<UpdateCheck> {
   }
 }
 
+/**
+ * What the last check found. Its event goes to a page that may not have loaded
+ * yet, on a quick network and a slow disk, and an event nobody is listening for
+ * is lost: the update then went unannounced until some later start.
+ */
+export function getPendingUpdate(): UpdateInfo | null {
+  return pendingUpdate;
+}
+
 /** The question asked without anybody pressing anything, which Settings can switch off. */
 export async function checkForUpdatesAtStart(): Promise<void> {
   if (!(await getSettings()).checkUpdatesOnStart) {

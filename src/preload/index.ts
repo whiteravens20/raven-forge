@@ -134,6 +134,7 @@ const api: RavenForgeAPI = {
   },
   updater: {
     check: () => ipcRenderer.invoke('updater:check'),
+    getPending: () => ipcRenderer.invoke('updater:get-pending'),
     download: () => ipcRenderer.invoke('updater:download'),
     install: () => ipcRenderer.invoke('updater:install'),
   },

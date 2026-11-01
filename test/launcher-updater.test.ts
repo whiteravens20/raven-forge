@@ -85,3 +85,16 @@ describe('the question at a start', () => {
     expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('what the check found', () => {
+  it('can be asked for afterwards, by a page that was not there to hear it', async () => {
+    const { getPendingUpdate } = await load();
+    expect(getPendingUpdate()).toBeNull();
+
+    updater.listeners.get('update-available')?.({ version: '0.9.0' });
+    expect(getPendingUpdate()).toEqual({ version: '0.9.0' });
+
+    updater.listeners.get('update-not-available')?.();
+    expect(getPendingUpdate()).toBeNull();
+  });
+});

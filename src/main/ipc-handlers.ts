@@ -79,6 +79,7 @@ import {
 import {
   checkForUpdates,
   downloadUpdate,
+  getPendingUpdate,
   quitAndInstall,
   updateSupport,
 } from '../core/updater/launcher-updater';
@@ -1218,6 +1219,7 @@ export function registerAllIpcHandlers(): void {
       return failed(`Update check failed`, err);
     }
   });
+  handle('updater:get-pending', async () => ok(getPendingUpdate()));
   handle('updater:download', async () => {
     try {
       await downloadUpdate();

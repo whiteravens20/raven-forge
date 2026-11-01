@@ -343,6 +343,7 @@ export interface InvokeChannels {
 
   // -- Updater --
   'updater:check': () => Promise<IpcResult<UpdateCheck>>;
+  'updater:get-pending': () => Promise<IpcResult<UpdateInfo | null>>;
   'updater:download': () => Promise<IpcResult<void>>;
   'updater:install': () => Promise<IpcResult<void>>; // quits and installs
 
@@ -526,6 +527,7 @@ export interface RavenForgeAPI {
   };
   updater: {
     check: InvokeChannels['updater:check'];
+    getPending: InvokeChannels['updater:get-pending'];
     download: InvokeChannels['updater:download'];
     install: InvokeChannels['updater:install'];
   };
