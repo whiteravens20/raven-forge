@@ -6,6 +6,7 @@ The whole list. The [README](../README.md) keeps the short one.
 
 - **Server Profiles** — per-server instance configs with pinned MC version, mod loader, and remote manifest
 - **Pack Install** — start a profile from a White Ravens pack, a `.mrpack` file, a manifest URL, or an empty form
+- **A Question Before A Stranger's Mods** — a pack from a file or a link that brings code Modrinth has not published shows you what it is and where it comes from before anything is written
 - **Modpacks On Modrinth** — search public modpacks from the new-profile dialog and install one as a new profile
 - **Mod Auto-Sync** — fetch server manifest → check its signature → diff → parallel download → verify each hash → install
 - **Pack Export** — write a profile back out as a `.mrpack`: a small file of references, with anything Modrinth does not host carried inside it

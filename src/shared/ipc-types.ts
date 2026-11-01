@@ -32,6 +32,7 @@ import type {
   MrpackExport,
   MrpackExportOptions,
   OrphanedProfile,
+  PackImport,
   PackInstall,
   WorldBackup,
   WorldBackupReason,
@@ -170,9 +171,9 @@ export interface InvokeChannels {
   /** Create a profile that follows a manifest URL and keeps updating from it. */
   'packs:create-from-manifest': (url: string) => Promise<IpcResult<PackInstall>>;
   /** Create a profile from a link to either a `.mrpack` or a manifest, sniffed apart. */
-  'packs:create-from-url': (url: string) => Promise<IpcResult<PackInstall>>;
+  'packs:create-from-url': (url: string, accepted?: string[]) => Promise<IpcResult<PackImport>>;
   /** Import a Modrinth `.mrpack` as a new profile — a snapshot, not a subscription. */
-  'packs:import-mrpack': (filePath: string) => Promise<IpcResult<PackInstall>>;
+  'packs:import-mrpack': (filePath: string, accepted?: string[]) => Promise<IpcResult<PackImport>>;
   /**
    * Install a modpack found by searching Modrinth: the newest version that fits
    * the Minecraft version and loader given, or simply the newest.

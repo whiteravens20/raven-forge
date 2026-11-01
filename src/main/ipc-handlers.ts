@@ -61,7 +61,7 @@ import { getProjectDetails } from '../core/mods/project-details';
 import { planModInstall, planContentInstall } from '../core/mods/compatibility';
 import { listCataloguePacks } from '../core/packs/catalogue';
 import {
-  importMrpack,
+  importHandedOverMrpack,
   installModrinthPack,
   createProfileFromManifest,
   createProfileFromUrl,
@@ -824,16 +824,16 @@ export function registerAllIpcHandlers(): void {
       return failed(`Could not create a profile from that manifest`, err);
     }
   });
-  handle('packs:create-from-url', async (_event, url: string) => {
+  handle('packs:create-from-url', async (_event, url: string, accepted?: string[]) => {
     try {
-      return ok(await createProfileFromUrl(url));
+      return ok(await createProfileFromUrl(url, accepted));
     } catch (err) {
       return failed(`Could not create a profile from that link`, err);
     }
   });
-  handle('packs:import-mrpack', async (_event, filePath: string) => {
+  handle('packs:import-mrpack', async (_event, filePath: string, accepted?: string[]) => {
     try {
-      return ok(await importMrpack(filePath));
+      return ok(await importHandedOverMrpack(filePath, accepted));
     } catch (err) {
       return failed(`Could not import that pack`, err);
     }

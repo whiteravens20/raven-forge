@@ -375,6 +375,15 @@ export const pl: Translations = {
   'packs.installUnfinished':
     'Profil „{name}” został utworzony, ale nie wszystkie jego pliki dotarły. Kliknij w profilu „{action}”, a instalacja ruszy dalej od miejsca, w którym stanęła. Podany powód: {error}',
   'packs.importFailed': 'Nie udało się zaimportować tej paczki.',
+  'packs.review.title': 'Mody, za które launcher nie ręczy',
+  'packs.review.body':
+    'Mod to program i sięga wszędzie tam, gdzie Twoje konto na tym komputerze. Modrinth sprawdza to, co publikuje, a tych plików nie ma w jego rejestrze, więc nikt nie obejrzał ich za Ciebie. Kontynuuj tylko wtedy, gdy ufasz temu, kto dał Ci tę paczkę.',
+  'packs.review.bodyUnchecked':
+    'Mod to program i sięga wszędzie tam, gdzie Twoje konto na tym komputerze. Modrinth sprawdza to, co publikuje, ale nie udało się teraz z nim połączyć, żeby zapytać o te pliki. Kontynuuj tylko wtedy, gdy ufasz temu, kto dał Ci tę paczkę.',
+  'packs.review.follows':
+    'Nie jest podpisana kluczem, któremu ufasz, a to, co instaluje, może się zmienić przy każdej kolejnej synchronizacji.',
+  'packs.review.insidePack': 'w środku paczki',
+  'packs.review.install': 'Zainstaluj mimo to',
   'packs.manifestFailed': 'Pod tym adresem nie ma paczki ani manifestu.',
   'packs.wrSyncNote': 'Te profile trzymają się serwera: każda synchronizacja przynosi zmiany.',
   'packs.mods.one': '{count} mod',
@@ -912,9 +921,9 @@ export const pl: Translations = {
   'privacy.dest.loaders.when': 'przy wyborze i instalacji loadera',
   'privacy.dest.modrinth.who': 'Modrinth',
   'privacy.dest.modrinth.when':
-    'gdy szukasz modów i paczek, otwierasz listę zainstalowanych, sprawdzasz aktualizacje albo dodajesz mod z pliku',
+    'gdy szukasz modów i paczek, otwierasz listę zainstalowanych, sprawdzasz aktualizacje, dodajesz mod z pliku albo bierzesz paczkę z pliku lub linku',
   'privacy.dest.modrinth.sends':
-    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Otwarcie listy modów, shaderów albo paczek zasobów profilu wysyła identyfikatory tych, które masz — tak launcher pobiera ich opisy i ikony, a odpowiedź pamięta przez tydzień. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu, a dodanie moda z pliku — skrót tego jednego pliku. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
+    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Otwarcie listy modów, shaderów albo paczek zasobów profilu wysyła identyfikatory tych, które masz — tak launcher pobiera ich opisy i ikony, a odpowiedź pamięta przez tydzień. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu, a dodanie moda z pliku — skrót tego jednego pliku. Paczka z pliku lub linku wysyła skróty tych modów z niej, które nie pochodzą z Modrinth. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'aktualności i ogłoszenia, lista paczek serwerowych i same paczki',
   'privacy.dest.updates.who': 'GitHub',

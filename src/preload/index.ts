@@ -51,8 +51,9 @@ const api: RavenForgeAPI = {
   packs: {
     listCatalogue: () => ipcRenderer.invoke('packs:list-catalogue'),
     createFromManifest: (url) => ipcRenderer.invoke('packs:create-from-manifest', url),
-    createFromUrl: (url) => ipcRenderer.invoke('packs:create-from-url', url),
-    importMrpack: (filePath) => ipcRenderer.invoke('packs:import-mrpack', filePath),
+    createFromUrl: (url, accepted) => ipcRenderer.invoke('packs:create-from-url', url, accepted),
+    importMrpack: (filePath, accepted) =>
+      ipcRenderer.invoke('packs:import-mrpack', filePath, accepted),
     installModrinth: (pack, wanted) => ipcRenderer.invoke('packs:install-modrinth', pack, wanted),
   },
   mods: {

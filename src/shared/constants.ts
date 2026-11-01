@@ -35,6 +35,8 @@ export const FILE_DATA_ROOT_POINTER = 'data-root.txt';
 export const MODRINTH_API_BASE = 'https://api.modrinth.com/v2';
 /** Where the files and icons Modrinth's API points at are served from. */
 export const MODRINTH_CDN_HOST = 'cdn.modrinth.com';
+/** A file of a project's version there: `…/data/<project>/versions/<version>/<file>`. */
+export const MODRINTH_CDN_FILE = /^https:\/\/cdn\.modrinth\.com\/data\/([^/]+)\/versions\//;
 
 /**
  * A project's page on Modrinth, from its id or its slug.

@@ -85,6 +85,29 @@ export interface PackInstall {
   failure?: string;
 }
 
+/** A file in a pack that can run code, and that Modrinth has no record of. */
+export interface UnknownPackFile {
+  /** Where it would land in the game directory. */
+  path: string;
+  /** The host it is fetched from, or `null` when it travels inside the pack. */
+  from: string | null;
+  /** What accepting it names: its hash, so that other bytes are asked about again. */
+  key: string;
+}
+
+/** A pack held back until the player has seen what it brings: see `pack-review.ts`. */
+export interface PackReview {
+  name: string;
+  unknown: UnknownPackFile[];
+  /** Modrinth could not be asked, so nothing on the list was looked up. */
+  unchecked: boolean;
+  /** It follows a manifest, so what it installs can change at any later sync. */
+  follows: boolean;
+}
+
+/** What taking a pack from a file or a link came to: a profile, or a question first. */
+export type PackImport = PackInstall | { review: PackReview };
+
 /**
  * What a profile owns on disk, so deleting it can say what that costs.
  *
