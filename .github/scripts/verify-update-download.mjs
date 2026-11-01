@@ -16,7 +16,7 @@
 // Exit codes: 0 everything was as it should be, 1 something was not, 2 the check
 // itself could not be made.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -41,7 +41,8 @@ const FEED_FILE = WINDOWS ? 'latest.yml' : 'latest-linux.yml';
 const UPDATE_FILE = WINDOWS
   ? 'Raven-Forge-Launcher-Setup-99.0.0.exe'
   : 'Raven-Forge-Launcher-99.0.0.AppImage';
-const INSPECTOR_PORT = 9339;
+/** One a launcher: what is left of the last one can hold its port for a moment. */
+let inspectorPort = 9339;
 const SLOW = 2 * 1024 * 1024;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -114,25 +115,29 @@ function startFeed() {
 // ── The launcher ──────────────────────────────────────────────────────────────
 
 /** Its main process through the inspector, and the page through that. */
-async function inspect(child) {
+async function inspect(child, port) {
   let target;
-  for (let i = 0; i < 300 && !target; i += 1) {
+  const end = Date.now() + 90000;
+  while (!target) {
     if (child.exitCode !== null) throw new Error(`the launcher ended with ${child.exitCode}`);
+    if (Date.now() > end)
+      throw new Error('the launcher is running and its inspector never answered');
     // With a time limit of its own: what a crashed launcher leaves behind can
-    // hold the port open with nobody answering.
-    target = await fetch(`http://127.0.0.1:${INSPECTOR_PORT}/json`, {
-      signal: AbortSignal.timeout(2000),
+    // hold the port open with nobody answering, and on Windows a port nobody
+    // holds takes two seconds to say so.
+    target = await fetch(`http://127.0.0.1:${port}/json`, {
+      signal: AbortSignal.timeout(5000),
     })
       .then((r) => r.json())
       .then((list) => list[0])
       .catch(() => undefined);
     if (!target) await sleep(200);
   }
-  if (!target) throw new Error('the launcher never opened its inspector');
+  console.log('  ...   its inspector answers');
   const socket = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
     socket.onopen = resolve;
-    socket.onerror = reject;
+    socket.onerror = () => reject(new Error('its inspector refused the connection'));
   });
   let id = 0;
   const waiting = new Map();
@@ -144,14 +149,23 @@ async function inspect(child) {
   const main = (expression) =>
     new Promise((resolve, reject) => {
       id += 1;
-      waiting.set(id, ({ result }) =>
-        result?.exceptionDetails
-          ? reject(new Error(result.exceptionDetails.exception?.description ?? 'it threw'))
-          : resolve(result?.result?.value),
-      );
+      const asked = id;
+      // A launcher stopped on a dialog of its own answers nothing, for ever.
+      const limit = setTimeout(() => {
+        waiting.delete(asked);
+        reject(new Error(`its main process did not answer: ${expression.slice(0, 60)}`));
+      }, 30000);
+      waiting.set(asked, ({ result }) => {
+        clearTimeout(limit);
+        if (result?.exceptionDetails) {
+          reject(new Error(result.exceptionDetails.exception?.description ?? 'it threw'));
+        } else {
+          resolve(result?.result?.value);
+        }
+      });
       socket.send(
         JSON.stringify({
-          id,
+          id: asked,
           method: 'Runtime.evaluate',
           params: {
             expression,
@@ -184,7 +198,9 @@ async function inspect(child) {
       button.scrollIntoView({ block: 'center' });
       const box = button.getBoundingClientRect();
       const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-      if (top !== button && !button.contains(top)) return 'something is drawn over it';
+      if (top !== button && !button.contains(top)) {
+        return 'something is drawn over it: ' + (top ? top.outerHTML.slice(0, 200) : 'nothing there');
+      }
       button.click();
       return 'pressed';
     })()`);
@@ -196,13 +212,15 @@ async function inspect(child) {
         return true;
       });
     })()`);
-  for (let i = 0; i < 300; i += 1) {
-    if (await main(`(() => { const w = ${window}; return !!w && !w.webContents.isLoading(); })()`))
-      break;
+  const windowEnd = Date.now() + 60000;
+  while (
+    !(await main(`(() => { const w = ${window}; return !!w && !w.webContents.isLoading(); })()`))
+  ) {
+    if (Date.now() > windowEnd) throw new Error('its window never finished loading');
     await sleep(200);
   }
-  const quit = () => main(`require('electron').app.exit(0); 1`).catch(() => undefined);
-  return { page, text, waitFor, press, shot, quit, close: () => socket.close() };
+  console.log('  ...   its window is up');
+  return { page, text, waitFor, press, shot, close: () => socket.close() };
 }
 
 /** Runs the copy over a home of its own, and hands the test the page. */
@@ -243,21 +261,45 @@ async function withLauncher(program, home, settings, test) {
     env.APPIMAGE = path.join(home, 'the-running.AppImage');
     fs.writeFileSync(env.APPIMAGE, '');
   }
-  const args = [`--inspect=127.0.0.1:${INSPECTOR_PORT}`, ...(WINDOWS ? [] : ['--no-sandbox'])];
-  const child = spawn(program, args, { env, stdio: 'ignore' });
+  inspectorPort += 1;
+  const args = [`--inspect=127.0.0.1:${inspectorPort}`, ...(WINDOWS ? [] : ['--no-sandbox'])];
+  const name = path.basename(home);
+  const said = fs.openSync(path.join(evidence, `${name}-stderr.log`), 'w');
+  const child = spawn(program, args, { env, stdio: ['ignore', said, said] });
   const exited = new Promise((resolve) => child.once('exit', resolve));
 
-  const launcher = await inspect(child);
+  let launcher;
   try {
+    launcher = await inspect(child, inspectorPort);
     await test(launcher);
+  } catch (err) {
+    saveTheScreen(name);
+    throw err;
   } finally {
-    await launcher.quit();
-    launcher.close();
+    // Not a quit: an update that has finished downloading is installed by one,
+    // and this one is random bytes.
+    launcher?.close();
+    child.kill('SIGKILL');
     await Promise.race([exited, sleep(10000)]);
-    child.kill();
+    fs.closeSync(said);
     const log = path.join(data, 'logs', 'main.log');
-    if (fs.existsSync(log)) fs.copyFileSync(log, path.join(evidence, `${path.basename(home)}.log`));
+    if (fs.existsSync(log)) fs.copyFileSync(log, path.join(evidence, `${name}.log`));
   }
+}
+
+/** What was on the screen when it went wrong: a dialog says more than a timeout. */
+function saveTheScreen(name) {
+  if (!WINDOWS) return;
+  const file = path.join(evidence, `${name}-screen.png`);
+  const script = [
+    'Add-Type -AssemblyName System.Windows.Forms, System.Drawing',
+    '$screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds',
+    '$image = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height',
+    '$drawing = [System.Drawing.Graphics]::FromImage($image)',
+    '$drawing.CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)',
+    `$image.Save('${file}')`,
+  ].join('; ');
+  spawnSync('powershell', ['-NoProfile', '-Command', script], { stdio: 'ignore', timeout: 30000 });
 }
 
 // ── What is checked ───────────────────────────────────────────────────────────
@@ -270,6 +312,17 @@ const pendingFiles = (home) => {
   return fs.existsSync(pending) ? fs.readdirSync(pending) : [];
 };
 
+/** It may be a moment coming: until the settings arrive, the page is in the system's language. */
+async function pressing(launcher, within, label, what) {
+  const end = Date.now() + 5000;
+  let outcome = await launcher.press(within, label);
+  while (outcome === 'there is no such button' && Date.now() < end) {
+    await sleep(100);
+    outcome = await launcher.press(within, label);
+  }
+  expect(outcome === 'pressed', what, outcome);
+}
+
 async function theQuestionSwitchedOff(program, home, feed) {
   console.log('With the question at a start switched off');
   await withLauncher(program, home, { checkUpdatesOnStart: false }, async (launcher) => {
@@ -278,10 +331,7 @@ async function theQuestionSwitchedOff(program, home, feed) {
     expect(!(await launcher.text()).includes('99.0.0'), 'and no update is announced');
     await launcher.page(`location.hash = '#/settings'; 1`);
     await sleep(800);
-    expect(
-      (await launcher.press('main', 'Check for updates')) === 'pressed',
-      '"Check for updates" can be pressed',
-    );
+    await pressing(launcher, 'main', 'Check for updates', '"Check for updates" can be pressed');
     await launcher.waitFor('announcement', (page) => page.includes('99.0.0'));
     expect(feed.asked === 1, 'and asks the feed, once', `asked ${feed.asked} times`);
   });
@@ -294,14 +344,10 @@ async function theDownload(program, home, feed) {
     expect(feed.asked > 0, 'the feed is asked, and the update announced');
 
     console.log('Cancelling the download');
-    expect(
-      (await launcher.press('[role=status]', 'Download')) === 'pressed',
-      '"Download" can be pressed',
-    );
+    await pressing(launcher, '[role=status]', 'Download', '"Download" can be pressed');
     await launcher.waitFor('progress', (page) => percentOf(page) >= 10);
     await launcher.shot('downloading');
-    const pressed = await launcher.press('[role=status]', 'Cancel');
-    expect(pressed === 'pressed', '"Cancel" can be pressed', pressed);
+    await pressing(launcher, '[role=status]', 'Cancel', '"Cancel" can be pressed');
     const after = await launcher.waitFor(
       'end of the download',
       (page) => !isDownloading(page),
@@ -315,10 +361,7 @@ async function theDownload(program, home, feed) {
 
     console.log('Starting it again at once, and having the server cut it off');
     feed.cutAfter = 4 * 1024 * 1024;
-    expect(
-      (await launcher.press('[role=status]', 'Download')) === 'pressed',
-      '"Download" can be pressed again',
-    );
+    await pressing(launcher, '[role=status]', 'Download', '"Download" can be pressed again');
     const cut = await launcher.waitFor(
       'failure',
       (page) => !isDownloading(page) && page.includes('failed'),
@@ -332,10 +375,7 @@ async function theDownload(program, home, feed) {
 
     console.log('And to the end');
     feed.bytesPerSecond = 200 * 1024 * 1024;
-    expect(
-      (await launcher.press('[role=status]', 'Download')) === 'pressed',
-      '"Download" can be pressed after that',
-    );
+    await pressing(launcher, '[role=status]', 'Download', '"Download" can be pressed after that');
     await launcher.waitFor('finished download', (page) => page.includes('Update ready'), 60000);
     await launcher.shot('ready');
     const pendingDir = path.join(home, 'cache', 'raven-forge-launcher-updater', 'pending');
