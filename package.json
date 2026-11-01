@@ -44,7 +44,7 @@
     "socks": "^2.8.10",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
-    "undici": "^8.11.2",
+    "undici": "^8.12.3",
     "yauzl": "^3.4.0",
     "zod": "^4.6.7"
   },
@@ -57,7 +57,7 @@
     "@types/yauzl": "^3.4.0",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
-    "electron": "^44.5.1",
+    "electron": "^44.9.1",
     "electron-builder": "^26.8.1",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
