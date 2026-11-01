@@ -44,7 +44,7 @@
     "socks": "^2.8.10",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
-    "undici": "^8.11.2",
+    "undici": "^8.12.3",
     "yauzl": "^3.4.0",
     "zod": "^4.6.7"
   },
