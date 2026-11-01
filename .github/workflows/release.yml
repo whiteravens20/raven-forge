@@ -339,11 +339,12 @@ jobs:
           merge-multiple: true
 
       # One SHA256SUMS.txt for the whole release, assembled from the per-OS
-      # files each runner produced. The per-OS files are not published.
+      # files each runner produced, with the SBOM's line added. The per-OS files
+      # are not published.
       - name: Assemble checksums
         working-directory: artifacts
         run: |
-          cat SHA256SUMS-*.txt | sort -k2 > SHA256SUMS.txt
+          { cat SHA256SUMS-*.txt; sha256sum sbom.cdx.json; } | sort -k2 > SHA256SUMS.txt
           rm -f SHA256SUMS-*.txt
           echo '### Artefacts' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -361,6 +362,7 @@ jobs:
             artifacts/*.exe
             artifacts/*.deb
             artifacts/*.AppImage
+            artifacts/sbom.cdx.json
 
       # The same attestation as a release asset, so it travels with the installers.
       - name: Keep the attestation bundle

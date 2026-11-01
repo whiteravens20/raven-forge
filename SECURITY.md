@@ -170,7 +170,8 @@ download.
   behaviour and not something to click past on a binary you did not get from the
   Releases page.
 - Every release carries `SHA256SUMS.txt`, a CycloneDX SBOM of the production
-  dependencies, and a signed SLSA build-provenance attestation:
+  dependencies, and a signed SLSA build-provenance attestation, which from the
+  release after `v0.8.0` cover the SBOM as well as the installers:
 
   ```bash
   sha256sum -c SHA256SUMS.txt --ignore-missing
