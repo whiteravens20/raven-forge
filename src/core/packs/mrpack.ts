@@ -1,5 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { constants as fsConstants } from 'node:fs';
@@ -288,6 +289,29 @@ export async function readMrpack(
     files,
     overrides,
   };
+}
+
+/**
+ * The sha512 of these overrides as the archive holds them, by archive entry.
+ *
+ * Reads only. With two entries of one name the later one is what stays here, as
+ * it is what {@link applyOverrides} leaves on the disk.
+ */
+export async function hashOverrides(
+  packFile: string,
+  overrides: MrpackOverride[],
+): Promise<Map<string, string>> {
+  const hashes = new Map<string, string>();
+  if (overrides.length === 0) return hashes;
+
+  const wanted = new Set(overrides.map((override) => override.entry));
+  await eachEntry(packFile, async (zip, entry) => {
+    if (!wanted.has(entry.fileName)) return;
+    const hash = crypto.createHash('sha512');
+    for await (const chunk of await openEntry(zip, entry)) hash.update(chunk as Buffer);
+    hashes.set(entry.fileName, hash.digest('hex'));
+  });
+  return hashes;
 }
 
 /**

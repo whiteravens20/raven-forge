@@ -359,32 +359,35 @@ p.text-rf-danger {
   animation-delay: -17s;
 }
 
-/* Lava falls: the dash pattern flowing equals one dasharray period. */
+/* A flowing dash pattern. Its speed and the length of one pattern are set
+   inline, by flowing() in backdrop-scenes.tsx. */
 .rf-backdrop .rf-bd-flow {
-  animation: rf-bd-flow 1.6s linear infinite;
+  animation: rf-bd-flow linear infinite;
 }
 
 .rf-backdrop .rf-bd-lava {
   animation: rf-bd-lava-pulse 4s ease-in-out infinite alternate;
 }
 
-/* Gears: duration/direction set inline per gear. */
+/* Gears: duration/direction set inline per gear. Each is drawn around its own
+   origin and turns about that. The centre of its box will not do: with an odd
+   number of teeth that is not the axle, and the wheel wobbles out of mesh. */
 .rf-backdrop .rf-bd-spin {
   animation: rf-bd-spin linear infinite;
-  transform-box: fill-box;
-  transform-origin: center;
+  transform-origin: 0 0;
 }
 
-/* Mine cart rolling through and off the frame; the reset happens offscreen. */
+/* Mine cart rolling through and off the frame; the reset happens offscreen.
+   CART_SPEED in backdrop-scenes.tsx is the distance over the time. */
 .rf-backdrop .rf-bd-cart {
   animation: rf-bd-cart 30s linear infinite;
 }
 
 /* Conveyor cargo advances one full pattern period (the clip width) per
-   loop, so irregular spacing still wraps seamlessly. Same 40px/s speed as
-   the old evenly-spaced belt. */
+   loop, so irregular spacing still wraps seamlessly. The period and the time
+   are set inline, from BELT_PERIOD and BELT_SPEED in backdrop-scenes.tsx. */
 .rf-backdrop .rf-bd-belt-item {
-  animation: rf-bd-belt 29.6s linear infinite;
+  animation: rf-bd-belt linear infinite;
 }
 
 /* fill-box anchors the scale to each puff (bottom-centre, so smoke grows
@@ -495,7 +498,7 @@ p.text-rf-danger {
 
 @keyframes rf-bd-flow {
   to {
-    stroke-dashoffset: -56;
+    stroke-dashoffset: calc(var(--rf-flow-period) * -1);
   }
 }
 
@@ -528,8 +531,7 @@ p.text-rf-danger {
     transform: translateX(0);
   }
   to {
-    /* Must equal BELT_PERIOD in backdrop-scenes.tsx. */
-    transform: translateX(1184px);
+    transform: translateX(var(--rf-belt-period));
   }
 }
 

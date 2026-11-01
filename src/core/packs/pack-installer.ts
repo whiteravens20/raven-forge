@@ -13,6 +13,8 @@ import { mutateLockFile } from '../mods/lock-file';
 import { getModVersions, primaryFile } from '../mods/modrinth-api';
 import { loaderLabel } from '../../shared/labels';
 import { readMrpack, applyOverrides, type MrpackContents, type MrpackFile } from './mrpack';
+import { needsAsking, reviewManifest, reviewMrpack, type ReviewFindings } from './pack-review';
+import { MODRINTH_CDN_FILE } from '../../shared/constants';
 import { assertSecureContentUrl } from '../../shared/validators';
 import {
   formatRamGb,
@@ -21,8 +23,10 @@ import {
   safeMaxRamMb,
 } from '../../shared/memory';
 import { machineMemoryMb } from '../util/machine-memory';
+import { errorText } from '../util/error-text';
+import { isConnectionFailure } from '../net/connection-failure';
 import type { ModManifest } from '../../shared/manifest-schema';
-import type { InstalledMod, PackInstall, Profile } from '../../shared/ipc-types';
+import type { InstalledMod, PackImport, PackInstall, Profile } from '../../shared/ipc-types';
 
 /**
  * Turning a pack into a profile.
@@ -52,16 +56,13 @@ const MODS_DIR = 'mods/';
 const RESOURCE_PACKS_DIR = 'resourcepacks/';
 const SHADER_PACKS_DIR = 'shaderpacks/';
 
-/** `https://cdn.modrinth.com/data/<project>/versions/<version>/<file>` */
-const MODRINTH_CDN = /^https:\/\/cdn\.modrinth\.com\/data\/([^/]+)\/versions\//;
-
 /** A stable id for a pack file, since an `.mrpack` gives its files no ids. */
 function entryId(file: MrpackFile): string {
   // A Modrinth download names its project in the path, and that is the same id
   // the mod search speaks — carrying it through is what lets the browse list
   // know the profile already has this mod, instead of offering it a second time
   // under a different filename.
-  const project = MODRINTH_CDN.exec(file.downloads[0] ?? '')?.[1];
+  const project = MODRINTH_CDN_FILE.exec(file.downloads[0] ?? '')?.[1];
   if (project) return project;
 
   // Otherwise the sha512 is the one thing guaranteed present and unique per
@@ -204,9 +205,15 @@ async function firstSync(profile: Profile, supplied?: ModManifest): Promise<Pack
     await syncManifest(profile.id, supplied);
     return { profile };
   } catch (err) {
-    const failure = err instanceof Error ? err.message : String(err);
+    const failure = errorText(err);
     log.warn(`Created ${profile.name}, but its files did not all arrive: ${failure}`);
-    return { profile, failure };
+    return {
+      profile,
+      failure,
+      ...(isConnectionFailure(err)
+        ? { failureMessage: { key: 'error.noConnection' } as const }
+        : {}),
+    };
   }
 }
 
@@ -275,6 +282,36 @@ export async function importMrpack(
   return firstSync(profile, mrpackToManifest(pack));
 }
 
+/** Said in the log whichever way it went: this is the record of what was let in. */
+function recordAccepted(name: string, findings: ReviewFindings): void {
+  if (findings.unknown.length === 0) return;
+  log.warn(
+    `Installing ${name} with files Modrinth does not know, as the player accepted: ` +
+      findings.unknown.map((file) => `${file.path} (${file.from ?? 'inside the pack'})`).join(', '),
+  );
+}
+
+/**
+ * Import a `.mrpack` somebody handed over: from a file, or from a link.
+ *
+ * Nothing is created until the player has seen what it brings that nobody has
+ * looked at. They answer by naming the files, and files they have not named are
+ * asked about again, so that what they accepted is what gets installed even when
+ * the link answers differently the second time.
+ */
+export async function importHandedOverMrpack(
+  filePath: string,
+  accepted: readonly string[] = [],
+): Promise<PackImport> {
+  const pack = await readMrpack(filePath);
+  const findings = await reviewMrpack(filePath, pack);
+  if (needsAsking(findings, accepted)) {
+    return { review: { name: pack.name, ...findings, follows: false } };
+  }
+  recordAccepted(pack.name, findings);
+  return importMrpack(filePath);
+}
+
 /**
  * Install a modpack found by searching Modrinth, as a new profile.
  *
@@ -340,7 +377,10 @@ const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
  * kilobytes and most pack files are little more, so the cost of being right is
  * as a rule one short download.
  */
-export async function createProfileFromUrl(url: string): Promise<PackInstall> {
+export async function createProfileFromUrl(
+  url: string,
+  accepted: readonly string[] = [],
+): Promise<PackImport> {
   assertSecureContentUrl(url);
 
   const scratch = path.join(paths.cacheDir, `pack-${crypto.randomUUID()}`);
@@ -355,16 +395,29 @@ export async function createProfileFromUrl(url: string): Promise<PackInstall> {
       await handle.close();
     }
 
-    // A manifest is refetched by `createProfileFromManifest` rather than read
-    // from here. It is a few kilobytes, and the alternative is a second way of
-    // building a profile from a manifest that has to stay in step with the
-    // first one.
+    // A manifest is fetched again rather than read from here. It is a few
+    // kilobytes, and the alternative is a second way of building a profile from
+    // a manifest that has to stay in step with the first one.
     return head.equals(ZIP_MAGIC)
-      ? await importMrpack(scratch)
-      : await createProfileFromManifest(url);
+      ? await importHandedOverMrpack(scratch, accepted)
+      : await followHandedOverManifest(url, accepted);
   } finally {
     await fs.rm(scratch, { force: true });
   }
+}
+
+/** A manifest pasted by the player, asked about as {@link importHandedOverMrpack} asks. */
+async function followHandedOverManifest(
+  url: string,
+  accepted: readonly string[],
+): Promise<PackImport> {
+  const manifest = await readManifestHead(url);
+  const findings = await reviewManifest(manifest, url);
+  if (needsAsking(findings, accepted)) {
+    return { review: { name: manifest.serverName, ...findings, follows: true } };
+  }
+  recordAccepted(manifest.serverName, findings);
+  return followManifest(url, manifest);
 }
 
 /**
@@ -375,6 +428,13 @@ export async function createProfileFromUrl(url: string): Promise<PackInstall> {
  * `.mrpack` import, which is a snapshot of a pack at one version.
  */
 export async function createProfileFromManifest(url: string): Promise<PackInstall> {
+  return followManifest(url, await readManifestHead(url));
+}
+
+type ManifestHead = Pick<ModManifest, 'serverName' | 'minecraftVersion' | 'modLoader'> &
+  Partial<ModManifest>;
+
+async function readManifestHead(url: string): Promise<ManifestHead> {
   assertSecureContentUrl(url);
 
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
@@ -397,7 +457,10 @@ export async function createProfileFromManifest(url: string): Promise<PackInstal
   if (!body?.serverName || !body.minecraftVersion || !body.modLoader) {
     throw new Error('That URL does not look like a Raven Forge manifest');
   }
+  return body as ManifestHead;
+}
 
+async function followManifest(url: string, body: ManifestHead): Promise<PackInstall> {
   const profile = await profileForPack(body.serverName, body.minecraftVersion, body.modLoader, {
     modLoaderVersion: body.modLoaderVersion,
     manifestUrl: url,

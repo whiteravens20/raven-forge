@@ -1,12 +1,19 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { autoUpdater } from 'electron-updater';
+import { autoUpdater, CancellationToken } from 'electron-updater';
 import { app } from 'electron';
 import { log } from '../../main/logger';
 import { getMainWindow } from '../../main/window';
 import { abandonProgress, emitProgress } from '../util/progress';
-import type { UpdateCheck, UpdateInfo, UpdateUnsupportedReason } from '../../shared/ipc-types';
+import type {
+  UpdateCheck,
+  UpdateDownloadEnd,
+  UpdateInfo,
+  UpdateUnsupportedReason,
+} from '../../shared/ipc-types';
 import { errorText } from '../util/error-text';
+import { isConnectionFailure } from '../net/connection-failure';
+import { getSettings } from '../config/settings-manager';
 import { clearPendingUpdate } from './update-cache';
 
 /** The one bar the update download draws. */
@@ -15,6 +22,8 @@ const UPDATE_OPERATION = 'launcher-update';
 let initialized = false;
 let pendingUpdate: UpdateInfo | null = null;
 let downloadedUpdate: UpdateInfo | null = null;
+/** The download under way: what a cancel has to reach, and what a second request joins. */
+let download: { token: CancellationToken; ended: Promise<UpdateDownloadEnd> } | null = null;
 
 export function initUpdater(): void {
   if (initialized) return;
@@ -101,7 +110,7 @@ export function updateSupportFor(
   return null;
 }
 
-function updateSupport(): UpdateUnsupportedReason | null {
+export function updateSupport(): UpdateUnsupportedReason | null {
   return updateSupportFor(app.isPackaged, process.platform, Boolean(process.env.APPIMAGE));
 }
 
@@ -130,15 +139,66 @@ export async function checkForUpdates(): Promise<UpdateCheck> {
       status: 'failed',
       currentVersion,
       error: err instanceof Error ? err.message : String(err),
+      ...(isConnectionFailure(err) ? { errorMessage: { key: 'error.noConnection' } as const } : {}),
     };
   }
 }
 
-export async function downloadUpdate(): Promise<void> {
+/**
+ * What the last check found. Its event goes to a page that may not have loaded
+ * yet, on a quick network and a slow disk, and an event nobody is listening for
+ * is lost: the update then went unannounced until some later start.
+ */
+export function getPendingUpdate(): UpdateInfo | null {
+  return pendingUpdate;
+}
+
+/** The question asked without anybody pressing anything, which Settings can switch off. */
+export async function checkForUpdatesAtStart(): Promise<void> {
+  if (!(await getSettings()).checkUpdatesOnStart) {
+    log.info('Not asking about a launcher update at this start: switched off in Settings');
+    return;
+  }
+  await checkForUpdates();
+}
+
+export async function downloadUpdate(): Promise<UpdateDownloadEnd> {
+  if (download) return download.ended;
   const unsupported = updateSupport();
   if (unsupported) throw new Error(`Cannot self-update this build (${unsupported})`);
   initUpdater();
-  await autoUpdater.downloadUpdate();
+
+  const token = new CancellationToken();
+  const ended = autoUpdater
+    .downloadUpdate(token)
+    .then(
+      (): UpdateDownloadEnd => 'downloaded',
+      (err: unknown): UpdateDownloadEnd => {
+        if (!token.cancelled) throw err;
+        // electron-updater has removed its partial file by now and reports
+        // this as no error, so the handler that takes the bar down never runs.
+        log.info('Launcher update download cancelled');
+        abandonProgress(UPDATE_OPERATION);
+        return 'cancelled';
+      },
+    )
+    .finally(() => {
+      download = null;
+    });
+  download = { token, ended };
+  return ended;
+}
+
+/**
+ * Stops the download under way; with none running, there is nothing to do.
+ *
+ * electron-updater stops writing and removes its partial file, and leaves the
+ * request itself alone. The connection fills its buffers and stalls (9 MB later,
+ * measured over loopback), and stays open until the server gives up on it or the
+ * launcher closes. Nothing more arrives, and the next attempt opens its own.
+ */
+export function cancelUpdateDownload(): void {
+  download?.token.cancel();
 }
 
 export function quitAndInstall(): void {

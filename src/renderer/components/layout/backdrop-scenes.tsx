@@ -2,10 +2,11 @@
 
 import type { CSSProperties, ReactElement } from 'react';
 import { VoxelTerrain } from './voxel-terrain';
+import { WORKSHOP_TRAIN, bodyRadius, loneGear, teethPath, type PlacedGear } from './gear-train';
 
 /**
- * The three Minecraft moods cycled by ForgeBackdrop: an overworld drone
- * flight, a Nether forge, and the End void. Each is a <g> painted into the
+ * The four Minecraft moods cycled by ForgeBackdrop: an overworld drone
+ * flight, a Nether forge, a mine and a workshop. Each is a <g> painted into the
  * shared 1920×1080 backdrop SVG and starts with its own full-canvas wash,
  * so the scene owns the atmosphere while the shared aurora bleeds through
  * faintly. All gradient/def ids referenced here live in ForgeBackdrop's
@@ -16,6 +17,25 @@ import { VoxelTerrain } from './voxel-terrain';
  */
 
 const pts = (p: Array<[number, number]>) => p.map(([x, y]) => `${x},${y}`).join(' ');
+
+/**
+ * A dash pattern that flows: one loop moves it by exactly one pattern, which is
+ * the only distance that does not show as a jump when the loop starts again.
+ * Taken from the pattern here, so a stroke cannot be given a loop of another
+ * length.
+ */
+function flowing(dash: number, gap: number, unitsPerSecond: number, backwards = false) {
+  const period = dash + gap;
+  return {
+    className: 'rf-bd-flow',
+    strokeDasharray: `${dash} ${gap}`,
+    style: {
+      '--rf-flow-period': `${period}px`,
+      animationDuration: `${period / unitsPerSecond}s`,
+      animationDirection: backwards ? 'reverse' : 'normal',
+    } as CSSProperties,
+  };
+}
 
 /** Isometric prism: top diamond + two faces, sealed against AA seams. */
 function column(
@@ -130,10 +150,29 @@ const BASALT_COLUMNS: Array<[number, number, number, number]> = [
   [620, 800, 34, 300],
 ];
 
+/** Each hangs off the edge of the roof where it is. */
 const GLOWSTONE: Array<[number, number]> = [
   [380, 108],
-  [1180, 88],
-  [1520, 128],
+  [1180, 128],
+  [1520, 125],
+];
+
+/** [dx, dy, size, colour] around a cluster's anchor, in blocks like the rest of the scene. */
+const GLOWSTONE_BLOCKS: Array<[number, number, number, string]> = [
+  [-26, -12, 18, '#fbbf24'],
+  [-8, -14, 20, '#fcd34d'],
+  [12, -12, 16, '#f59e0b'],
+  [-18, 6, 16, '#f59e0b'],
+  [-2, 6, 14, '#fbbf24'],
+  [-6, 20, 10, '#d97706'],
+];
+
+/** [screen y, stroke width, dash, gap, units a second, colour, opacity, backwards] */
+const LAVA_CURRENTS: Array<[number, number, number, number, number, string, number, boolean]> = [
+  [894, 5, 90, 150, 16, '#fde68a', 0.55, false],
+  [918, 9, 130, 190, 12, '#f97316', 0.5, true],
+  [954, 13, 170, 270, 10, '#ea580c', 0.5, false],
+  [1006, 18, 220, 340, 8, '#b45309', 0.5, true],
 ];
 
 const NETHER_EMBER_XS = [180, 420, 700, 1000, 1350, 1600, 1750, 880];
@@ -146,9 +185,9 @@ export function NetherScene() {
       {/* Far basalt silhouettes give the mid-band depth. */}
       {[
         [350, 620, 30, 460],
-        [520, 700, 24, 380],
-        [1240, 660, 28, 420],
-        [1390, 730, 22, 350],
+        [440, 740, 24, 340],
+        [800, 690, 28, 420],
+        [1010, 730, 22, 350],
       ].map(([x, y, hw, d], i) => (
         <g key={i} opacity="0.6">
           {column(`far${i}`, x, y, hw, hw / 2, d, '#2c2130', '#1a1120', '#241a28')}
@@ -186,53 +225,74 @@ export function NetherScene() {
         column(`b${i}`, x, y, hw, hw / 2, d, BASALT_TOP, BASALT_L, BASALT_R),
       )}
 
-      {/* Ceiling: the Nether has a roof — stepped blocks, stalactites and
-          glowstone pockets. */}
+      {/* A lava fall pouring out of the roof into the sea, so it is painted
+          before the roof, which hides where it starts. Three streams at three
+          speeds over a solid body: one dashed line reads as road marking. */}
+      <g>
+        <rect x="494" y="100" width="52" height="790" fill="#f59e0b" opacity="0.28" />
+        <rect x="502" y="100" width="36" height="790" fill="#ea580c" />
+        <line
+          {...flowing(96, 34, 90)}
+          x1="510"
+          y1="100"
+          x2="510"
+          y2="890"
+          stroke="#f59e0b"
+          strokeWidth="14"
+        />
+        <line
+          {...flowing(70, 26, 130)}
+          x1="524"
+          y1="100"
+          x2="524"
+          y2="890"
+          stroke="#fbbf24"
+          strokeWidth="14"
+        />
+        <line
+          {...flowing(30, 58, 170)}
+          x1="518"
+          y1="100"
+          x2="518"
+          y2="890"
+          stroke="#fde68a"
+          strokeWidth="6"
+        />
+      </g>
+
+      {/* Ceiling: the Nether has a roof, with blocky stalactites of its own
+          rock and glowstone hanging off it. */}
       <polygon
         points="0,0 1920,0 1920,150 1620,120 1320,170 1040,110 700,160 380,120 0,170"
         fill="#221420"
       />
-      {[
-        [240, 130, 26, 90],
-        [700, 150, 30, 130],
-        [1120, 115, 24, 80],
-        [1620, 125, 28, 110],
-      ].map(([x, y, hw, len], i) => (
-        <polygon
-          key={i}
-          points={pts([
-            [x - hw, y],
-            [x + hw, y],
-            [x, y + len],
-          ])}
-          fill="#1a0f1b"
-        />
-      ))}
+      {(
+        [
+          [240, 110, 54],
+          [700, 130, 62],
+          [1120, 100, 48],
+          [1620, 100, 58],
+        ] as const
+      ).map(([x, y, w], i) => blockStack(`st${i}`, x, y, w, '#221420'))}
       {GLOWSTONE.map(([x, y], i) => (
         <g key={i} className="rf-bd-lava">
           <ellipse cx={x} cy={y} rx="80" ry="46" fill="url(#rfbd-lava-glow)" />
-          <rect x={x - 26} y={y - 12} width="52" height="26" rx="4" fill="#fbbf24" opacity="0.85" />
-          <rect x={x - 12} y={y + 12} width="26" height="14" rx="3" fill="#f59e0b" opacity="0.75" />
+          {GLOWSTONE_BLOCKS.map(([dx, dy, size, fill]) => (
+            <rect
+              key={`${dx},${dy}`}
+              x={x + dx}
+              y={y + dy}
+              width={size}
+              height={size}
+              fill={fill}
+              opacity="0.9"
+            />
+          ))}
         </g>
       ))}
 
-      {/* A single lava fall pouring from the ceiling into the sea — the
-          flowing dash pattern is what sells the motion. */}
-      <g>
-        <line x1="520" y1="152" x2="520" y2="890" stroke="#f59e0b" strokeWidth="30" opacity="0.4" />
-        <line
-          className="rf-bd-flow"
-          x1="520"
-          y1="152"
-          x2="520"
-          y2="890"
-          stroke="#fbbf24"
-          strokeWidth="12"
-          strokeDasharray="34 22"
-        />
-      </g>
-
-      {/* The lava sea; the wider glow sits where the fall lands. */}
+      {/* The lava sea, with currents crossing it; the wider glow sits where the
+          fall lands. */}
       <rect y="880" width="1920" height="200" fill="url(#rfbd-lava)" />
       <rect
         y="880"
@@ -242,6 +302,20 @@ export function NetherScene() {
         className="rf-bd-lava"
         opacity="0.5"
       />
+      {LAVA_CURRENTS.map(([y, width, dash, gap, speed, colour, opacity, backwards]) => (
+        <line
+          key={y}
+          {...flowing(dash, gap, speed, backwards)}
+          x1="0"
+          y1={y}
+          x2="1920"
+          y2={y}
+          stroke={colour}
+          strokeWidth={width}
+          opacity={opacity}
+        />
+      ))}
+      <rect y="878" width="1920" height="4" fill="#fde68a" opacity="0.55" />
       {[300, 520, 860, 1420, 1750].map((x, i) => (
         <ellipse
           key={i}
@@ -253,6 +327,8 @@ export function NetherScene() {
           fill="url(#rfbd-lava-glow)"
         />
       ))}
+      {/* Where the fall lands, the surface is at its brightest. */}
+      <rect className="rf-bd-lava" x="486" y="878" width="68" height="7" fill="#fb923c" />
 
       {/* Ember storm — denser and warmer than the ambient field. */}
       {NETHER_EMBER_XS.map((x, i) => (
@@ -349,6 +425,20 @@ const STRATA_A = [332, 300, 348, 316, 360, 308, 340, 324];
 const STRATA_B = [560, 528, 592, 544, 604, 536, 576, 552];
 const FLOOR_STEPS = [864, 840, 876, 852, 884, 846, 868, 856, 872, 844, 880, 858];
 
+/** One step of the floor is this wide. */
+const FLOOR_STEP = 160;
+
+/** The rail climbs to the right, away from the floor, so timber holds it up from here on. */
+const TRESTLE_XS = [640, 820, 1000, 1180, 1360, 1540, 1720, 1900];
+
+/** Where the underside of the sleepers is, in the scene's own coordinates. */
+const railUnderside = (x: number) => 818 - (x - 962) * 0.0612;
+
+/** How long a wheel of the cart takes to turn: its rim, at the speed the cart rolls. */
+const CART_SPEED = 82;
+const WHEEL_RADIUS = 11;
+const WHEEL_TURN_S = (2 * Math.PI * WHEEL_RADIUS) / CART_SPEED;
+
 export function CaveScene() {
   return (
     <g>
@@ -405,11 +495,19 @@ export function CaveScene() {
 
       {/* Blocky floor line behind the rails. */}
       {FLOOR_STEPS.map((y, i) => (
-        <rect key={`f${i}`} x={i * 160} y={y} width="160" height={1080 - y} fill="#0b1120" />
+        <rect
+          key={`f${i}`}
+          x={i * FLOOR_STEP}
+          y={y}
+          width={FLOOR_STEP}
+          height={1080 - y}
+          fill="#0b1120"
+        />
       ))}
 
-      {/* Amethyst geode — the cave's brand moment, in a stepped pocket. */}
-      <g>
+      {/* Amethyst geode — the cave's brand moment, in a stepped pocket, clear
+          of the rail that passes under it. */}
+      <g transform="translate(0 -70)">
         <rect x="1370" y="620" width="300" height="170" fill="#0a0e1c" />
         <rect x="1410" y="588" width="220" height="34" fill="#0a0e1c" />
         <rect x="1410" y="788" width="220" height="34" fill="#0a0e1c" />
@@ -442,8 +540,8 @@ export function CaveScene() {
       {oreBlock('d1', 358, 738, 'url(#rfbd-cyan-glow)', '#67e8f9')}
       {oreBlock('d1b', 402, 762, 'url(#rfbd-cyan-glow)', '#67e8f9')}
       {oreBlock('d2', 760, 500, 'url(#rfbd-cyan-glow)', '#67e8f9')}
-      {oreBlock('g1', 1018, 778, 'url(#rfbd-lava-glow)', '#fbbf24')}
-      {oreBlock('g1b', 1062, 754, 'url(#rfbd-lava-glow)', '#fbbf24')}
+      {oreBlock('g1', 1018, 672, 'url(#rfbd-lava-glow)', '#fbbf24')}
+      {oreBlock('g1b', 1062, 648, 'url(#rfbd-lava-glow)', '#fbbf24')}
       {oreBlock('g2', 200, 458, 'url(#rfbd-lava-glow)', '#fbbf24')}
       {oreBlock('a1', 1728, 478, 'url(#rfbd-crystal-halo)', '#d8b4fe')}
 
@@ -457,48 +555,74 @@ export function CaveScene() {
           <rect x={x - 12} y={y - 14} width="24" height="28" rx="2" fill="#78350f" />
           <rect x={x - 8} y={y - 10} width="16" height="20" fill="#fbbf24" opacity="0.95" />
           <rect x={x - 4} y={y - 20} width="8" height="6" fill="#78350f" />
+          <rect x={x - 14} y={y - 26} width="28" height="6" fill="#3a3444" />
         </g>
       ))}
+
+      {/* Mineshaft timber under the rail, where it has left the floor. */}
+      {TRESTLE_XS.map((x) => {
+        const top = railUnderside(x);
+        const floor = FLOOR_STEPS[Math.min(Math.floor(x / FLOOR_STEP), FLOOR_STEPS.length - 1)];
+        return (
+          <g key={x}>
+            <rect x={x - 6} y={top} width="12" height={floor - top + 2} fill="#2c2836" />
+            <rect x={x - 20} y={top - 3} width="40" height="6" fill="#3a3444" />
+          </g>
+        );
+      })}
 
       {/* The rail line, slightly downhill, with a loaded cart rolling out.
           It sits above the news strip's cover line so the cart stays visible. */}
       <g transform="rotate(-3.5 960 780)">
         <rect x="-60" y="798" width="2100" height="10" fill="#0a0e1a" />
         {Array.from({ length: 24 }, (_, i) => (
-          <rect key={i} x={-40 + i * 90} y="788" width="14" height="30" rx="2" fill="#1e2a44" />
+          <rect key={i} x={-40 + i * 90} y="778" width="14" height="40" rx="2" fill="#1e2a44" />
         ))}
         <rect x="-60" y="780" width="2100" height="5" fill="#334b73" />
         <rect x="-60" y="812" width="2100" height="5" fill="#2a3d5e" />
         <g className="rf-bd-cart">
+          {/* Its load, in blocks like everything else down here, a glint on each. */}
+          {(
+            [
+              [2, 703, 20, '#0e7490', '#67e8f9'],
+              [22, 697, 24, '#7c5ce0', '#d8b4fe'],
+              [46, 703, 20, '#b45309', '#fbbf24'],
+            ] as const
+          ).map(([x, y, size, ore, glint], i) => (
+            <g key={x}>
+              <rect x={x} y={y} width={size} height={size} rx="2" fill={ore} />
+              <rect
+                className="rf-bd-glint"
+                x={x + 4}
+                y={y + 4}
+                width="7"
+                height="7"
+                fill={glint}
+                style={{ animationDelay: `${-i * 1.1}s` } as CSSProperties}
+              />
+            </g>
+          ))}
           <rect
             x="-10"
-            y="736"
+            y="719"
             width="86"
             height="44"
             rx="5"
             fill="#1b2438"
-            stroke="#31456b"
+            stroke="#3a5280"
             strokeWidth="2"
           />
-          <circle cx="12" cy="786" r="11" fill="#31456b" />
-          <circle cx="54" cy="786" r="11" fill="#31456b" />
-          <circle className="rf-bd-glint" cx="18" cy="734" r="6" fill="#67e8f9" />
-          <circle
-            className="rf-bd-glint"
-            cx="38"
-            cy="728"
-            r="7"
-            fill="#d8b4fe"
-            style={{ animationDelay: '-1.2s' } as CSSProperties}
-          />
-          <circle
-            className="rf-bd-glint"
-            cx="58"
-            cy="734"
-            r="6"
-            fill="#fbbf24"
-            style={{ animationDelay: '-2.1s' } as CSSProperties}
-          />
+          <rect x="-10" y="737" width="86" height="4" fill="#31456b" />
+          {/* The wheels stand on the rail, and turn as fast as the cart rolls. */}
+          {[12, 54].map((x) => (
+            <g key={x} transform={`translate(${x} ${780 - WHEEL_RADIUS})`}>
+              <circle r={WHEEL_RADIUS} fill="#31456b" />
+              <g className="rf-bd-spin" style={{ animationDuration: `${WHEEL_TURN_S}s` }}>
+                <rect x="-8" y="-1.5" width="16" height="3" fill="#0e1526" />
+                <rect x="-1.5" y="-8" width="3" height="16" fill="#0e1526" />
+              </g>
+            </g>
+          ))}
         </g>
       </g>
 
@@ -521,56 +645,32 @@ export function CaveScene() {
 
 /* ── Tech: the workshop ───────────────────────────────────── */
 
-/** Create-style cogwheel: chunky square teeth, thick ring, square hub. */
-function gear(
-  key: string,
-  cx: number,
-  cy: number,
-  r: number,
-  teeth: number,
-  durS: number,
-  body: string,
-  rim: string,
-  reverse = false,
-) {
-  const rects: ReactElement[] = [];
-  for (let i = 0; i < teeth; i++) {
-    const a = (360 / teeth) * i;
-    rects.push(
-      <rect
-        key={i}
-        x={cx - r * 0.12}
-        y={cy - r - r * 0.24}
-        width={r * 0.24}
-        height={r * 0.3}
-        rx={r * 0.03}
-        fill={rim}
-        transform={`rotate(${a} ${cx} ${cy})`}
-      />,
-    );
-  }
+/** Create-style cogwheel: chunky teeth, thick ring, square hub. Drawn around its own centre. */
+function gear(key: string, wheel: PlacedGear, body: string, rim: string) {
+  const disc = bodyRadius(wheel);
   return (
-    <g
-      key={key}
-      className="rf-bd-spin"
-      style={
-        {
-          animationDuration: `${durS}s`,
-          animationDirection: reverse ? 'reverse' : 'normal',
-        } as CSSProperties
-      }
-    >
-      {rects}
-      <circle cx={cx} cy={cy} r={r} fill={body} />
-      <circle cx={cx} cy={cy} r={r * 0.76} fill="none" stroke={rim} strokeWidth={r * 0.12} />
-      <rect
-        x={cx - r * 0.18}
-        y={cy - r * 0.18}
-        width={r * 0.36}
-        height={r * 0.36}
-        rx={r * 0.04}
-        fill="#0e0c18"
-      />
+    <g key={key} transform={`translate(${wheel.x} ${wheel.y}) rotate(${wheel.phase})`}>
+      <g
+        className="rf-bd-spin"
+        style={
+          {
+            animationDuration: `${wheel.turnSeconds}s`,
+            animationDirection: wheel.reverse ? 'reverse' : 'normal',
+          } as CSSProperties
+        }
+      >
+        <path d={teethPath(wheel)} fill={rim} />
+        <circle r={disc} fill={body} />
+        <circle r={disc * 0.76} fill="none" stroke={rim} strokeWidth={disc * 0.12} />
+        <rect
+          x={-disc * 0.18}
+          y={-disc * 0.18}
+          width={disc * 0.36}
+          height={disc * 0.36}
+          rx={disc * 0.04}
+          fill="#0e0c18"
+        />
+      </g>
     </g>
   );
 }
@@ -587,8 +687,11 @@ const ORE_FACES = {
 
 /** One marquee period of the belt — equal to the clip width, so when the
     animation snaps back by exactly this much, the wrap is invisible even
-    though the cargo is irregularly spaced. */
-const BELT_PERIOD = 1184;
+    though the cargo is irregularly spaced. It runs from inside one machine to
+    inside another: an end out in the open shows the cargo being cut off. */
+const BELT_START = 368;
+const BELT_PERIOD = 1320;
+const BELT_SPEED = 40;
 
 /** [pattern offset, ore, half-width, depth] — clustered and gapped by hand
     (pairs, stragglers, empty stretches) instead of an even parade. */
@@ -603,6 +706,7 @@ const BELT_ITEMS: Array<[number, keyof typeof ORE_FACES, number, number]> = [
   [748, 'diamond', 18, 13],
   [952, 'amethyst', 16, 11],
   [1060, 'redstone', 20, 14],
+  [1236, 'iron', 16, 12],
 ];
 
 export function TechScene() {
@@ -641,73 +745,37 @@ export function TechScene() {
       ))}
 
       {/* The great flywheel, half sunk behind the machines. */}
-      {gear('fly', 1560, 460, 220, 12, 70, '#191430', '#3d3663')}
-      {/* Five-gear train down the left wall. Meshing is geometry, not luck:
-          centres sit ≈1.09·(r₁+r₂) apart so teeth interleave without the
-          bodies touching, tooth counts keep the pitch near 2πr/n ≈ 40 for
-          every wheel, spin period scales with radius (0.217·r) so rim speeds
-          match, and direction alternates down the chain. */}
-      {gear('g1', 398, 484, 54, 8, 11.7, '#1c1633', '#494077')}
-      {gear('g2', 492, 604, 86, 13, 18.7, '#1c1633', '#494077', true)}
-      {gear('g3', 641, 556, 58, 9, 12.6, '#1c1633', '#494077')}
-      {gear('g4', 728, 656, 64, 10, 13.9, '#1c1633', '#494077', true)}
-      {gear('g5', 835, 606, 44, 7, 9.5, '#1c1633', '#494077')}
+      {gear('fly', loneGear(1560, 460, 220, 12, 70), '#191430', '#3d3663')}
+      {WORKSHOP_TRAIN.map((wheel, i) => gear(`g${i}`, wheel, '#1c1633', '#494077'))}
 
-      {/* Machine blocks, with vents and status lights on their faces. */}
-      {column('m1', 300, 700, 90, 45, 260, '#241d3f', '#151027', '#1c1633')}
+      {/* The machine the belt passes in front of. */}
       {column('m2', 1150, 740, 70, 35, 220, '#241d3f', '#151027', '#1c1633')}
-      {column('m3', 1750, 690, 84, 42, 270, '#241d3f', '#151027', '#1c1633')}
-      {(
-        [
-          [316, 796],
-          [1164, 830],
-          [1768, 790],
-        ] as const
-      ).map(([x, y], i) => (
-        <g key={i}>
-          <rect x={x} y={y} width="34" height="7" fill="#332c56" />
-          <rect x={x} y={y + 14} width="34" height="7" fill="#332c56" />
-          <rect
-            className="rf-bd-glint"
-            x={x + 44}
-            y={y + 2}
-            width="8"
-            height="8"
-            fill={i === 1 ? '#67e8f9' : '#fbbf24'}
-            style={{ animationDelay: `${-i * 1.4}s` } as CSSProperties}
-          />
-        </g>
-      ))}
-      {/* Energy cells glowing on two of them. */}
-      {(
-        [
-          [300, 682, '#67e8f9', 'url(#rfbd-cyan-glow)'],
-          [1750, 672, '#fbbf24', 'url(#rfbd-lava-glow)'],
-        ] as const
-      ).map(([x, y, dot, glow], i) => (
-        <g key={i} className="rf-bd-lava">
-          <circle cx={x} cy={y} r="54" fill={glow} />
-          <rect x={x - 16} y={y - 10} width="32" height="20" rx="3" fill={dot} opacity="0.85" />
-        </g>
-      ))}
 
       {/* The conveyor — one horizontal belt hauling raw ore across the hall. */}
       <g>
-        <rect x="390" y="816" width="16" height="116" fill="#1a1530" />
-        <rect x="1520" y="816" width="16" height="116" fill="#1a1530" />
-        <rect x="360" y="790" width="1200" height="26" rx="6" fill="#1a1530" />
+        <rect x="420" y="816" width="16" height="116" fill="#1a1530" />
+        <rect x="1040" y="816" width="16" height="116" fill="#1a1530" />
+        <rect x="1620" y="816" width="16" height="116" fill="#1a1530" />
+        <rect
+          x={BELT_START - 8}
+          y="790"
+          width={BELT_PERIOD + 16}
+          height="26"
+          rx="6"
+          fill="#1a1530"
+        />
+        {/* Its markings move with the cargo. */}
         <line
-          className="rf-bd-flow"
-          x1="368"
+          {...flowing(20, 20, BELT_SPEED)}
+          x1={BELT_START}
           y1="816"
-          x2="1552"
+          x2={BELT_START + BELT_PERIOD}
           y2="816"
           stroke="#494077"
           strokeWidth="5"
-          strokeDasharray="20 20"
         />
         <clipPath id="rfbd-belt-clip">
-          <rect x="368" y="726" width={BELT_PERIOD} height="66" />
+          <rect x={BELT_START} y="726" width={BELT_PERIOD} height="66" />
         </clipPath>
         <g clipPath="url(#rfbd-belt-clip)">
           {BELT_ITEMS.map(([off, ore, hw, depth], i) => {
@@ -715,11 +783,20 @@ export function TechScene() {
             // Bottoms pinned to the belt surface regardless of block size.
             const yTop = 800 - hw / 2 - depth;
             return (
-              <g key={i} className="rf-bd-belt-item">
-                {column(`ore${i}a`, 368 + off, yTop, hw, hw / 2, depth, top, left, right)}
+              <g
+                key={i}
+                className="rf-bd-belt-item"
+                style={
+                  {
+                    '--rf-belt-period': `${BELT_PERIOD}px`,
+                    animationDuration: `${BELT_PERIOD / BELT_SPEED}s`,
+                  } as CSSProperties
+                }
+              >
+                {column(`ore${i}a`, BELT_START + off, yTop, hw, hw / 2, depth, top, left, right)}
                 {column(
                   `ore${i}b`,
-                  368 + off - BELT_PERIOD,
+                  BELT_START + off - BELT_PERIOD,
                   yTop,
                   hw,
                   hw / 2,
@@ -772,6 +849,44 @@ export function TechScene() {
           />
         ))}
       </g>
+
+      {/* The two machines the belt runs between, over its ends, and the vents and
+          status lights on all three. */}
+      {column('m1', 300, 700, 90, 45, 260, '#241d3f', '#151027', '#1c1633')}
+      {column('m3', 1750, 690, 84, 42, 270, '#241d3f', '#151027', '#1c1633')}
+      {(
+        [
+          [316, 796],
+          [1164, 830],
+          [1768, 790],
+        ] as const
+      ).map(([x, y], i) => (
+        <g key={i}>
+          <rect x={x} y={y} width="34" height="7" fill="#332c56" />
+          <rect x={x} y={y + 14} width="34" height="7" fill="#332c56" />
+          <rect
+            className="rf-bd-glint"
+            x={x + 44}
+            y={y + 2}
+            width="8"
+            height="8"
+            fill={i === 1 ? '#67e8f9' : '#fbbf24'}
+            style={{ animationDelay: `${-i * 1.4}s` } as CSSProperties}
+          />
+        </g>
+      ))}
+      {/* Energy cells glowing on two of them. */}
+      {(
+        [
+          [300, 682, '#67e8f9', 'url(#rfbd-cyan-glow)'],
+          [1750, 672, '#fbbf24', 'url(#rfbd-lava-glow)'],
+        ] as const
+      ).map(([x, y, dot, glow], i) => (
+        <g key={i} className="rf-bd-lava">
+          <circle cx={x} cy={y} r="54" fill={glow} />
+          <rect x={x - 16} y={y - 10} width="32" height="20" rx="3" fill={dot} opacity="0.85" />
+        </g>
+      ))}
 
       {/* Tiled floor. */}
       <rect y="932" width="1920" height="148" fill="#120e20" />

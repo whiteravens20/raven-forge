@@ -16,7 +16,11 @@ export interface NewsItem {
   url?: string;
   imageUrl?: string;
   publishedAt: string;
+  /** What it says again in other languages, by language code. See `inLanguage`. */
+  translations?: Record<string, NewsTranslation>;
 }
+
+export type NewsTranslation = Partial<Pick<NewsItem, 'title' | 'excerpt' | 'body' | 'url'>>;
 
 export interface Announcement {
   id: string;
@@ -28,7 +32,13 @@ export interface Announcement {
   body?: string;
   url?: string;
   dismissible: boolean;
+  /** What it says again in other languages, by language code. See `inLanguage`. */
+  translations?: Record<string, AnnouncementTranslation>;
 }
+
+export type AnnouncementTranslation = Partial<
+  Pick<Announcement, 'message' | 'title' | 'body' | 'url'>
+>;
 
 /**
  * A feed, plus whether the last attempt to fetch it worked.

@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import type { UpdateInfo } from '@shared/ipc-types';
+import { failureText } from '../i18n';
 
 const api = window.ravenforge;
 
@@ -33,6 +34,8 @@ interface UpdaterStore {
 
   /** Download the pending update. Resolves true once it is ready to install. */
   download: () => Promise<boolean>;
+  /** Stop that download. It is offered again, as if it had not been started. */
+  cancelDownload: () => void;
   /** Restart into the update. Resolves false, with `error` set, when that failed. */
   install: () => Promise<boolean>;
   postpone: () => void;
@@ -58,7 +61,11 @@ export const useUpdaterStore = create<UpdaterStore>((set, get) => ({
       .download()
       .then((result) => {
         if (!result.success) {
-          set({ stage: 'failed', error: result.error ?? null });
+          set({ stage: 'failed', error: failureText(result, '') || null });
+          return false;
+        }
+        if (result.data === 'cancelled') {
+          set({ stage: 'idle', percent: 0, error: null });
           return false;
         }
         // `update-downloaded` also sets this; setting it here too means a caller
@@ -72,10 +79,14 @@ export const useUpdaterStore = create<UpdaterStore>((set, get) => ({
     return downloading;
   },
 
+  cancelDownload: () => {
+    void api.updater.cancelDownload();
+  },
+
   install: async () => {
     const result = await api.updater.install();
     // Success quits the launcher, so only a failure ever gets here.
-    if (!result.success) set({ error: result.error ?? null });
+    if (!result.success) set({ error: failureText(result, '') || null });
     return result.success;
   },
 
@@ -113,4 +124,12 @@ api.on('updater:update-downloaded', (info) => {
 
 api.on('progress:launcher-update', (event) => {
   useUpdaterStore.setState({ percent: Math.round(event.progress * 100) });
+});
+
+// Asked once the events above are being heard: the start-up check may have
+// answered before this module loaded, with nobody listening.
+void api.updater.getPending().then((result) => {
+  if (result.success && result.data && !useUpdaterStore.getState().available) {
+    useUpdaterStore.setState({ available: result.data });
+  }
 });

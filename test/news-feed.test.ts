@@ -2,6 +2,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { GlobalSettings } from '../src/shared/ipc-types';
+import { inLanguage } from '../src/shared/feed-language';
+import { announcementSchema, newsItemSchema } from '../src/shared/validators';
 
 const settings: Partial<GlobalSettings> = {};
 
@@ -219,5 +221,96 @@ describe('announcements', () => {
 
     fetchMock.mockResolvedValue(jsonResponse([announcement('b')]));
     expect((await fetchAnnouncements(true)).items.map((a) => a.id)).toEqual(['b']);
+  });
+});
+
+describe('translations in a feed', () => {
+  const written = {
+    id: 'a',
+    title: 'Serwer działa',
+    excerpt: 'Wchodź',
+    publishedAt: '2026-08-05T00:00:00Z',
+  };
+
+  it('needs none: an entry in one language reads as it always has', () => {
+    expect(inLanguage(newsItemSchema.parse(written), 'en').title).toBe('Serwer działa');
+  });
+
+  it('shows an entry in the language the launcher is set to', () => {
+    const item = newsItemSchema.parse({
+      ...written,
+      translations: { en: { title: 'The server is up', excerpt: 'Come in' } },
+    });
+    expect(inLanguage(item, 'en')).toMatchObject({ title: 'The server is up', excerpt: 'Come in' });
+    expect(inLanguage(item, 'pl')).toMatchObject({ title: 'Serwer działa', excerpt: 'Wchodź' });
+  });
+
+  it('leaves what a translation does not say as the entry has it', () => {
+    const item = newsItemSchema.parse({
+      ...written,
+      translations: { en: { title: 'The server is up', excerpt: '' } },
+    });
+    expect(inLanguage(item, 'en')).toMatchObject({ title: 'The server is up', excerpt: 'Wchodź' });
+  });
+
+  it('shows a language nobody translated into as it was written', () => {
+    const item = newsItemSchema.parse({ ...written, translations: { en: { title: 'Up' } } });
+    expect(inLanguage(item, 'de').title).toBe('Serwer działa');
+  });
+
+  it('takes the plain language for a regional one, and the other way round', () => {
+    const plain = newsItemSchema.parse({ ...written, translations: { pt: { title: 'Olá' } } });
+    expect(inLanguage(plain, 'pt-BR').title).toBe('Olá');
+    const regional = newsItemSchema.parse({
+      ...written,
+      translations: { 'pt-BR': { title: 'Oi' } },
+    });
+    expect(inLanguage(regional, 'pt').title).toBe('Oi');
+  });
+
+  it('costs a slip in one translation that translation and no more', () => {
+    const item = newsItemSchema.parse({
+      ...written,
+      translations: {
+        en: { title: 'The server is up' },
+        de: { title: 7 },
+        fr: { url: 'not an address' },
+        'not a language': { title: 'x' },
+        __proto__: { title: 'x' },
+      },
+    });
+    expect(Object.keys(item.translations ?? {})).toEqual(['en']);
+    expect(inLanguage(item, 'de').title).toBe('Serwer działa');
+  });
+
+  it.each([['a string'], [7], [['en']], [null]])(
+    'ignores translations that are not a map (%j), and keeps the entry',
+    (translations) => {
+      const parsed = newsItemSchema.safeParse({ ...written, translations });
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.translations).toBeUndefined();
+    },
+  );
+
+  it('does the same for an announcement, whose text is its message', () => {
+    const entry = announcementSchema.parse({
+      id: 'b',
+      message: 'Przerwa o 22:00',
+      type: 'warning',
+      dismissible: true,
+      translations: { en: { message: 'Maintenance at 22:00' } },
+    });
+    expect(inLanguage(entry, 'en').message).toBe('Maintenance at 22:00');
+    expect(inLanguage(entry, 'pl').message).toBe('Przerwa o 22:00');
+    expect(inLanguage(entry, 'en').type).toBe('warning');
+  });
+
+  it('asks at one address, whatever the language', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([written]));
+    settings.newsFeedUrl = freshUrl();
+    await fetchNews();
+    const asked = String(fetchMock.mock.calls[0][0]);
+    expect(asked).toBe(settings.newsFeedUrl);
+    expect(JSON.stringify(fetchMock.mock.calls[0][1])).not.toMatch(/language/i);
   });
 });

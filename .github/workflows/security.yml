@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -71,10 +71,16 @@ jobs:
           # Any allowlisted ID goes here as `allow-ghsas:`, and its justification
           # in .github/scripts/audit-allowlist.json. Keep the two in sync.
           #
-          # Deny licences that would conflict with redistributing the packaged
-          # app. Raven Forge is AGPL-3.0-only, and these two are not compatible
-          # with it, so a dependency under either cannot ship inside the installer.
-          deny-licenses: GPL-2.0-only, SSPL-1.0
+          # Raven Forge is AGPL-3.0-only and ships its dependencies inside the
+          # installer, so a dependency comes in only under a licence that can be
+          # combined with it. One under any other licence fails the review, and
+          # is let in by name (`allow-dependencies-licenses`) once it has been read.
+          allow-licenses: >-
+            0BSD, AGPL-3.0-only, AGPL-3.0-or-later, Apache-2.0, BlueOak-1.0.0,
+            BSD-2-Clause, BSD-3-Clause, BSL-1.0, CC-BY-4.0, CC0-1.0,
+            GPL-3.0-only, GPL-3.0-or-later, ISC, LGPL-2.1-or-later,
+            LGPL-3.0-only, LGPL-3.0-or-later, MIT, MIT-0, MPL-2.0, Python-2.0,
+            Unlicense, WTFPL, Zlib
 
   scan:
     name: Trivy secret & config scan
@@ -105,7 +111,7 @@ jobs:
           exit-code: '1'
 
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         if: always()
         with:
           sarif_file: trivy-fs.sarif

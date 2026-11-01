@@ -11,7 +11,7 @@ import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
-import { useT } from '@renderer/i18n';
+import { failureText, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import { isProject } from '@shared/mod-identity';
 import {
@@ -109,7 +109,7 @@ export function ContentPage() {
     if (result.success && result.data) setInstalled(result.data);
     // A list that could not be read is not an empty one: "nothing installed"
     // over a folder full of packs is the wrong thing to be told.
-    else setError(result.error ?? t('content.listFailed'));
+    else setError(failureText(result, t('content.listFailed')));
   }, [selectedId, kind, t]);
 
   useEffect(() => {
@@ -178,7 +178,7 @@ export function ContentPage() {
     try {
       const check = await api.content.checkInstall(selectedId, item);
       if (!check.success || !check.data) {
-        setError(check.error ?? t('content.installFailed', { name: item.name }));
+        setError(failureText(check, t('content.installFailed', { name: item.name })));
         return;
       }
       if (check.data.issues.length > 0) {
@@ -198,7 +198,7 @@ export function ContentPage() {
         ? await api.content.installShader(selectedId, item.id, versionId)
         : await api.content.installResourcePack(selectedId, item.id, versionId);
     if (!result.success) {
-      setError(result.error ?? t('content.installFailed', { name: item.name }));
+      setError(failureText(result, t('content.installFailed', { name: item.name })));
       return;
     }
     await loadInstalled();
@@ -228,7 +228,7 @@ export function ContentPage() {
         setError(
           result.errorMessage
             ? t(result.errorMessage.key, result.errorMessage.vars)
-            : (result.error ?? t('content.addFileFailed')),
+            : failureText(result, t('content.addFileFailed')),
         );
         return;
       }
@@ -254,7 +254,7 @@ export function ContentPage() {
     if (!state.success || !state.data) {
       // The pack is in; whether anything can read it is what could not be found
       // out, and that is worth knowing about a shader that then does nothing.
-      setError(state.error ?? t('content.loaderCheckFailed'));
+      setError(failureText(state, t('content.loaderCheckFailed')));
       return;
     }
     if (state.data.status === 'choose') setChoosingLoader(state.data.options);
@@ -269,7 +269,7 @@ export function ContentPage() {
     try {
       const result = await api.content.installShaderLoader(selectedId, projectId);
       if (result.success && result.data) setLoaderNote(result.data);
-      else setError(result.error ?? t('content.loaderFailed', { error: '' }));
+      else setError(failureText(result, t('content.loaderFailed', { error: '' })));
       setChoosingLoader(null);
     } finally {
       setInstallingLoader(false);
@@ -284,7 +284,7 @@ export function ContentPage() {
         kind === 'shaders'
           ? await api.content.removeShader(selectedId, id)
           : await api.content.removeResourcePack(selectedId, id);
-      if (!result.success) setError(result.error ?? t('content.removeFailed'));
+      if (!result.success) setError(failureText(result, t('content.removeFailed')));
       await loadInstalled();
     } finally {
       setBusyId(null);
@@ -312,7 +312,7 @@ export function ContentPage() {
       next.map((p) => p.id),
     );
     if (!result.success) {
-      setError(result.error ?? t('content.reorderFailed'));
+      setError(failureText(result, t('content.reorderFailed')));
       await loadInstalled();
     }
   };

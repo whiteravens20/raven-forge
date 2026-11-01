@@ -4,8 +4,8 @@
 # Tags created on any other branch are refused by the guard job.
 #
 # Produces, for one tag:
-#   Raven-Forge-Launcher-Setup-<ver>.exe   NSIS installer, Authenticode-signed
-#   raven-forge-launcher_<ver>_amd64.deb   Debian 11+ / Ubuntu 20.04+
+#   Raven-Forge-Launcher-Setup-<ver>.exe   NSIS installer, signed when the certificate is set
+#   raven-forge-launcher_<ver>_amd64.deb   Debian 12+ / Ubuntu 22.04+
 #   Raven-Forge-Launcher-<ver>.AppImage    any x64 glibc >= 2.25
 #   latest.yml / latest-linux.yml + .blockmap   electron-updater feeds
 #   SHA256SUMS.txt                         checksums over every artefact
@@ -123,7 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -239,7 +239,7 @@ jobs:
           cat "SHA256SUMS-${{ matrix.target }}.txt"
 
       - name: Upload artefacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.target }}
           if-no-files-found: error
@@ -264,7 +264,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -281,16 +281,47 @@ jobs:
       - name: CycloneDX SBOM
         run: npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-format JSON --output-file sbom.cdx.json
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom
           path: sbom.cdx.json
           if-no-files-found: error
 
-  # ── Job 4: publish one draft release with everything attached ──────────────
+  # ── Job 4: scan what ships, before anything is released ────────────────────
+  # The dependencies that end up inside the installer are audited the way the
+  # Security workflow audits them (audit-check.mjs: production at moderate, with
+  # the allowlist's justifications and expiries), and every tarball's registry
+  # signature is verified. The draft release waits for it, so no artefact of a
+  # tag is published past a known hole.
+  scan:
+    name: Scan what ships
+    needs: [check-branch, check-version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Audit production dependencies (moderate)
+        run: node .github/scripts/audit-check.mjs --omit=dev --audit-level moderate
+
+      # --ignore-scripts: no keytar rebuild and no Electron download, neither of
+      # which changes a tarball's signature.
+      - name: Install (for signature audit)
+        run: npm ci --ignore-scripts
+
+      - name: Verify package signatures
+        run: npm audit signatures
+
+  # ── Job 5: publish one draft release with everything attached ──────────────
   release:
     name: Publish draft release
-    needs: [check-branch, build, sbom]
+    needs: [check-branch, build, sbom, scan]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release
@@ -302,17 +333,18 @@ jobs:
           fetch-depth: 0 # tag message + release-note diffing
 
       - name: Download every artefact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
           merge-multiple: true
 
       # One SHA256SUMS.txt for the whole release, assembled from the per-OS
-      # files each runner produced. The per-OS files are not published.
+      # files each runner produced, with the SBOM's line added. The per-OS files
+      # are not published.
       - name: Assemble checksums
         working-directory: artifacts
         run: |
-          cat SHA256SUMS-*.txt | sort -k2 > SHA256SUMS.txt
+          { cat SHA256SUMS-*.txt; sha256sum sbom.cdx.json; } | sort -k2 > SHA256SUMS.txt
           rm -f SHA256SUMS-*.txt
           echo '### Artefacts' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -330,6 +362,7 @@ jobs:
             artifacts/*.exe
             artifacts/*.deb
             artifacts/*.AppImage
+            artifacts/sbom.cdx.json
 
       # The same attestation as a release asset, so it travels with the installers.
       - name: Keep the attestation bundle
@@ -375,7 +408,7 @@ jobs:
             | Platform | File | Notes |
             |---|---|---|
             | Windows 10 1809+ / 11 | `Raven-Forge-Launcher-Setup-*.exe` | NSIS installer, nothing to install first |
-            | Debian 11+ / Ubuntu 20.04+ | `raven-forge-launcher_*_amd64.deb` | recommended on Linux — apt pulls everything |
+            | Debian 12+ / Ubuntu 22.04+ | `raven-forge-launcher_*_amd64.deb` | recommended on Linux — apt pulls everything |
             | Any x64 Linux, glibc ≥ 2.25 | `Raven-Forge-Launcher-*.AppImage` | needs libraries installed by hand, see below |
 
             Java is not on this list. The launcher downloads the JRE each profile

@@ -53,6 +53,18 @@ describe('requiredJavaFor', () => {
     expect(requiredJavaFor('25w14a')).toBe(25);
   });
 
+  it('gives the oldest Java to a snapshot whose metadata is there and names none', () => {
+    // Every such version is from the summer of 2013; 13w38c does not start on 25.
+    expect(requiredJavaFor('13w38c', {})).toBe(8);
+    expect(requiredJavaFor('13w24a', { javaVersion: undefined })).toBe(8);
+  });
+
+  it('still goes by what a snapshot’s metadata says, when it says', () => {
+    expect(requiredJavaFor('25w14a', { javaVersion: { component: 'x', majorVersion: 21 } })).toBe(
+      21,
+    );
+  });
+
   it.each([
     ['a path traversal', '../../../../usr/bin/evil'],
     ['a relative segment', '..'],

@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Play, RefreshCw, Terminal, Gamepad2, X, Square } from 'lucide-react';
 import { useProfileStore } from '@stores/profile-store';
 import { useAuthStore } from '@stores/auth-store';
@@ -17,6 +17,7 @@ import { CrashReporter } from '@components/CrashReporter';
 import { ArticleReader, type Article } from '@components/ArticleReader';
 import { ForgeBackdrop } from '@components/layout/ForgeBackdrop';
 import { useLocale, useT } from '@renderer/i18n';
+import { inLanguage } from '@shared/feed-language';
 import { loaderLabel } from '@shared/labels';
 import { useUpdaterStore } from '@stores/updater-store';
 
@@ -43,8 +44,8 @@ export function HomePage() {
   const accounts = useAuthStore((s) => s.accounts);
   const accountsLoaded = useAuthStore((s) => s.loaded);
 
-  const news = useNewsStore((s) => s.news);
-  const announcements = useNewsStore((s) => s.announcements);
+  const feedNews = useNewsStore((s) => s.news);
+  const feedAnnouncements = useNewsStore((s) => s.announcements);
   const dismissedIds = useNewsStore((s) => s.dismissedIds);
   const dismiss = useNewsStore((s) => s.dismiss);
   const refreshNews = useNewsStore((s) => s.refresh);
@@ -87,6 +88,11 @@ export function HomePage() {
   const updateFirst = Boolean(pendingUpdate) && !updatePostponed && updateStage !== 'failed';
   const t = useT();
   const locale = useLocale();
+  const news = useMemo(() => feedNews.map((item) => inLanguage(item, locale)), [feedNews, locale]);
+  const announcements = useMemo(
+    () => feedAnnouncements.map((item) => inLanguage(item, locale)),
+    [feedAnnouncements, locale],
+  );
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
@@ -106,8 +112,8 @@ export function HomePage() {
     // failed or never-completed check leaves `available` null and play proceeds.
     if (updateFirst) {
       const ready = await downloadUpdate();
-      // Quits and relaunches into the new version — unless it could not, and
-      // being unable to update is not a reason to be unable to play.
+      // Quits and relaunches into the new version — unless it could not, or the
+      // download was cancelled, and neither is a reason to be unable to play.
       if (ready && (await installUpdate())) return;
     }
 

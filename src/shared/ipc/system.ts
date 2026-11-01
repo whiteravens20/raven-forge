@@ -3,6 +3,8 @@
 // The host machine, as the About and Settings pages report it.
 // Part of the IPC contract — see `../ipc-types.ts`.
 
+import type { UpdateUnsupportedReason } from './updater';
+
 export interface SystemInfo {
   /**
    * `app.getVersion()` — the version of the build that is actually running,
@@ -13,6 +15,8 @@ export interface SystemInfo {
   dataDirectory: string;
   /** Where the crash reports land, so Settings can offer to open it. */
   crashReportsDirectory: string;
+  /** Why this build does not update itself, and asks nobody about it; `null` when it does. */
+  updateUnsupported: UpdateUnsupportedReason | null;
 }
 
 /** One place the launcher writes to. The renderer names it; this locates it. */

@@ -185,6 +185,8 @@ export const en = {
     'The shader pack is inside a folder ({folder}) in that archive, and it is only read when its shaders folder is at the top level. Zip what is in that folder, not the folder itself.',
   'contentError.ownedByPack':
     '{name} is already here, put there by the modpack this profile follows. A sync would put the modpack’s copy back.',
+  'error.noConnection':
+    'Could not connect. Check your internet connection and, if you use one, the proxy in Settings, then try again.',
   'home.showConsole': 'Show console',
   'home.hideConsole': 'Hide console',
   'home.news': 'News',
@@ -196,7 +198,8 @@ export const en = {
   'home.newsOlder': 'Older news',
   'home.newsNewer': 'Newer news',
   'home.newsStale': 'Could not refresh the feed — these are the last entries loaded.',
-  'home.newsUnavailable': 'Could not load the news feed. Check the feed address in Settings.',
+  'home.newsUnavailable':
+    'Could not load the news feed. Check your connection, or the feed address in Settings.',
   'news.openInBrowser': 'Open in browser',
   'news.noBody': 'This entry carries no further text.',
   'home.ram': '{mb} MB RAM',
@@ -348,6 +351,15 @@ export const en = {
   'packs.installUnfinished':
     'Profile “{name}” was created, but its files did not all arrive. Press “{action}” on the profile and the install carries on from where it stopped. The reason given: {error}',
   'packs.importFailed': 'Could not import that pack.',
+  'packs.review.title': 'Mods the launcher cannot vouch for',
+  'packs.review.body':
+    'A mod is a program, and it can reach everything your user account can. Modrinth reviews what it publishes and has no record of these files, so nobody has looked at them for you. Go on only if you trust whoever gave you this pack.',
+  'packs.review.bodyUnchecked':
+    'A mod is a program, and it can reach everything your user account can. Modrinth reviews what it publishes, but it could not be reached just now to ask about these files. Go on only if you trust whoever gave you this pack.',
+  'packs.review.follows':
+    'It is not signed by a key you trust, and what it installs can change at any later sync.',
+  'packs.review.insidePack': 'inside the pack',
+  'packs.review.install': 'Install anyway',
   'packs.manifestFailed': 'That address holds neither a pack nor a manifest.',
   'packs.wrSyncNote': 'These profiles follow the server: every sync brings whatever changed.',
   'packs.mods.one': '{count} mod',
@@ -502,6 +514,9 @@ export const en = {
   'mods.loaderFilter': 'Loader',
   'mods.searchFailed': 'Search failed',
   'mods.installFailed': 'Could not install {name}',
+  'mods.filterInstalled': 'Filter installed mods…',
+  'mods.filterCount': '{shown} of {total}',
+  'mods.filterNothing': 'No installed mod matches “{query}”.',
   'mods.empty': 'No mods installed',
   'mods.emptyHint': 'Search for mods in the Browse tab, or sync the profile with a manifest',
   'mods.fromManifest': 'from the pack',
@@ -587,6 +602,9 @@ export const en = {
   'settings.section.updates': 'Updates',
   'settings.installedVersion': 'Installed version: {version}',
   'settings.checkUpdates': 'Check for updates',
+  'settings.checkUpdatesOnStart': 'Check for a new version at every start',
+  'settings.checkUpdatesOnStartHint':
+    'One request to GitHub. Switched off, you hear of a new version, security fixes included, only when you press “Check for updates”.',
   'settings.downloadUpdate': 'Download update',
   'settings.restartToUpdate': 'Restart to install',
   'settings.updateUpToDate': 'You are on the newest release.',
@@ -791,8 +809,7 @@ export const en = {
   // ── About ────────────────────────────────────────────────
   'about.tagline':
     'A custom Minecraft: Java Edition launcher with mod management, auto-sync from server manifests, and profiles.',
-  'about.authorship':
-    'Written from scratch by one person — {author} — under the {org} banner, for a server of his own and the players on it.',
+  'about.authorship': 'Made under the {org} banner, for a server of his own and the players on it.',
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Secret of the forge',
   'about.privacy': 'Privacy',
@@ -900,15 +917,16 @@ export const en = {
   'privacy.dest.loaders.when': 'when choosing and installing a loader',
   'privacy.dest.modrinth.who': 'Modrinth',
   'privacy.dest.modrinth.when':
-    'when you look for mods and packs, open the list of what is installed, check for updates, or add a mod from a file',
+    'when you look for mods and packs, open the list of what is installed, check for updates, add a mod from a file, or take a pack from a file or a link',
   'privacy.dest.modrinth.sends':
-    'What you type in the search box, and the filters you set. Opening a profile’s list of mods, shaders or resource packs sends the identifiers of the ones you have — that is how the launcher fetches their descriptions and icons, and it remembers the answer for a week. Checking for updates, or exporting a pack, also sends a hash of each mod file in that profile, and adding a mod from a file sends the hash of that one file. Nothing that says who you are — the request introduces the launcher that is asking, not a person.',
+    'What you type in the search box, and the filters you set. Opening a profile’s list of mods, shaders or resource packs sends the identifiers of the ones you have — that is how the launcher fetches their descriptions and icons, and it remembers the answer for a week. Checking for updates, or exporting a pack, also sends a hash of each mod file in that profile, and adding a mod from a file sends the hash of that one file. Taking a pack from a file or a link sends the hashes of the mods in it that do not come from Modrinth. Nothing that says who you are — the request introduces the launcher that is asking, not a person.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'news, the list of server packs, and the packs themselves',
   'privacy.dest.updates.who': 'GitHub',
   'privacy.dest.updates.when': 'at every start, and when you check for updates',
-  'privacy.dest.updates.sends':
-    'One question: is there a newer version? It happens on its own at every start, and there is currently no way to switch that off.',
+  'privacy.dest.updates.whenAsked': 'when you check for updates',
+  'privacy.dest.updates.whenNever': 'never: this build does not update itself',
+  'privacy.dest.updates.sends': 'One question: is there a newer version?',
   'privacy.dest.feeds': 'News, as set up on this computer:',
   'privacy.dest.feedOff': 'off — nothing is being downloaded',
 
@@ -930,7 +948,7 @@ export const en = {
   'privacy.control.packs':
     'Packs: a profile that follows a pack asks the address in its “Manifest URL” field about it — when the launcher starts and before every launch of the game. Remove that address in the profile editor and the profile stops asking, and stops updating.',
   'privacy.control.updates':
-    'Launcher updates: checked at every start with one request to GitHub. This cannot be switched off yet.',
+    'Launcher updates: Settings → Updates → “Check for a new version at every start”, on by default. It is one request to GitHub. Switched off, the launcher asks only when you press “Check for updates”.',
   'privacy.control.diagnostics':
     'Logs and crash reports: they do not leave the computer until you send them to someone yourself. “Report a bug” opens the issue page in your browser, and you attach the file by hand.',
   'privacy.control.location':

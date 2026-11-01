@@ -32,6 +32,7 @@ import type {
   MrpackExport,
   MrpackExportOptions,
   OrphanedProfile,
+  PackImport,
   PackInstall,
   WorldBackup,
   WorldBackupReason,
@@ -69,7 +70,12 @@ import type {
 } from './ipc/settings';
 import type { Announcement, FeedResult, NewsItem } from './ipc/news';
 import type { GameExitInfo, GameLogLine, LaunchOptions } from './ipc/game';
-import type { ManifestVerification, UpdateCheck, UpdateInfo } from './ipc/updater';
+import type {
+  ManifestVerification,
+  UpdateCheck,
+  UpdateDownloadEnd,
+  UpdateInfo,
+} from './ipc/updater';
 import type { LogTail, StorageReport, SystemInfo } from './ipc/system';
 
 // Naming convention: "domain:action"
@@ -165,9 +171,9 @@ export interface InvokeChannels {
   /** Create a profile that follows a manifest URL and keeps updating from it. */
   'packs:create-from-manifest': (url: string) => Promise<IpcResult<PackInstall>>;
   /** Create a profile from a link to either a `.mrpack` or a manifest, sniffed apart. */
-  'packs:create-from-url': (url: string) => Promise<IpcResult<PackInstall>>;
+  'packs:create-from-url': (url: string, accepted?: string[]) => Promise<IpcResult<PackImport>>;
   /** Import a Modrinth `.mrpack` as a new profile — a snapshot, not a subscription. */
-  'packs:import-mrpack': (filePath: string) => Promise<IpcResult<PackInstall>>;
+  'packs:import-mrpack': (filePath: string, accepted?: string[]) => Promise<IpcResult<PackImport>>;
   /**
    * Install a modpack found by searching Modrinth: the newest version that fits
    * the Minecraft version and loader given, or simply the newest.
@@ -343,7 +349,9 @@ export interface InvokeChannels {
 
   // -- Updater --
   'updater:check': () => Promise<IpcResult<UpdateCheck>>;
-  'updater:download': () => Promise<IpcResult<void>>;
+  'updater:get-pending': () => Promise<IpcResult<UpdateInfo | null>>;
+  'updater:download': () => Promise<IpcResult<UpdateDownloadEnd>>;
+  'updater:cancel-download': () => Promise<IpcResult<void>>;
   'updater:install': () => Promise<IpcResult<void>>; // quits and installs
 
   // -- System --
@@ -526,7 +534,9 @@ export interface RavenForgeAPI {
   };
   updater: {
     check: InvokeChannels['updater:check'];
+    getPending: InvokeChannels['updater:get-pending'];
     download: InvokeChannels['updater:download'];
+    cancelDownload: InvokeChannels['updater:cancel-download'];
     install: InvokeChannels['updater:install'];
   };
   system: {

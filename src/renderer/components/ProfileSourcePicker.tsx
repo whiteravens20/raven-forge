@@ -7,10 +7,17 @@ import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
-import { localized, useLocale, useT } from '@renderer/i18n';
+import { failureText, localized, useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import { formatRamGb, ramAdvice, safeMaxRamMb } from '@shared/memory';
-import type { CataloguePack, IpcResult, PackInstall, Profile } from '@shared/ipc-types';
+import type {
+  CataloguePack,
+  IpcResult,
+  PackImport,
+  PackInstall,
+  PackReview,
+  Profile,
+} from '@shared/ipc-types';
 import { useDialogFocus } from '@hooks/use-dialog-focus';
 import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 
@@ -30,6 +37,12 @@ interface Props {
 }
 
 type Route = 'choose' | 'white-ravens' | 'modrinth' | 'import';
+
+/** Why a pack's files did not all arrive, or nothing when they did. */
+function unfinishedText(install: PackInstall): string | undefined {
+  if (!install.failure) return undefined;
+  return failureText({ error: install.failure, errorMessage: install.failureMessage }, '');
+}
 
 /**
  * Where a new profile comes from.
@@ -53,14 +66,21 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [packUrl, setPackUrl] = useState('');
+  /** A pack that brings something nobody has looked at, and how to go on with it. */
+  const [asking, setAsking] = useState<{
+    review: PackReview;
+    accept: (names: string[]) => Promise<void>;
+  } | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onCancel();
+      if (e.key !== 'Escape' || busy) return;
+      if (asking) setAsking(null);
+      else onCancel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel, busy]);
+  }, [onCancel, busy, asking]);
 
   // Fetched when that route is opened, not on mount: the other routes never
   // need it, and a network round trip to draw a menu is a menu that lags.
@@ -76,7 +96,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
       if (r.success && r.data) setPacks(r.data);
       else {
         setListFailed(true);
-        setError(r.error ?? t('packs.listFailed'));
+        setError(failureText(r, t('packs.listFailed')));
       }
     });
     return () => {
@@ -93,9 +113,31 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
    * staying here to offer "Install" again is how each retry used to leave
    * another half-filled profile of the same name behind.
    */
-  const installed = (result: IpcResult<PackInstall>, fallback: string) => {
-    if (!result.success || !result.data) setError(result.error ?? fallback);
-    else onCreated(result.data.profile, { unfinished: result.data.failure });
+  const installed = (
+    result: IpcResult<PackImport>,
+    fallback: string,
+    ask?: (review: PackReview) => void,
+  ) => {
+    if (!result.success || !result.data) setError(failureText(result, fallback));
+    else if ('review' in result.data) ask?.(result.data.review);
+    else onCreated(result.data.profile, { unfinished: unfinishedText(result.data) });
+  };
+
+  /** A pack somebody handed over: the player is asked first when it needs that. */
+  const handedOver = async (
+    token: string,
+    take: (accepted?: string[]) => Promise<IpcResult<PackImport>>,
+    fallback: string,
+    accepted?: string[],
+  ): Promise<void> => {
+    setBusy(token);
+    setError(null);
+    const result = await take(accepted);
+    setBusy(null);
+    setAsking(null);
+    installed(result, fallback, (review) =>
+      setAsking({ review, accept: (names) => handedOver(token, take, fallback, names) }),
+    );
   };
 
   const installPack = async (pack: CataloguePack) => {
@@ -110,11 +152,12 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     const picked = await api.system.selectFile([{ name: 'Modrinth pack', extensions: ['mrpack'] }]);
     if (!picked.success || !picked.data) return;
 
-    setBusy('file');
-    setError(null);
-    const result = await api.packs.importMrpack(picked.data);
-    setBusy(null);
-    installed(result, t('packs.importFailed'));
+    const file = picked.data;
+    await handedOver(
+      'file',
+      (accepted) => api.packs.importMrpack(file, accepted),
+      t('packs.importFailed'),
+    );
   };
 
   // The settings of one profile, as this launcher's own Export wrote them. It
@@ -125,7 +168,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
     setError(null);
     const result = await api.profiles.import();
     setBusy(null);
-    if (!result.success) setError(result.error ?? t('packs.profileFileFailed'));
+    if (!result.success) setError(failureText(result, t('packs.profileFileFailed')));
     else if (result.data) onCreated(result.data.profile, { dropped: result.data.dropped });
   };
 
@@ -135,11 +178,11 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   const followUrl = async () => {
     const url = packUrl.trim();
     if (!url) return;
-    setBusy('url');
-    setError(null);
-    const result = await api.packs.createFromUrl(url);
-    setBusy(null);
-    installed(result, t('packs.manifestFailed'));
+    await handedOver(
+      'url',
+      (accepted) => api.packs.createFromUrl(url, accepted),
+      t('packs.manifestFailed'),
+    );
   };
 
   return (
@@ -156,7 +199,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
         aria-labelledby="source-title"
       >
         <header className="flex items-center gap-2 border-b border-rf-border px-5 py-3">
-          {route !== 'choose' && (
+          {route !== 'choose' && !asking && (
             <button
               onClick={() => {
                 setRoute('choose');
@@ -172,13 +215,15 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
             </button>
           )}
           <h2 id="source-title" className="flex-1 text-sm font-display font-semibold text-rf-text">
-            {route === 'choose'
-              ? t('packs.title')
-              : route === 'white-ravens'
-                ? t('packs.wrTitle')
-                : route === 'modrinth'
-                  ? t('packs.modrinthTitle')
-                  : t('packs.importTitle')}
+            {asking
+              ? t('packs.review.title')
+              : route === 'choose'
+                ? t('packs.title')
+                : route === 'white-ravens'
+                  ? t('packs.wrTitle')
+                  : route === 'modrinth'
+                    ? t('packs.modrinthTitle')
+                    : t('packs.importTitle')}
           </h2>
           <button
             onClick={onCancel}
@@ -193,7 +238,16 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
         <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
           {error && <Banner type="urgent">{error}</Banner>}
 
-          {route === 'choose' && (
+          {asking && (
+            <PackReviewPanel
+              review={asking.review}
+              busy={Boolean(busy)}
+              onCancel={() => setAsking(null)}
+              onAccept={() => void asking.accept(asking.review.unknown.map((file) => file.key))}
+            />
+          )}
+
+          {!asking && route === 'choose' && (
             <>
               <SourceCard
                 icon={<Server size={18} />}
@@ -223,7 +277,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
             </>
           )}
 
-          {route === 'white-ravens' && (
+          {!asking && route === 'white-ravens' && (
             <>
               {/* Said before the install, not after it: the pack downloads for
                   anyone, and finding out at the connect screen that the server
@@ -304,14 +358,16 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
             </>
           )}
 
-          {route === 'modrinth' && (
+          {!asking && route === 'modrinth' && (
             <ModrinthPackSearch
               onBusy={(installing) => setBusy(installing ? 'modrinth' : null)}
-              onInstalled={(install) => onCreated(install.profile, { unfinished: install.failure })}
+              onInstalled={(install) =>
+                onCreated(install.profile, { unfinished: unfinishedText(install) })
+              }
             />
           )}
 
-          {route === 'import' && (
+          {!asking && route === 'import' && (
             <>
               <div className="rounded-lg border border-rf-border p-3">
                 <p className="text-sm font-medium text-rf-text">{t('packs.fileTitle')}</p>
@@ -376,6 +432,50 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * What a pack brings that nobody has looked at, before anything of it is on the
+ * disk. Going back is the first thing on offer and the one that does nothing.
+ */
+function PackReviewPanel({
+  review,
+  busy,
+  onCancel,
+  onAccept,
+}: {
+  review: PackReview;
+  busy: boolean;
+  onCancel: () => void;
+  onAccept: () => void;
+}) {
+  const t = useT();
+  return (
+    <>
+      <p className="text-sm font-medium text-rf-text">{review.name}</p>
+      <Banner type="warning">
+        {t(review.unchecked ? 'packs.review.bodyUnchecked' : 'packs.review.body')}
+      </Banner>
+      {review.follows && <p className="text-xs text-rf-warning">{t('packs.review.follows')}</p>}
+      <ul className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-rf-border p-3">
+        {review.unknown.map((file) => (
+          <li key={`${file.path} ${file.key}`} className="text-xs text-rf-text-muted">
+            <span className="break-all font-mono text-rf-text">{file.path}</span>
+            {' — '}
+            {file.from ?? t('packs.review.insidePack')}
+          </li>
+        ))}
+      </ul>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="secondary" disabled={busy} onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button size="sm" variant="danger" loading={busy} onClick={onAccept}>
+          {t('packs.review.install')}
+        </Button>
+      </div>
+    </>
   );
 }
 

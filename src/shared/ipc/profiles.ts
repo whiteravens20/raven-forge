@@ -3,6 +3,8 @@
 // A profile: what it targets, what it has played, what it owns on disk.
 // Part of the IPC contract — see `../ipc-types.ts`.
 
+import type { ErrorMessage } from './common';
+
 export type ModLoaderType = 'vanilla' | 'forge' | 'neoforge' | 'fabric' | 'quilt';
 
 /** A mod loader build offered for a given Minecraft version. */
@@ -59,6 +61,8 @@ export interface ProfileSyncStatus {
   pendingUpdates: number;
   status: 'synced' | 'updates-available' | 'error' | 'never-synced';
   errorMessage?: string;
+  /** The failure above is that nothing could be reached, and is said as that. */
+  noConnection?: boolean;
   /**
    * Set for a profile made from a pack file rather than from an address. It
    * follows nothing, so there is never an update to fetch — but the pack it was
@@ -81,7 +85,32 @@ export interface PackInstall {
   profile: Profile;
   /** Why the install stopped short, in the main process's own words. */
   failure?: string;
+  /** The same in the player's language, where there is a way to say it. */
+  failureMessage?: ErrorMessage;
 }
+
+/** A file in a pack that can run code, and that Modrinth has no record of. */
+export interface UnknownPackFile {
+  /** Where it would land in the game directory. */
+  path: string;
+  /** The host it is fetched from, or `null` when it travels inside the pack. */
+  from: string | null;
+  /** What accepting it names: its hash, so that other bytes are asked about again. */
+  key: string;
+}
+
+/** A pack held back until the player has seen what it brings: see `pack-review.ts`. */
+export interface PackReview {
+  name: string;
+  unknown: UnknownPackFile[];
+  /** Modrinth could not be asked, so nothing on the list was looked up. */
+  unchecked: boolean;
+  /** It follows a manifest, so what it installs can change at any later sync. */
+  follows: boolean;
+}
+
+/** What taking a pack from a file or a link came to: a profile, or a question first. */
+export type PackImport = PackInstall | { review: PackReview };
 
 /**
  * What a profile owns on disk, so deleting it can say what that costs.

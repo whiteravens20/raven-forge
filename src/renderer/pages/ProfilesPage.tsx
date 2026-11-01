@@ -37,7 +37,7 @@ import { isAllocatableRam, isManifestUrl, isServerPort } from '@shared/profile-d
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
 import { useMachineMemoryMb } from '@hooks/use-machine-memory';
-import { useLocale, useT, type TranslationKey } from '@renderer/i18n';
+import { failureText, useLocale, useT, type TranslationKey } from '@renderer/i18n';
 import { MAX_GAME_DIMENSION, MIN_GAME_HEIGHT, MIN_GAME_WIDTH } from '@shared/constants';
 import { GAME_LANGUAGES } from '@shared/game-languages';
 import { loaderLabel } from '@shared/labels';
@@ -254,14 +254,14 @@ export function ProfilesPage() {
         await reload();
         select(profileId);
       } else {
-        setActionError(result.error ?? t('orphans.restoreFailed'));
+        setActionError(failureText(result, t('orphans.restoreFailed')));
       }
     });
 
   const discard = (profileId: string) =>
     whileOrphanBusy(profileId, async () => {
       const r = await api.profiles.discardOrphaned(profileId);
-      if (!r.success) setActionError(r.error ?? t('orphans.discardFailed'));
+      if (!r.success) setActionError(failureText(r, t('orphans.discardFailed')));
     });
   /**
    * The profiles a sync was started for from this page and has not come back.
@@ -393,7 +393,7 @@ export function ProfilesPage() {
       // profile exactly as it was rather than half-changed.
       const backup = await api.profiles.backupWorlds(selectedProfile.id, 'version-change');
       if (!backup.success) {
-        setActionError(backup.error ?? t('versionChange.backupFailed'));
+        setActionError(failureText(backup, t('versionChange.backupFailed')));
         return;
       }
     }
@@ -407,7 +407,7 @@ export function ProfilesPage() {
     // The form stays open over what was typed. It used to close either way,
     // and a profile the main process had refused was simply not there.
     if (saved && !saved.success) {
-      setSaveError(saved.error ?? t('profileForm.saveFailed'));
+      setSaveError(failureText(saved, t('profileForm.saveFailed')));
       return;
     }
     setMode('view');
@@ -462,7 +462,7 @@ export function ProfilesPage() {
     // nothing stopped; when it did stop, the sync returning is what clears this.
     if (!r.success || !r.data) {
       stopCancelling(id);
-      setActionError(r.error ?? t('profiles.cancelSyncFailed'));
+      setActionError(failureText(r, t('profiles.cancelSyncFailed')));
     }
   };
 
@@ -477,14 +477,14 @@ export function ProfilesPage() {
     // Said either way: the copy is everything but the world backups, and
     // whoever goes looking for those in it should not conclude they were lost.
     if (r.success) setNotice(t('profiles.duplicated'));
-    else setActionError(r.error ?? t('profiles.duplicateFailed'));
+    else setActionError(failureText(r, t('profiles.duplicateFailed')));
   };
 
   const handleExport = async () => {
     if (!selectedId) return;
     const r = await api.profiles.export(selectedId);
     if (!r.success || !r.data) {
-      setActionError(r.error ?? t('profiles.exportFailed'));
+      setActionError(failureText(r, t('profiles.exportFailed')));
       return;
     }
     const blob = new Blob([r.data], { type: 'application/json' });
@@ -521,7 +521,7 @@ export function ProfilesPage() {
     setExportingPack(true);
     try {
       const r = await api.profiles.exportPack(selectedId, { settings: exportSettings });
-      if (!r.success) setActionError(r.error ?? t('profiles.exportPackFailed'));
+      if (!r.success) setActionError(failureText(r, t('profiles.exportPackFailed')));
       else if (r.data) setExported(r.data);
       setAskingExport(false);
     } finally {
@@ -828,7 +828,7 @@ export function ProfilesPage() {
             setDeleting(null);
             setActionError(null);
             void removeProfile(id, deleteFiles).then((r) => {
-              if (!r.success) setActionError(r.error ?? t('profiles.deleteFailed'));
+              if (!r.success) setActionError(failureText(r, t('profiles.deleteFailed')));
               // Files that would not go are listed as kept; show them now.
               void refreshOrphans();
             });
@@ -1002,7 +1002,7 @@ function ProfileDetail({
               a manifest refused over its signature alike. */}
           {syncStatus?.status === 'error' && syncStatus.errorMessage && (
             <p role="alert" className="break-words text-xs text-rf-danger">
-              {syncStatus.errorMessage}
+              {syncStatus.noConnection ? t('error.noConnection') : syncStatus.errorMessage}
             </p>
           )}
         </div>

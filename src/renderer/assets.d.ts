@@ -22,6 +22,11 @@ declare module '*.svg' {
   export default url;
 }
 
+declare module '*.webp' {
+  const url: string;
+  export default url;
+}
+
 declare module '*.svg?raw' {
   const source: string;
   export default source;

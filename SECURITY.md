@@ -170,7 +170,8 @@ download.
   behaviour and not something to click past on a binary you did not get from the
   Releases page.
 - Every release carries `SHA256SUMS.txt`, a CycloneDX SBOM of the production
-  dependencies, and a signed SLSA build-provenance attestation:
+  dependencies, and a signed SLSA build-provenance attestation, which from the
+  release after `v0.8.0` cover the SBOM as well as the installers:
 
   ```bash
   sha256sum -c SHA256SUMS.txt --ignore-missing
@@ -207,7 +208,11 @@ Listed on purpose. An honest list beats a clean-looking one.
 - **Mods are not sandboxed.** A Minecraft mod is arbitrary Java running with your
   user's privileges. Raven Forge verifies that you got _the file the manifest
   named_; it cannot tell you that file is safe. Only add manifest sources you
-  trust.
+  trust. A pack from a file or a link that brings code Modrinth has not published
+  shows you those files before anything is installed. That is a question and not
+  a check of what they do. A manifest you accepted can bring more at a later sync
+  without asking, and an address typed into a profile's form is not asked about
+  at all.
 - **No reproducible builds.** You cannot currently verify that a published binary
   corresponds to the tagged source.
 

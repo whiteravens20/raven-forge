@@ -14,7 +14,7 @@ import { LogViewer } from '@components/LogViewer';
 import { DataFolderCard } from '@components/DataFolderCard';
 import { StorageMap } from '@components/StorageMap';
 import { Spinner } from '@components/ui/Spinner';
-import { LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
+import { failureText, LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
 import { RELEASES_URL, isBuiltInKey, releaseNotesUrl, trustedKeyRing } from '@shared/branding';
 import { EXAMPLE_PUBLIC_KEY, isEd25519PublicKey } from '@shared/trusted-key';
 import type { ThemeMode, LauncherBehaviorOnLaunch, UpdateCheck } from '@shared/ipc-types';
@@ -312,7 +312,10 @@ export function SettingsPage() {
       </Section>
 
       <Section title={t('settings.section.updates')}>
-        <UpdateRow />
+        <UpdateRow
+          checkOnStart={settings.checkUpdatesOnStart}
+          onCheckOnStartChange={(v) => update({ checkUpdatesOnStart: v })}
+        />
       </Section>
 
       <Section title={t('settings.section.data')}>
@@ -468,11 +471,18 @@ function CheckboxRow({
  * number someone needs when filing a bug, and making them press a button to see
  * it — one that will not even work on a source build — is the wrong order.
  */
-function UpdateRow() {
+function UpdateRow({
+  checkOnStart,
+  onCheckOnStartChange,
+}: {
+  checkOnStart: boolean;
+  onCheckOnStartChange: (v: boolean) => void;
+}) {
   const t = useT();
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<UpdateCheck | null>(null);
   const [version, setVersion] = useState<string | null>(null);
+  const [selfUpdating, setSelfUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // What is known about the update itself is the store's, shared with the
   // notification and the Play button — this row used to keep its own, and
@@ -481,11 +491,15 @@ function UpdateRow() {
   const stage = useUpdaterStore((s) => s.stage);
   const updateError = useUpdaterStore((s) => s.error);
   const downloadUpdate = useUpdaterStore((s) => s.download);
+  const cancelUpdateDownload = useUpdaterStore((s) => s.cancelDownload);
   const installUpdate = useUpdaterStore((s) => s.install);
 
   useEffect(() => {
     void api.system.getInfo().then((r) => {
-      if (r.success && r.data) setVersion(r.data.launcherVersion);
+      if (r.success && r.data) {
+        setVersion(r.data.launcherVersion);
+        setSelfUpdating(r.data.updateUnsupported === null);
+      }
     });
   }, []);
 
@@ -498,7 +512,7 @@ function UpdateRow() {
         setResult(r.data);
         setVersion(r.data.currentVersion);
       } else {
-        setError(r.error ?? t('settings.updateCheckFailed'));
+        setError(failureText(r, t('settings.updateCheckFailed')));
       }
     } finally {
       setChecking(false);
@@ -519,6 +533,11 @@ function UpdateRow() {
         {available && stage !== 'ready' && (
           <Button size="sm" loading={stage === 'downloading'} onClick={() => void downloadUpdate()}>
             {t('settings.downloadUpdate')}
+          </Button>
+        )}
+        {stage === 'downloading' && (
+          <Button size="sm" variant="ghost" onClick={cancelUpdateDownload}>
+            {t('common.cancel')}
           </Button>
         )}
         {stage === 'ready' && (
@@ -575,10 +594,23 @@ function UpdateRow() {
       )}
       {result?.status === 'failed' && (
         <p className="text-xs text-rf-danger">
-          {t('settings.updateCheckFailedWith', { error: result.error })}
+          {t('settings.updateCheckFailedWith', { error: failureText(result, result.error) })}
         </p>
       )}
       {error && <p className="text-xs text-rf-danger">{error}</p>}
+
+      {/* A build that does not update itself asks nothing at a start: no switch
+          for a question that is never put. */}
+      {selfUpdating && (
+        <>
+          <CheckboxRow
+            checked={checkOnStart}
+            onChange={onCheckOnStartChange}
+            label={t('settings.checkUpdatesOnStart')}
+          />
+          <p className="text-xs text-rf-text-muted">{t('settings.checkUpdatesOnStartHint')}</p>
+        </>
+      )}
     </div>
   );
 }

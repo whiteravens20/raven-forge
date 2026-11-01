@@ -6,7 +6,7 @@ import { Button } from '@components/ui/Button';
 import { ConfirmButton } from '@components/ui/ConfirmButton';
 import { Banner } from '@components/ui/Banner';
 import { formatBytes } from '@renderer/format';
-import { useLocale, useT } from '@renderer/i18n';
+import { failureText, useLocale, useT } from '@renderer/i18n';
 import type { WorldBackup } from '@shared/ipc-types';
 
 const api = window.ravenforge;
@@ -86,7 +86,7 @@ export function WorldBackupCard({ profileId }: { profileId: string }) {
   const backUp = () =>
     act(async () => {
       const r = await api.profiles.backupWorlds(profileId);
-      if (!r.success) return { failure: r.error ?? t('worlds.backupFailed') };
+      if (!r.success) return { failure: failureText(r, t('worlds.backupFailed')) };
       return { note: t('worlds.backedUp') };
     });
 
@@ -94,7 +94,7 @@ export function WorldBackupCard({ profileId }: { profileId: string }) {
     act(async () => {
       setConfirming(null);
       const r = await api.profiles.restoreBackup(profileId, backupId);
-      if (!r.success) return { failure: r.error ?? t('worlds.restoreFailed') };
+      if (!r.success) return { failure: failureText(r, t('worlds.restoreFailed')) };
       // `data` is the copy taken of what was just replaced — the reason this is
       // recoverable, so it is what gets said rather than a bare "done".
       return { note: r.data ? t('worlds.restoredWithSafety') : t('worlds.restored') };
@@ -103,7 +103,7 @@ export function WorldBackupCard({ profileId }: { profileId: string }) {
   const remove = (backupId: string) =>
     act(async () => {
       const r = await api.profiles.deleteBackup(profileId, backupId);
-      return r.success ? {} : { failure: r.error ?? t('worlds.deleteFailed') };
+      return r.success ? {} : { failure: failureText(r, t('worlds.deleteFailed')) };
     });
 
   return (

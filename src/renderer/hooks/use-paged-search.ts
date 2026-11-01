@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { appendPage, hasMorePages, type PagedList } from '@shared/search-paging';
 import type { ModSearchFilters, ModSearchResult } from '@shared/ipc-types';
+import { failureText } from '@renderer/i18n';
 
 const api = window.ravenforge;
 
@@ -58,7 +59,7 @@ export function usePagedSearch() {
       } else {
         current.current = null;
         setList(EMPTY);
-        setError(reply.error ?? '');
+        setError(failureText(reply, ''));
       }
       setSearched(true);
     } finally {
@@ -86,7 +87,7 @@ export function usePagedSearch() {
       });
       if (mine !== generation.current) return;
       if (!reply.success || !reply.data) {
-        setError(reply.error ?? '');
+        setError(failureText(reply, ''));
         return;
       }
       state.list = appendPage(state.list, reply.data);

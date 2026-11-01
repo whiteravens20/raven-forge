@@ -46,11 +46,16 @@ function javaForRelease(mcVersion: string): number {
 /**
  * The Java major version a Minecraft version needs.
  *
- * Mojang states this in the metadata of nearly every release, and that is always
+ * Mojang states this in the metadata of nearly every version, and that is always
  * the authority. The rule above is for the few that say nothing — 1.6.x — and for
  * when the metadata is not at hand: the profile editor asks about a version
  * that may never have been fetched. It matters, since running 1.8 on Java 21
  * fails in ways that look like anything but a Java version problem.
+ *
+ * A snapshot has no release number for the rule to read, so one whose metadata
+ * is in hand and silent is told apart by that silence: of the 921 versions Mojang
+ * lists, the 18 that name no Java are all from the summer of 2013 (measured
+ * 2026-11-01), and they want the oldest.
  *
  * The Forge and NeoForge installers need this too: they are modern Java
  * applications, and the version the game wants is the right floor for them.
@@ -65,8 +70,14 @@ export function requiredJavaFor(
   // executes on every launch, and the version in the Adoptium download URL. A
   // version meta that said `../../../something` would be choosing the binary we
   // run. So what is handed on is never the value the meta held — see below.
-  return javaMajor(meta?.javaVersion?.majorVersion) ?? javaForRelease(mcVersion);
+  const stated = javaMajor(meta?.javaVersion?.majorVersion);
+  if (stated !== null) return stated;
+  if (meta && WEEK_SNAPSHOT.test(mcVersion)) return OLDEST_JAVA;
+  return javaForRelease(mcVersion);
 }
+
+/** `13w38c`, the form a snapshot's id took until 2025. */
+const WEEK_SNAPSHOT = /^\d\dw\d\d/;
 
 /**
  * The Java release `value` names, as a number of the launcher's own — or null

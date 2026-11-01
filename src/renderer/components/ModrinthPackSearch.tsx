@@ -13,7 +13,7 @@ import {
 } from '@components/SearchFilters';
 import { SearchPager, SearchResultRow } from '@components/SearchResults';
 import { usePagedSearch } from '@hooks/use-paged-search';
-import { useT } from '@renderer/i18n';
+import { failureText, useT } from '@renderer/i18n';
 import { isClientModLoader } from '@shared/constants';
 import type { FacetGroups, ModSearchResult, PackInstall } from '@shared/ipc-types';
 
@@ -93,7 +93,7 @@ export function ModrinthPackSearch({
         loader: isClientModLoader(filters.loader) ? filters.loader : undefined,
       });
       if (result.success && result.data) onInstalled(result.data);
-      else setError(result.error ?? t('packs.installFailed', { name: pack.name }));
+      else setError(failureText(result, t('packs.installFailed', { name: pack.name })));
     } finally {
       setBusyId(null);
       onBusy(false);

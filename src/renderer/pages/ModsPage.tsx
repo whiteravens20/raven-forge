@@ -12,7 +12,8 @@ import { Input } from '@components/ui/Input';
 import { Switch } from '@components/ui/Switch';
 import { Banner } from '@components/ui/Banner';
 import { EmptyState } from '@components/ui/EmptyState';
-import { useT } from '@renderer/i18n';
+import { filterInstalled } from '@components/installed-filter';
+import { failureText, useT } from '@renderer/i18n';
 import {
   SearchFilters,
   EMPTY_FILTERS,
@@ -46,6 +47,7 @@ export function ModsPage() {
   const search = usePagedSearch();
   const { results, searching, searched } = search;
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
+  const [installedFilter, setInstalledFilter] = useState('');
   const [tab, setTab] = useState<'installed' | 'browse'>('installed');
   const [error, setError] = useState<string | null>(null);
   const [facets, setFacets] = useState<FacetGroups>(NO_FACETS);
@@ -99,6 +101,7 @@ export function ModsPage() {
   // The badge is on the entry, put there by the last check, so this needs no
   // second source of truth and no request of its own.
   const outdated = installed.filter((mod) => mod.updateAvailable);
+  const shownInstalled = filterInstalled(installed, installedFilter);
   // What the check would even look at. A profile whose mods all come from its
   // manifest has nothing to offer, and a button that always answers "0 of 0"
   // is a button that teaches people to ignore it.
@@ -109,7 +112,7 @@ export function ModsPage() {
     const result = await api.mods.getInstalled(selectedId);
     if (result.success && result.data) setInstalled(result.data);
     // Said, and the list left as it was: an unread list is not an empty one.
-    else setError(result.error ?? t('mods.listFailed'));
+    else setError(failureText(result, t('mods.listFailed')));
   }, [selectedId, t]);
 
   const handleSearch = () => {
@@ -145,7 +148,7 @@ export function ModsPage() {
     await working([mod.id], async () => {
       const check = await api.mods.checkInstall(selectedId, mod);
       if (!check.success || !check.data) {
-        setError(check.error ?? t('mods.installFailed', { name: mod.name }));
+        setError(failureText(check, t('mods.installFailed', { name: mod.name })));
         return;
       }
       // Nothing to decide when nothing is wrong — a dialog confirming that an
@@ -177,7 +180,7 @@ export function ModsPage() {
         setError(
           result.errorMessage
             ? t(result.errorMessage.key, result.errorMessage.vars)
-            : (result.error ?? t('mods.addFileFailed')),
+            : failureText(result, t('mods.addFileFailed')),
         );
       } else if (result.data) {
         const { name, dependencies } = result.data;
@@ -201,7 +204,7 @@ export function ModsPage() {
     if (!selectedId) return;
     const result = await api.mods.installFromSearch(selectedId, mod, versionId);
     if (!result.success || !result.data) {
-      setError(result.error ?? t('mods.installFailed', { name: mod.name }));
+      setError(failureText(result, t('mods.installFailed', { name: mod.name })));
     } else if (result.data.dependencies.length > 0) {
       // Files appeared in the profile that nobody asked for. Say which.
       setNote(
@@ -229,7 +232,7 @@ export function ModsPage() {
     try {
       const result = await api.mods.checkUpdates(selectedId);
       if (!result.success || !result.data) {
-        setError(result.error ?? t('mods.checkUpdatesFailed'));
+        setError(failureText(result, t('mods.checkUpdatesFailed')));
         return;
       }
       setUpdateCheck(result.data);
@@ -249,7 +252,7 @@ export function ModsPage() {
     await working(modIds, async () => {
       const result = await api.mods.update(selectedId, modIds);
       if (!result.success || !result.data) {
-        setError(result.error ?? t('mods.updateNotDone'));
+        setError(failureText(result, t('mods.updateNotDone')));
         return;
       }
       // Both halves get said. A run that updated nine mods and lost one is not
@@ -282,7 +285,7 @@ export function ModsPage() {
     await working([mod.id], async () => {
       const result = await api.mods.toggleEnabled(selectedId, mod.id, enabled);
       if (!result.success) {
-        setError(result.error ?? t('mods.toggleFailed', { name: mod.name }));
+        setError(failureText(result, t('mods.toggleFailed', { name: mod.name })));
       }
       await loadInstalled();
     });
@@ -294,7 +297,7 @@ export function ModsPage() {
     await working([mod.id], async () => {
       const result = await api.mods.uninstall(selectedId, mod.id);
       if (!result.success) {
-        setError(result.error ?? t('mods.removeFailed', { name: mod.name }));
+        setError(failureText(result, t('mods.removeFailed', { name: mod.name })));
       }
       await loadInstalled();
     });
@@ -305,6 +308,7 @@ export function ModsPage() {
     // A summary line counts one profile's mods; carrying it to the next one
     // would describe a list that is no longer on screen.
     setUpdateCheck(null);
+    setInstalledFilter('');
   }, [loadInstalled]);
 
   // Modrinth's own vocabulary, fetched rather than hardcoded — these lists move,
@@ -494,10 +498,33 @@ export function ModsPage() {
             </div>
           )}
 
+          {installed.length > 0 && (
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Input
+                  type="search"
+                  aria-label={t('mods.filterInstalled')}
+                  placeholder={t('mods.filterInstalled')}
+                  value={installedFilter}
+                  onChange={(e) => setInstalledFilter(e.target.value)}
+                />
+              </div>
+              {installedFilter.trim() && (
+                <span className="shrink-0 text-xs text-rf-text-muted" aria-live="polite">
+                  {t('mods.filterCount', { shown: shownInstalled.length, total: installed.length })}
+                </span>
+              )}
+            </div>
+          )}
+
           {installed.length === 0 ? (
             <EmptyState kind="mods" title={t('mods.empty')} hint={t('mods.emptyHint')} />
+          ) : shownInstalled.length === 0 ? (
+            <p className="py-8 text-center text-sm text-rf-text-muted">
+              {t('mods.filterNothing', { query: installedFilter.trim() })}
+            </p>
           ) : (
-            installed.map((mod) => (
+            shownInstalled.map((mod) => (
               <div
                 key={mod.id}
                 className="flex items-center gap-3 rounded-lg border border-rf-border bg-rf-surface p-3"

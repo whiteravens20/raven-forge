@@ -13,6 +13,11 @@
 # primary enforcement point for the 7-day release-age policy — a version that is
 # too fresh never becomes a PR, so it can never be merged early. `.npmrc`
 # `min-release-age=7` remains as the client-side backstop for manual installs.
+#
+# No pull request is rebased by itself (`rebase-strategy: disabled`) while the
+# repo is in development: a push to `dev` would otherwise rebase every open one
+# and run its checks again. One is rebased when it is next to be merged, with a
+# `@dependabot rebase` comment.
 
 version: 2
 
@@ -23,6 +28,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev
+    rebase-strategy: disabled
     schedule:
       interval: monthly
       time: '08:00'
@@ -48,6 +54,7 @@ updates:
   - package-ecosystem: npm
     directory: /
     target-branch: dev
+    rebase-strategy: disabled
     schedule:
       interval: weekly
       day: monday

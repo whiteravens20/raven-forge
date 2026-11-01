@@ -7,14 +7,39 @@
  * cmd.exe does not understand the leading assignment, so the npm script would
  * only work on Linux and macOS. Setting it here keeps one dev command for
  * every platform without pulling in cross-env.
+ *
+ * It starts beside the two things it needs, so it waits for them first: the
+ * dev server, and what `tsc --watch` writes. A few lines of its own, because
+ * a package for that brought an HTTP client and a schema library along, with
+ * their advisories, to ask whether one port is open.
  */
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { connect } from 'node:net';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 const require = createRequire(import.meta.url);
 const electron = require('electron');
 
 const url = process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173';
+const BUILT = ['dist/main/index.js', 'dist/preload/index.js'];
+
+function serverListening() {
+  const { hostname, port, protocol } = new URL(url);
+  return new Promise((resolve) => {
+    const socket = connect(Number(port) || (protocol === 'https:' ? 443 : 80), hostname);
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once('error', () => resolve(false));
+  });
+}
+
+while (!BUILT.every((file) => existsSync(file)) || !(await serverListening())) {
+  await sleep(250);
+}
 
 const child = spawn(electron, ['.', ...process.argv.slice(2)], {
   stdio: 'inherit',

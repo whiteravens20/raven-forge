@@ -56,6 +56,7 @@ import type {
   TrustedKey,
 } from '../../shared/ipc-types';
 import { errorText } from '../util/error-text';
+import { isConnectionFailure } from '../net/connection-failure';
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -74,6 +75,8 @@ interface SyncState {
   pendingUpdates: number;
   status: ProfileSyncStatus['status'];
   errorMessage?: string;
+  /** What stopped it is that nothing could be reached; said to the player as that. */
+  noConnection?: boolean;
   /**
    * What the signature check said about the manifest that was last installed.
    *
@@ -113,6 +116,7 @@ const syncStateSchema: z.ZodType<SyncState> = z.object({
   pendingUpdates: z.number().int().nonnegative().catch(0),
   status: z.enum(['synced', 'updates-available', 'error', 'never-synced']).catch('never-synced'),
   errorMessage: z.string().optional().catch(undefined),
+  noConnection: z.boolean().optional().catch(undefined),
   verification: z
     .object({
       signed: z.boolean(),
@@ -213,9 +217,9 @@ export async function getInstalledMods(profileId: string): Promise<InstalledMod[
  */
 async function shownSyncState(
   profileId: string,
-): Promise<Pick<ProfileSyncStatus, 'pendingUpdates' | 'status' | 'errorMessage'>> {
-  const { pendingUpdates, status, errorMessage } = await readSyncState(profileId);
-  return { pendingUpdates, status, errorMessage };
+): Promise<Pick<ProfileSyncStatus, 'pendingUpdates' | 'status' | 'errorMessage' | 'noConnection'>> {
+  const { pendingUpdates, status, errorMessage, noConnection } = await readSyncState(profileId);
+  return { pendingUpdates, status, errorMessage, noConnection };
 }
 
 export async function getProfileSyncStatus(profileId: string): Promise<ProfileSyncStatus> {
@@ -991,6 +995,7 @@ async function runSync(profileId: string, supplied?: ModManifest): Promise<void>
       ...previousState,
       status: 'error',
       errorMessage: message,
+      noConnection: isConnectionFailure(err),
     });
     throw err;
   } finally {

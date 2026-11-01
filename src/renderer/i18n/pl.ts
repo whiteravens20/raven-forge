@@ -173,6 +173,8 @@ export const pl: Translations = {
     'Paczka shaderów leży w tym archiwum wewnątrz folderu ({folder}), a jest wczytywana tylko wtedy, gdy jej folder shaders jest na najwyższym poziomie. Spakuj zawartość tego folderu, a nie sam folder.',
   'contentError.ownedByPack':
     '{name} już tu jest — pochodzi z modpacka, za którym podąża ten profil. Synchronizacja i tak przywróciłaby wersję z modpacka.',
+  'error.noConnection':
+    'Nie udało się połączyć. Sprawdź połączenie z internetem i, jeśli go używasz, proxy w Ustawieniach, a potem spróbuj ponownie.',
   'home.showConsole': 'Pokaż konsolę',
   'home.hideConsole': 'Ukryj konsolę',
   'home.news': 'Aktualności',
@@ -187,7 +189,7 @@ export const pl: Translations = {
   'home.newsNewer': 'Nowsze aktualności',
   'home.newsStale': 'Nie udało się odświeżyć kanału — to ostatnie wczytane wpisy.',
   'home.newsUnavailable':
-    'Nie udało się wczytać kanału aktualności. Sprawdź adres kanału w Ustawieniach.',
+    'Nie udało się wczytać aktualności. Sprawdź połączenie albo adres kanału w Ustawieniach.',
   'news.openInBrowser': 'Otwórz w przeglądarce',
   'news.noBody': 'Ten wpis nie ma dalszej treści.',
   'home.ram': '{mb} MB RAM',
@@ -373,6 +375,15 @@ export const pl: Translations = {
   'packs.installUnfinished':
     'Profil „{name}” został utworzony, ale nie wszystkie jego pliki dotarły. Kliknij w profilu „{action}”, a instalacja ruszy dalej od miejsca, w którym stanęła. Podany powód: {error}',
   'packs.importFailed': 'Nie udało się zaimportować tej paczki.',
+  'packs.review.title': 'Mody, za które launcher nie ręczy',
+  'packs.review.body':
+    'Mod to program i sięga wszędzie tam, gdzie Twoje konto na tym komputerze. Modrinth sprawdza to, co publikuje, a tych plików nie ma w jego rejestrze, więc nikt nie obejrzał ich za Ciebie. Kontynuuj tylko wtedy, gdy ufasz temu, kto dał Ci tę paczkę.',
+  'packs.review.bodyUnchecked':
+    'Mod to program i sięga wszędzie tam, gdzie Twoje konto na tym komputerze. Modrinth sprawdza to, co publikuje, ale nie udało się teraz z nim połączyć, żeby zapytać o te pliki. Kontynuuj tylko wtedy, gdy ufasz temu, kto dał Ci tę paczkę.',
+  'packs.review.follows':
+    'Nie jest podpisana kluczem, któremu ufasz, a to, co instaluje, może się zmienić przy każdej kolejnej synchronizacji.',
+  'packs.review.insidePack': 'w środku paczki',
+  'packs.review.install': 'Zainstaluj mimo to',
   'packs.manifestFailed': 'Pod tym adresem nie ma paczki ani manifestu.',
   'packs.wrSyncNote': 'Te profile trzymają się serwera: każda synchronizacja przynosi zmiany.',
   'packs.mods.one': '{count} mod',
@@ -533,6 +544,9 @@ export const pl: Translations = {
   'mods.loaderFilter': 'Loader',
   'mods.searchFailed': 'Wyszukiwanie nie powiodło się',
   'mods.installFailed': 'Nie udało się zainstalować {name}',
+  'mods.filterInstalled': 'Filtruj zainstalowane mody…',
+  'mods.filterCount': '{shown} z {total}',
+  'mods.filterNothing': 'Żaden zainstalowany mod nie pasuje do „{query}”.',
   'mods.empty': 'Brak zainstalowanych modów',
   'mods.emptyHint': 'Wyszukaj mody w zakładce Przeglądaj lub zsynchronizuj profil z manifestem',
   'mods.fromManifest': 'z paczki',
@@ -626,6 +640,9 @@ export const pl: Translations = {
   'settings.section.updates': 'Aktualizacje',
   'settings.installedVersion': 'Zainstalowana wersja: {version}',
   'settings.checkUpdates': 'Sprawdź aktualizacje',
+  'settings.checkUpdatesOnStart': 'Sprawdzaj nową wersję przy każdym starcie',
+  'settings.checkUpdatesOnStartHint':
+    'Jedno zapytanie do GitHuba. Po wyłączeniu o nowej wersji, także z poprawkami bezpieczeństwa, dowiesz się tylko po naciśnięciu „Sprawdź aktualizacje”.',
   'settings.downloadUpdate': 'Pobierz aktualizację',
   'settings.restartToUpdate': 'Uruchom ponownie, aby zainstalować',
   'settings.updateUpToDate': 'Masz najnowsze wydanie.',
@@ -793,8 +810,7 @@ export const pl: Translations = {
   // ── About ────────────────────────────────────────────────
   'about.tagline':
     'Customowy launcher Minecraft: Java Edition z zarządzaniem modami, auto-synchronizacją z manifestów serwera i profilami.',
-  'about.authorship':
-    'Pisany od zera przez jedną osobę — {author} — pod szyldem {org}, z myślą o własnym serwerze i graczach na nim.',
+  'about.authorship': 'Powstał pod szyldem {org}, z myślą o własnym serwerze i graczach na nim.',
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Sekret kuźni',
   'about.privacy': 'Prywatność',
@@ -905,15 +921,16 @@ export const pl: Translations = {
   'privacy.dest.loaders.when': 'przy wyborze i instalacji loadera',
   'privacy.dest.modrinth.who': 'Modrinth',
   'privacy.dest.modrinth.when':
-    'gdy szukasz modów i paczek, otwierasz listę zainstalowanych, sprawdzasz aktualizacje albo dodajesz mod z pliku',
+    'gdy szukasz modów i paczek, otwierasz listę zainstalowanych, sprawdzasz aktualizacje, dodajesz mod z pliku albo bierzesz paczkę z pliku lub linku',
   'privacy.dest.modrinth.sends':
-    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Otwarcie listy modów, shaderów albo paczek zasobów profilu wysyła identyfikatory tych, które masz — tak launcher pobiera ich opisy i ikony, a odpowiedź pamięta przez tydzień. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu, a dodanie moda z pliku — skrót tego jednego pliku. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
+    'To, co wpisujesz w wyszukiwarkę, i ustawione filtry. Otwarcie listy modów, shaderów albo paczek zasobów profilu wysyła identyfikatory tych, które masz — tak launcher pobiera ich opisy i ikony, a odpowiedź pamięta przez tydzień. Sprawdzenie aktualizacji albo eksport paczki wysyła dodatkowo skrót każdego pliku moda z tego profilu, a dodanie moda z pliku — skrót tego jednego pliku. Paczka z pliku lub linku wysyła skróty tych modów z niej, które nie pochodzą z Modrinth. Nic, co mówiłoby, kim jesteś — zapytanie przedstawia launcher, który pyta, a nie osobę.',
   'privacy.dest.packs.who': 'White Ravens',
   'privacy.dest.packs.when': 'aktualności i ogłoszenia, lista paczek serwerowych i same paczki',
   'privacy.dest.updates.who': 'GitHub',
   'privacy.dest.updates.when': 'przy każdym starcie i gdy sprawdzasz aktualizacje',
-  'privacy.dest.updates.sends':
-    'Jedno pytanie: czy jest nowsza wersja? Dzieje się samo przy każdym starcie i na razie nie da się tego wyłączyć.',
+  'privacy.dest.updates.whenAsked': 'gdy sprawdzasz aktualizacje',
+  'privacy.dest.updates.whenNever': 'nigdy: ta wersja nie aktualizuje się sama',
+  'privacy.dest.updates.sends': 'Jedno pytanie: czy jest nowsza wersja?',
   'privacy.dest.feeds': 'Aktualności i ogłoszenia, tak jak są ustawione na tym komputerze:',
   'privacy.dest.feedOff': 'wyłączone — nic nie jest pobierane',
 
@@ -935,7 +952,7 @@ export const pl: Translations = {
   'privacy.control.packs':
     'Paczki: profil, który śledzi paczkę, pyta o nią adres ze swojego pola „Adres manifestu” — przy starcie launchera i przed każdym uruchomieniem gry. Usuń ten adres w edytorze profilu, a profil przestanie pytać i przestanie się aktualizować.',
   'privacy.control.updates':
-    'Aktualizacje launchera: sprawdzane przy każdym starcie jednym zapytaniem do GitHuba. Tego na razie nie da się wyłączyć.',
+    'Aktualizacje launchera: Ustawienia → Aktualizacje → „Sprawdzaj nową wersję przy każdym starcie”, domyślnie włączone. To jedno zapytanie do GitHuba. Po wyłączeniu launcher pyta tylko po naciśnięciu „Sprawdź aktualizacje”.',
   'privacy.control.diagnostics':
     'Logi i raporty z awarii: nie opuszczają komputera, dopóki ich komuś nie wyślesz. „Zgłoś błąd” otwiera stronę zgłoszeń w przeglądarce, a plik dołączasz ręcznie.',
   'privacy.control.location':

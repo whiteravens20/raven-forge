@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, FolderOpen, HardDrive, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
-import { useT } from '@renderer/i18n';
+import { failureText, useT } from '@renderer/i18n';
 import { formatBytes } from '@renderer/format';
 import type {
   DataRootInfo,
@@ -50,7 +50,7 @@ export function DataFolderCard() {
   const consider = async (ask: () => ReturnType<typeof api.settings.chooseDataRoot>) => {
     setError(null);
     const result = await ask();
-    if (!result.success) setError(result.error ?? t('dataRoot.failed', { error: '' }));
+    if (!result.success) setError(failureText(result, t('dataRoot.failed', { error: '' })));
     else if (result.data) setPlan(result.data);
   };
 
@@ -63,7 +63,7 @@ export function DataFolderCard() {
       return;
     }
     setForgetting(false);
-    setError(result.error ?? t('dataRoot.failed', { error: '' }));
+    setError(failureText(result, t('dataRoot.failed', { error: '' })));
   };
 
   return (
@@ -213,7 +213,7 @@ function DataRootDialog({
       return;
     }
     setProgress(null);
-    setError(result.error ?? t('dataRoot.failed', { error: '' }));
+    setError(failureText(result, t('dataRoot.failed', { error: '' })));
   };
 
   return (

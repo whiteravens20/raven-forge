@@ -14,7 +14,7 @@ import { holdHandlersUntil, registerAllIpcHandlers } from './ipc-handlers';
 import { loadSettings } from '../core/config/settings-manager';
 import { ensureDataDirectories } from './init';
 import { applyProxySettings, proxyCredentialsFor } from '../core/net/proxy';
-import { initUpdater, checkForUpdates } from '../core/updater/launcher-updater';
+import { initUpdater, checkForUpdatesAtStart } from '../core/updater/launcher-updater';
 import { checkAllProfilesForPackUpdates } from '../core/mods/mod-sync';
 
 /**
@@ -151,7 +151,7 @@ function registerAppLifecycle(home: AppHome): void {
     await started;
 
     initUpdater();
-    void checkForUpdates();
+    void checkForUpdatesAtStart();
     // The launcher's own update check has a counterpart for the packs profiles
     // follow. Both are fire-and-forget: neither should hold up the window.
     void checkAllProfilesForPackUpdates();

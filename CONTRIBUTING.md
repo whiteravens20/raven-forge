@@ -64,7 +64,15 @@ before opening a pull request.
 | npm     | ≥ 11 (bundled with Node) |
 | Git     | any recent               |
 
-Platform prerequisites for the native `keytar` build are listed in the [README](README.md#dev-setup) — build tools on Windows, `libsecret-1-dev` on Debian/Ubuntu.
+The native `keytar` build needs a toolchain:
+
+- **Windows:** `keytar` is a native module and needs a C++ toolchain to build. The Node.js installer offers to set one up ("Tools for Native Modules"); otherwise install the **Desktop development with C++** workload from the Visual Studio Installer. The old `windows-build-tools` package is deprecated — npm itself now says Node ships what it used to provide.
+- **Debian / Ubuntu:**
+
+  ```bash
+  sudo apt update
+  sudo apt install -y build-essential libsecret-1-dev libx11-dev libxss1 libnotify4
+  ```
 
 ```bash
 git clone https://github.com/whiteravens20/raven-forge.git
@@ -72,6 +80,8 @@ cd raven-forge
 npm install
 npm run dev          # Vite renderer + tsc watch for main + Electron
 ```
+
+The other scripts, and how to build the installers, are in [docs/BUILDING.md](docs/BUILDING.md).
 
 ### Microsoft login in development
 
@@ -89,23 +99,37 @@ Register your own Azure application rather than asking for the project's client 
 
 ```
 src/
-  core/          # main-process logic; no Electron window or React imports
-    auth/        # Microsoft OAuth → Xbox Live → Minecraft JWT; keychain token store
-    config/      # settings manager, path resolution, defaults
-    java/        # Adoptium Temurin download and JRE selection
-    minecraft/   # version manifest, inheritsFrom merging, assets, launch
-    modloader/   # loader install + loader-profile merge over vanilla
-    mods/        # Modrinth API, manifest sync, hashing
-    net/         # undici dispatcher + Chromium session proxy — all egress
-    news/        # news and announcement feed fetching
-    profiles/    # profile CRUD, per-profile directories, icons
-    updater/     # electron-updater wiring, Ed25519 manifest verification
-    util/        # small shared helpers
-  main/          # Electron main: window creation, IPC handlers, logging
-  preload/       # the ONLY bridge between main and renderer
-  renderer/      # React UI — pages/, components/, stores/ (zustand), i18n/, styles/
-  shared/        # types and Zod schemas used on both sides of the bridge
-test/            # Vitest suites + an Electron stub (linted and typechecked like src/)
+├── main/           # Electron main process (Node.js)
+├── preload/        # contextBridge preload scripts
+├── renderer/       # React SPA (Vite-bundled)
+│   ├── components/ # UI components
+│   ├── pages/      # Route pages
+│   ├── stores/     # Zustand state stores
+│   ├── i18n/       # UI string dictionaries (pl, en) + tiny t() helper
+│   ├── assets/     # bundled fonts
+│   └── styles/     # Tailwind entry + theme tokens + backdrop animations
+├── core/           # Business logic (runs in main process)
+│   ├── auth/       # Microsoft OAuth + offline auth
+│   ├── config/     # Settings, paths, and the movable data root
+│   ├── diagnostics/# Crash reports — one redacted file per crash
+│   ├── discord/    # Rich Presence over Discord's local IPC socket (opt-in)
+│   ├── java/       # Adoptium JRE management
+│   ├── minecraft/  # Version manifest, assets, game launcher
+│   ├── modloader/  # Fabric/Quilt/Forge/NeoForge installers
+│   ├── mods/       # Manifest fetch, sync, Modrinth API, integrity, compatibility
+│   ├── net/        # Proxy dispatcher + the shared download helper
+│   ├── news/       # News + announcement feeds
+│   ├── packs/      # .mrpack reader, pack catalogue, profile-from-pack install
+│   ├── profiles/   # Profile CRUD + import/export
+│   ├── updater/    # electron-updater + Ed25519 manifest verification
+│   └── util/       # Atomic writes, cancellation, per-file serialization, path containment
+└── shared/         # Types shared between main + renderer
+    ├── ipc-types.ts    # the channel contract
+    └── ipc/            # payload shapes, one file per domain
+
+test/               # Vitest suites — pure logic, the state files over a real
+                    # temporary data root, the download policy over a real socket,
+                    # and real subprocesses (tar, unzip) + an Electron stub
 ```
 
 Two boundaries worth respecting:
@@ -162,10 +186,10 @@ topic, no body. Do not mix a refactor into a feature commit.
 
 ### Translations
 
-UI strings live in `src/renderer/i18n/`. Polish (`pl.ts`) is the language the interface opens in; English (`en.ts`) is the one that defines the keys — `pl.ts` is typed against it — and what a missing entry falls back to. Both carry the same keys, and the type system enforces that.
+UI strings live in `src/renderer/i18n/`. A first start opens in the first of the system's languages that has a dictionary, and in English when none has. English (`en.ts`) is the one that defines the keys — `pl.ts` is typed against it — and what a missing entry falls back to. Both carry the same keys, and the type system enforces that.
 
 - **Never hardcode a user-facing string in a component.** Add the key to both dictionaries and use the `t()` helper.
-- To add a language, copy `en.ts`, translate the values, and register it in `src/renderer/i18n/index.ts`. TypeScript will name any key you missed.
+- To add a language, copy `en.ts`, translate the values, and add it to `Locale` in `src/shared/ipc/settings.ts` and to the `language` schema in `src/shared/validators.ts`. TypeScript will then name the other places it has to be listed (`src/renderer/i18n/index.ts`, `src/shared/locale.ts`) and any key you missed.
 - Keep placeholders (`{name}`) intact and keep the tone consistent with the existing entries.
 
 ---
@@ -258,7 +282,7 @@ State in the PR description what you actually ran. "Typechecks" is not a test re
 
 ### AI-assisted code
 
-Most of this project is written with AI coding tools, as the [README](README.md#how-the-code-is-written-and-checked) describes, and the same rule applies to contributions:
+This project is built using AI coding tools, as the [README](README.md#how-the-code-is-written-and-checked) describes, and the same rule applies to contributions:
 
 - AI-generated code **must be reviewed line by line** before you submit it.
 - Do not submit code you cannot explain and defend in review.
