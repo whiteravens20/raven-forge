@@ -48,7 +48,7 @@ Download the file for your system from the [latest release](https://github.com/w
 | Debian 12+ or Ubuntu 22.04+, x64     | `raven-forge-launcher_<version>_amd64.deb` | `sudo apt install ./raven-forge-launcher_<version>_amd64.deb`                                                                      |
 | Any other x64 Linux with glibc 2.25+ | `Raven-Forge-Launcher-<version>.AppImage`  | Make it executable and run it. It needs a few system libraries: [docs/INSTALL.md](docs/INSTALL.md#appimage).                       |
 
-The window opens in Polish; **Ustawienia → Wygląd → Język** switches it to English. Then:
+The window opens in your system's language if that is Polish, and in English otherwise; **Options → Appearance → Language** (**Ustawienia → Wygląd → Język**) changes it. Then:
 
 1. **Accounts → Sign in with Microsoft.** You type your password on Microsoft's own page, never in the launcher.
 2. **Profiles → New profile**, and say where it comes from: a White Ravens pack, a modpack found on Modrinth, a `.mrpack` file or a link, or an empty profile of your own.

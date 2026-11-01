@@ -24,6 +24,7 @@ vi.mock('../src/main/logger', () => ({
 }));
 
 vi.mock('../src/main/window', () => ({ getMainWindow: () => undefined }));
+vi.mock('electron', () => ({ app: { getPreferredSystemLanguages: () => ['en-US'] } }));
 
 let base = '';
 vi.mock('../src/shared/constants', async (original) => ({

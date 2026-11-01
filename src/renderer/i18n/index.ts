@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useSettingsStore } from '../stores/settings-store';
 import type { ErrorMessage, Locale } from '@shared/ipc-types';
+import { pickLocale } from '@shared/locale';
 import { en, type PluralKey, type TranslationKey, type Translations } from './en';
 import { pl } from './pl';
 
@@ -33,11 +34,10 @@ export const LOCALE_NAMES: Record<Locale, string> = {
 };
 
 /**
- * Polish, not English. The UI was written in Polish first and every string in
- * `en.ts` is a translation of one; falling back to English would change the
- * language of the app for anyone who never touched the setting.
+ * For the moment before the settings arrive, with the rule a first start goes
+ * by: whatever is saved takes over as soon as they do.
  */
-const DEFAULT_LOCALE: Locale = 'pl';
+const BEFORE_SETTINGS: Locale = pickLocale(navigator.languages);
 
 function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && value in LOCALES;
@@ -45,7 +45,7 @@ function isLocale(value: unknown): value is Locale {
 
 /** Settings store `language` as a usable locale, whatever ends up in the file. */
 export function asLocale(value: unknown): Locale {
-  return isLocale(value) ? value : DEFAULT_LOCALE;
+  return isLocale(value) ? value : BEFORE_SETTINGS;
 }
 
 export type TranslationVars = Record<string, string | number>;

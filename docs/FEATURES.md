@@ -52,7 +52,7 @@ The whole list. The [README](../README.md) keeps the short one.
 
 ## Look and language
 
-- **Bilingual UI** — Polish and English, switchable in Settings
+- **Bilingual UI** — Polish and English, opening in the system's language and switchable in Settings
 - **Three Themes** — dark, OLED black and light
 - **Modern UI** — dark gaming-grade design, animated voxel hero scenes (drone flight, Nether forge, mine, tech workshop), news feed, frameless window
 - **News And Announcements** — read inside the launcher, from feeds you can point anywhere or switch off ([configuration](CONFIGURATION.md#news-feed-and-announcements))

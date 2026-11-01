@@ -1,12 +1,14 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
 import fs from 'node:fs/promises';
+import { app } from 'electron';
 import { log } from '../../main/logger';
 import { paths } from './paths';
 import { writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
 import { DEFAULT_SETTINGS } from './defaults';
 import { globalSettingsSchema } from '../../shared/validators';
+import { pickLocale } from '../../shared/locale';
 import type { GlobalSettings } from '../../shared/ipc-types';
 
 let cachedSettings: GlobalSettings | null = null;
@@ -17,6 +19,15 @@ let cachedSettings: GlobalSettings | null = null;
  * `changeSettings`.
  */
 let standingIn = false;
+
+/**
+ * What a launcher with nothing saved starts from: the defaults, in the system's
+ * language. A language somebody has saved is never replaced by this, whatever
+ * the system says, so a new build does not change it under anyone.
+ */
+function freshSettings(): GlobalSettings {
+  return { ...DEFAULT_SETTINGS, language: pickLocale(app.getPreferredSystemLanguages()) };
+}
 
 /**
  * Load settings from disk.
@@ -42,7 +53,7 @@ export async function loadSettings(): Promise<GlobalSettings> {
     standingIn = false;
   } catch (err) {
     log.error(`Could not read ${paths.settings}:`, err);
-    cachedSettings = { ...DEFAULT_SETTINGS };
+    cachedSettings = freshSettings();
     standingIn = true;
   }
   return cachedSettings;
@@ -55,7 +66,7 @@ async function readSettingsFile(): Promise<GlobalSettings> {
     raw = await fs.readFile(paths.settings, 'utf-8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    const defaults = { ...DEFAULT_SETTINGS };
+    const defaults = freshSettings();
     await writeJsonAtomic(paths.settings, defaults);
     return defaults;
   }
@@ -71,7 +82,7 @@ async function readSettingsFile(): Promise<GlobalSettings> {
   );
   await fs.rename(paths.settings, backup).catch(() => undefined);
 
-  const defaults = { ...DEFAULT_SETTINGS };
+  const defaults = freshSettings();
   await writeJsonAtomic(paths.settings, defaults);
   return defaults;
 }
@@ -123,7 +134,7 @@ export function updateSettings(updates: Partial<GlobalSettings>): Promise<Global
  * Reset settings to defaults.
  */
 export function resetSettings(): Promise<GlobalSettings> {
-  return changeSettings(() => ({ ...DEFAULT_SETTINGS }));
+  return changeSettings(() => freshSettings());
 }
 
 /**

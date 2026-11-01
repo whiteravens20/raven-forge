@@ -8,9 +8,8 @@ import { DEFAULT_NEWS_FEED_URL, DEFAULT_ANNOUNCEMENT_FEED_URL } from '../../shar
  */
 export const DEFAULT_SETTINGS: GlobalSettings = {
   theme: 'dark',
-  // The UI is written in Polish and English is the translation, so a fresh
-  // install starts Polish. See src/renderer/i18n/.
-  language: 'pl',
+  // A first start has `freshSettings` put the system's language here.
+  language: 'en',
   launcherBehaviorOnLaunch: 'minimize',
   proxyUrl: undefined,
   downloadConcurrency: 4,

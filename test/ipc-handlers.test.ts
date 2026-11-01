@@ -42,6 +42,7 @@ vi.mock('electron', () => ({
   app: {
     getPath: () => path.join(root, 'userData'),
     getVersion: () => '0.0.0-test',
+    getPreferredSystemLanguages: () => ['en-US'],
     isPackaged: false,
   },
   ipcMain: {

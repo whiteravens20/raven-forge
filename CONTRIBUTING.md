@@ -186,7 +186,7 @@ topic, no body. Do not mix a refactor into a feature commit.
 
 ### Translations
 
-UI strings live in `src/renderer/i18n/`. Polish (`pl.ts`) is the language the interface opens in; English (`en.ts`) is the one that defines the keys — `pl.ts` is typed against it — and what a missing entry falls back to. Both carry the same keys, and the type system enforces that.
+UI strings live in `src/renderer/i18n/`. A first start opens in the first of the system's languages that has a dictionary, and in English when none has. English (`en.ts`) is the one that defines the keys — `pl.ts` is typed against it — and what a missing entry falls back to. Both carry the same keys, and the type system enforces that.
 
 - **Never hardcode a user-facing string in a component.** Add the key to both dictionaries and use the `t()` helper.
 - To add a language, copy `en.ts`, translate the values, and register it in `src/renderer/i18n/index.ts`. TypeScript will name any key you missed.

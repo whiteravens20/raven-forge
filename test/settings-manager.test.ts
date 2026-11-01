@@ -26,6 +26,13 @@ vi.mock('../src/main/logger', () => ({
   log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 
+/** What the system says it speaks, from the most preferred. */
+let systemLanguages: string[];
+
+vi.mock('electron', () => ({
+  app: { getPreferredSystemLanguages: () => systemLanguages },
+}));
+
 async function loadModule() {
   vi.resetModules();
   const { reloadDataRoot } = await import('../src/core/config/data-root');
@@ -39,6 +46,7 @@ const settingsFile = () => path.join(root, 'settings.json');
 const asRoot = typeof process.getuid === 'function' && process.getuid() === 0;
 
 beforeEach(async () => {
+  systemLanguages = ['en-US'];
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'rf-settings-'));
   process.env.RAVENFORGE_DATA_DIR = root;
 });
@@ -46,6 +54,64 @@ beforeEach(async () => {
 afterEach(async () => {
   delete process.env.RAVENFORGE_DATA_DIR;
   await fs.rm(root, { recursive: true, force: true });
+});
+
+describe('the language of a launcher with nothing saved', () => {
+  const firstStartOn = async (languages: string[]) => {
+    systemLanguages = languages;
+    const { loadSettings } = await loadModule();
+    const settings = await loadSettings();
+    const saved = JSON.parse(await fs.readFile(settingsFile(), 'utf-8')) as { language: string };
+    expect(saved.language).toBe(settings.language);
+    return settings.language;
+  };
+
+  it('is the language of the system, when the launcher has it', async () => {
+    expect(await firstStartOn(['pl-PL', 'en-US'])).toBe('pl');
+    await fs.rm(settingsFile());
+    expect(await firstStartOn(['en-GB', 'pl-PL'])).toBe('en');
+  });
+
+  it('is the first of the languages the system lists that the launcher has', async () => {
+    expect(await firstStartOn(['de-DE', 'pl-PL', 'en-US'])).toBe('pl');
+  });
+
+  it('is English on a system with none of them, and on one that lists nothing', async () => {
+    expect(await firstStartOn(['de-DE', 'fr-FR'])).toBe('en');
+    await fs.rm(settingsFile());
+    expect(await firstStartOn([])).toBe('en');
+  });
+
+  it.each(['pl', 'en'] as const)('leaves a saved %s where it is, on any system', async (saved) => {
+    await fs.writeFile(settingsFile(), JSON.stringify({ ...DEFAULT_SETTINGS, language: saved }));
+    systemLanguages = [saved === 'pl' ? 'en-US' : 'pl-PL'];
+    const { loadSettings, updateSettings } = await loadModule();
+
+    expect((await loadSettings()).language).toBe(saved);
+    expect((await updateSettings({ theme: 'light' })).language).toBe(saved);
+    const onDisk = JSON.parse(await fs.readFile(settingsFile(), 'utf-8')) as { language: string };
+    expect(onDisk.language).toBe(saved);
+  });
+
+  it('is asked again by a reset, which goes back to what a first start would do', async () => {
+    systemLanguages = ['pl-PL'];
+    const { loadSettings, updateSettings, resetSettings } = await loadModule();
+    await loadSettings();
+    await updateSettings({ language: 'en' });
+
+    expect((await resetSettings()).language).toBe('pl');
+  });
+
+  it('turns a language this build has no dictionary for into English, keeping the rest', async () => {
+    await fs.writeFile(
+      settingsFile(),
+      JSON.stringify({ ...DEFAULT_SETTINGS, language: 'de', theme: 'light' }),
+    );
+    systemLanguages = ['pl-PL'];
+    const { loadSettings } = await loadModule();
+
+    expect(await loadSettings()).toMatchObject({ language: 'en', theme: 'light' });
+  });
 });
 
 describe('loadSettings', () => {

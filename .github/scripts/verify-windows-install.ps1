@@ -792,6 +792,9 @@ try {
   if ($null -eq $launcher) { throw 'the launcher said it was ready and is not running' }
   Expect ((Get-LauncherFolder) -eq $Folder.Now) "from $($Folder.Now)" "from '$(Get-LauncherFolder)'"
   Expect (Test-Path -LiteralPath (Join-Path $Data.Now 'settings.json')) "its settings are saved in $($Data.Now)"
+  $language = (Get-Content -LiteralPath (Join-Path $Data.Now 'settings.json') -Raw | ConvertFrom-Json).language
+  $expected = if ((Get-UICulture).TwoLetterISOLanguageName -eq 'pl') { 'pl' } else { 'en' }
+  Expect ($language -eq $expected) "in $expected, on a Windows set to $((Get-UICulture).Name)" "in '$language', on a Windows set to $((Get-UICulture).Name)"
   Expect (-not (Test-Path -LiteralPath $Data.Before)) 'and nothing is made under the older name'
   $halfWritten = @(Get-ChildItem -LiteralPath $Data.Now -Filter '*.tmp' -File)
   Expect ($halfWritten.Count -eq 0) 'no half-written file is left beside them' (@($halfWritten | ForEach-Object Name) -join ', ')
