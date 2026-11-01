@@ -18,6 +18,7 @@ The whole list. The [README](../README.md) keeps the short one.
 - **Mod Browser** — search Modrinth from the launcher, filtered to your profile
 - **Compatibility Checks** — warns before an install that does not fit the profile, and pulls in required dependencies
 - **Mods From A File** — add a jar you already have: it is checked to be for the profile's loader, recognised by its contents when Modrinth publishes that very build — so its updates and the mods it needs are handled like any other — and listed as a plain file when not
+- **Installed Mods, Filtered** — a pack runs to a hundred mods and more, so the list of what is installed narrows as you type, by a mod's name or its file
 - **Mod Updates** — checks what you installed by hand against Modrinth by file hash, so a jar you added from a file is recognised too, and updates them in place
 - **Shaders & Resource Packs** — found on Modrinth or added from a zip you already have, checked to be the kind of pack the game will read, then ordered and removed per profile
 
