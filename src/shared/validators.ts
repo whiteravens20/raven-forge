@@ -316,6 +316,30 @@ export const storedInstalledSchema = z
   })
   .transform((stored) => ({ ...stored, name: stored.name ?? stored.fileName }));
 
+/**
+ * A feed entry's translations, read a language at a time, the way the feed is
+ * read an entry at a time: a slip in one costs that one. The entry is still
+ * shown, in the language it was written in, and so are its other translations.
+ */
+function feedTranslations<T>(translation: z.ZodType<T>) {
+  return z
+    .unknown()
+    .optional()
+    .transform((value): Record<string, T> | undefined => {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+      const kept = Object.entries(value).flatMap(([language, text]): [string, T][] => {
+        const parsed = translation.safeParse(text);
+        return FEED_LANGUAGE.test(language) && parsed.success
+          ? [[language.toLowerCase(), parsed.data]]
+          : [];
+      });
+      return kept.length > 0 ? Object.fromEntries(kept) : undefined;
+    });
+}
+
+/** `en`, `pl`, `pt-BR`. */
+const FEED_LANGUAGE = /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i;
+
 export const newsItemSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -326,6 +350,14 @@ export const newsItemSchema = z.object({
   url: z.string().url().optional(),
   imageUrl: z.string().url().optional(),
   publishedAt: z.string(),
+  translations: feedTranslations(
+    z.object({
+      title: z.string().optional(),
+      excerpt: z.string().optional(),
+      body: z.string().optional(),
+      url: z.string().url().optional(),
+    }),
+  ),
 });
 
 export const announcementSchema = z.object({
@@ -336,4 +368,12 @@ export const announcementSchema = z.object({
   body: z.string().optional(),
   url: z.string().url().optional(),
   dismissible: z.boolean(),
+  translations: feedTranslations(
+    z.object({
+      message: z.string().optional(),
+      title: z.string().optional(),
+      body: z.string().optional(),
+      url: z.string().url().optional(),
+    }),
+  ),
 });
