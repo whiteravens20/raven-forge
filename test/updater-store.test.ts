@@ -177,3 +177,31 @@ describe('installing an update', () => {
     expect(store.getState().error).toBe('EPERM');
   });
 });
+
+describe('a download that fails', () => {
+  it('keeps what the main process said, for the page to quote', async () => {
+    const store = await loadStore();
+    api.emit('updater:update-available', update());
+    api.call('updater', 'download').mockResolvedValueOnce({ success: false, error: 'disk full' });
+
+    await expect(store.getState().download()).resolves.toBe(false);
+
+    expect(store.getState()).toMatchObject({ stage: 'failed', error: 'disk full' });
+  });
+
+  it("says a lost connection in the player's language, and not in Chromium's", async () => {
+    const store = await loadStore();
+    api.emit('updater:update-available', update());
+    api.call('updater', 'download').mockResolvedValueOnce({
+      success: false,
+      error: 'net::ERR_INTERNET_DISCONNECTED',
+      errorMessage: { key: 'error.noConnection' },
+    });
+
+    await store.getState().download();
+
+    expect(store.getState().stage).toBe('failed');
+    expect(store.getState().error).not.toContain('net::');
+    expect(store.getState().error).toBeTruthy();
+  });
+});

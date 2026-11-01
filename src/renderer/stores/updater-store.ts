@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import type { UpdateInfo } from '@shared/ipc-types';
+import { failureText } from '../i18n';
 
 const api = window.ravenforge;
 
@@ -58,7 +59,7 @@ export const useUpdaterStore = create<UpdaterStore>((set, get) => ({
       .download()
       .then((result) => {
         if (!result.success) {
-          set({ stage: 'failed', error: result.error ?? null });
+          set({ stage: 'failed', error: failureText(result, '') || null });
           return false;
         }
         // `update-downloaded` also sets this; setting it here too means a caller
@@ -75,7 +76,7 @@ export const useUpdaterStore = create<UpdaterStore>((set, get) => ({
   install: async () => {
     const result = await api.updater.install();
     // Success quits the launcher, so only a failure ever gets here.
-    if (!result.success) set({ error: result.error ?? null });
+    if (!result.success) set({ error: failureText(result, '') || null });
     return result.success;
   },
 

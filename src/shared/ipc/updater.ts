@@ -3,6 +3,8 @@
 // Manifest signatures and launcher updates.
 // Part of the IPC contract — see `../ipc-types.ts`.
 
+import type { ErrorMessage } from './common';
+
 /**
  * The outcome of checking a manifest's signature — always about the manifest a
  * profile last *installed*, never about one fetched to answer the question.
@@ -37,7 +39,7 @@ export type UpdateCheck =
   | { status: 'available'; currentVersion: string; update: UpdateInfo }
   /** Self-update is not possible for this build — `reason` says why. */
   | { status: 'unsupported'; currentVersion: string; reason: UpdateUnsupportedReason }
-  | { status: 'failed'; currentVersion: string; error: string };
+  | { status: 'failed'; currentVersion: string; error: string; errorMessage?: ErrorMessage };
 
 export type UpdateUnsupportedReason =
   /** Running from source; there is no installed artifact to replace. */

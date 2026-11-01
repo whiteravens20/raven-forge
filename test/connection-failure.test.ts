@@ -22,6 +22,7 @@ describe('isConnectionFailure', () => {
     'net::ERR_CONNECTION_REFUSED',
     'net::ERR_PROXY_CONNECTION_FAILED',
     'net::ERR_TIMED_OUT',
+    'net::ERR_CONTENT_LENGTH_MISMATCH',
   ])('knows %s, from what goes through Chromium', (message) => {
     expect(isConnectionFailure(new Error(message))).toBe(true);
   });

@@ -7,6 +7,7 @@ import { getMainWindow } from '../../main/window';
 import { abandonProgress, emitProgress } from '../util/progress';
 import type { UpdateCheck, UpdateInfo, UpdateUnsupportedReason } from '../../shared/ipc-types';
 import { errorText } from '../util/error-text';
+import { isConnectionFailure } from '../net/connection-failure';
 import { getSettings } from '../config/settings-manager';
 import { clearPendingUpdate } from './update-cache';
 
@@ -131,6 +132,7 @@ export async function checkForUpdates(): Promise<UpdateCheck> {
       status: 'failed',
       currentVersion,
       error: err instanceof Error ? err.message : String(err),
+      ...(isConnectionFailure(err) ? { errorMessage: { key: 'error.noConnection' } as const } : {}),
     };
   }
 }

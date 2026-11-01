@@ -8,7 +8,7 @@ import { isNetworkFailure } from '../auth/auth-errors';
  * with no code to read.
  */
 const CHROMIUM_NO_CONNECTION =
-  /net::ERR_(INTERNET_DISCONNECTED|NAME_NOT_RESOLVED|NAME_RESOLUTION_FAILED|ADDRESS_UNREACHABLE|CONNECTION_\w+|NETWORK_\w+|PROXY_\w+|TIMED_OUT|TUNNEL_CONNECTION_FAILED|SOCKS_CONNECTION_\w+)/;
+  /net::ERR_(INTERNET_DISCONNECTED|NAME_NOT_RESOLVED|NAME_RESOLUTION_FAILED|ADDRESS_UNREACHABLE|CONNECTION_\w+|NETWORK_\w+|PROXY_\w+|TIMED_OUT|TUNNEL_CONNECTION_FAILED|SOCKS_CONNECTION_\w+|CONTENT_LENGTH_MISMATCH)/;
 
 /** Whether what stopped something is that nothing could be reached. */
 export function isConnectionFailure(err: unknown): boolean {

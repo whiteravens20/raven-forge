@@ -86,6 +86,28 @@ describe('the question at a start', () => {
   });
 });
 
+describe('a check that fails', () => {
+  it("says so in the player's language when nothing could be reached", async () => {
+    updater.checkForUpdates.mockRejectedValueOnce(new Error('net::ERR_INTERNET_DISCONNECTED'));
+    const { checkForUpdates } = await load();
+
+    expect(await checkForUpdates()).toMatchObject({
+      status: 'failed',
+      error: 'net::ERR_INTERNET_DISCONNECTED',
+      errorMessage: { key: 'error.noConnection' },
+    });
+  });
+
+  it('quotes anything else as it came', async () => {
+    updater.checkForUpdates.mockRejectedValueOnce(new Error('Cannot parse the feed'));
+    const { checkForUpdates } = await load();
+
+    const result = await checkForUpdates();
+    expect(result).toMatchObject({ status: 'failed', error: 'Cannot parse the feed' });
+    expect(result).not.toHaveProperty('errorMessage');
+  });
+});
+
 describe('what the check found', () => {
   it('can be asked for afterwards, by a page that was not there to hear it', async () => {
     const { getPendingUpdate } = await load();

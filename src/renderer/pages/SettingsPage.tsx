@@ -588,7 +588,7 @@ function UpdateRow({
       )}
       {result?.status === 'failed' && (
         <p className="text-xs text-rf-danger">
-          {t('settings.updateCheckFailedWith', { error: result.error })}
+          {t('settings.updateCheckFailedWith', { error: failureText(result, result.error) })}
         </p>
       )}
       {error && <p className="text-xs text-rf-danger">{error}</p>}

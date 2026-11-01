@@ -161,10 +161,11 @@ const reason = errorText;
  * cable pulled out, in words only the log needs.
  */
 function failed<T>(doing: string, err: unknown, refusal?: ErrorMessage): IpcResult<T> {
-  const noConnection: ErrorMessage | undefined = isConnectionFailure(err)
-    ? { key: 'error.noConnection' }
-    : undefined;
-  return fail(`${doing}: ${reason(err)}`, undefined, refusal ?? noConnection);
+  return fail(`${doing}: ${reason(err)}`, undefined, refusal ?? noConnection(err));
+}
+
+function noConnection(err: unknown): ErrorMessage | undefined {
+  return isConnectionFailure(err) ? { key: 'error.noConnection' } : undefined;
 }
 
 /** Settled once the launcher has finished starting — see {@link holdHandlersUntil}. */
@@ -1225,7 +1226,9 @@ export function registerAllIpcHandlers(): void {
       await downloadUpdate();
       return ok(undefined);
     } catch (err) {
-      return failed(`Update download failed`, err);
+      // The page says what it was doing, in the player's language, and quotes
+      // this after it.
+      return fail(reason(err), undefined, noConnection(err));
     }
   });
   handle('updater:install', async () => {
