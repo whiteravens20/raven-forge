@@ -244,9 +244,8 @@ async function withLauncher(program, home, settings, test) {
       ...settings,
     }),
   );
-  // They have to exist: Electron stops on a dialog when the one in `APPDATA` does not.
   const folders = Object.fromEntries(
-    ['roaming', 'config', 'cache', 'share'].map((name) => {
+    ['config', 'cache', 'share'].map((name) => {
       const folder = path.join(home, name);
       fs.mkdirSync(folder, { recursive: true });
       return [name, folder];
@@ -255,13 +254,15 @@ async function withLauncher(program, home, settings, test) {
   const env = {
     ...process.env,
     RAVENFORGE_DATA_DIR: data,
-    HOME: home,
-    USERPROFILE: home,
-    APPDATA: folders.roaming,
+    // Where electron-updater keeps what it downloads, on each system.
     LOCALAPPDATA: folders.cache,
-    XDG_CONFIG_HOME: folders.config,
     XDG_CACHE_HOME: folders.cache,
-    XDG_DATA_HOME: folders.share,
+    // Not `USERPROFILE` on Windows: the system works out the folders it knows
+    // from it, and Electron stops on a dialog when the one for `appData` is not
+    // there. The data has a place of its own above, and the runner is thrown away.
+    ...(WINDOWS
+      ? {}
+      : { HOME: home, XDG_CONFIG_HOME: folders.config, XDG_DATA_HOME: folders.share }),
   };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.DBUS_SESSION_BUS_ADDRESS;
