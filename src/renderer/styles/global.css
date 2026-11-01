@@ -368,11 +368,12 @@ p.text-rf-danger {
   animation: rf-bd-lava-pulse 4s ease-in-out infinite alternate;
 }
 
-/* Gears: duration/direction set inline per gear. */
+/* Gears: duration/direction set inline per gear. Each is drawn around its own
+   origin and turns about that. The centre of its box will not do: with an odd
+   number of teeth that is not the axle, and the wheel wobbles out of mesh. */
 .rf-backdrop .rf-bd-spin {
   animation: rf-bd-spin linear infinite;
-  transform-box: fill-box;
-  transform-origin: center;
+  transform-origin: 0 0;
 }
 
 /* Mine cart rolling through and off the frame; the reset happens offscreen. */

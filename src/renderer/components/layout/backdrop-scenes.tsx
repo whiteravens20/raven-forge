@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactElement } from 'react';
 import { VoxelTerrain } from './voxel-terrain';
+import { WORKSHOP_TRAIN, bodyRadius, loneGear, teethPath, type PlacedGear } from './gear-train';
 
 /**
  * The three Minecraft moods cycled by ForgeBackdrop: an overworld drone
@@ -521,56 +522,32 @@ export function CaveScene() {
 
 /* ── Tech: the workshop ───────────────────────────────────── */
 
-/** Create-style cogwheel: chunky square teeth, thick ring, square hub. */
-function gear(
-  key: string,
-  cx: number,
-  cy: number,
-  r: number,
-  teeth: number,
-  durS: number,
-  body: string,
-  rim: string,
-  reverse = false,
-) {
-  const rects: ReactElement[] = [];
-  for (let i = 0; i < teeth; i++) {
-    const a = (360 / teeth) * i;
-    rects.push(
-      <rect
-        key={i}
-        x={cx - r * 0.12}
-        y={cy - r - r * 0.24}
-        width={r * 0.24}
-        height={r * 0.3}
-        rx={r * 0.03}
-        fill={rim}
-        transform={`rotate(${a} ${cx} ${cy})`}
-      />,
-    );
-  }
+/** Create-style cogwheel: chunky teeth, thick ring, square hub. Drawn around its own centre. */
+function gear(key: string, wheel: PlacedGear, body: string, rim: string) {
+  const disc = bodyRadius(wheel);
   return (
-    <g
-      key={key}
-      className="rf-bd-spin"
-      style={
-        {
-          animationDuration: `${durS}s`,
-          animationDirection: reverse ? 'reverse' : 'normal',
-        } as CSSProperties
-      }
-    >
-      {rects}
-      <circle cx={cx} cy={cy} r={r} fill={body} />
-      <circle cx={cx} cy={cy} r={r * 0.76} fill="none" stroke={rim} strokeWidth={r * 0.12} />
-      <rect
-        x={cx - r * 0.18}
-        y={cy - r * 0.18}
-        width={r * 0.36}
-        height={r * 0.36}
-        rx={r * 0.04}
-        fill="#0e0c18"
-      />
+    <g key={key} transform={`translate(${wheel.x} ${wheel.y}) rotate(${wheel.phase})`}>
+      <g
+        className="rf-bd-spin"
+        style={
+          {
+            animationDuration: `${wheel.turnSeconds}s`,
+            animationDirection: wheel.reverse ? 'reverse' : 'normal',
+          } as CSSProperties
+        }
+      >
+        <path d={teethPath(wheel)} fill={rim} />
+        <circle r={disc} fill={body} />
+        <circle r={disc * 0.76} fill="none" stroke={rim} strokeWidth={disc * 0.12} />
+        <rect
+          x={-disc * 0.18}
+          y={-disc * 0.18}
+          width={disc * 0.36}
+          height={disc * 0.36}
+          rx={disc * 0.04}
+          fill="#0e0c18"
+        />
+      </g>
     </g>
   );
 }
@@ -641,17 +618,8 @@ export function TechScene() {
       ))}
 
       {/* The great flywheel, half sunk behind the machines. */}
-      {gear('fly', 1560, 460, 220, 12, 70, '#191430', '#3d3663')}
-      {/* Five-gear train down the left wall. Meshing is geometry, not luck:
-          centres sit ≈1.09·(r₁+r₂) apart so teeth interleave without the
-          bodies touching, tooth counts keep the pitch near 2πr/n ≈ 40 for
-          every wheel, spin period scales with radius (0.217·r) so rim speeds
-          match, and direction alternates down the chain. */}
-      {gear('g1', 398, 484, 54, 8, 11.7, '#1c1633', '#494077')}
-      {gear('g2', 492, 604, 86, 13, 18.7, '#1c1633', '#494077', true)}
-      {gear('g3', 641, 556, 58, 9, 12.6, '#1c1633', '#494077')}
-      {gear('g4', 728, 656, 64, 10, 13.9, '#1c1633', '#494077', true)}
-      {gear('g5', 835, 606, 44, 7, 9.5, '#1c1633', '#494077')}
+      {gear('fly', loneGear(1560, 460, 220, 12, 70), '#191430', '#3d3663')}
+      {WORKSHOP_TRAIN.map((wheel, i) => gear(`g${i}`, wheel, '#1c1633', '#494077'))}
 
       {/* Machine blocks, with vents and status lights on their faces. */}
       {column('m1', 300, 700, 90, 45, 260, '#241d3f', '#151027', '#1c1633')}
