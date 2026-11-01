@@ -408,7 +408,7 @@ jobs:
             | Platform | File | Notes |
             |---|---|---|
             | Windows 10 1809+ / 11 | `Raven-Forge-Launcher-Setup-*.exe` | NSIS installer, nothing to install first |
-            | Debian 11+ / Ubuntu 20.04+ | `raven-forge-launcher_*_amd64.deb` | recommended on Linux — apt pulls everything |
+            | Debian 12+ / Ubuntu 22.04+ | `raven-forge-launcher_*_amd64.deb` | recommended on Linux — apt pulls everything |
             | Any x64 Linux, glibc ≥ 2.25 | `Raven-Forge-Launcher-*.AppImage` | needs libraries installed by hand, see below |
 
             Java is not on this list. The launcher downloads the JRE each profile
