@@ -4,8 +4,8 @@
 # Tags created on any other branch are refused by the guard job.
 #
 # Produces, for one tag:
-#   Raven-Forge-Launcher-Setup-<ver>.exe   NSIS installer, Authenticode-signed
-#   raven-forge-launcher_<ver>_amd64.deb   Debian 11+ / Ubuntu 20.04+
+#   Raven-Forge-Launcher-Setup-<ver>.exe   NSIS installer, signed when the certificate is set
+#   raven-forge-launcher_<ver>_amd64.deb   Debian 12+ / Ubuntu 22.04+
 #   Raven-Forge-Launcher-<ver>.AppImage    any x64 glibc >= 2.25
 #   latest.yml / latest-linux.yml + .blockmap   electron-updater feeds
 #   SHA256SUMS.txt                         checksums over every artefact
