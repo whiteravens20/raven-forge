@@ -28,6 +28,11 @@ export interface GlobalSettings {
    * beside the installer jar. Off by default: that jar is executed.
    */
   allowUnverifiedLoaderInstaller: boolean;
+  /**
+   * Ask GitHub for a newer launcher by itself, at every start. "Check for
+   * updates" asks when it is pressed, either way.
+   */
+  checkUpdatesOnStart: boolean;
 }
 
 export interface TrustedKey {

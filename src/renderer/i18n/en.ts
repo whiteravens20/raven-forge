@@ -590,6 +590,9 @@ export const en = {
   'settings.section.updates': 'Updates',
   'settings.installedVersion': 'Installed version: {version}',
   'settings.checkUpdates': 'Check for updates',
+  'settings.checkUpdatesOnStart': 'Check for a new version at every start',
+  'settings.checkUpdatesOnStartHint':
+    'One request to GitHub. Switched off, you hear of a new version, security fixes included, only when you press “Check for updates”.',
   'settings.downloadUpdate': 'Download update',
   'settings.restartToUpdate': 'Restart to install',
   'settings.updateUpToDate': 'You are on the newest release.',
@@ -909,8 +912,9 @@ export const en = {
   'privacy.dest.packs.when': 'news, the list of server packs, and the packs themselves',
   'privacy.dest.updates.who': 'GitHub',
   'privacy.dest.updates.when': 'at every start, and when you check for updates',
-  'privacy.dest.updates.sends':
-    'One question: is there a newer version? It happens on its own at every start, and there is currently no way to switch that off.',
+  'privacy.dest.updates.whenAsked': 'when you check for updates',
+  'privacy.dest.updates.whenNever': 'never: this build does not update itself',
+  'privacy.dest.updates.sends': 'One question: is there a newer version?',
   'privacy.dest.feeds': 'News, as set up on this computer:',
   'privacy.dest.feedOff': 'off — nothing is being downloaded',
 
@@ -932,7 +936,7 @@ export const en = {
   'privacy.control.packs':
     'Packs: a profile that follows a pack asks the address in its “Manifest URL” field about it — when the launcher starts and before every launch of the game. Remove that address in the profile editor and the profile stops asking, and stops updating.',
   'privacy.control.updates':
-    'Launcher updates: checked at every start with one request to GitHub. This cannot be switched off yet.',
+    'Launcher updates: Settings → Updates → “Check for a new version at every start”, on by default. It is one request to GitHub. Switched off, the launcher asks only when you press “Check for updates”.',
   'privacy.control.diagnostics':
     'Logs and crash reports: they do not leave the computer until you send them to someone yourself. “Report a bug” opens the issue page in your browser, and you attach the file by hand.',
   'privacy.control.location':

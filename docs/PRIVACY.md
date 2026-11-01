@@ -225,7 +225,7 @@ Whoever operates that address sees your IP.
 | --------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | GitHub Releases | **Automatically, on every start**, and whenever you press "Check for updates" | Nothing but the request. It reveals your IP, the launcher version and your platform to GitHub. |
 
-See "Known gaps" — there is currently no switch to disable the automatic check.
+Settings → Updates → "Check for a new version at every start" switches the automatic one off. A `.deb` install asks neither way: the package manager updates it.
 
 ### Links that hand you to your browser
 
@@ -312,7 +312,7 @@ read a report through before attaching it to a public issue.
 | Discord               | **Settings → Behaviour → "Show the game on your Discord status"**, off by default.                                                                                                                            |
 | Packs                 | A profile that follows a pack asks the address in its **Manifest URL** field — when the launcher starts and before every launch. Remove the address in the profile editor and it stops asking, and updating.  |
 | Content from Modrinth | Nothing is sent to Modrinth unless you search, open a profile's list of mods, shaders or resource packs, check for updates, export a pack, or add a mod from a file.                                          |
-| Launcher updates      | Checked at every start with one request to GitHub. This cannot be switched off yet — see "Known gaps".                                                                                                        |
+| Launcher updates      | Settings → Updates → "Check for a new version at every start", on by default. It is one request to GitHub; switched off, the launcher asks only when you press "Check for updates".                           |
 | Logs and reports      | They do not leave the computer until you send them yourself. "Report a bug" opens the issue page in your browser; you attach the file by hand.                                                                |
 | Where it all is       | **Settings → Data → Move…** moves the data folder to wherever you point.                                                                                                                                      |
 
@@ -340,9 +340,6 @@ read a report through before attaching it to a public issue.
 
 Listed on purpose. An honest list beats a clean-looking one.
 
-- **The update check on start cannot be disabled** from Settings. It is a single
-  request to GitHub Releases on each launch. A blocked network simply makes it
-  fail quietly.
 - **Log files are only partly redacted.** The session token is taken out; your
   player name, UUID and file paths are not. Crash reports have all of those
   removed. See "What ends up in the log".

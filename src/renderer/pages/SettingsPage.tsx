@@ -312,7 +312,10 @@ export function SettingsPage() {
       </Section>
 
       <Section title={t('settings.section.updates')}>
-        <UpdateRow />
+        <UpdateRow
+          checkOnStart={settings.checkUpdatesOnStart}
+          onCheckOnStartChange={(v) => update({ checkUpdatesOnStart: v })}
+        />
       </Section>
 
       <Section title={t('settings.section.data')}>
@@ -468,11 +471,18 @@ function CheckboxRow({
  * number someone needs when filing a bug, and making them press a button to see
  * it — one that will not even work on a source build — is the wrong order.
  */
-function UpdateRow() {
+function UpdateRow({
+  checkOnStart,
+  onCheckOnStartChange,
+}: {
+  checkOnStart: boolean;
+  onCheckOnStartChange: (v: boolean) => void;
+}) {
   const t = useT();
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<UpdateCheck | null>(null);
   const [version, setVersion] = useState<string | null>(null);
+  const [selfUpdating, setSelfUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // What is known about the update itself is the store's, shared with the
   // notification and the Play button — this row used to keep its own, and
@@ -485,7 +495,10 @@ function UpdateRow() {
 
   useEffect(() => {
     void api.system.getInfo().then((r) => {
-      if (r.success && r.data) setVersion(r.data.launcherVersion);
+      if (r.success && r.data) {
+        setVersion(r.data.launcherVersion);
+        setSelfUpdating(r.data.updateUnsupported === null);
+      }
     });
   }, []);
 
@@ -579,6 +592,19 @@ function UpdateRow() {
         </p>
       )}
       {error && <p className="text-xs text-rf-danger">{error}</p>}
+
+      {/* A build that does not update itself asks nothing at a start: no switch
+          for a question that is never put. */}
+      {selfUpdating && (
+        <>
+          <CheckboxRow
+            checked={checkOnStart}
+            onChange={onCheckOnStartChange}
+            label={t('settings.checkUpdatesOnStart')}
+          />
+          <p className="text-xs text-rf-text-muted">{t('settings.checkUpdatesOnStartHint')}</p>
+        </>
+      )}
     </div>
   );
 }

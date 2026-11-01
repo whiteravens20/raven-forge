@@ -1,5 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
+import { useEffect, useState } from 'react';
 import { ShieldCheck, ExternalLink } from 'lucide-react';
 import {
   MS_AUTH_BASE,
@@ -116,6 +117,20 @@ export function PrivacyPage() {
   const t = useT();
   const locale = useLocale();
   const settings = useSettingsStore((s) => s.settings);
+  const [selfUpdating, setSelfUpdating] = useState(true);
+
+  useEffect(() => {
+    void window.ravenforge.system.getInfo().then((r) => {
+      if (r.success && r.data) setSelfUpdating(r.data.updateUnsupported === null);
+    });
+  }, []);
+
+  /** The one entry here that depends on this computer. */
+  const whenAsked = (dest: Destination): TranslationKey => {
+    if (dest.when !== 'privacy.dest.updates.when') return dest.when;
+    if (!selfUpdating) return 'privacy.dest.updates.whenNever';
+    return settings?.checkUpdatesOnStart === false ? 'privacy.dest.updates.whenAsked' : dest.when;
+  };
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-6">
@@ -161,7 +176,7 @@ export function PrivacyPage() {
             <div key={dest.hosts.join()} className="space-y-1 p-3">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <span className="text-sm font-medium text-rf-text">{t(dest.who)}</span>
-                <span className="text-xs text-rf-text-muted">— {t(dest.when)}</span>
+                <span className="text-xs text-rf-text-muted">— {t(whenAsked(dest))}</span>
               </div>
               <p
                 className={`text-xs leading-relaxed ${
@@ -203,7 +218,7 @@ export function PrivacyPage() {
               'privacy.control.proxy',
               'privacy.control.discord',
               'privacy.control.packs',
-              'privacy.control.updates',
+              ...(selfUpdating ? (['privacy.control.updates'] as const) : []),
               'privacy.control.diagnostics',
               'privacy.control.location',
               'privacy.control.delete',

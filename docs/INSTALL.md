@@ -90,7 +90,7 @@ Debian does not apply that restriction, so the AppImage runs as-is.
 
 ## Updating
 
-A Windows install and an AppImage update themselves: the launcher asks GitHub for a newer release at every start and offers it, and nothing is downloaded until you say so. A `.deb` belongs to the package manager, so the launcher leaves it alone: download the newer `.deb` and install it the same way, over the old one. Profiles, worlds, accounts and settings stay where they are.
+A Windows install and an AppImage update themselves: the launcher asks GitHub for a newer release at every start and offers it, and nothing is downloaded until you say so. Settings → Updates switches the question off, and "Check for updates" then asks when you press it. A `.deb` belongs to the package manager, so the launcher leaves it alone: download the newer `.deb` and install it the same way, over the old one. Profiles, worlds, accounts and settings stay where they are.
 
 ## Checking what you downloaded
 

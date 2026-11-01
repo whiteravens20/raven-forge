@@ -636,9 +636,6 @@ were not.
 post-main` description, and that exit is logged but not reported as a crash.
   Matching the description rather than the exit code is deliberate: the code is
   only `halt()`'s argument and says nothing about why.
-- **The startup update check cannot be switched off.** One request to GitHub
-  Releases on every launch, with no setting behind it — itemised in
-  [PRIVACY.md](PRIVACY.md) rather than left for someone to discover.
 - **Launcher logs are not redacted.** Only crash reports are. `main.log` echoes
   the game's stdout verbatim, and a mod that prints its launch arguments prints
   a live session token with them.

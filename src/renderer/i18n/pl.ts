@@ -628,6 +628,9 @@ export const pl: Translations = {
   'settings.section.updates': 'Aktualizacje',
   'settings.installedVersion': 'Zainstalowana wersja: {version}',
   'settings.checkUpdates': 'Sprawdź aktualizacje',
+  'settings.checkUpdatesOnStart': 'Sprawdzaj nową wersję przy każdym starcie',
+  'settings.checkUpdatesOnStartHint':
+    'Jedno zapytanie do GitHuba. Po wyłączeniu o nowej wersji, także z poprawkami bezpieczeństwa, dowiesz się tylko po naciśnięciu „Sprawdź aktualizacje”.',
   'settings.downloadUpdate': 'Pobierz aktualizację',
   'settings.restartToUpdate': 'Uruchom ponownie, aby zainstalować',
   'settings.updateUpToDate': 'Masz najnowsze wydanie.',
@@ -913,8 +916,9 @@ export const pl: Translations = {
   'privacy.dest.packs.when': 'aktualności i ogłoszenia, lista paczek serwerowych i same paczki',
   'privacy.dest.updates.who': 'GitHub',
   'privacy.dest.updates.when': 'przy każdym starcie i gdy sprawdzasz aktualizacje',
-  'privacy.dest.updates.sends':
-    'Jedno pytanie: czy jest nowsza wersja? Dzieje się samo przy każdym starcie i na razie nie da się tego wyłączyć.',
+  'privacy.dest.updates.whenAsked': 'gdy sprawdzasz aktualizacje',
+  'privacy.dest.updates.whenNever': 'nigdy: ta wersja nie aktualizuje się sama',
+  'privacy.dest.updates.sends': 'Jedno pytanie: czy jest nowsza wersja?',
   'privacy.dest.feeds': 'Aktualności i ogłoszenia, tak jak są ustawione na tym komputerze:',
   'privacy.dest.feedOff': 'wyłączone — nic nie jest pobierane',
 
@@ -936,7 +940,7 @@ export const pl: Translations = {
   'privacy.control.packs':
     'Paczki: profil, który śledzi paczkę, pyta o nią adres ze swojego pola „Adres manifestu” — przy starcie launchera i przed każdym uruchomieniem gry. Usuń ten adres w edytorze profilu, a profil przestanie pytać i przestanie się aktualizować.',
   'privacy.control.updates':
-    'Aktualizacje launchera: sprawdzane przy każdym starcie jednym zapytaniem do GitHuba. Tego na razie nie da się wyłączyć.',
+    'Aktualizacje launchera: Ustawienia → Aktualizacje → „Sprawdzaj nową wersję przy każdym starcie”, domyślnie włączone. To jedno zapytanie do GitHuba. Po wyłączeniu launcher pyta tylko po naciśnięciu „Sprawdź aktualizacje”.',
   'privacy.control.diagnostics':
     'Logi i raporty z awarii: nie opuszczają komputera, dopóki ich komuś nie wyślesz. „Zgłoś błąd” otwiera stronę zgłoszeń w przeglądarce, a plik dołączasz ręcznie.',
   'privacy.control.location':

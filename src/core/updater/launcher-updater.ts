@@ -7,6 +7,7 @@ import { getMainWindow } from '../../main/window';
 import { abandonProgress, emitProgress } from '../util/progress';
 import type { UpdateCheck, UpdateInfo, UpdateUnsupportedReason } from '../../shared/ipc-types';
 import { errorText } from '../util/error-text';
+import { getSettings } from '../config/settings-manager';
 import { clearPendingUpdate } from './update-cache';
 
 /** The one bar the update download draws. */
@@ -101,7 +102,7 @@ export function updateSupportFor(
   return null;
 }
 
-function updateSupport(): UpdateUnsupportedReason | null {
+export function updateSupport(): UpdateUnsupportedReason | null {
   return updateSupportFor(app.isPackaged, process.platform, Boolean(process.env.APPIMAGE));
 }
 
@@ -132,6 +133,15 @@ export async function checkForUpdates(): Promise<UpdateCheck> {
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/** The question asked without anybody pressing anything, which Settings can switch off. */
+export async function checkForUpdatesAtStart(): Promise<void> {
+  if (!(await getSettings()).checkUpdatesOnStart) {
+    log.info('Not asking about a launcher update at this start: switched off in Settings');
+    return;
+  }
+  await checkForUpdates();
 }
 
 export async function downloadUpdate(): Promise<void> {

@@ -228,8 +228,9 @@ Ten, kto prowadzi tamten adres, widzi Twoje IP.
 | --------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | GitHub Releases | **Automatycznie przy każdym starcie** oraz po naciśnięciu „Sprawdź aktualizacje” | Nic poza samym żądaniem. Ujawnia GitHubowi Twoje IP, wersję launchera i platformę. |
 
-Patrz „Znane luki” — obecnie nie ma przełącznika wyłączającego automatyczne
-sprawdzanie.
+Ustawienia → Aktualizacje → „Sprawdzaj nową wersję przy każdym starcie” wyłącza
+to automatyczne. Instalacja z `.deb` nie pyta w żadnym wypadku: aktualizuje ją
+menedżer pakietów.
 
 ### Odnośniki, które przekazują Cię przeglądarce
 
@@ -319,7 +320,7 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 | Discord                | **Ustawienia → Zachowanie → „Pokazuj grę na statusie Discorda”**, domyślnie wyłączone.                                                                                                                                   |
 | Paczki                 | Profil, który trzyma się paczki, pyta o nią adres z pola **Adres manifestu** — przy starcie launchera i przed każdym uruchomieniem gry. Usuń ten adres w edytorze profilu, a profil przestanie pytać i się aktualizować. |
 | Zawartość z Modrinth   | Do Modrinth nie idzie nic, dopóki czegoś nie wyszukasz, nie otworzysz listy modów, shaderów albo paczek zasobów profilu, nie sprawdzisz aktualizacji, nie wyeksportujesz paczki ani nie dodasz moda z pliku.             |
-| Aktualizacje launchera | Sprawdzane przy każdym starcie jednym zapytaniem do GitHuba. Tego na razie nie da się wyłączyć — patrz „Znane luki”.                                                                                                     |
+| Aktualizacje launchera | Ustawienia → Aktualizacje → „Sprawdzaj nową wersję przy każdym starcie”, domyślnie włączone. To jedno zapytanie do GitHuba; po wyłączeniu launcher pyta tylko po naciśnięciu „Sprawdź aktualizacje”.                     |
 | Logi i raporty         | Nie opuszczają komputera, dopóki sam ich komuś nie wyślesz. „Zgłoś błąd” otwiera stronę zgłoszeń w przeglądarce; plik dołączasz ręcznie.                                                                                 |
 | Gdzie to wszystko leży | **Ustawienia → Dane → Przenieś…** przenosi folder danych tam, gdzie wskażesz.                                                                                                                                            |
 
@@ -347,9 +348,6 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 Wymienione celowo. Uczciwa lista jest lepsza niż taka, która ładnie wygląda.
 
-- **Sprawdzania aktualizacji przy starcie nie da się wyłączyć** z Ustawień. To
-  jedno żądanie do GitHub Releases przy każdym uruchomieniu. Przy zablokowanej
-  sieci po prostu cicho zawodzi.
 - **Pliki logów są redagowane tylko częściowo.** Token sesji jest usuwany; nazwa
   gracza, UUID i ścieżki plików nie. Raporty z awarii mają usunięte wszystkie te
   rzeczy. Patrz „Co trafia do logu”.

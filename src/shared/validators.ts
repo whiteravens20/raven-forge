@@ -142,6 +142,7 @@ export const globalSettingsSchema = z.object({
    * since Discord shows one activity at a time.
    */
   discordRichPresence: z.boolean().default(false),
+  checkUpdatesOnStart: z.boolean().default(true),
   /**
    * Never contact the auth servers; launch every profile with the offline
    * session token. Singleplayer and LAN only — an online-mode server rejects it.

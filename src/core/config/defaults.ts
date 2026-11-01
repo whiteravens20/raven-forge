@@ -23,4 +23,5 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   discordRichPresence: false,
   offlineMode: false,
   allowUnverifiedLoaderInstaller: false,
+  checkUpdatesOnStart: true,
 };

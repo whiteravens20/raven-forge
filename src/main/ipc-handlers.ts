@@ -76,7 +76,12 @@ import {
   removeContent,
   reorderResourcePacks,
 } from '../core/mods/content-manager';
-import { checkForUpdates, downloadUpdate, quitAndInstall } from '../core/updater/launcher-updater';
+import {
+  checkForUpdates,
+  downloadUpdate,
+  quitAndInstall,
+  updateSupport,
+} from '../core/updater/launcher-updater';
 import { detectSystemJava, probeJava } from '../core/java/java-manager';
 import { requiredJavaFor } from '../core/minecraft/java-requirement';
 import { getLoaderVersions, loaderBuildStarts } from '../core/modloader/loader-manager';
@@ -228,6 +233,7 @@ export function registerAllIpcHandlers(): void {
       totalMemoryMb: machineMemoryMb(),
       dataDirectory: paths.root,
       crashReportsDirectory: paths.crashReportsDir,
+      updateUnsupported: updateSupport(),
     };
     return ok(info);
   });
