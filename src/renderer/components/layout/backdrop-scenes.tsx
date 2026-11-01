@@ -5,8 +5,8 @@ import { VoxelTerrain } from './voxel-terrain';
 import { WORKSHOP_TRAIN, bodyRadius, loneGear, teethPath, type PlacedGear } from './gear-train';
 
 /**
- * The three Minecraft moods cycled by ForgeBackdrop: an overworld drone
- * flight, a Nether forge, and the End void. Each is a <g> painted into the
+ * The four Minecraft moods cycled by ForgeBackdrop: an overworld drone
+ * flight, a Nether forge, a mine and a workshop. Each is a <g> painted into the
  * shared 1920×1080 backdrop SVG and starts with its own full-canvas wash,
  * so the scene owns the atmosphere while the shared aurora bleeds through
  * faintly. All gradient/def ids referenced here live in ForgeBackdrop's
