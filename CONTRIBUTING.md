@@ -189,7 +189,7 @@ topic, no body. Do not mix a refactor into a feature commit.
 UI strings live in `src/renderer/i18n/`. A first start opens in the first of the system's languages that has a dictionary, and in English when none has. English (`en.ts`) is the one that defines the keys — `pl.ts` is typed against it — and what a missing entry falls back to. Both carry the same keys, and the type system enforces that.
 
 - **Never hardcode a user-facing string in a component.** Add the key to both dictionaries and use the `t()` helper.
-- To add a language, copy `en.ts`, translate the values, and register it in `src/renderer/i18n/index.ts`. TypeScript will name any key you missed.
+- To add a language, copy `en.ts`, translate the values, and add it to `Locale` in `src/shared/ipc/settings.ts` and to the `language` schema in `src/shared/validators.ts`. TypeScript will then name the other places it has to be listed (`src/renderer/i18n/index.ts`, `src/shared/locale.ts`) and any key you missed.
 - Keep placeholders (`{name}`) intact and keep the tone consistent with the existing entries.
 
 ---
