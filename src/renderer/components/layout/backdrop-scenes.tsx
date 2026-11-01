@@ -18,6 +18,25 @@ import { WORKSHOP_TRAIN, bodyRadius, loneGear, teethPath, type PlacedGear } from
 
 const pts = (p: Array<[number, number]>) => p.map(([x, y]) => `${x},${y}`).join(' ');
 
+/**
+ * A dash pattern that flows: one loop moves it by exactly one pattern, which is
+ * the only distance that does not show as a jump when the loop starts again.
+ * Taken from the pattern here, so a stroke cannot be given a loop of another
+ * length.
+ */
+function flowing(dash: number, gap: number, unitsPerSecond: number, backwards = false) {
+  const period = dash + gap;
+  return {
+    className: 'rf-bd-flow',
+    strokeDasharray: `${dash} ${gap}`,
+    style: {
+      '--rf-flow-period': `${period}px`,
+      animationDuration: `${period / unitsPerSecond}s`,
+      animationDirection: backwards ? 'reverse' : 'normal',
+    } as CSSProperties,
+  };
+}
+
 /** Isometric prism: top diamond + two faces, sealed against AA seams. */
 function column(
   key: string,
@@ -131,10 +150,29 @@ const BASALT_COLUMNS: Array<[number, number, number, number]> = [
   [620, 800, 34, 300],
 ];
 
+/** Each hangs off the edge of the roof where it is. */
 const GLOWSTONE: Array<[number, number]> = [
   [380, 108],
-  [1180, 88],
-  [1520, 128],
+  [1180, 128],
+  [1520, 125],
+];
+
+/** [dx, dy, size, colour] around a cluster's anchor, in blocks like the rest of the scene. */
+const GLOWSTONE_BLOCKS: Array<[number, number, number, string]> = [
+  [-26, -12, 18, '#fbbf24'],
+  [-8, -14, 20, '#fcd34d'],
+  [12, -12, 16, '#f59e0b'],
+  [-18, 6, 16, '#f59e0b'],
+  [-2, 6, 14, '#fbbf24'],
+  [-6, 20, 10, '#d97706'],
+];
+
+/** [screen y, stroke width, dash, gap, units a second, colour, opacity, backwards] */
+const LAVA_CURRENTS: Array<[number, number, number, number, number, string, number, boolean]> = [
+  [894, 5, 90, 150, 16, '#fde68a', 0.55, false],
+  [918, 9, 130, 190, 12, '#f97316', 0.5, true],
+  [954, 13, 170, 270, 10, '#ea580c', 0.5, false],
+  [1006, 18, 220, 340, 8, '#b45309', 0.5, true],
 ];
 
 const NETHER_EMBER_XS = [180, 420, 700, 1000, 1350, 1600, 1750, 880];
@@ -147,9 +185,9 @@ export function NetherScene() {
       {/* Far basalt silhouettes give the mid-band depth. */}
       {[
         [350, 620, 30, 460],
-        [520, 700, 24, 380],
-        [1240, 660, 28, 420],
-        [1390, 730, 22, 350],
+        [440, 740, 24, 340],
+        [800, 690, 28, 420],
+        [1010, 730, 22, 350],
       ].map(([x, y, hw, d], i) => (
         <g key={i} opacity="0.6">
           {column(`far${i}`, x, y, hw, hw / 2, d, '#2c2130', '#1a1120', '#241a28')}
@@ -187,53 +225,74 @@ export function NetherScene() {
         column(`b${i}`, x, y, hw, hw / 2, d, BASALT_TOP, BASALT_L, BASALT_R),
       )}
 
-      {/* Ceiling: the Nether has a roof — stepped blocks, stalactites and
-          glowstone pockets. */}
+      {/* A lava fall pouring out of the roof into the sea, so it is painted
+          before the roof, which hides where it starts. Three streams at three
+          speeds over a solid body: one dashed line reads as road marking. */}
+      <g>
+        <rect x="494" y="100" width="52" height="790" fill="#f59e0b" opacity="0.28" />
+        <rect x="502" y="100" width="36" height="790" fill="#ea580c" />
+        <line
+          {...flowing(96, 34, 90)}
+          x1="510"
+          y1="100"
+          x2="510"
+          y2="890"
+          stroke="#f59e0b"
+          strokeWidth="14"
+        />
+        <line
+          {...flowing(70, 26, 130)}
+          x1="524"
+          y1="100"
+          x2="524"
+          y2="890"
+          stroke="#fbbf24"
+          strokeWidth="14"
+        />
+        <line
+          {...flowing(30, 58, 170)}
+          x1="518"
+          y1="100"
+          x2="518"
+          y2="890"
+          stroke="#fde68a"
+          strokeWidth="6"
+        />
+      </g>
+
+      {/* Ceiling: the Nether has a roof, with blocky stalactites of its own
+          rock and glowstone hanging off it. */}
       <polygon
         points="0,0 1920,0 1920,150 1620,120 1320,170 1040,110 700,160 380,120 0,170"
         fill="#221420"
       />
-      {[
-        [240, 130, 26, 90],
-        [700, 150, 30, 130],
-        [1120, 115, 24, 80],
-        [1620, 125, 28, 110],
-      ].map(([x, y, hw, len], i) => (
-        <polygon
-          key={i}
-          points={pts([
-            [x - hw, y],
-            [x + hw, y],
-            [x, y + len],
-          ])}
-          fill="#1a0f1b"
-        />
-      ))}
+      {(
+        [
+          [240, 110, 54],
+          [700, 130, 62],
+          [1120, 100, 48],
+          [1620, 100, 58],
+        ] as const
+      ).map(([x, y, w], i) => blockStack(`st${i}`, x, y, w, '#221420'))}
       {GLOWSTONE.map(([x, y], i) => (
         <g key={i} className="rf-bd-lava">
           <ellipse cx={x} cy={y} rx="80" ry="46" fill="url(#rfbd-lava-glow)" />
-          <rect x={x - 26} y={y - 12} width="52" height="26" rx="4" fill="#fbbf24" opacity="0.85" />
-          <rect x={x - 12} y={y + 12} width="26" height="14" rx="3" fill="#f59e0b" opacity="0.75" />
+          {GLOWSTONE_BLOCKS.map(([dx, dy, size, fill]) => (
+            <rect
+              key={`${dx},${dy}`}
+              x={x + dx}
+              y={y + dy}
+              width={size}
+              height={size}
+              fill={fill}
+              opacity="0.9"
+            />
+          ))}
         </g>
       ))}
 
-      {/* A single lava fall pouring from the ceiling into the sea — the
-          flowing dash pattern is what sells the motion. */}
-      <g>
-        <line x1="520" y1="152" x2="520" y2="890" stroke="#f59e0b" strokeWidth="30" opacity="0.4" />
-        <line
-          className="rf-bd-flow"
-          x1="520"
-          y1="152"
-          x2="520"
-          y2="890"
-          stroke="#fbbf24"
-          strokeWidth="12"
-          strokeDasharray="34 22"
-        />
-      </g>
-
-      {/* The lava sea; the wider glow sits where the fall lands. */}
+      {/* The lava sea, with currents crossing it; the wider glow sits where the
+          fall lands. */}
       <rect y="880" width="1920" height="200" fill="url(#rfbd-lava)" />
       <rect
         y="880"
@@ -243,6 +302,20 @@ export function NetherScene() {
         className="rf-bd-lava"
         opacity="0.5"
       />
+      {LAVA_CURRENTS.map(([y, width, dash, gap, speed, colour, opacity, backwards]) => (
+        <line
+          key={y}
+          {...flowing(dash, gap, speed, backwards)}
+          x1="0"
+          y1={y}
+          x2="1920"
+          y2={y}
+          stroke={colour}
+          strokeWidth={width}
+          opacity={opacity}
+        />
+      ))}
+      <rect y="878" width="1920" height="4" fill="#fde68a" opacity="0.55" />
       {[300, 520, 860, 1420, 1750].map((x, i) => (
         <ellipse
           key={i}
@@ -254,6 +327,8 @@ export function NetherScene() {
           fill="url(#rfbd-lava-glow)"
         />
       ))}
+      {/* Where the fall lands, the surface is at its brightest. */}
+      <rect className="rf-bd-lava" x="486" y="878" width="68" height="7" fill="#fb923c" />
 
       {/* Ember storm — denser and warmer than the ambient field. */}
       {NETHER_EMBER_XS.map((x, i) => (

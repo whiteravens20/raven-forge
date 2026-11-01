@@ -359,9 +359,10 @@ p.text-rf-danger {
   animation-delay: -17s;
 }
 
-/* Lava falls: the dash pattern flowing equals one dasharray period. */
+/* A flowing dash pattern. Its speed and the length of one pattern are set
+   inline, by flowing() in backdrop-scenes.tsx. */
 .rf-backdrop .rf-bd-flow {
-  animation: rf-bd-flow 1.6s linear infinite;
+  animation: rf-bd-flow linear infinite;
 }
 
 .rf-backdrop .rf-bd-lava {
@@ -496,7 +497,7 @@ p.text-rf-danger {
 
 @keyframes rf-bd-flow {
   to {
-    stroke-dashoffset: -56;
+    stroke-dashoffset: calc(var(--rf-flow-period) * -1);
   }
 }
 
