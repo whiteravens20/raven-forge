@@ -795,8 +795,7 @@ export const pl: Translations = {
   // ── About ────────────────────────────────────────────────
   'about.tagline':
     'Customowy launcher Minecraft: Java Edition z zarządzaniem modami, auto-synchronizacją z manifestów serwera i profilami.',
-  'about.authorship':
-    'Pisany od zera przez jedną osobę — {author} — pod szyldem {org}, z myślą o własnym serwerze i graczach na nim.',
+  'about.authorship': 'Powstał pod szyldem {org}, z myślą o własnym serwerze i graczach na nim.',
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Sekret kuźni',
   'about.privacy': 'Prywatność',

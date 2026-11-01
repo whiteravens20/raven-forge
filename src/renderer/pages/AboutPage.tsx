@@ -17,7 +17,6 @@ import { openLink } from '@renderer/open';
 const api = window.ravenforge;
 
 const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`;
-const AUTHOR_URL = 'https://github.com/pavlojs';
 
 /**
  * Mojang's brand guidelines prescribe this sentence word for word, so it is not
@@ -89,12 +88,11 @@ export function AboutPage() {
 
       <div className="max-w-md space-y-3 text-center text-sm text-rf-text-secondary">
         <p>{t('about.tagline')}</p>
-        {/* The two names are links, so the sentence is assembled from the
-            translated string around `{author}` and `{org}` rather than being
-            split into fragments a translator could not reorder. */}
+        {/* The name is a link, so the sentence is assembled from the translated
+            string around `{org}` rather than being split into fragments a
+            translator could not reorder. */}
         <p>
           {interleave(t('about.authorship'), {
-            author: <ExtLink href={AUTHOR_URL}>pavlojs</ExtLink>,
             org: <ExtLink href={ORG_URL}>White Ravens</ExtLink>,
           })}
         </p>

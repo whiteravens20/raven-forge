@@ -794,8 +794,7 @@ export const en = {
   // ── About ────────────────────────────────────────────────
   'about.tagline':
     'A custom Minecraft: Java Edition launcher with mod management, auto-sync from server manifests, and profiles.',
-  'about.authorship':
-    'Written from scratch by one person — {author} — under the {org} banner, for a server of his own and the players on it.',
+  'about.authorship': 'Made under the {org} banner, for a server of his own and the players on it.',
   'about.stack': 'Electron + TypeScript + React + Vite + Tailwind CSS.',
   'about.secret': 'Secret of the forge',
   'about.privacy': 'Privacy',
