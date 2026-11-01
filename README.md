@@ -1,525 +1,130 @@
-<p align="center">
-  <img src="assets/brand/logo.svg" alt="Raven Forge — Minecraft: Java Edition launcher" width="640">
-</p>
+<div align="center">
+    <img src="assets/brand/logo.svg" alt="Raven Forge — Minecraft: Java Edition launcher" width="640">
+<br /><br />
 
-<p align="center">
-  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/build.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/build.yml/badge.svg?branch=dev" alt="CI"></a>
-  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/package.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/package.yml/badge.svg" alt="Packaging"></a>
-  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/release.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/release.yml/badge.svg" alt="Release"></a>
-  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/codeql.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
-  <a href="https://github.com/whiteravens20/raven-forge/actions/workflows/security.yml"><img src="https://github.com/whiteravens20/raven-forge/actions/workflows/security.yml/badge.svg" alt="Security scan"></a>
-  <a href="https://scorecard.dev/viewer/?uri=github.com/whiteravens20/raven-forge"><img src="https://api.securityscorecards.dev/projects/github.com/whiteravens20/raven-forge/badge" alt="OpenSSF Scorecard"></a>
-</p>
+# Raven Forge
+
+Minecraft: Java Edition launcher for modded players and server communities: signed packs that stay in sync, and no telemetry.
+
+<br />
+
+[![Latest release](https://img.shields.io/github/v/release/whiteravens20/raven-forge)](https://github.com/whiteravens20/raven-forge/releases/latest)
+[![CI](https://github.com/whiteravens20/raven-forge/actions/workflows/build.yml/badge.svg?branch=dev)](https://github.com/whiteravens20/raven-forge/actions/workflows/build.yml)
+[![Packaging](https://github.com/whiteravens20/raven-forge/actions/workflows/package.yml/badge.svg)](https://github.com/whiteravens20/raven-forge/actions/workflows/package.yml)
+[![Release](https://github.com/whiteravens20/raven-forge/actions/workflows/release.yml/badge.svg)](https://github.com/whiteravens20/raven-forge/actions/workflows/release.yml)
+[![CodeQL](https://github.com/whiteravens20/raven-forge/actions/workflows/codeql.yml/badge.svg)](https://github.com/whiteravens20/raven-forge/actions/workflows/codeql.yml)
+[![Security scan](https://github.com/whiteravens20/raven-forge/actions/workflows/security.yml/badge.svg)](https://github.com/whiteravens20/raven-forge/actions/workflows/security.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/whiteravens20/raven-forge/badge)](https://scorecard.dev/viewer/?uri=github.com/whiteravens20/raven-forge)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
+
+<br />
+
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-47848F?style=flat&logo=electron&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat&logo=tailwindcss&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=flat&logo=vitest&logoColor=white)
+
+</div>
+
+![Raven Forge — a pack installed and ready to play, with news from the server](docs/img/hero-screenshot.png)
+
+**Why this exists:** Raven Forge was built for a modded server and the players on it. A player installs the server's pack once; from then on the launcher follows the manifest the server publishes, so every sync brings what changed, each file held to its hash and the manifest to its signature. Everything else a modded player expects is here too, from a Modrinth search to world backups, and nothing about you is measured or reported back.
 
 > **🧪 TESTING & DEVELOPMENT — Raven Forge is usable today, but it is still in testing and active development. Some features are still landing, a few edges are rough, and details may change between releases. Bug reports, feedback and contributions are very welcome!**
-
-Custom Minecraft: Java Edition launcher with mod management, auto-sync from server manifests, and server profiles.
-
-Built with **Electron + TypeScript + React + Vite + Tailwind CSS**.
 
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 
 ---
 
-## Features
+## Try It Now
 
-- **Server Profiles** — per-server instance configs with pinned MC version, mod loader, and remote manifest
-- **Pack Install** — start a profile from a White Ravens pack, a `.mrpack` file, a manifest URL, or an empty form
-- **Mod Auto-Sync** — fetch server manifest → check its signature → diff → parallel download → verify each hash → install
-- **Mod Browser** — search Modrinth from the launcher, filtered to your profile
-- **Compatibility Checks** — warns before an install that does not fit the profile, and pulls in required dependencies
-- **Mods From A File** — add a jar you already have: it is checked to be for the profile's loader, recognised by its contents when Modrinth publishes that very build — so its updates and the mods it needs are handled like any other — and listed as a plain file when not
-- **Mod Updates** — checks what you installed by hand against Modrinth by file hash, so a jar you added from a file is recognised too, and updates them in place
-- **Pack Export** — write a profile back out as a `.mrpack`: a small file of references, with anything Modrinth does not host carried inside it
-- **World Backups** — copy a profile's worlds aside, restore them again, and get asked before a Minecraft version change touches them
-- **Data Folder You Choose** — profiles, assets and the managed JREs are gigabytes; point them at another drive from Settings and the launcher carries what is already there, or picks up a folder it used before. `RAVENFORGE_DATA_DIR` decides instead for a portable install
-- **RAM That Fits The Machine** — the allocation slider is bounded by the memory this computer actually has, recommends a size for it, and the launcher refuses a heap the machine cannot back rather than failing later
-- **Bilingual UI** — Polish and English, switchable in Settings
-- **Mod Loader Engine** — auto-install Fabric, Quilt, Forge and NeoForge, or run Vanilla. Each from the first Minecraft version it can be installed for — Fabric 1.14, Quilt 1.14.4, Forge 1.7.10, NeoForge 1.20.1 — through to the newest release. Only the loader builds that start the chosen Minecraft version are offered for it; a profile that holds another, because a pack named it, is told so when it fails to start; and a loader install that has lost files is put right at the next launch
-- **Microsoft Auth** — full OAuth 2.0 → Xbox Live → Minecraft JWT chain + offline mode
-- **Java Management** — auto-download the Adoptium Temurin JRE the game actually asks for; Mojang's version metadata names the major (Java 25 for 26.2, 21 for 1.21, and so on), with a table covering versions old enough not to state one. A profile may name a JVM of its own instead — picked from the ones found on this machine or from a file — and the launcher checks it says what it needs to before the game gets it
-- **The Window The Game Starts In** — a size and a windowed/fullscreen choice per profile, both optional. Fullscreen is written into the game's own settings rather than passed as an argument, so switching it back off works as well as switching it on
-- **Snapshots** — Mojang's weekly test builds are one toggle away in the version picker, off by default, and a profile already on one opens with them shown
-- **Shaders & Resource Packs** — found on Modrinth or added from a zip you already have, checked to be the kind of pack the game will read, then ordered and removed per profile
-- **Auto-Update** — launcher self-updates via GitHub Releases (electron-updater)
-- **Stop The Game** — a running profile can be stopped from the launcher: SIGTERM first, SIGKILL after ten seconds, and it does not report success until the process has actually gone
-- **Crash Reports** — one file per crash with versions, mods and the game's own report, written with tokens and account details already stripped out
-- **Discord Status** — optional, off by default: shows the running profile, version and loader on your Discord status, never the server address ([setup](docs/DISCORD-SETUP.md))
-- **No Telemetry** — nothing is measured, nothing is sent; the app itself lists what it stores and every server it contacts ([privacy policy](docs/PRIVACY.md))
-- **Modern UI** — dark gaming-grade design, animated voxel hero scenes (drone flight, Nether forge, mine, tech workshop), news feed, frameless window
+Download the file for your system from the [latest release](https://github.com/whiteravens20/raven-forge/releases/latest):
 
----
+| System                               | File                                       | Then                                                                                                                               |
+| ------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Windows 11 or 10 (1809+), x64        | `Raven-Forge-Launcher-Setup-<version>.exe` | Run it. It asks for no administrator rights. The installer is unsigned, so SmartScreen warns first: **More info**, **Run anyway**. |
+| Debian 12+ or Ubuntu 22.04+, x64     | `raven-forge-launcher_<version>_amd64.deb` | `sudo apt install ./raven-forge-launcher_<version>_amd64.deb`                                                                      |
+| Any other x64 Linux with glibc 2.25+ | `Raven-Forge-Launcher-<version>.AppImage`  | Make it executable and run it. It needs a few system libraries: [docs/INSTALL.md](docs/INSTALL.md#appimage).                       |
 
-## Dev Setup
+The window opens in Polish; **Ustawienia → Wygląd → Język** switches it to English. Then:
 
-### Prerequisites
+1. **Accounts → Sign in with Microsoft.** You type your password on Microsoft's own page, never in the launcher.
+2. **Profiles → New profile**, and say where it comes from: a White Ravens pack, a modpack found on Modrinth, a `.mrpack` file or a link, or an empty profile of your own.
+3. **Home → PLAY.** The first start fetches what the profile still needs: Java, Minecraft and the loader.
 
-| Tool    | Version        |
-| ------- | -------------- |
-| Node.js | ≥ 24.0.0 (LTS) |
-| npm     | ≥ 11.0.0       |
-| Git     | any recent     |
+## What It Does
 
-### Windows 10/11
+- **Server packs that stay in sync** — a profile follows a manifest the server publishes; Sync or Play brings what changed, checked against its signature and hashes
+- **Modrinth built in** — mods, shaders, resource packs and whole modpacks, searched from the launcher and filtered to your profile, with what they require and their updates handled
+- **Loaders and Java handled** — Fabric, Quilt, Forge and NeoForge from the first Minecraft version they can be installed for, only the builds that start that version, and the Java it asks for
+- **Packs in and out** — `.mrpack` files and links come in, a profile goes back out as a `.mrpack`
+- **Worlds kept safe** — backups you can restore, and a question before a Minecraft version change touches them
+- **Your disk, your choice** — move the data to another drive with a verified copy, and see every place the launcher writes to, with its size
+- **Your sign-in kept out of the launcher's files** — you type your password on Microsoft's own page, and the tokens go into the system's credential store
+- **It says what went wrong** — crash reports with tokens and account details stripped out, and errors that name the cause
+- **No telemetry** — nothing is measured and nothing is reported back; the app lists what it stores and every server it contacts ([privacy policy](docs/PRIVACY.md))
+- **Polish and English, three themes**, animated voxel scenes and a news feed
 
-```bash
-# Clone
-git clone https://github.com/whiteravens20/raven-forge.git
-cd raven-forge
+<p align="center">
+  <img src="docs/img/profile-screenshot.png" alt="A profile following a pack: in sync, and verified against the White Ravens key" width="49%">
+  <img src="docs/img/mods-screenshot.png" alt="Searching Modrinth for mods, filtered to the profile" width="49%">
+</p>
 
-# Install dependencies
-npm install
+The whole list is in [docs/FEATURES.md](docs/FEATURES.md).
 
-# Run in development mode
-npm run dev
-```
+## How It Works
 
-> **Note:** On Windows, `keytar` is a native module and needs a C++ toolchain to
-> build. The Node.js installer offers to set one up ("Tools for Native Modules");
-> otherwise install the **Desktop development with C++** workload from the Visual
-> Studio Installer. The old `windows-build-tools` package is deprecated — npm
-> itself now says Node ships what it used to provide.
+The launcher is a desktop app in two parts. The window is a sandboxed page that holds no secrets: it asks the main process for everything over a typed set of channels, and whatever touches the disk, your account or a download happens there. Each profile is a folder of its own, while Minecraft's files, the loaders and the Java runtimes are downloaded once and shared.
 
-### Debian / Ubuntu
+A profile can follow a manifest, a file a server publishes at an address that names the Minecraft version, the loader and every mod with its hash. At every Sync and every Play the launcher reads it, checks its Ed25519 signature, compares it with what is installed, downloads what changed and refuses any file whose hash does not match. White Ravens' own key is compiled into the launcher, and a pack of ours that fails the check is refused. Any other signature is reported until you add a key of your own, and enforced from then on. A `.mrpack` is turned into the same kind of list and goes the same way, once.
 
-```bash
-# System dependencies for Electron + keytar
-sudo apt update
-sudo apt install -y build-essential libsecret-1-dev libx11-dev libxss1 libnotify4
+You sign in on Microsoft's page, in a window of its own. The tokens that come back go into the system's credential store, or, where there is none, into a file only your user can read, and the Accounts page says so. The game then runs as its own Java process, and its session token is taken out of everything the launcher logs.
 
-# Clone
-git clone https://github.com/whiteravens20/raven-forge.git
-cd raven-forge
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) goes through all of it.
 
-# Install dependencies
-npm install
-
-# Run in development mode
-npm run dev
-```
-
----
-
-## npm Scripts
-
-| Script                 | Description                                                      |
-| ---------------------- | ---------------------------------------------------------------- |
-| `npm run dev`          | Start Electron + Vite dev server (hot reload)                    |
-| `npm run build`        | Build main + renderer for production                             |
-| `npm run dist`         | Build + package installer (auto-detect platform)                 |
-| `npm run dist:win`     | Build + package NSIS installer (Windows)                         |
-| `npm run dist:linux`   | Build + package .deb + AppImage (Linux)                          |
-| `npm run icons`        | Rasterise `icon.svg` → `icon.png`, `icon.ico`, installer sidebar |
-| `npm run lint`         | Run ESLint over `src/` and `test/`                               |
-| `npm run lint:fix`     | Run ESLint with auto-fix                                         |
-| `npm run typecheck`    | TypeScript type checking (main, renderer, tests)                 |
-| `npm test`             | Run the Vitest suite once                                        |
-| `npm run test:watch`   | Vitest in watch mode                                             |
-| `npm run format`       | Format code with Prettier                                        |
-| `npm run format:check` | Check formatting without writing                                 |
-| `npm run clean`        | Remove dist/ and out/                                            |
-
----
-
-## Project Structure
-
-```
-src/
-├── main/           # Electron main process (Node.js)
-├── preload/        # contextBridge preload scripts
-├── renderer/       # React SPA (Vite-bundled)
-│   ├── components/ # UI components
-│   ├── pages/      # Route pages
-│   ├── stores/     # Zustand state stores
-│   ├── i18n/       # UI string dictionaries (pl, en) + tiny t() helper
-│   ├── assets/     # bundled fonts
-│   └── styles/     # Tailwind entry + theme tokens + backdrop animations
-├── core/           # Business logic (runs in main process)
-│   ├── auth/       # Microsoft OAuth + offline auth
-│   ├── config/     # Settings, paths, and the movable data root
-│   ├── diagnostics/# Crash reports — one redacted file per crash
-│   ├── discord/    # Rich Presence over Discord's local IPC socket (opt-in)
-│   ├── java/       # Adoptium JRE management
-│   ├── minecraft/  # Version manifest, assets, game launcher
-│   ├── modloader/  # Fabric/Quilt/Forge/NeoForge installers
-│   ├── mods/       # Manifest fetch, sync, Modrinth API, integrity, compatibility
-│   ├── net/        # Proxy dispatcher + the shared download helper
-│   ├── news/       # News + announcement feeds
-│   ├── packs/      # .mrpack reader, pack catalogue, profile-from-pack install
-│   ├── profiles/   # Profile CRUD + import/export
-│   ├── updater/    # electron-updater + Ed25519 manifest verification
-│   └── util/       # Atomic writes, cancellation, per-file serialization, path containment
-└── shared/         # Types shared between main + renderer
-    ├── ipc-types.ts    # the channel contract
-    └── ipc/            # payload shapes, one file per domain
-
-test/               # Vitest suites — pure logic, the state files over a real
-                    # temporary data root, the download policy over a real socket,
-                    # and real subprocesses (tar, unzip) + an Electron stub
-```
-
----
-
-## Configuration: News Feed & Announcements
-
-A fresh install points at White Ravens' published feeds (listed under [Live endpoints](#live-endpoints)). Both are yours to change — under Settings, or in `settings.json` in the data folder (Settings → Data shows where that is). Clearing a field switches that section off rather than restoring the default.
-
-### News Feed
-
-```json
-{
-  "newsFeedUrl": "https://your-server.com/api/news.json"
-}
-```
-
-Expected response format:
-
-```json
-[
-  {
-    "id": "1",
-    "title": "Server Update 1.21",
-    "excerpt": "We've updated to 1.21 with new mods!",
-    "body": "## What changed\n- Mekanism 10.7\n- New spawn\n\nSee **Profiles** to sync.",
-    "url": "https://your-server.com/blog/update-121",
-    "imageUrl": "https://your-server.com/images/news-1.jpg",
-    "publishedAt": "2026-03-15T12:00:00Z"
-  }
-]
-```
-
-Only `id`, `title`, `excerpt` and `publishedAt` are required. Clicking a card opens `body` **inside the launcher**, so a feed needs no website behind it; `url` is an optional "open in browser" link rather than the way in.
-
-`body` accepts a small Markdown subset — `## headings`, `- lists`, `**bold**`, `*italic*`, `` `code` `` and `[links](https://…)`. It is parsed into elements, never into HTML, so a feed cannot inject markup. Anything outside the subset renders as the literal text you wrote.
-
-### Announcements
-
-```json
-{
-  "announcementFeedUrl": "https://your-server.com/api/announcements.json"
-}
-```
-
-Expected response format:
-
-```json
-[
-  {
-    "id": "1",
-    "message": "Maintenance scheduled for Saturday 10 PM UTC",
-    "type": "warning",
-    "title": "Scheduled maintenance",
-    "body": "The server goes down at 22:00 UTC for about two hours.\n\n- World backup\n- Mod updates",
-    "url": "https://your-server.com/status",
-    "dismissible": true
-  }
-]
-```
-
-`title` and `body` are optional and use the same Markdown subset as news. A banner is only clickable when it has one of `body` or `url` — a dialog that repeats the banner's own sentence teaches people the click is not worth making.
-
-### Live endpoints
-
-White Ravens publishes both feeds — and the pack manifests — from the sibling
-[raven-packs](https://github.com/whiteravens20/raven-packs) repository, which
-doubles as a working reference for each format:
-
-| Setting                                 | URL                                                                          |
-| --------------------------------------- | ---------------------------------------------------------------------------- |
-| News feed                               | `https://whiteravens20.github.io/raven-packs/raven-forge/news.json`          |
-| Announcement feed                       | `https://whiteravens20.github.io/raven-packs/raven-forge/announcements.json` |
-| Pack catalogue                          | `https://whiteravens20.github.io/raven-packs/packs.json`                     |
-| Profile manifest (White Ravens Classic) | `https://whiteravens20.github.io/raven-packs/ravenclassic/manifest.json`     |
-
-Manifests published there are Ed25519-signed, and the White Ravens public key is
-compiled into the launcher, so those packs read **Verified** with nothing to
-configure. It is shipped rather than downloaded on purpose: a key fetched
-alongside the manifest it vouches for proves nothing, because whoever can
-rewrite one can rewrite the other.
-
-**Settings → Trusted Keys** lists that built-in key first — unremovable, and
-labelled as shipped with the launcher, because it is the reason a White Ravens
-pack reads Verified on an install where you added nothing.
-
-A White Ravens pack is held to that key whatever you have configured: one whose
-signature does not verify is refused, not flagged. There is no honest reason for
-a first-party manifest to fail the check.
-
-Adding a key of your own extends the same rule to everything else: from then on
-the launcher refuses to install any manifest not signed by a key you trust,
-unsigned ones included. Until you add one, third-party signatures are reported
-but not enforced, which is what keeps packs from anywhere else installable.
-
-### Forking
-
-Every address the launcher ships pointing at White Ravens lives in one file,
-[`src/shared/branding.ts`](src/shared/branding.ts): the two feed defaults and
-the pack catalogue behind _Play on the White Ravens servers_. Change those three
-constants and a fork inherits none of our infrastructure. Nothing else in the
-codebase hardcodes a `whiteravens20` URL.
-
-The two feed values are only _defaults_ — they seed a first launch and an
-install that predates them, and any player can point them elsewhere. The
-catalogue URL is deliberately not settable: its entries become manifest URLs
-that profiles get created from, so a settable address would turn a screen badged
-White Ravens into a way to serve somebody arbitrary manifests. The manifest-URL
-and `.mrpack` import routes exist for everything else, and there the address is
-plainly the player's own.
-
-### UI Language
-
-Polish and English ship in `src/renderer/i18n/`; switch under Settings → Appearance. Adding a language is copying `en.ts`, translating the values, and registering it — TypeScript names any key you miss. See [CONTRIBUTING.md](CONTRIBUTING.md#translations).
-
-> **Note:** An empty `newsFeedUrl` or `announcementFeedUrl` shows an empty section — the launcher has no placeholder copy to fall back on, because demo text presented as a server's announcements is worse than nothing.
-
----
-
-## Mod Sources
-
-| Source         | API key    | Notes                                                                                                                                       |
-| -------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Modrinth**   | not needed | The primary source. Search, version lookup and downloads all go through the [public API](https://docs.modrinth.com/). Publishes `sha512`.   |
-| **Direct URL** | —          | For custom or private mods, via the manifest's `"source": "url"` field. Skips API lookups entirely and keeps working when a source is down. |
-| **Local file** | —          | A jar you already have, via `"source": "local"`.                                                                                            |
-
-**CurseForge is deliberately not supported.** Its API key is issued per developer
-after a manual application, and the [3rd Party API terms](https://support.curseforge.com/support/solutions/articles/9000207405-curse-forge-3rd-party-api-terms-and-conditions)
-make it non-transferable and unshareable — so a key can neither be shipped in a
-public binary nor be expected from a player. Since **16 July 2026** CurseForge's
-CDN also rejects unauthenticated downloads (`401 A valid api-key is required`),
-which closes the last route that did not need one. A CurseForge-only mod has to
-be downloaded by hand and added as a local file.
-
----
-
-## Pack Formats
-
-A new profile can start from a whole pack rather than an empty form.
-
-| Route                  | Format                                                                                                                                                              | Keeps updating?                                                                |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| **White Ravens packs** | The catalogue at [`raven-packs`](https://github.com/whiteravens20/raven-packs), which publishes a `packs.json` index beside each pack's manifest                    | Yes — the profile stores the manifest URL and every sync reconciles against it |
-| **A link**             | Either a Raven Forge manifest v2 or a `.mrpack` — including the link behind Modrinth's Download button                                                              | A manifest, yes; a `.mrpack`, no                                               |
-| **`.mrpack` file**     | [Modrinth's modpack format](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack) — a zip holding `modrinth.index.json` and `overrides/` | No — an import is a snapshot of one version                                    |
-
-One field takes both kinds of link, and which one arrived is decided from the
-bytes at the address rather than from the file extension: Modrinth's CDN ends
-its URLs in `.mrpack`, but a signed or proxied link need not, and it is the
-content that decides what a thing is. A manifest is stored on the profile and
-re-read on every sync; a `.mrpack` is unpacked once, exactly like the file route.
-
-`.mrpack` is the only open, cross-launcher pack format the launcher reads; Prism,
-ATLauncher, MultiMC and the Modrinth app produce and consume the same files. An
-import is converted into a manifest and installed through the ordinary sync path,
-so it gets the same hash verification, removal of dropped mods and resource-pack
-ordering as a server pack. CurseForge's pack zip is not read, for the reason above: its
-files cannot be fetched without a key.
-
-Paths inside a pack are checked before anything is written. An entry that tries
-to leave the game directory is refused outright rather than trimmed and installed
-somewhere else.
-
----
-
-## Build & Release
-
-### Supported targets
-
-| Target         | File                                       | Size    | Runs on                                    |
-| -------------- | ------------------------------------------ | ------- | ------------------------------------------ |
-| NSIS installer | `Raven-Forge-Launcher-Setup-<version>.exe` | ~109 MB | **Windows 11** and Windows 10 (1809+), x64 |
-| Debian package | `raven-forge-launcher_<version>_amd64.deb` | ~98 MB  | **Debian 12+**, **Ubuntu 22.04+**, x64     |
-| AppImage       | `Raven-Forge-Launcher-<version>.AppImage`  | ~123 MB | Any x64 Linux with glibc ≥ 2.25            |
-
-The Linux floor is the Electron binary's own: it links `GLIBC_2.25`, which the
-`.deb` declares as `libc6 (>= 2.25)` so apt refuses the install rather than
-letting it fail at startup. Windows 7/8/8.1 are not supported; Electron dropped
-them.
-
-The `.deb` is installed and started on Debian 12, Ubuntu 22.04 and Ubuntu 24.04.
-Nothing older is claimed: Electron supports a release of a distribution for as
-long as its maker does, and on Ubuntu 20.04 the package does not install at all
-— one of the libraries it asks for goes by another name there.
-
-**The `.deb` carries the full dependency list; the AppImage cannot.** `fpm` — the
-tool electron-builder builds Debian packages with — does not run
-`dpkg-shlibdeps`, so nothing computes that list for you: whatever the
-`deb.depends` array in [electron-builder.config.js](electron-builder.config.js)
-omits is simply absent from the package, `apt install ./…` reports success, and
-the app dies on a missing `.so`. The array is therefore measured from the built
-binary rather than assumed, and the comment above it carries the command to
-regenerate it after an Electron bump. Note that `strings` matters as much as
-`objdump` there — libsecret, libnotify, libasound, libcups and libgbm are
-`dlopen`'d, so a link-time-only audit misses them.
-
-### Manual build
-
-Every target needs the app built first, which `npm run dist*` does for you.
-The app icons are committed, and generated from one drawing — run
-`npm run icons` after changing `assets/icons/icon.svg` (it writes `icon.png`,
-`icon.ico` and the NSIS sidebar bitmap; it needs a display, so on a headless
-box give it an X server), and commit what it wrote.
-
-```bash
-# Linux — .deb + AppImage
-npm run dist:linux
-
-# Windows — NSIS installer
-npm run dist:win
-```
-
-Output goes to `out/`, alongside `latest.yml` and a `.blockmap` for
-electron-updater.
-
-Set `RAVENFORGE_CLIENT_ID` on the build command to bake in Microsoft login —
-see [docs/AZURE-SETUP.md](docs/AZURE-SETUP.md). Without it the installer is
-built fine and the launcher works in offline mode.
-
-#### Building the Windows installer from Linux
-
-electron-builder shells out to `signtool.exe` and `makensis.exe`, so it needs
-wine. Tested against **WineHQ stable 11.0** on Debian 12:
-
-```bash
-sudo dpkg --add-architecture i386
-sudo mkdir -pm755 /etc/apt/keyrings
-sudo wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
-sudo wget -NP /etc/apt/sources.list.d/ \
-  https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources
-sudo apt update && sudo apt install --install-recommends winehq-stable
-
-# Initialise the prefix ONCE with the Mono/Gecko prompts disabled.
-# Skip this and `wineboot --init` blocks on a dialog, and the build hangs
-# forever with no output at all.
-WINEDLLOVERRIDES="mscoree,mshtml=" wineboot -u
-```
-
-On Ubuntu use the matching `winehq-<codename>.sources` file from the same
-directory. The GitHub Actions release workflow sidesteps all of this by
-building the Windows target on a `windows-latest` runner.
-
-### Installing what you built
-
-**Windows 11 / 10** — run the `Setup .exe`. It is a per-user install by
-default, so no administrator prompt, and it lets you pick the directory.
-Unsigned builds trip SmartScreen; see [docs/SIGNING.md](docs/SIGNING.md).
-
-**Debian / Ubuntu (.deb)** — recommended:
-
-```bash
-sudo apt install ./raven-forge-launcher_<version>_amd64.deb
-```
-
-Use `apt`, not `dpkg -i` — `dpkg` installs the package without resolving
-anything, and every library below then goes missing. `apt` pulls all of them,
-sets up the `/usr/bin/raven-forge-launcher` symlink, configures `chrome-sandbox`
-(the renderer runs with `sandbox: true`, so it needs one of the two sandboxes),
-and on Ubuntu 24.04+ installs the AppArmor profile that lets the user-namespace
-sandbox work.
-
-**AppImage** — nothing resolves dependencies for you here; an AppImage carries no
-dependency metadata at all, and the file bundles Electron but not the system
-libraries it links. Install these first, then `chmod +x` and run it:
-
-```bash
-# Debian / Ubuntu / Mint
-sudo apt install libgtk-3-0 libnss3 libgbm1 libsecret-1-0 libnotify4 xdg-utils libfuse2 fuse
-sudo apt install libasound2t64 || sudo apt install libasound2
-
-# Fedora
-sudo dnf install gtk3 nss mesa-libgbm libsecret libnotify xdg-utils fuse-libs fuse alsa-lib
-
-# Arch
-sudo pacman -S --needed gtk3 nss mesa libsecret libnotify xdg-utils fuse2 alsa-lib
-```
-
-The rest of the list — cairo, pango, the X libraries, cups — comes in with GTK on
-all three. `alsa-lib` needs the fallback line on Debian and Ubuntu because 24.04
-renamed the package to `libasound2t64` and left `libasound2` as a virtual name
-with two providers, which apt will not install by name.
-
-`libfuse2` and `fuse` belong to the AppImage runtime rather than to the launcher,
-and one without the other gets you nowhere: `libfuse2` is the library, while
-`fusermount` — the helper that actually mounts the image — ships in `fuse`, which
-`libfuse2` only _suggests_. A current desktop looks equipped and is not, because
-what it installs is `fuse3`, whose helper is named `fusermount3` and is not the
-one a type-2 AppImage looks for. Without the helper the file stops at _"fuse:
-failed to exec fusermount"_, without the library at _"AppImages require FUSE to
-run"_ — both before any of our code runs. Arch ships both in `fuse2`, so one
-package covers it there.
-
-Missing `xdg-utils` is the quiet one — the app starts fine and then "open folder"
-and every external link silently do nothing, because `shell.openExternal` shells
-out to `xdg-open` on Linux.
-
-One further caveat: **Ubuntu 23.10 and later** restrict unprivileged user
-namespaces through AppArmor, and an AppImage cannot carry a SUID `chrome-sandbox`
-because it is mounted as your own user. Electron apps therefore fail to start
-there. Prefer the `.deb` on Ubuntu — it ships an AppArmor profile and its
-post-install step loads it. If you need the AppImage, write a profile for it, or
-relax the restriction system-wide:
-
-```bash
-sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-```
-
-Debian does not apply that restriction, so the AppImage runs as-is.
-
-Going the other way is [docs/UNINSTALL.md](docs/UNINSTALL.md) — what each
-platform's uninstaller removes, and what happens to your profiles and worlds.
-
-### CI/CD (GitHub Actions)
-
-- **Push or PR to `main`/`dev`** → lint, typecheck, tests, format check, and build on Linux + Windows ([build.yml](.github/workflows/build.yml))
-- **Push or PR to `main`/`dev`, plus weekly** → CodeQL ([codeql.yml](.github/workflows/codeql.yml)) and the dependency, secret and pinned-action gates ([security.yml](.github/workflows/security.yml))
-- **Push to `dev`, plus weekly** → the OpenSSF Scorecard behind the badge at the top ([scorecard.yml](.github/workflows/scorecard.yml))
-- **Daily** → a check that branch protection is still what it is meant to be ([branch-protection-audit.yml](.github/workflows/branch-protection-audit.yml))
-- **Nightly and on demand** → the full electron-builder run for both platforms ([package.yml](.github/workflows/package.yml)), so a packaging regression surfaces on a weekday rather than during a release. What was built is then used: the `.deb` is started on a clean Ubuntu, and the Windows installer is run on Windows — installed, started, updated from 0.7.1 and uninstalled
-- **Push a tag `vMAJOR.MINOR.PATCH`** (e.g. `git tag v0.1.0 && git push --tags`) → builds installers, signs (if certs configured), audits the dependencies that ship and verifies their signatures, and creates a draft GitHub Release only when that audit passed ([release.yml](.github/workflows/release.yml)). The pattern is exact — a suffixed tag like `v0.1.0-beta` triggers nothing
-
-Required checks, repository secrets and the supply-chain rules behind these are written down in [.github/CICD.md](.github/CICD.md).
-
-### Code Signing
-
-Two separate systems — Authenticode for the Windows installer, Ed25519 for mod manifests. Both are documented in **[docs/SIGNING.md](docs/SIGNING.md)**.
-
-Short version for the installer: add `WIN_CSC_LINK` (base64 of your `.pfx`) and `WIN_CSC_KEY_PASSWORD` as repository secrets and the release workflow signs the `.exe`. Without them the build still succeeds and produces an **unsigned** installer — check the artefacts rather than assuming.
-
----
-
-## Architecture
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation including:
-
-- Mod-sync data flow diagram
-- Microsoft OAuth authentication chain
-- Launcher startup sequence
-- IPC channel map
-
----
-
-## Contributing
-
-Contributions are welcome — bug fixes, macOS support, accessibility and translations.
+## Documentation
 
 | Document                                                                | What it covers                                                                               |
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                                      | Setup, project layout, coding guidelines, how to verify a change, PR process                 |
-| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)                                | Community expectations                                                                       |
-| [SECURITY.md](SECURITY.md)                                              | Security model, known gaps, and how to report a vulnerability privately                      |
-| [docs/PRIVACY.md](docs/PRIVACY.md) · [🇵🇱 po polsku](docs/PRIVACY.pl.md) | Every byte stored and every server contacted, and why. Also in the app under About → Privacy |
-| [docs/DISCORD-SETUP.md](docs/DISCORD-SETUP.md)                          | Registering the Discord application behind the optional status feature                       |
+| [docs/INSTALL.md](docs/INSTALL.md)                                      | What each file runs on and needs, updating, and checking what you downloaded                 |
 | [docs/UNINSTALL.md](docs/UNINSTALL.md)                                  | Removing the launcher on each platform, and what happens to your profiles and worlds         |
+| [docs/FEATURES.md](docs/FEATURES.md)                                    | Everything the launcher does                                                                 |
+| [docs/PACKS.md](docs/PACKS.md)                                          | Where mods and packs come from, the formats it reads, and why not CurseForge                 |
+| [docs/MANIFEST-SCHEMA.md](docs/MANIFEST-SCHEMA.md)                      | The manifest a server publishes                                                              |
+| [docs/SIGNING.md](docs/SIGNING.md)                                      | Signing a manifest, and signing the installer                                                |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md)                          | The news and announcement feeds, the addresses White Ravens publishes, forking               |
+| [docs/PRIVACY.md](docs/PRIVACY.md) · [🇵🇱 po polsku](docs/PRIVACY.pl.md) | Every byte stored and every server contacted, and why. Also in the app under About → Privacy |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)                            | How it is built                                                                              |
+| [docs/BUILDING.md](docs/BUILDING.md)                                    | The npm scripts and building the installers                                                  |
+| [docs/AZURE-SETUP.md](docs/AZURE-SETUP.md)                              | Registering the Azure application behind Microsoft sign-in, for a fork                       |
+| [docs/DISCORD-SETUP.md](docs/DISCORD-SETUP.md)                          | Registering the Discord application behind the optional status                               |
 
-`dev` is the working branch; `main` is a release snapshot synced from it by the maintainer. Fork and open your PR against `dev`, never `main`. Commits follow [Conventional Commits](https://www.conventionalcommits.org/), one topic per commit, subject line only. There is **no `CHANGELOG.md`** — release notes are generated by GitHub from everything that landed since the previous tag, grouped by [`.github/release.yml`](.github/release.yml).
+## Development
 
----
+Node.js 24 or newer, npm 11 or newer, and a C++ toolchain for the one native module:
+
+```bash
+git clone https://github.com/whiteravens20/raven-forge.git
+cd raven-forge
+npm install
+npm run dev
+```
+
+[CONTRIBUTING.md](CONTRIBUTING.md#development-setup) has what each platform needs, and [docs/BUILDING.md](docs/BUILDING.md) the rest of the scripts and how to build the installers.
+
+## Contributing
+
+Contributions are welcome: bug fixes, macOS support, accessibility and translations. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, against `dev` and never `main`.
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
 ## Security
 
 Found a vulnerability? Do not open a public issue — use [private vulnerability reporting](https://github.com/whiteravens20/raven-forge/security/advisories/new), and redact access tokens from any log you attach. [SECURITY.md](SECURITY.md) says what to include and how soon to expect an answer, and describes the security model and its known gaps.
-
----
 
 ## How the code is written and checked
 
@@ -538,8 +143,6 @@ Raven Forge is built using AI coding tools. The maintainer decides what gets bui
 - Generated code is reviewed and tested by the maintainer in the session that produces it. Changes to the sign-in chain and the token store, manifest signature verification, the hash check on downloads and the launch path are read line by line.
 
 If something looks wrong, open an issue. For a vulnerability, use [private vulnerability reporting](https://github.com/whiteravens20/raven-forge/security/advisories/new).
-
----
 
 ## License
 

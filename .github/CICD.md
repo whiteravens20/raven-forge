@@ -49,7 +49,7 @@ git tag -s v1.2.3
 git push origin v1.2.3
 ```
 
-`release.yml` refuses a tag that is not on `main`, and one that does not match
+The tag pattern is exact: a suffixed tag like `v1.2.3-beta` starts nothing. `release.yml` refuses a tag that is not on `main`, and one that does not match
 the `version` in `package.json` — electron-builder names every file, and writes
 the update feed, from that field.
 

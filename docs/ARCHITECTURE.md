@@ -17,12 +17,18 @@
 
 ```
 raven-forge/
-├── README.md                     # dev setup + feature overview
+├── README.md                     # what it is, how to try it, and the way into these docs
 ├── docs/
 │   ├── ARCHITECTURE.md           # this document
 │   ├── AZURE-SETUP.md            # registering the Azure app + Mojang approval
+│   ├── BUILDING.md               # npm scripts and building the installers
+│   ├── CONFIGURATION.md          # feeds, live endpoints, environment variables, forking
 │   ├── DISCORD-SETUP.md          # registering the app behind the optional status
+│   ├── FEATURES.md               # everything the launcher does
+│   ├── img/                      # the screenshots the README shows
+│   ├── INSTALL.md                # what each installer runs on and needs
 │   ├── MANIFEST-SCHEMA.md        # remote manifest spec
+│   ├── PACKS.md                  # mod sources and pack formats
 │   ├── PRIVACY.md                # what is stored and sent (EN — canonical pair)
 │   ├── PRIVACY.pl.md             # the same, in Polish; both are maintained
 │   ├── SIGNING.md                # Ed25519 manifest signing
