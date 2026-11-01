@@ -3,6 +3,8 @@
 // A profile: what it targets, what it has played, what it owns on disk.
 // Part of the IPC contract — see `../ipc-types.ts`.
 
+import type { ErrorMessage } from './common';
+
 export type ModLoaderType = 'vanilla' | 'forge' | 'neoforge' | 'fabric' | 'quilt';
 
 /** A mod loader build offered for a given Minecraft version. */
@@ -83,6 +85,8 @@ export interface PackInstall {
   profile: Profile;
   /** Why the install stopped short, in the main process's own words. */
   failure?: string;
+  /** The same in the player's language, where there is a way to say it. */
+  failureMessage?: ErrorMessage;
 }
 
 /** A file in a pack that can run code, and that Modrinth has no record of. */

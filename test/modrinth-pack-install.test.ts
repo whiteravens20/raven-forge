@@ -174,6 +174,17 @@ describe('an install that fails after the profile was made', () => {
     expect(deleteProfile).not.toHaveBeenCalled();
   });
 
+  it('says a lost connection so that the player can be told in their language', async () => {
+    syncManifest.mockRejectedValueOnce(new Error('net::ERR_INTERNET_DISCONNECTED'));
+
+    const outcome = await installer.installModrinthPack(pack);
+
+    expect(outcome).toMatchObject({
+      failure: 'net::ERR_INTERNET_DISCONNECTED',
+      failureMessage: { key: 'error.noConnection' },
+    });
+  });
+
   it('reports no failure when everything arrived', async () => {
     expect(await installer.installModrinthPack(pack)).not.toHaveProperty('failure');
   });

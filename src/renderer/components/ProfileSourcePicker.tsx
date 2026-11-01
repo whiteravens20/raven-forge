@@ -10,7 +10,14 @@ import { formatBytes } from '@renderer/format';
 import { failureText, localized, useLocale, useT } from '@renderer/i18n';
 import { loaderLabel } from '@shared/labels';
 import { formatRamGb, ramAdvice, safeMaxRamMb } from '@shared/memory';
-import type { CataloguePack, IpcResult, PackImport, PackReview, Profile } from '@shared/ipc-types';
+import type {
+  CataloguePack,
+  IpcResult,
+  PackImport,
+  PackInstall,
+  PackReview,
+  Profile,
+} from '@shared/ipc-types';
 import { useDialogFocus } from '@hooks/use-dialog-focus';
 import { useMachineMemoryMb } from '@hooks/use-machine-memory';
 
@@ -30,6 +37,12 @@ interface Props {
 }
 
 type Route = 'choose' | 'white-ravens' | 'modrinth' | 'import';
+
+/** Why a pack's files did not all arrive, or nothing when they did. */
+function unfinishedText(install: PackInstall): string | undefined {
+  if (!install.failure) return undefined;
+  return failureText({ error: install.failure, errorMessage: install.failureMessage }, '');
+}
 
 /**
  * Where a new profile comes from.
@@ -107,7 +120,7 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
   ) => {
     if (!result.success || !result.data) setError(failureText(result, fallback));
     else if ('review' in result.data) ask?.(result.data.review);
-    else onCreated(result.data.profile, { unfinished: result.data.failure });
+    else onCreated(result.data.profile, { unfinished: unfinishedText(result.data) });
   };
 
   /** A pack somebody handed over: the player is asked first when it needs that. */
@@ -348,7 +361,9 @@ export function ProfileSourcePicker({ onCancel, onScratch, onCreated }: Props) {
           {!asking && route === 'modrinth' && (
             <ModrinthPackSearch
               onBusy={(installing) => setBusy(installing ? 'modrinth' : null)}
-              onInstalled={(install) => onCreated(install.profile, { unfinished: install.failure })}
+              onInstalled={(install) =>
+                onCreated(install.profile, { unfinished: unfinishedText(install) })
+              }
             />
           )}
 

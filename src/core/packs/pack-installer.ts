@@ -23,6 +23,8 @@ import {
   safeMaxRamMb,
 } from '../../shared/memory';
 import { machineMemoryMb } from '../util/machine-memory';
+import { errorText } from '../util/error-text';
+import { isConnectionFailure } from '../net/connection-failure';
 import type { ModManifest } from '../../shared/manifest-schema';
 import type { InstalledMod, PackImport, PackInstall, Profile } from '../../shared/ipc-types';
 
@@ -203,9 +205,15 @@ async function firstSync(profile: Profile, supplied?: ModManifest): Promise<Pack
     await syncManifest(profile.id, supplied);
     return { profile };
   } catch (err) {
-    const failure = err instanceof Error ? err.message : String(err);
+    const failure = errorText(err);
     log.warn(`Created ${profile.name}, but its files did not all arrive: ${failure}`);
-    return { profile, failure };
+    return {
+      profile,
+      failure,
+      ...(isConnectionFailure(err)
+        ? { failureMessage: { key: 'error.noConnection' } as const }
+        : {}),
+    };
   }
 }
 
