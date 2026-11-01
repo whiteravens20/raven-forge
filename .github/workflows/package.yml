@@ -259,6 +259,15 @@ jobs:
           }
           ./.github/scripts/verify-windows-install.ps1 -Installer $built[0].FullName -Previous previous/Raven-Forge-Launcher-Setup-0.7.1.exe -Evidence evidence
 
+      # The launcher's own update, on the program that was just packaged and
+      # from a feed the script keeps. electron-updater downloads by another road
+      # here than on Linux, and what is left of a cancelled download depends on
+      # what Windows does with a file that is still open.
+      - name: Update the launcher on Windows, cancelling on the way
+        if: runner.os == 'Windows'
+        timeout-minutes: 6
+        run: node .github/scripts/verify-update-download.mjs out/win-unpacked evidence/update
+
       # The launcher's logs and the screen as it was, for whoever reads a miss.
       - name: Upload what was seen on Windows
         if: always() && runner.os == 'Windows'
