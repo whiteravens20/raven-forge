@@ -384,10 +384,10 @@ p.text-rf-danger {
 }
 
 /* Conveyor cargo advances one full pattern period (the clip width) per
-   loop, so irregular spacing still wraps seamlessly. Same 40px/s speed as
-   the old evenly-spaced belt. */
+   loop, so irregular spacing still wraps seamlessly. The period and the time
+   are set inline, from BELT_PERIOD and BELT_SPEED in backdrop-scenes.tsx. */
 .rf-backdrop .rf-bd-belt-item {
-  animation: rf-bd-belt 29.6s linear infinite;
+  animation: rf-bd-belt linear infinite;
 }
 
 /* fill-box anchors the scale to each puff (bottom-centre, so smoke grows
@@ -531,8 +531,7 @@ p.text-rf-danger {
     transform: translateX(0);
   }
   to {
-    /* Must equal BELT_PERIOD in backdrop-scenes.tsx. */
-    transform: translateX(1184px);
+    transform: translateX(var(--rf-belt-period));
   }
 }
 

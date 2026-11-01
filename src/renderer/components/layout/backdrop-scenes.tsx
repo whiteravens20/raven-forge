@@ -687,8 +687,11 @@ const ORE_FACES = {
 
 /** One marquee period of the belt — equal to the clip width, so when the
     animation snaps back by exactly this much, the wrap is invisible even
-    though the cargo is irregularly spaced. */
-const BELT_PERIOD = 1184;
+    though the cargo is irregularly spaced. It runs from inside one machine to
+    inside another: an end out in the open shows the cargo being cut off. */
+const BELT_START = 368;
+const BELT_PERIOD = 1320;
+const BELT_SPEED = 40;
 
 /** [pattern offset, ore, half-width, depth] — clustered and gapped by hand
     (pairs, stragglers, empty stretches) instead of an even parade. */
@@ -703,6 +706,7 @@ const BELT_ITEMS: Array<[number, keyof typeof ORE_FACES, number, number]> = [
   [748, 'diamond', 18, 13],
   [952, 'amethyst', 16, 11],
   [1060, 'redstone', 20, 14],
+  [1236, 'iron', 16, 12],
 ];
 
 export function TechScene() {
@@ -744,61 +748,34 @@ export function TechScene() {
       {gear('fly', loneGear(1560, 460, 220, 12, 70), '#191430', '#3d3663')}
       {WORKSHOP_TRAIN.map((wheel, i) => gear(`g${i}`, wheel, '#1c1633', '#494077'))}
 
-      {/* Machine blocks, with vents and status lights on their faces. */}
-      {column('m1', 300, 700, 90, 45, 260, '#241d3f', '#151027', '#1c1633')}
+      {/* The machine the belt passes in front of. */}
       {column('m2', 1150, 740, 70, 35, 220, '#241d3f', '#151027', '#1c1633')}
-      {column('m3', 1750, 690, 84, 42, 270, '#241d3f', '#151027', '#1c1633')}
-      {(
-        [
-          [316, 796],
-          [1164, 830],
-          [1768, 790],
-        ] as const
-      ).map(([x, y], i) => (
-        <g key={i}>
-          <rect x={x} y={y} width="34" height="7" fill="#332c56" />
-          <rect x={x} y={y + 14} width="34" height="7" fill="#332c56" />
-          <rect
-            className="rf-bd-glint"
-            x={x + 44}
-            y={y + 2}
-            width="8"
-            height="8"
-            fill={i === 1 ? '#67e8f9' : '#fbbf24'}
-            style={{ animationDelay: `${-i * 1.4}s` } as CSSProperties}
-          />
-        </g>
-      ))}
-      {/* Energy cells glowing on two of them. */}
-      {(
-        [
-          [300, 682, '#67e8f9', 'url(#rfbd-cyan-glow)'],
-          [1750, 672, '#fbbf24', 'url(#rfbd-lava-glow)'],
-        ] as const
-      ).map(([x, y, dot, glow], i) => (
-        <g key={i} className="rf-bd-lava">
-          <circle cx={x} cy={y} r="54" fill={glow} />
-          <rect x={x - 16} y={y - 10} width="32" height="20" rx="3" fill={dot} opacity="0.85" />
-        </g>
-      ))}
 
       {/* The conveyor — one horizontal belt hauling raw ore across the hall. */}
       <g>
-        <rect x="390" y="816" width="16" height="116" fill="#1a1530" />
-        <rect x="1520" y="816" width="16" height="116" fill="#1a1530" />
-        <rect x="360" y="790" width="1200" height="26" rx="6" fill="#1a1530" />
+        <rect x="420" y="816" width="16" height="116" fill="#1a1530" />
+        <rect x="1040" y="816" width="16" height="116" fill="#1a1530" />
+        <rect x="1620" y="816" width="16" height="116" fill="#1a1530" />
+        <rect
+          x={BELT_START - 8}
+          y="790"
+          width={BELT_PERIOD + 16}
+          height="26"
+          rx="6"
+          fill="#1a1530"
+        />
+        {/* Its markings move with the cargo. */}
         <line
-          className="rf-bd-flow"
-          x1="368"
+          {...flowing(20, 20, BELT_SPEED)}
+          x1={BELT_START}
           y1="816"
-          x2="1552"
+          x2={BELT_START + BELT_PERIOD}
           y2="816"
           stroke="#494077"
           strokeWidth="5"
-          strokeDasharray="20 20"
         />
         <clipPath id="rfbd-belt-clip">
-          <rect x="368" y="726" width={BELT_PERIOD} height="66" />
+          <rect x={BELT_START} y="726" width={BELT_PERIOD} height="66" />
         </clipPath>
         <g clipPath="url(#rfbd-belt-clip)">
           {BELT_ITEMS.map(([off, ore, hw, depth], i) => {
@@ -806,11 +783,20 @@ export function TechScene() {
             // Bottoms pinned to the belt surface regardless of block size.
             const yTop = 800 - hw / 2 - depth;
             return (
-              <g key={i} className="rf-bd-belt-item">
-                {column(`ore${i}a`, 368 + off, yTop, hw, hw / 2, depth, top, left, right)}
+              <g
+                key={i}
+                className="rf-bd-belt-item"
+                style={
+                  {
+                    '--rf-belt-period': `${BELT_PERIOD}px`,
+                    animationDuration: `${BELT_PERIOD / BELT_SPEED}s`,
+                  } as CSSProperties
+                }
+              >
+                {column(`ore${i}a`, BELT_START + off, yTop, hw, hw / 2, depth, top, left, right)}
                 {column(
                   `ore${i}b`,
-                  368 + off - BELT_PERIOD,
+                  BELT_START + off - BELT_PERIOD,
                   yTop,
                   hw,
                   hw / 2,
@@ -863,6 +849,44 @@ export function TechScene() {
           />
         ))}
       </g>
+
+      {/* The two machines the belt runs between, over its ends, and the vents and
+          status lights on all three. */}
+      {column('m1', 300, 700, 90, 45, 260, '#241d3f', '#151027', '#1c1633')}
+      {column('m3', 1750, 690, 84, 42, 270, '#241d3f', '#151027', '#1c1633')}
+      {(
+        [
+          [316, 796],
+          [1164, 830],
+          [1768, 790],
+        ] as const
+      ).map(([x, y], i) => (
+        <g key={i}>
+          <rect x={x} y={y} width="34" height="7" fill="#332c56" />
+          <rect x={x} y={y + 14} width="34" height="7" fill="#332c56" />
+          <rect
+            className="rf-bd-glint"
+            x={x + 44}
+            y={y + 2}
+            width="8"
+            height="8"
+            fill={i === 1 ? '#67e8f9' : '#fbbf24'}
+            style={{ animationDelay: `${-i * 1.4}s` } as CSSProperties}
+          />
+        </g>
+      ))}
+      {/* Energy cells glowing on two of them. */}
+      {(
+        [
+          [300, 682, '#67e8f9', 'url(#rfbd-cyan-glow)'],
+          [1750, 672, '#fbbf24', 'url(#rfbd-lava-glow)'],
+        ] as const
+      ).map(([x, y, dot, glow], i) => (
+        <g key={i} className="rf-bd-lava">
+          <circle cx={x} cy={y} r="54" fill={glow} />
+          <rect x={x - 16} y={y - 10} width="32" height="20" rx="3" fill={dot} opacity="0.85" />
+        </g>
+      ))}
 
       {/* Tiled floor. */}
       <rect y="932" width="1920" height="148" fill="#120e20" />
