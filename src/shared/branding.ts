@@ -147,8 +147,8 @@ export const ORIGINAL_SOURCE_URL = 'https://github.com/whiteravens20/raven-forge
  *
  * A `Record<Locale, …>` rather than a ternary on purpose: adding a language to
  * `Locale` without publishing its policy then fails to compile, instead of
- * quietly handing that language the English file. `Translations` is kept honest
- * the same way — see `LOCALES` in `renderer/i18n`.
+ * quietly handing that language the English file. The messages are kept in
+ * step the same way — see `MESSAGES` in `renderer/i18n`.
  */
 const PRIVACY_POLICY_FILES: Record<Locale, string> = {
   pl: 'PRIVACY.pl.md',

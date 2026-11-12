@@ -2,30 +2,27 @@
 
 import { useMemo } from 'react';
 import { useSettingsStore } from '../stores/settings-store';
-import type { ErrorMessage, Locale } from '@shared/ipc-types';
-import { pickLocale } from '@shared/locale';
-import { en, type PluralKey, type TranslationKey, type Translations } from './en';
-import { pl } from './pl';
+import type { ErrorMessage } from '@shared/ipc-types';
+import { LOCALES, pickLocale, type Locale } from '@shared/locale';
+import {
+  plural,
+  translate,
+  type PluralKey,
+  type TranslationKey,
+  type TranslationVars,
+} from './messages';
 
-export type { TranslationKey };
+export type { PluralKey, TranslationKey, TranslationVars };
 export { localized } from './localized';
 
 /**
  * Deliberately not an i18n library.
  *
- * The whole feature set needed here is: pick a dictionary, substitute a few
- * placeholders, and get plural agreement right in Polish. `Intl.PluralRules`
- * ships with the platform and does the only genuinely hard part, so the rest
- * is about forty lines and no dependency.
+ * The whole feature set needed here is: pick a language's messages, substitute
+ * a few placeholders, and get plural agreement right in Polish.
+ * `Intl.PluralRules` ships with the platform and does the only genuinely hard
+ * part, so the rest is about forty lines and no dependency.
  */
-
-/**
- * `Locale` is declared in `@shared/ipc-types` because the settings schema
- * validates against it in the main process. `satisfies` keeps this map and that
- * union in step: adding a locale there without a dictionary here fails to
- * compile.
- */
-const LOCALES = { pl, en } satisfies Record<Locale, Translations>;
 
 /** Endonyms — a language is listed the way its own speakers write it. */
 export const LOCALE_NAMES: Record<Locale, string> = {
@@ -40,56 +37,12 @@ export const LOCALE_NAMES: Record<Locale, string> = {
 const BEFORE_SETTINGS: Locale = pickLocale(navigator.languages);
 
 function isLocale(value: unknown): value is Locale {
-  return typeof value === 'string' && value in LOCALES;
+  return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
 
 /** Settings store `language` as a usable locale, whatever ends up in the file. */
 export function asLocale(value: unknown): Locale {
   return isLocale(value) ? value : BEFORE_SETTINGS;
-}
-
-export type TranslationVars = Record<string, string | number>;
-
-function interpolate(template: string, vars?: TranslationVars): string {
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
-    name in vars ? String(vars[name]) : match,
-  );
-}
-
-function translate(locale: Locale, key: TranslationKey, vars?: TranslationVars): string {
-  // English is the last resort rather than the raw key: a locale that is
-  // missing an entry should degrade to a readable sentence, not to
-  // `settings.trustedKeysHint` in the middle of a settings page.
-  const template = LOCALES[locale][key] ?? en[key];
-  return interpolate(template, vars);
-}
-
-// ── Plurals ────────────────────────────────────────────────
-// A counted string is stored as several keys — `foo.one`, `foo.few`,
-// `foo.many`, `foo.other` — and the right one is chosen per locale.
-
-const pluralRules = new Map<Locale, Intl.PluralRules>();
-
-function rulesFor(locale: Locale): Intl.PluralRules {
-  let rules = pluralRules.get(locale);
-  if (!rules) {
-    rules = new Intl.PluralRules(locale);
-    pluralRules.set(locale, rules);
-  }
-  return rules;
-}
-
-function plural(locale: Locale, base: PluralKey, count: number, vars?: TranslationVars): string {
-  const category = rulesFor(locale).select(count);
-  // English never produces `few`/`many`, and a translator may legitimately
-  // leave a category out where their language does not distinguish it, so an
-  // absent variant falls back to `.other` instead of vanishing.
-  const dict: Partial<Record<string, string>> = LOCALES[locale];
-  const fallback: Partial<Record<string, string>> = en;
-  const template =
-    dict[`${base}.${category}`] ?? dict[`${base}.other`] ?? fallback[`${base}.other`] ?? base;
-  return interpolate(template, { count, ...vars });
 }
 
 // ── React bindings ─────────────────────────────────────────
