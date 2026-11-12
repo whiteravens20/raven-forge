@@ -62,7 +62,7 @@ raven-forge/
     │   ├── components/           # ui/ (Button, Input, Select, Switch, Banner, …) + layout/
     │   ├── stores/               # Zustand stores (auth, game, news, notice, profile, progress, settings, updater)
     │   ├── hooks/                # cross-page React hooks (e.g. the machine's memory)
-    │   ├── i18n/                 # UI string dictionaries (pl, en) + the t() helper
+    │   ├── i18n/                 # UI messages, one JSON file per language + the t() helper
     │   └── styles/global.css     # @import "tailwindcss", @theme tokens, per-theme --rf-*
     ├── core/                     # business logic, runs in main process
     │   ├── auth/                 # MS OAuth → Xbox → XSTS → MC chain, keytar token store
@@ -537,7 +537,7 @@ from a shell script are still Linux only.
 | Subprocesses           | Real ones: `tar` unpacks a real archive (on Windows, Windows' own, by its full path), `unzip -t` reads back an export, `taskkill` closes a stand-in game's window, and a shell script or a small compiled program that prints a version banner stands in for a JVM |
 | Build tooling          | `inject-build-ids.mjs` is run over a staged `dist/`, because otherwise it runs for the first time during a release                                                                                                                                                 |
 | The IPC contract       | Preload and main are both loaded and their channel names compared, which is the one half of that contract the types cannot state                                                                                                                                   |
-| Renderer-facing checks | The CSP header, the IPC sender guard, the progress labels the overlay resolves, and the two dictionaries against each other                                                                                                                                        |
+| Renderer-facing checks | The CSP header, the IPC sender guard, the progress labels the overlay resolves, and every message file against `en.json`                                                                                                                                           |
 
 Three properties are asserted rather than assumed, because each of them failed
 silently before it was: **overlapping writes** — every serialized state file has

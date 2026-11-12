@@ -12,6 +12,7 @@ import {
 } from './constants';
 import { isSafeFileName } from './manifest-schema';
 import { GAME_LANGUAGE_PATTERN } from './game-languages';
+import { LOCALES } from './locale';
 
 // ── Runtime validators for IPC payloads ───────────────────
 // These schemas validate data at IPC boundaries. The types they are checked
@@ -105,7 +106,7 @@ export const globalSettingsSchema = z.object({
   theme: z.enum(['dark', 'oled-black', 'light']),
   // `.catch` rather than `.default`: an unknown language in an existing
   // settings file must not fail the whole parse and reset every other setting.
-  language: z.enum(['pl', 'en']).catch('en'),
+  language: z.enum(LOCALES).catch('en'),
   launcherBehaviorOnLaunch: z.enum(['close', 'minimize', 'keep-open']),
   // Validated rather than free text: an unparseable URL used to be accepted and
   // then silently ignored. Every scheme listed here has a dispatcher behind it —

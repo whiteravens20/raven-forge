@@ -145,4 +145,4 @@ plainly the player's own.
 
 ## UI language
 
-Polish and English ship in `src/renderer/i18n/`; switch under Settings → Appearance. Adding a language is copying `en.ts`, translating the values, and registering it — TypeScript names any key you miss. See [CONTRIBUTING.md](../CONTRIBUTING.md#translations).
+Polish and English ship in `src/renderer/i18n/`, one JSON file each; switch under Settings → Appearance. A new language is a file translated from `en.json`, loaded once it has every message and its code is added to `LOCALES` in `src/shared/locale.ts`. See [CONTRIBUTING.md](../CONTRIBUTING.md#translations).

@@ -1,18 +1,23 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import type { Locale } from './ipc/settings';
+/**
+ * The languages the launcher ships: the only ones it loads and offers. A
+ * language joins this list by hand once its file in `src/renderer/i18n/` has
+ * every message. Until then the file may hold part of them, and it is never
+ * loaded.
+ */
+export const LOCALES = ['pl', 'en'] as const;
 
-/** `satisfies` has a locale added to the union fail to compile until it is listed here too. */
-const WITH_A_DICTIONARY = { pl: true, en: true } satisfies Record<Locale, true>;
+export type Locale = (typeof LOCALES)[number];
 
-function hasDictionary(language: string | undefined): language is Locale {
-  return language !== undefined && Object.hasOwn(WITH_A_DICTIONARY, language);
+function isListed(language: string | undefined): language is Locale {
+  return language !== undefined && (LOCALES as readonly string[]).includes(language);
 }
 
 /**
  * The language a launcher with nothing saved opens in: the first of the system's
- * languages, in the system's order, that has a dictionary. English when none has,
- * since a window in Polish is no use to somebody on a German system.
+ * languages, in the system's order, that the launcher ships. English when none
+ * is, since a window in Polish is no use to somebody on a German system.
  *
  * What the system lists looks different from platform to platform (`pl-PL`,
  * `pl_PL.UTF-8`, `C`), and only the language at the front of it is compared.
@@ -20,7 +25,7 @@ function hasDictionary(language: string | undefined): language is Locale {
 export function pickLocale(systemLanguages: readonly string[]): Locale {
   for (const tag of systemLanguages) {
     const language = /^[a-z]+/i.exec(tag)?.[0].toLowerCase();
-    if (hasDictionary(language)) return language;
+    if (isListed(language)) return language;
   }
   return 'en';
 }
