@@ -105,7 +105,7 @@ src/
 │   ├── components/ # UI components
 │   ├── pages/      # Route pages
 │   ├── stores/     # Zustand state stores
-│   ├── i18n/       # UI string dictionaries (pl, en) + tiny t() helper
+│   ├── i18n/       # UI messages, one JSON file per language + tiny t() helper
 │   ├── assets/     # bundled fonts
 │   └── styles/     # Tailwind entry + theme tokens + backdrop animations
 ├── core/           # Business logic (runs in main process)
@@ -149,7 +149,7 @@ Architecture detail lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the
 - Keep functions small and single-purpose. Match the surrounding style; ESLint is the source of truth.
 - **No dead code, no commented-out blocks, no speculative abstraction, no backwards-compatibility shims.** If something is unused, delete it.
 - Comments explain _why_, not _what_. A comment restating the line below it is noise; a comment recording why the obvious approach failed is worth its weight.
-- Every user-facing string goes through the i18n dictionary — see [Translations](#translations).
+- Every user-facing string goes through `t()` and the message files — see [Translations](#translations).
 
 ### Naming
 
@@ -186,11 +186,13 @@ topic, no body. Do not mix a refactor into a feature commit.
 
 ### Translations
 
-UI strings live in `src/renderer/i18n/`. A first start opens in the first of the system's languages that has a dictionary, and in English when none has. English (`en.ts`) is the one that defines the keys — `pl.ts` is typed against it — and what a missing entry falls back to. Both carry the same keys, and the type system enforces that.
+The interface text lives in `src/renderer/i18n/`, one JSON file per language, named by its language code: a flat object of messages by key. `en.json` is the source the other files translate, and a message a language lacks is shown in English. A `{name}` in a message is a value the code puts in, and a translation keeps every one of them. A message that depends on a number has a key for each plural category that whole numbers fall into in the language, as `Intl.PluralRules` names them, with the category after the key: `logs.errorCount_one` and `logs.errorCount_other` in English, `_one`, `_few` and `_many` in Polish, whose `other` is for fractions only. `*emphasis*` and `**strong**` are read only in the chronicle's prose; everywhere else a message is shown as written, asterisks included.
 
-- **Never hardcode a user-facing string in a component.** Add the key to both dictionaries and use the `t()` helper.
-- To add a language, copy `en.ts`, translate the values, and add it to `Locale` in `src/shared/ipc/settings.ts` and to the `language` schema in `src/shared/validators.ts`. TypeScript will then name the other places it has to be listed (`src/renderer/i18n/index.ts`, `src/shared/locale.ts`) and any key you missed.
-- Keep placeholders (`{name}`) intact and keep the tone consistent with the existing entries.
+The launcher loads and offers only the languages in `LOCALES` (`src/shared/locale.ts`), and a first start opens in the first of the system's languages that is on it, or in English. `test/i18n-messages.test.ts` holds each of them to every message of `en.json`. A file of a language not on that list may hold part of the messages, as a translation still in progress does, and is checked for what it has: each of its messages is in `en.json`, is not empty, keeps the placeholders of the English one and has the plural forms of its language.
+
+- **Never hardcode a user-facing string in a component.** Add the message to `en.json` and to the file of every language in `LOCALES`, and show it with `t('key')` from `useT()`. A count that changes the wording goes through `t.plural('key', count)`.
+- To add a language, create `src/renderer/i18n/<code>.json` and translate the messages of `en.json` into it; the tests name any plural form that is missing. The file can grow over several changes: until the language is on the list, it is not loaded. Once it has every message, add the code to `LOCALES`. TypeScript then names what else a language needs: its file in `MESSAGES` and its own name in `LOCALE_NAMES` (`src/renderer/i18n/index.ts`), and the privacy policy it is shown (`PRIVACY_POLICY_FILES` in `src/shared/branding.ts`).
+- Keep the tone consistent with the existing messages.
 
 ---
 
@@ -235,7 +237,7 @@ Five kinds of suite:
 - **Contracts between two files.** Things the type system cannot state and
   nothing else would notice: that every channel the preload can invoke has a
   handler registered for it, that every message key the main process names
-  exists in both dictionaries with the variables it was handed, and that the
+  exists in `en.json` with the variables it was handed, and that the
   build-time ID injector still finds the literal it rewrites.
 
 Out of scope is what needs a real JVM, a real Microsoft account or a published

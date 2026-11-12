@@ -38,7 +38,7 @@ Details:
 - [ ] Checked in all three themes (dark, OLED black, light)
 - [ ] Checked with `prefers-reduced-motion: reduce` (only if animation changed)
 - [ ] Keyboard reachable, visible focus state
-- [ ] All new user-facing strings added to **both** `src/renderer/i18n/pl.ts` and `en.ts`
+- [ ] All new user-facing strings added to **both** `src/renderer/i18n/en.json` and `pl.json`
 - [ ] Screenshots attached below
 
 ### If the launch or sync path changed
