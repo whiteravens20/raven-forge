@@ -17,6 +17,7 @@ import { Spinner } from '@components/ui/Spinner';
 import { failureText, LOCALE_NAMES, asLocale, useLocale, useT } from '@renderer/i18n';
 import { RELEASES_URL, isBuiltInKey, releaseNotesUrl, trustedKeyRing } from '@shared/branding';
 import { EXAMPLE_PUBLIC_KEY, isEd25519PublicKey } from '@shared/trusted-key';
+import { LOCALES } from '@shared/locale';
 import type { ThemeMode, LauncherBehaviorOnLaunch, UpdateCheck } from '@shared/ipc-types';
 import { openLink } from '@renderer/open';
 
@@ -24,7 +25,7 @@ const api = window.ravenforge;
 
 // Languages are listed by endonym, so they stay legible whichever locale the
 // UI is currently in — someone who set the wrong one has to find their way back.
-const LANGUAGE_OPTIONS = Object.entries(LOCALE_NAMES).map(([value, label]) => ({ value, label }));
+const LANGUAGE_OPTIONS = LOCALES.map((value) => ({ value, label: LOCALE_NAMES[value] }));
 
 export function SettingsPage() {
   const t = useT();
