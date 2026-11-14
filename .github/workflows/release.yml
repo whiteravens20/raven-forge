@@ -410,22 +410,15 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create draft release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          draft: true
-          generate_release_notes: true
-          append_body: true
-          fail_on_unmatched_files: true
-          files: |
-            artifacts/*.exe
-            artifacts/*.deb
-            artifacts/*.AppImage
-            artifacts/*.blockmap
-            artifacts/*.yml
-            artifacts/SHA256SUMS.txt
-            artifacts/sbom.cdx.json
-            artifacts/*.sigstore.json
-          body: |
+        # gh, which the runner already has, rather than an action that would be
+        # handed this job's write token. The body below comes first and GitHub's
+        # generated notes after it, as before; a file that is not there fails the
+        # step; run again over a draft that is already there, this only puts the
+        # files back and leaves its text alone.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BODY: |
             ${{ steps.tag-msg.outputs.message }}
 
             ---
@@ -489,3 +482,27 @@ jobs:
 
             The `.yml` and `.blockmap` files are the electron-updater feed. Leave
             them attached — removing them breaks in-app updates for existing users.
+        run: |
+          set -euo pipefail
+          shopt -s failglob
+          files=(
+            artifacts/*.exe
+            artifacts/*.deb
+            artifacts/*.AppImage
+            artifacts/*.blockmap
+            artifacts/*.yml
+            artifacts/SHA256SUMS.txt
+            artifacts/sbom.cdx.json
+            artifacts/*.sigstore.json
+          )
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --clobber "${files[@]}"
+            exit 0
+          fi
+          body=${BODY#"${BODY%%[![:space:]]*}"}
+          body=${body%"${body##*[![:space:]]}"}
+          notes=$(gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" --jq .body)
+          printf '%s\n\n%s\n' "$body" "$notes" > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" "${files[@]}"
