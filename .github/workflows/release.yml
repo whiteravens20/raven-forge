@@ -177,6 +177,18 @@ jobs:
             node .github/scripts/verify-fuses.mjs out/linux-unpacked/raven-forge-launcher
           fi
 
+      # The same reading of the package the packaging job makes: nothing the
+      # .deb installs may be changed by anyone but root.
+      - name: Verify that only root may change what the .deb installs
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          open=$(dpkg-deb --contents out/*.deb | awk '$1 !~ /^l/ && ($1 ~ /^.....w/ || $1 ~ /^........w/)')
+          if [ -n "$open" ]; then
+            echo "::error::the package installs files other accounts may change:"; echo "$open" | head; exit 1
+          fi
+
       - name: Verify the client ID was baked in
         shell: bash
         run: |

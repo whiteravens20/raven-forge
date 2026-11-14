@@ -41,6 +41,29 @@ if (linuxNamed && otherNamed) {
 }
 const forLinux = linuxNamed || (!otherNamed && process.platform === 'linux');
 
+const fs = require('node:fs/promises');
+const path = require('node:path');
+
+/**
+ * Take the right to change it away from everyone but its owner, for `target`
+ * and everything under it.
+ *
+ * Electron comes as a zip, and the modes in that zip are open to everyone:
+ * unpacked, the program, its libraries and `chrome-sandbox` were `rwxrwxrwx`,
+ * and the `.deb` installed them so — owned by root, in `/opt`, and writable by
+ * any account on the computer, which could then put a program of its own in the
+ * launcher's place for whoever starts it next. Links are passed over: a link
+ * has no mode of its own, and following one could reach outside the package.
+ */
+async function closeToOthers(target) {
+  const found = await fs.lstat(target);
+  if (found.isSymbolicLink()) return;
+  const mode = found.mode & 0o7777;
+  if (mode & 0o022) await fs.chmod(target, mode & ~0o022);
+  if (!found.isDirectory()) return;
+  for (const name of await fs.readdir(target)) await closeToOthers(path.join(target, name));
+}
+
 /** @type {import('electron-builder').Configuration} */
 const config = {
   appId: 'com.ravenforge.launcher',
@@ -65,6 +88,13 @@ const config = {
     // Native modules that can't run from asar
     'node_modules/keytar/**',
   ],
+
+  // Before anything is packed: what the packages carry is the unpacked folder
+  // as it is, modes and all. Windows keeps no such modes, so there is nothing
+  // to take away there. See `closeToOthers` above.
+  afterPack: async ({ appOutDir }) => {
+    if (process.platform !== 'win32') await closeToOthers(appOutDir);
+  },
 
   // ── What the packaged program refuses to be ──────────────
   // Electron's binary comes with two ways to make any app built on it into

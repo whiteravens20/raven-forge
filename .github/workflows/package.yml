@@ -123,6 +123,15 @@ jobs:
           grep -qx 'Name=Raven Forge Launcher' /tmp/entry.desktop \
             || { echo "::error::the desktop entry is no longer called Raven Forge Launcher"; exit 1; }
 
+          # Nothing the package installs may be changed by anyone but root.
+          # Electron unpacks open to every account, the launcher's own binary
+          # included, and the package used to carry that into /opt; afterPack
+          # in electron-builder.config.js closes it before anything is packed.
+          dpkg-deb --contents "${deb[0]}" | awk '$1 !~ /^l/ && ($1 ~ /^.....w/ || $1 ~ /^........w/)' > /tmp/open.txt
+          if [ -s /tmp/open.txt ]; then
+            echo "::error::the package installs files other accounts may change:"; head /tmp/open.txt; exit 1
+          fi
+
           ls -lh out/*.deb out/*.AppImage
 
       # `fpm` does not run dpkg-shlibdeps, so the dependency list in
