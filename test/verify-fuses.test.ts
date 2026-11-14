@@ -27,10 +27,13 @@ const script = path.join(root, '.github/scripts/verify-fuses.mjs');
 
 /** The marker Electron's binary carries in front of its fuses. */
 const SENTINEL = 'dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX';
-/** The nine fuses as Electron 44 ships them: run-as-Node and the inspector both on. */
+/**
+ * The nine fuses as Electron 44 ships them: run-as-Node and the inspector on,
+ * the two that hold the program to its app.asar off.
+ */
 const AS_SHIPPED = '101100011';
-/** The same with the two the packaging config switches off. */
-const AS_PACKED = '001000011';
+/** The same as the packaging config leaves them: each of those four the other way. */
+const AS_PACKED = '001011011';
 
 let dir: string;
 
@@ -62,25 +65,29 @@ const check = (...args: string[]) =>
   spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: 'utf-8' });
 
 describe('reading the fuses back off a binary', () => {
-  it('passes a binary in which both fuses the config names are off', async () => {
+  it('passes a binary in which every fuse the config names is as it says', async () => {
     const result = check(await binaryWith(AS_PACKED));
 
     expect(result.stdout).toContain('RunAsNode is off');
     expect(result.stdout).toContain('EnableNodeCliInspectArguments is off');
+    expect(result.stdout).toContain('OnlyLoadAppFromAsar is on');
+    expect(result.stdout).toContain('EnableEmbeddedAsarIntegrityValidation is on');
     expect(result.status).toBe(0);
   });
 
-  it('fails an Electron nobody packed, and says which two', async () => {
+  it('fails an Electron nobody packed, and says which four', async () => {
     const result = check(await binaryWith(AS_SHIPPED));
 
     expect(result.stderr).toContain('RunAsNode is on');
     expect(result.stderr).toContain('EnableNodeCliInspectArguments is on');
+    expect(result.stderr).toContain('OnlyLoadAppFromAsar is off');
+    expect(result.stderr).toContain('EnableEmbeddedAsarIntegrityValidation is off');
     expect(result.status).toBe(1);
   });
 
   it('fails on the one that was left on, and only names that one', async () => {
-    // The inspector, with run-as-Node off.
-    const result = check(await binaryWith('001100011'));
+    // The inspector, with the other three as packed.
+    const result = check(await binaryWith('001111011'));
 
     expect(result.stdout).toContain('RunAsNode is off');
     expect(result.stderr).toContain('EnableNodeCliInspectArguments is on');
@@ -90,7 +97,7 @@ describe('reading the fuses back off a binary', () => {
 
   it('does not take a fuse the binary no longer has for one that is off', async () => {
     // A later Electron may remove a fuse, and writes `r` where it was.
-    const removed = check(await binaryWith('r01r00011'));
+    const removed = check(await binaryWith('r01r11011'));
     expect(removed.stderr).toContain('RunAsNode is not there');
     expect(removed.stderr).toContain('EnableNodeCliInspectArguments is not there');
     expect(removed.status).toBe(1);
@@ -99,6 +106,13 @@ describe('reading the fuses back off a binary', () => {
     const short = check(await binaryWith('00'));
     expect(short.stderr).toContain('EnableNodeCliInspectArguments is not there');
     expect(short.status).toBe(1);
+  });
+
+  it('does not take a fuse the binary no longer has for one that is on', async () => {
+    const removed = check(await binaryWith('0010rr011'));
+    expect(removed.stderr).toContain('OnlyLoadAppFromAsar is not there');
+    expect(removed.stderr).toContain('EnableEmbeddedAsarIntegrityValidation is not there');
+    expect(removed.status).toBe(1);
   });
 
   it('does not pass a file it could not read as one', () => {
