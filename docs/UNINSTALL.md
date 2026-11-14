@@ -154,7 +154,7 @@ deliberately not in the data folder, which is why **deleting files does not
 remove them**.
 
 The clean way is to log out on the Accounts page **before** uninstalling: that
-deletes the keychain entries and clears the sign-in window's cookies. If the
+deletes the keychain entries and clears what the sign-in window kept. If the
 launcher is already gone, open your keychain manager and delete the
 `com.ravenforge.launcher` entries by hand.
 

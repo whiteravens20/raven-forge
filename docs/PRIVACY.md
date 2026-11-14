@@ -83,10 +83,10 @@ In the data folder:
 
 In the launcher folder, wherever the data is:
 
-| Path            | Contents                                                                                                                                                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `browser/`      | The launcher's window is an embedded browser, and this is its own storage: a cache of images (mod icons, news pictures), the announcements you dismissed, which profile was selected last, and the Microsoft sign-in page's cookies. |
-| `data-root.txt` | Present only if you moved the data folder: one line naming where it went, and nothing else. The launcher and the Windows uninstaller read it to find the data.                                                                       |
+| Path            | Contents                                                                                                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `browser/`      | The launcher's window is an embedded browser, and this is its own storage: a cache of images (mod icons, news pictures), the announcements you dismissed, which profile was selected last, and the Microsoft sign-in page's cookies and storage. |
+| `data-root.txt` | Present only if you moved the data folder: one line naming where it went, and nothing else. The launcher and the Windows uninstaller read it to find the data.                                                                                   |
 
 And outside both:
 
@@ -322,7 +322,8 @@ read a report through before attaching it to a public issue.
 
 - **One account:** "Log out" on the Accounts page removes it from `auth.json`
   and deletes its entries in the credential store. Logging out of a Microsoft
-  account also clears the sign-in window's cookies, so the next sign-in starts
+  account also clears what the sign-in window kept — the cookies and storage of
+  Microsoft's pages — so the next sign-in starts
   from a blank page rather than recognising you.
 - **All launcher data:** quit the launcher and delete the data folder and the
   launcher folder listed above. Nothing survives outside them except the

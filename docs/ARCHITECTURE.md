@@ -368,16 +368,18 @@ plaintext secrets move into the keychain and are stripped from the file. Any
 entry the keychain rejects is left untouched, so a failed migration never costs
 the user a login.
 
-**Logging out clears the sign-in cookies.** The authorization window runs in the
-default session — it has to, or the configured proxy would not apply to it — so
-Microsoft's cookies outlive the account unless something removes them, and a
-"log out" the next sign-in can see straight through is not one. `logoutAccount`
-clears the whole cookie jar when the account being removed is a Microsoft one.
-The whole jar rather than a Microsoft domain list: the launcher's own page is a
-`file://` document that sets no cookies, so everything in there was set by a
-page the sign-in flow loaded, and a domain list would be one more thing to keep
-correct as Microsoft moves hosts around. An offline account never opened that
-window, so its logout leaves the jar alone.
+**Logging out clears what the sign-in window kept.** The authorization window
+runs in the default session — it has to, or the configured proxy would not apply
+to it — so what Microsoft's pages keep outlives the account unless something
+removes it, and a "log out" the next sign-in can see straight through is not
+one. When the account being removed is a Microsoft one, `logoutAccount` clears
+every origin's cookies and storage (local storage, databases, cache) with
+`session.clearData`, leaving out one origin: the launcher's own page, `file://`
+(and the development server's, under `npm run dev`), which keeps the selected
+profile and the dismissed announcements in its local storage. That one origin
+rather than a Microsoft domain list, because a domain list would be one more
+thing to keep correct as Microsoft moves hosts around. An offline account never
+opened that window, so its logout clears nothing.
 
 ## Launcher startup sequence
 

@@ -86,10 +86,10 @@ W folderze danych:
 
 W folderze launchera, gdziekolwiek są dane:
 
-| Ścieżka         | Zawartość                                                                                                                                                                                                                |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `browser/`      | Okno launchera to wbudowana przeglądarka, a to jej własne pliki: pamięć podręczna obrazków (ikony modów, grafiki z aktualności), zamknięte ogłoszenia, ostatnio wybrany profil i ciasteczka strony logowania Microsoftu. |
-| `data-root.txt` | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, dokąd trafił, i nic poza tym. Czytają go launcher i deinstalator Windows, żeby znaleźć dane.                                                    |
+| Ścieżka         | Zawartość                                                                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `browser/`      | Okno launchera to wbudowana przeglądarka, a to jej własne pliki: pamięć podręczna obrazków (ikony modów, grafiki z aktualności), zamknięte ogłoszenia, ostatnio wybrany profil i ciasteczka oraz dane strony logowania Microsoftu. |
+| `data-root.txt` | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, dokąd trafił, i nic poza tym. Czytają go launcher i deinstalator Windows, żeby znaleźć dane.                                                              |
 
 I poza oboma:
 
@@ -330,7 +330,8 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 - **Jedno konto:** „Wyloguj” na stronie Konta usuwa je z `auth.json` i kasuje
   jego wpisy w magazynie poświadczeń. Wylogowanie z konta Microsoft czyści też
-  ciasteczka okna logowania, więc następne logowanie zaczyna się od pustej
+  to, co zostawiło okno logowania — ciasteczka i dane stron Microsoftu — więc
+  następne logowanie zaczyna się od pustej
   strony, a nie od rozpoznania Ciebie.
 - **Wszystkie dane launchera:** zamknij launcher i usuń wymienione wyżej folder
   danych i folder launchera. Poza nimi nie zostaje nic oprócz wpisów w magazynie

@@ -461,27 +461,39 @@ export async function loginOffline(username: string): Promise<MinecraftAccount> 
 }
 
 /**
- * Forget the sign-in window's cookies.
+ * Where the launcher's own page comes from: the file it is built into, or the
+ * development server that serves it while it is being worked on.
+ */
+function launcherPageOrigins(): string[] {
+  const devServer = process.env.VITE_DEV_SERVER_URL;
+  return devServer ? ['file://', new URL(devServer).origin] : ['file://'];
+}
+
+/**
+ * Forget what the sign-in window kept.
  *
  * The authorization window shares the launcher's session — it has to, or the
- * proxy set in Settings would not apply to it — so Microsoft's cookies outlive
- * the account unless something removes them. A "log out" after which the next
- * sign-in already knows who you are has not logged anybody out.
+ * proxy set in Settings would not apply to it — so what Microsoft's pages keep
+ * outlives the account unless something removes it. A "log out" after which
+ * the next sign-in already knows who you are has not logged anybody out.
  *
- * Clearing the whole cookie jar rather than a list of Microsoft domains: the
- * launcher's own page is a `file://` document and sets no cookies of its own,
- * so everything in here was set by a page this flow loaded. A domain list would
- * be a thing to keep correct as Microsoft moves hosts around, and being wrong
- * about it would fail silently, in the direction of leaving the session behind.
+ * Their cookies, and their storage beside them: a page can remember an account
+ * in its local storage or its database as well as in a cookie, and only the
+ * cookies used to be cleared. Everything any page kept is cleared, except what
+ * the launcher's own page keeps in the same session — the profile chosen, the
+ * announcements put away. That page is the one origin left alone, rather than
+ * the sign-in clearing a list of Microsoft's: a list would be a thing to keep
+ * correct as Microsoft moves hosts around, and being wrong about it would fail
+ * silently, in the direction of leaving the session behind.
  *
  * Never throws. Logging out must succeed even where this cannot.
  */
-async function clearSignInCookies(): Promise<void> {
+async function clearSignInData(): Promise<void> {
   try {
-    await session.defaultSession.clearStorageData({ storages: ['cookies'] });
-    log.info('Cleared the sign-in window cookies');
+    await session.defaultSession.clearData({ excludeOrigins: launcherPageOrigins() });
+    log.info('Cleared what the sign-in window kept');
   } catch (err) {
-    log.warn('Could not clear the sign-in window cookies:', err);
+    log.warn('Could not clear what the sign-in window kept:', err);
   }
 }
 
@@ -494,7 +506,7 @@ export async function logoutAccount(accountId: string): Promise<void> {
   // clear, and wiping the jar would only sign out the Microsoft accounts that
   // are still here.
   if (account?.type === 'microsoft') {
-    await clearSignInCookies();
+    await clearSignInData();
   }
 
   pushAuthState();
