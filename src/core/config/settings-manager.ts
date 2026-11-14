@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import { app } from 'electron';
 import { log } from '../../main/logger';
 import { paths } from './paths';
-import { writeJsonAtomic } from '../util/atomic-file';
+import { OWNER_ONLY, keepToOwner, writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
 import { DEFAULT_SETTINGS } from './defaults';
 import { globalSettingsSchema } from '../../shared/validators';
@@ -67,9 +67,12 @@ async function readSettingsFile(): Promise<GlobalSettings> {
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     const defaults = freshSettings();
-    await writeJsonAtomic(paths.settings, defaults);
+    await writeJsonAtomic(paths.settings, defaults, OWNER_ONLY, 'write anyway');
     return defaults;
   }
+  // A proxy's password can be in here. Closed before anything else is done
+  // with it, so a copy kept of a file that will not parse is closed too.
+  await keepToOwner(paths.settings);
 
   const parsed = globalSettingsSchema.safeParse(safeJsonParse(raw));
   if (parsed.success) return parsed.data;
@@ -83,7 +86,7 @@ async function readSettingsFile(): Promise<GlobalSettings> {
   await fs.rename(paths.settings, backup).catch(() => undefined);
 
   const defaults = freshSettings();
-  await writeJsonAtomic(paths.settings, defaults);
+  await writeJsonAtomic(paths.settings, defaults, OWNER_ONLY, 'write anyway');
   return defaults;
 }
 
@@ -116,7 +119,7 @@ function changeSettings(
   return serializeByKey(paths.settings, async () => {
     const current = cachedSettings && !standingIn ? cachedSettings : await readSettingsFile();
     const next = globalSettingsSchema.parse(change(current));
-    await writeJsonAtomic(paths.settings, next);
+    await writeJsonAtomic(paths.settings, next, OWNER_ONLY, 'write anyway');
     cachedSettings = next;
     standingIn = false;
     return next;

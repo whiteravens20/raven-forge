@@ -745,3 +745,63 @@ describe('exportProfile', () => {
     await expect(mgr.importProfileFile(file)).rejects.toThrow(/too large/);
   });
 });
+
+/**
+ * A profile can follow a pack at an address that carries a token, so the list
+ * and what is kept of it are its owner's alone, as `auth.json` is. The mode bits
+ * mean nothing on Windows, so this is asked of the other systems only.
+ */
+describe.skipIf(process.platform === 'win32')('who may read profiles.json', () => {
+  const modeOf = async (file: string) => (await fs.stat(file)).mode & 0o777;
+
+  it('is its owner alone, once a profile is written', async () => {
+    await mgr.createProfile(newProfile('Ravens'));
+    expect(await modeOf(indexFile())).toBe(0o600);
+  });
+
+  it('closes a list an older build left readable by others, as soon as it is read', async () => {
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    await fs.chmod(indexFile(), 0o644);
+    mgr = await loadModule();
+    expect(await mgr.getProfile(created.id)).not.toBeNull();
+    expect(await modeOf(indexFile())).toBe(0o600);
+  });
+
+  it('keeps the copy of a list it could not read to its owner too', async () => {
+    await fs.writeFile(indexFile(), '[{ "manifestUrl": "https://host/m.json?token=secret", oops');
+    await fs.chmod(indexFile(), 0o644);
+    expect(await mgr.getAllProfiles()).toEqual([]);
+    const kept = await keptAside();
+    expect(kept).toHaveLength(1);
+    expect(await modeOf(path.join(root, kept[0]))).toBe(0o600);
+  });
+
+  it('does not stop the list loading or saving on a filesystem that keeps no modes', async () => {
+    const first = await mgr.createProfile(newProfile('Ravens'));
+    await fs.chmod(indexFile(), 0o644);
+    const chmod = vi
+      .spyOn(fs, 'chmod')
+      .mockRejectedValue(
+        Object.assign(new Error('EPERM: not permitted, chmod'), { code: 'EPERM' }),
+      );
+    let second: Profile;
+    try {
+      mgr = await loadModule();
+      expect(await mgr.getProfile(first.id)).not.toBeNull();
+      second = await mgr.createProfile(newProfile('Crows'));
+      await mgr.deleteProfile(first.id, false);
+      expect(chmod).toHaveBeenCalled();
+    } finally {
+      chmod.mockRestore();
+    }
+    mgr = await loadModule();
+    expect((await mgr.getAllProfiles()).map((p) => p.id)).toEqual([second.id]);
+    expect((await mgr.listOrphanedProfiles()).map((o) => o.profile.id)).toEqual([first.id]);
+  });
+
+  it('keeps the record left beside kept files to its owner too', async () => {
+    const created = await mgr.createProfile(newProfile('Ravens'));
+    await mgr.deleteProfile(created.id, false);
+    expect(await modeOf(path.join(root, 'profiles', created.id, 'profile.json'))).toBe(0o600);
+  });
+});

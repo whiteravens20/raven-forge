@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import type { Dirent } from 'node:fs';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
-import { writeJsonAtomic } from '../util/atomic-file';
+import { OWNER_ONLY, keepToOwner, writeJsonAtomic } from '../util/atomic-file';
 import { serializeByKey } from '../util/serialize';
 import { profileSchema, storedProfileSchema } from '../../shared/validators';
 import type {
@@ -75,6 +75,9 @@ async function loadProfilesIndex(): Promise<Profile[]> {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     return [];
   }
+  // A pack's address can carry a token. Closed before anything else is done
+  // with it, so a copy kept of a list that will not parse is closed too.
+  await keepToOwner(file);
 
   let parsed: unknown;
   try {
@@ -112,7 +115,12 @@ async function loadProfilesIndex(): Promise<Profile[]> {
 
 /** The cache follows the file: a write that failed leaves both as they were. */
 async function writeProfilesIndex(profiles: Profile[]): Promise<void> {
-  await writeJsonAtomic(paths.profilesIndex, [...profiles, ...unreadableEntries]);
+  await writeJsonAtomic(
+    paths.profilesIndex,
+    [...profiles, ...unreadableEntries],
+    OWNER_ONLY,
+    'write anyway',
+  );
   cachedProfiles = profiles;
 }
 
@@ -317,7 +325,9 @@ export async function deleteProfile(profileId: string, deleteFiles: boolean): Pr
       // folder named by an id, with the worlds in it, that no screen listed.
       // What is left is recorded as kept files, so it shows where those do and
       // can be deleted from there, and the caller is told the truth.
-      await writeJsonAtomic(orphanRecordPath(profileId), removed).catch(() => undefined);
+      await writeJsonAtomic(orphanRecordPath(profileId), removed, OWNER_ONLY, 'write anyway').catch(
+        () => undefined,
+      );
       throw new Error(
         `${name} is off the list, but not all of its files could be deleted — ` +
           `${err instanceof Error ? err.message : String(err)}. ` +
@@ -329,7 +339,7 @@ export async function deleteProfile(profileId: string, deleteFiles: boolean): Pr
     // Leave the profile's own record beside its files. Directories are named by
     // id, so without this the folder is an opaque UUID full of jars that nothing
     // — not the launcher, not the person who kept them — can identify later.
-    await writeJsonAtomic(orphanRecordPath(profileId), removed);
+    await writeJsonAtomic(orphanRecordPath(profileId), removed, OWNER_ONLY, 'write anyway');
     keptFiles.delete(profileId);
     log.info(`Kept the files of profile ${name} at ${paths.profileDir(profileId)}`);
   }
