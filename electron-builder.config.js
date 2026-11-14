@@ -75,7 +75,16 @@ const config = {
     buildResources: 'build',
   },
 
-  files: ['dist/**/*', 'package.json'],
+  files: [
+    'dist/**/*',
+    'package.json',
+    // What dependencies carry for working on them and the running program never
+    // reads: source maps, TypeScript sources (zod ships all of its own, its test
+    // suite with them), and the headers and gyp files a native module is built
+    // from — keytar is built in node_modules before anything is packed.
+    '!node_modules/**/*.{map,ts,mts,cts}',
+    '!node_modules/**/*.{h,hpp,c,cc,cpp,gyp,gypi}',
+  ],
 
   // The licence asks that every copy come with its text, and NOTICE that the
   // attribution travel with it. The NSIS licence page shows the first only, and
