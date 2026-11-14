@@ -73,10 +73,9 @@ tworzy, gdy przenosisz dane — i zamyka folder launchera w Twoim katalogu
 domowym, jeśli starsza wersja zostawiła go otwartym. Folder danych, który już
 istniał, zachowuje uprawnienia, jakie miał, dlatego `settings.json`,
 `profiles.json` i `auth.json` też są zapisywane tylko dla Ciebie (`0600`): w
-dwóch pierwszych może być hasło do proxy albo adres paczki z tokenem. Dysk,
-który w ogóle nie zna uprawnień, jak pendrive z FAT albo exFAT, nie przyjmie
-żadnego z nich; ustawienia i lista profili trafiają na niego tak, jak trzyma
-każdy plik.
+dwóch pierwszych może być hasło do proxy albo adres paczki z tokenem. Na dysku,
+który w ogóle nie zna uprawnień — FAT32, exFAT, NTFS przez ntfs-3g — każdy plik,
+lista kont też, ma takie uprawnienia, jakie nadają mu opcje montowania.
 
 Żadnego z nich nie musisz szukać ręcznie. **Ustawienia → Dane** oraz strona
 prywatności w apce (Informacje → Prywatność) wymieniają każde miejsce, w którym

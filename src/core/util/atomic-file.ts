@@ -98,52 +98,14 @@ export async function renameIntoPlace(from: string, to: string): Promise<void> {
 /**
  * Read and write for the account that runs the launcher, nothing for any other.
  *
- * The folder Electron makes for the launcher is already closed to other
- * accounts. A folder the data has been moved to, or one a portable install is
- * pointed at, is made by the launcher like any other new folder and is open to
- * them; and what the files in it hold can be a proxy's password or an address
- * with a token in it.
+ * The launcher makes its own folders closed to other accounts, but a folder the
+ * data was moved into that was already there keeps the permissions it had, and
+ * what the files hold can be a proxy's password or an address with a token in
+ * it. A disk that keeps no permissions — FAT32, exFAT, NTFS through ntfs-3g,
+ * tried on Linux — takes the change without a word and goes on keeping every
+ * file as its mount options say.
  */
 export const OWNER_ONLY = 0o600;
-
-/**
- * What a filesystem that keeps no owner for a file answers a change of its
- * mode with: a FAT or exFAT stick, where a portable install keeps its data,
- * says `EPERM`; others say outright that they do not do it.
- */
-const KEEPS_NO_MODES = new Set(['EPERM', 'ENOTSUP', 'ENOSYS']);
-
-let saidItKeepsNoModes = false;
-
-/**
- * What a write that asked for a mode does where the filesystem refuses it.
- *
- * `'fail'` makes the refusal the write's failure. `'write anyway'` writes the
- * file as that filesystem keeps every file, and the log says so, once: a
- * setting that cannot be saved at all is a worse thing than one saved on a
- * stick that any account on the computer could read anyway.
- */
-export type WhenModeRefused = 'fail' | 'write anyway';
-
-async function applyMode(
-  target: string,
-  mode: number,
-  whenRefused: WhenModeRefused,
-  about: string,
-): Promise<void> {
-  try {
-    await fs.chmod(target, mode);
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (whenRefused === 'fail' || !code || !KEEPS_NO_MODES.has(code)) throw err;
-    if (saidItKeepsNoModes) return;
-    saidItKeepsNoModes = true;
-    log.warn(
-      `${path.dirname(about)} is on a filesystem that keeps no owner for a file (${code}) — ` +
-        'files there are written as it keeps them, open to whoever can open the folder',
-    );
-  }
-}
 
 /**
  * Close a file that an older build left open to other accounts.
@@ -151,15 +113,15 @@ async function applyMode(
  * The files the launcher writes now are given {@link OWNER_ONLY} as they are
  * written. One that has not been written since it was made the old way would
  * stay readable by others for as long as nothing changed it, so it is closed
- * when it is read. Nothing is decided by whether that works: a refusal is the
- * same as {@link applyMode}'s, said once, and anything else is left for the
- * next write. Windows keeps its permissions some other way, and is left alone.
+ * when it is read. Nothing is decided by whether that works: what fails is
+ * logged and left for the next write. Windows keeps its permissions some other
+ * way, and is left alone.
  */
 export async function keepToOwner(file: string): Promise<void> {
   if (process.platform === 'win32') return;
   try {
     if (((await fs.stat(file)).mode & 0o077) === 0) return;
-    await applyMode(file, OWNER_ONLY, 'write anyway', file);
+    await fs.chmod(file, OWNER_ONLY);
   } catch (err) {
     log.warn(`Could not close ${file} to other accounts:`, err);
   }
@@ -190,15 +152,11 @@ export async function keepToOwner(file: string): Promise<void> {
  *
  * The temporary file is deleted on failure, so a full disk does not leave a
  * `.tmp` beside every state file.
- *
- * A `mode` is the file's from the moment it exists; see {@link WhenModeRefused}
- * for a filesystem that will not keep one.
  */
 export async function writeFileAtomic(
   file: string,
   contents: string,
   mode?: number,
-  whenModeRefused: WhenModeRefused = 'fail',
 ): Promise<void> {
   await fs.mkdir(path.dirname(file), { recursive: true });
 
@@ -224,7 +182,7 @@ export async function writeFileAtomic(
     }
     // The mode is applied only when the file is created, and a leftover tmp
     // from a previous run would keep its old permissions without this.
-    if (mode !== undefined) await applyMode(tmp, mode, whenModeRefused, file);
+    if (mode !== undefined) await fs.chmod(tmp, mode);
     await renameIntoPlace(tmp, file);
   } catch (err) {
     await fs.rm(tmp, { force: true }).catch(() => undefined);
@@ -233,11 +191,6 @@ export async function writeFileAtomic(
 }
 
 /** The same, for anything stored as pretty-printed JSON. */
-export async function writeJsonAtomic(
-  file: string,
-  value: unknown,
-  mode?: number,
-  whenModeRefused: WhenModeRefused = 'fail',
-): Promise<void> {
-  await writeFileAtomic(file, JSON.stringify(value, null, 2), mode, whenModeRefused);
+export async function writeJsonAtomic(file: string, value: unknown, mode?: number): Promise<void> {
+  await writeFileAtomic(file, JSON.stringify(value, null, 2), mode);
 }

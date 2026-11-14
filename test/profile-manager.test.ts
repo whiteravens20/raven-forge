@@ -776,29 +776,6 @@ describe.skipIf(process.platform === 'win32')('who may read profiles.json', () =
     expect(await modeOf(path.join(root, kept[0]))).toBe(0o600);
   });
 
-  it('does not stop the list loading or saving on a filesystem that keeps no modes', async () => {
-    const first = await mgr.createProfile(newProfile('Ravens'));
-    await fs.chmod(indexFile(), 0o644);
-    const chmod = vi
-      .spyOn(fs, 'chmod')
-      .mockRejectedValue(
-        Object.assign(new Error('EPERM: not permitted, chmod'), { code: 'EPERM' }),
-      );
-    let second: Profile;
-    try {
-      mgr = await loadModule();
-      expect(await mgr.getProfile(first.id)).not.toBeNull();
-      second = await mgr.createProfile(newProfile('Crows'));
-      await mgr.deleteProfile(first.id, false);
-      expect(chmod).toHaveBeenCalled();
-    } finally {
-      chmod.mockRestore();
-    }
-    mgr = await loadModule();
-    expect((await mgr.getAllProfiles()).map((p) => p.id)).toEqual([second.id]);
-    expect((await mgr.listOrphanedProfiles()).map((o) => o.profile.id)).toEqual([first.id]);
-  });
-
   it('keeps the record left beside kept files to its owner too', async () => {
     const created = await mgr.createProfile(newProfile('Ravens'));
     await mgr.deleteProfile(created.id, false);

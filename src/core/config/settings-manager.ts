@@ -67,7 +67,7 @@ async function readSettingsFile(): Promise<GlobalSettings> {
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     const defaults = freshSettings();
-    await writeJsonAtomic(paths.settings, defaults, OWNER_ONLY, 'write anyway');
+    await writeJsonAtomic(paths.settings, defaults, OWNER_ONLY);
     return defaults;
   }
   // A proxy's password can be in here. Closed before anything else is done
@@ -86,7 +86,7 @@ async function readSettingsFile(): Promise<GlobalSettings> {
   await fs.rename(paths.settings, backup).catch(() => undefined);
 
   const defaults = freshSettings();
-  await writeJsonAtomic(paths.settings, defaults, OWNER_ONLY, 'write anyway');
+  await writeJsonAtomic(paths.settings, defaults, OWNER_ONLY);
   return defaults;
 }
 
@@ -119,7 +119,7 @@ function changeSettings(
   return serializeByKey(paths.settings, async () => {
     const current = cachedSettings && !standingIn ? cachedSettings : await readSettingsFile();
     const next = globalSettingsSchema.parse(change(current));
-    await writeJsonAtomic(paths.settings, next, OWNER_ONLY, 'write anyway');
+    await writeJsonAtomic(paths.settings, next, OWNER_ONLY);
     cachedSettings = next;
     standingIn = false;
     return next;

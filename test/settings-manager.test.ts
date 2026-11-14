@@ -372,29 +372,6 @@ describe.skipIf(process.platform === 'win32')('who may read settings.json', () =
     expect(await modeOf(settingsFile())).toBe(0o600);
   });
 
-  it('does not stop settings loading or saving on a filesystem that keeps no modes', async () => {
-    const proxyUrl = 'http://user:secret@127.0.0.1:3128';
-    await fs.writeFile(settingsFile(), JSON.stringify({ ...DEFAULT_SETTINGS, proxyUrl }));
-    await fs.chmod(settingsFile(), 0o644);
-    const chmod = vi
-      .spyOn(fs, 'chmod')
-      .mockRejectedValue(
-        Object.assign(new Error('EPERM: not permitted, chmod'), { code: 'EPERM' }),
-      );
-    try {
-      const { loadSettings, updateSettings } = await loadModule();
-      expect((await loadSettings()).proxyUrl).toBe(proxyUrl);
-      await updateSettings({ proxyUrl: 'http://127.0.0.1:3128' });
-      await fs.rm(settingsFile());
-      await loadModule().then((fresh) => fresh.loadSettings());
-      expect(chmod).toHaveBeenCalled();
-    } finally {
-      chmod.mockRestore();
-    }
-    const saved = JSON.parse(await fs.readFile(settingsFile(), 'utf-8')) as { proxyUrl?: string };
-    expect(saved.proxyUrl).toBe(DEFAULT_SETTINGS.proxyUrl);
-  });
-
   it('keeps the copy of a file it could not read to its owner too', async () => {
     await fs.writeFile(settingsFile(), '{ "proxyUrl": "http://user:secret@127.0.0.1:1", oops');
     await fs.chmod(settingsFile(), 0o644);

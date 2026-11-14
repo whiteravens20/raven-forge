@@ -70,9 +70,9 @@ move the data — and closes the launcher folder in your home if an older versio
 left it open. A data folder that was already there keeps the permissions it had,
 so `settings.json`, `profiles.json` and `auth.json` are written for you alone
 (`0600`) as well: the first two can hold a proxy password or a pack address with
-a token in it. A disk that keeps no permissions at all, such as a FAT or exFAT
-stick, cannot be told any of this; the settings and the profile list are
-written there as it keeps every file.
+a token in it. On a disk that keeps no permissions at all — FAT32, exFAT, NTFS
+through ntfs-3g — every file, the account list included, is as its mount
+options make it.
 
 You never have to find either by hand. **Settings → Data** and the in-app
 privacy page (About → Privacy) list every place the launcher writes to on this

@@ -275,69 +275,17 @@ describe('writeFileAtomic', () => {
   );
 });
 
-/**
- * A filesystem with no owner to keep a file to — a FAT or exFAT stick, where a
- * portable install keeps its data — answers a change of mode with `EPERM`.
- */
-describe('a write that asks for a mode, where the filesystem keeps none', () => {
-  const refusesModes = (code = 'EPERM') =>
-    vi
+describe('a write that asks for a mode', () => {
+  it('fails when the mode cannot be given, and leaves nothing behind', async () => {
+    const chmod = vi
       .spyOn(fs, 'chmod')
       .mockRejectedValue(
-        Object.assign(new Error(`${code}: could not change mode, chmod`), { code }),
+        Object.assign(new Error('EIO: could not change mode, chmod'), { code: 'EIO' }),
       );
-
-  it('fails, and leaves nothing behind, unless it was told to write anyway', async () => {
-    const chmod = refusesModes();
     try {
       await expect(writeFileAtomic(path.join(dir, 'auth.json'), 'secret', 0o600)).rejects.toThrow(
-        'EPERM',
+        'EIO',
       );
-    } finally {
-      chmod.mockRestore();
-    }
-    expect(await fs.readdir(dir)).toEqual([]);
-  });
-
-  it('writes anyway where told to, and says so in the log once', async () => {
-    vi.resetModules();
-    const fresh = await import('../src/core/util/atomic-file');
-    const chmod = refusesModes();
-    try {
-      await fresh.writeFileAtomic(path.join(dir, 'one.json'), '1', 0o600, 'write anyway');
-      await fresh.writeJsonAtomic(path.join(dir, 'two.json'), 2, 0o600, 'write anyway');
-    } finally {
-      chmod.mockRestore();
-    }
-
-    expect(await fs.readFile(path.join(dir, 'one.json'), 'utf-8')).toBe('1');
-    expect(await fs.readFile(path.join(dir, 'two.json'), 'utf-8')).toBe('2');
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain(dir);
-    expect(warnings[0]).toContain('EPERM');
-  });
-
-  it.skipIf(process.platform === 'win32')(
-    'still gets the mode where the filesystem keeps one, from the moment the file exists',
-    async () => {
-      // The mode goes to the call that makes the file, so what keeps a file
-      // private on an ordinary disk is not the change of mode afterwards.
-      const chmod = refusesModes();
-      try {
-        await writeFileAtomic(path.join(dir, 'settings.json'), '{}', 0o600, 'write anyway');
-      } finally {
-        chmod.mockRestore();
-      }
-      expect((await fs.stat(path.join(dir, 'settings.json'))).mode & 0o777).toBe(0o600);
-    },
-  );
-
-  it('still fails for any other answer', async () => {
-    const chmod = refusesModes('EIO');
-    try {
-      await expect(
-        writeFileAtomic(path.join(dir, 'settings.json'), '{}', 0o600, 'write anyway'),
-      ).rejects.toThrow('EIO');
     } finally {
       chmod.mockRestore();
     }
