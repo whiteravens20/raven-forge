@@ -67,14 +67,16 @@ całość, sprawdza kopię i dopiero wtedy usuwa oryginał; jeśli coś po drodz
 nie uda, przywraca stan sprzed przenoszenia, a jeśli czegoś nie dało się usunąć
 ze starego miejsca, wymienia dokładnie co.
 
-Na Linuksie i macOS żadne inne konto na komputerze nie zajrzy do żadnego z tych
-folderów: launcher tworzy je dostępne tylko dla Ciebie (`0700`) i zamyka folder
-launchera w Twoim katalogu domowym, jeśli starsza wersja zostawiła go otwartym.
-Folder, który wybrałeś na dane i który już istniał, zachowuje uprawnienia, jakie
-mu dałeś, dlatego `settings.json`, `profiles.json` i `auth.json` też są
-zapisywane tylko dla Ciebie (`0600`) — w dwóch pierwszych może być hasło do
-proxy albo adres paczki z tokenem. Dysk, który w ogóle nie zna uprawnień, jak
-pendrive z FAT albo exFAT, dostaje pliki tak, jak trzyma każdy plik.
+Na Linuksie i macOS launcher tworzy foldery, które zakłada dla siebie, jako
+dostępne tylko dla Ciebie (`0700`) — folder launchera i folder danych, który
+tworzy, gdy przenosisz dane — i zamyka folder launchera w Twoim katalogu
+domowym, jeśli starsza wersja zostawiła go otwartym. Folder danych, który już
+istniał, zachowuje uprawnienia, jakie miał, dlatego `settings.json`,
+`profiles.json` i `auth.json` też są zapisywane tylko dla Ciebie (`0600`): w
+dwóch pierwszych może być hasło do proxy albo adres paczki z tokenem. Dysk,
+który w ogóle nie zna uprawnień, jak pendrive z FAT albo exFAT, nie przyjmie
+żadnego z nich; ustawienia i lista profili trafiają na niego tak, jak trzyma
+każdy plik.
 
 Żadnego z nich nie musisz szukać ręcznie. **Ustawienia → Dane** oraz strona
 prywatności w apce (Informacje → Prywatność) wymieniają każde miejsce, w którym
@@ -155,7 +157,9 @@ offline to dosłownie znak `0`.
 `logs/main.log` zapisuje, co launcher robił: który profil wystartował, jakie
 pliki pobrał, jakie błędy wystąpiły. Zawiera Twoją nazwę gracza
 (`Authenticated Microsoft account: <nazwa>`) i bezwzględne ścieżki plików, w
-których na Windows siedzi nazwa Twojego konta systemowego.
+których na Windows siedzi nazwa Twojego konta systemowego. Adres paczki trafia
+tam bez nazwy, hasła i zapytania, które może zawierać — to w nich prywatna
+paczka trzyma to, co Cię wpuszcza.
 
 Trzyma też **wyjście samej gry** — i to jest ta część, na którą trzeba uważać:
 mod może wypisać tam cokolwiek. Launcher usuwa token sesji z każdej linii, zanim
@@ -306,9 +310,9 @@ wyjścia gry.
 **Zapisuje się już zredagowany.** Zanim plik trafi na dysk, launcher usuwa:
 każdy token o kształcie JWT, wartość każdego argumentu `--accessToken` /
 `--clientId` / `--xuid` / `--uuid` / `--username` / `--session`, dosłowny token
-dostępu, UUID i nazwę gracza użyte w tym uruchomieniu, oraz ścieżkę Twojego
-katalogu domowego — która na Windows zawiera nazwę Twojego konta — zastępowaną
-znakiem `~`.
+dostępu, UUID i nazwę gracza użyte w tym uruchomieniu, nazwę, hasło i
+zapytanie z adresu paczki profilu, oraz ścieżkę Twojego katalogu domowego —
+która na Windows zawiera nazwę Twojego konta — zastępowaną znakiem `~`.
 
 **Nic go nie wysyła.** Leży w folderze, dopóki nie zdecydujesz inaczej. Karta
 pokazywana po awarii proponuje jego otwarcie, a **Ustawienia → Dane** wymieniają

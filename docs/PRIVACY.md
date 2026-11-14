@@ -64,14 +64,15 @@ carries all of it across, checks the copy, and only then removes the original;
 if anything fails on the way it puts things back as they were, and if something
 could not be removed from the old place it lists exactly what.
 
-On Linux and macOS no other account on the computer can look inside either
-folder: the launcher makes them open to you alone (`0700`), and closes the
-launcher folder in your home if an older version left it open. A folder you
-picked for the data that was already there keeps the permissions you gave it,
+On Linux and macOS the launcher makes the folders it creates for itself open to
+you alone (`0700`) — the launcher folder, and a data folder it makes when you
+move the data — and closes the launcher folder in your home if an older version
+left it open. A data folder that was already there keeps the permissions it had,
 so `settings.json`, `profiles.json` and `auth.json` are written for you alone
-(`0600`) as well — the first two can hold a proxy password or a pack address
-with a token in it. A disk that keeps no permissions at all, such as a FAT or
-exFAT stick, is written to as it keeps every file.
+(`0600`) as well: the first two can hold a proxy password or a pack address with
+a token in it. A disk that keeps no permissions at all, such as a FAT or exFAT
+stick, cannot be told any of this; the settings and the profile list are
+written there as it keeps every file.
 
 You never have to find either by hand. **Settings → Data** and the in-app
 privacy page (About → Privacy) list every place the launcher writes to on this
@@ -153,7 +154,9 @@ is the literal string `0`.
 `logs/main.log` records what the launcher did: which profile launched, which
 files were downloaded, which errors occurred. It includes your Minecraft
 username (`Authenticated Microsoft account: <name>`) and absolute file paths,
-which on Windows contain your account name.
+which on Windows contain your account name. A pack's address is written
+without the name, password and query it may carry, which is where a private
+pack keeps what lets you in.
 
 It also keeps **the game's own output**, and that is the part to be careful
 with: a mod can print anything into it. The launcher takes the session token out
@@ -299,8 +302,9 @@ last 100 lines of game output.
 **It is written already redacted.** Before the file is saved, the launcher
 removes: any JWT-shaped token, any `--accessToken` / `--clientId` / `--xuid` /
 `--uuid` / `--username` / `--session` argument value, the literal access token,
-UUID and player name used by that launch, and your home directory path — which
-on Windows contains your account name — replaced with `~`.
+UUID and player name used by that launch, the name, password and query of the
+profile's pack address, and your home directory path — which on Windows
+contains your account name — replaced with `~`.
 
 **Nothing uploads it.** It sits in a folder until you decide otherwise. The card
 shown after a crash offers to open it, and **Settings → Data** lists the folder
