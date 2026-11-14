@@ -59,9 +59,10 @@ jobs:
 
       # `--publish never` matters: without it electron-builder sees the `publish`
       # block in the config and can try to talk to GitHub Releases from a job
-      # that has no business doing so.
+      # that has no business doing so. zizmor reads the word as publishing to a
+      # registry, which nothing here does.
       - name: Package
-        run: npm run ${{ matrix.script }} -- --publish never
+        run: npm run ${{ matrix.script }} -- --publish never # zizmor: ignore[use-trusted-publishing]
 
       # electron-builder switches off, in the binary, the two ways an Electron
       # program can be made into something else (`electronFuses` in its config).
