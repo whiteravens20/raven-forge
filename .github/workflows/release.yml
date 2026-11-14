@@ -34,6 +34,10 @@
 # verified after the build and the job fails if it is not valid — a silently
 # unsigned release is the failure mode this is written to prevent.
 # See docs/SIGNING.md for what certificate to buy and why EV needs a cloud HSM.
+#
+# No job here restores a cache, `setup-node`'s own included: a release is built
+# from what the registry and the lockfile say, never from files another run left
+# for it to find.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Release — Build, Sign & Publish
@@ -131,7 +135,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: npm
+          package-manager-cache: false
 
       # keytar is a native module; `postinstall` rebuilds it against Electron's
       # headers and node-gyp needs libsecret's development headers to do that.
@@ -286,7 +290,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: npm
+          package-manager-cache: false
 
       - run: npm ci --ignore-scripts
 
@@ -326,7 +330,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: npm
+          package-manager-cache: false
 
       - name: Audit production dependencies (moderate)
         run: node .github/scripts/audit-check.mjs --omit=dev --audit-level moderate
