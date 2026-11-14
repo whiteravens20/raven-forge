@@ -63,9 +63,15 @@ download.
 
 ### Content integrity
 
-- **Every downloaded file is hash-checked** before it is installed. `sha512` wins
-  over `sha256` when a manifest carries both (`src/core/mods/integrity.ts`).
-  A mismatch deletes the file and fails the sync — it is never installed "anyway".
+- **Every downloaded file is held to the hash published for it** before it is
+  installed: the manifest's, or the one Modrinth, Mojang or the loader gives.
+  `sha512` wins over `sha256` when a manifest carries both
+  (`src/core/mods/integrity.ts`). A mismatch deletes the file and fails the sync
+  — it is never installed "anyway". A mod a manifest gives by address must carry
+  a hash of its own. A file nobody published a hash for — a shader, resource
+  pack or config file a manifest gives by address without one, a loader library
+  its loader lists without a checksum, as Quilt lists all of them — is fetched
+  over https and installed unverified.
 - **Manifests can be signed** with Ed25519 (`tweetnacl`) and are verified before
   their contents are acted on (`src/core/updater/manifest-verify.ts`). The
   signature covers a canonical JSON form of the whole manifest with keys sorted
