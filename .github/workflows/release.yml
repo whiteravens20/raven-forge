@@ -34,6 +34,10 @@
 # verified after the build and the job fails if it is not valid — a silently
 # unsigned release is the failure mode this is written to prevent.
 # See docs/SIGNING.md for what certificate to buy and why EV needs a cloud HSM.
+#
+# No job here restores a cache, `setup-node`'s own included: a release is built
+# from what the registry and the lockfile say, never from files another run left
+# for it to find.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Release — Build, Sign & Publish
@@ -64,6 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0 # full history needed for the containment check
 
       - name: Check branch containment
@@ -91,6 +96,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Compare
         run: |
@@ -122,11 +129,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: npm
+          package-manager-cache: false
 
       # keytar is a native module; `postinstall` rebuilds it against Electron's
       # headers and node-gyp needs libsecret's development headers to do that.
@@ -175,6 +184,18 @@ jobs:
             node .github/scripts/verify-fuses.mjs 'out/win-unpacked/Raven Forge Launcher.exe'
           else
             node .github/scripts/verify-fuses.mjs out/linux-unpacked/raven-forge-launcher
+          fi
+
+      # The same reading of the package the packaging job makes: nothing the
+      # .deb installs may be changed by anyone but root.
+      - name: Verify that only root may change what the .deb installs
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          open=$(dpkg-deb --contents out/*.deb | awk '$1 !~ /^l/ && ($1 ~ /^.....w/ || $1 ~ /^........w/)')
+          if [ -n "$open" ]; then
+            echo "::error::the package installs files other accounts may change:"; echo "$open" | head; exit 1
           fi
 
       - name: Verify the client ID was baked in
@@ -263,11 +284,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: npm
+          package-manager-cache: false
 
       - run: npm ci --ignore-scripts
 
@@ -301,11 +324,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: npm
+          package-manager-cache: false
 
       - name: Audit production dependencies (moderate)
         run: node .github/scripts/audit-check.mjs --omit=dev --audit-level moderate
@@ -330,6 +355,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0 # tag message + release-note diffing
 
       - name: Download every artefact
@@ -384,22 +410,15 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create draft release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          draft: true
-          generate_release_notes: true
-          append_body: true
-          fail_on_unmatched_files: true
-          files: |
-            artifacts/*.exe
-            artifacts/*.deb
-            artifacts/*.AppImage
-            artifacts/*.blockmap
-            artifacts/*.yml
-            artifacts/SHA256SUMS.txt
-            artifacts/sbom.cdx.json
-            artifacts/*.sigstore.json
-          body: |
+        # gh, which the runner already has, rather than an action that would be
+        # handed this job's write token. The body below comes first and GitHub's
+        # generated notes after it, as before; a file that is not there fails the
+        # step; run again over a draft that is already there, this only puts the
+        # files back and leaves its text alone.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BODY: |
             ${{ steps.tag-msg.outputs.message }}
 
             ---
@@ -463,3 +482,27 @@ jobs:
 
             The `.yml` and `.blockmap` files are the electron-updater feed. Leave
             them attached — removing them breaks in-app updates for existing users.
+        run: |
+          set -euo pipefail
+          shopt -s failglob
+          files=(
+            artifacts/*.exe
+            artifacts/*.deb
+            artifacts/*.AppImage
+            artifacts/*.blockmap
+            artifacts/*.yml
+            artifacts/SHA256SUMS.txt
+            artifacts/sbom.cdx.json
+            artifacts/*.sigstore.json
+          )
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --clobber "${files[@]}"
+            exit 0
+          fi
+          body=${BODY#"${BODY%%[![:space:]]*}"}
+          body=${body%"${body##*[![:space:]]}"}
+          notes=$(gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" --jq .body)
+          printf '%s\n\n%s\n' "$body" "$notes" > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" "${files[@]}"

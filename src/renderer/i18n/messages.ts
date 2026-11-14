@@ -1,6 +1,6 @@
 // Copyright (C) 2026 White Ravens. AGPL-3.0-only with an additional term; see LICENSE and NOTICE.
 
-import type { Locale } from '@shared/locale';
+import type { Locale } from '../../shared/locale';
 import en from './en.json';
 import pl from './pl.json';
 

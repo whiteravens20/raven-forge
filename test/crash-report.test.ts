@@ -142,6 +142,27 @@ const input: CrashReportInput = {
 };
 
 describe('buildCrashReport', () => {
+  it.each([
+    [
+      'token from the query',
+      'https://packs.example/m.json?token=s3cr3t-pack-key',
+      's3cr3t-pack-key',
+    ],
+    ['password from before the host', 'https://raven:hunter22@packs.example/m.json', 'hunter22'],
+  ])('carries no %s of the pack address, anywhere', (_, manifestUrl, secret) => {
+    const report = buildCrashReport(
+      {
+        ...input,
+        profile: { ...profile, manifestUrl },
+        logTail: [`[main/INFO]: pack from ${manifestUrl}`],
+        minecraftCrash: { file: 'crash.txt', content: `Pack: ${manifestUrl}` },
+      },
+      [],
+    );
+    expect(report).not.toContain(secret);
+    expect(report).toContain('packs.example/m.json');
+  });
+
   it('carries what a bug report needs', () => {
     const report = buildCrashReport(input, ['sodium.jar', 'lithium.jar']);
     expect(report).toContain('1.21.4');

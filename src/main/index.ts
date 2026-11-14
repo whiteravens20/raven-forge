@@ -2,7 +2,7 @@
 
 import { app, BrowserWindow, Menu, session } from 'electron';
 import { initLogger, log } from './logger';
-import { establishAppHome } from './home';
+import { establishAppHome, homeRefused, refuseHome } from './home';
 import type { AppHome } from '../core/config/app-home';
 import { createMainWindow, getMainWindow } from './window';
 import {
@@ -191,8 +191,10 @@ refuseRemoteDebugging();
 // for.
 const home = establishAppHome();
 
-// Prevent multiple instances.
-if (app.requestSingleInstanceLock()) {
+// Prevent multiple instances — where the lock can be made at all.
+if (homeRefused(home)) {
+  refuseHome(home);
+} else if (app.requestSingleInstanceLock()) {
   registerAppLifecycle(home);
 } else {
   app.quit();

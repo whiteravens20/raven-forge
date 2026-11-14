@@ -41,6 +41,11 @@ vi.mock('../src/main/home', () => ({
     did.push('settle the home');
     return {};
   },
+  homeRefused: () => {
+    did.push('ask whether the home can hold the lock');
+    return false;
+  },
+  refuseHome: () => {},
 }));
 
 // The rest of what the main script brings in. It reaches for none of it before
@@ -90,10 +95,11 @@ describe("the browser's own debugger", () => {
   it('is refused before the main script does anything else', async () => {
     await import('../src/main/index');
 
-    expect(did.slice(0, 3)).toEqual([
+    expect(did.slice(0, 4)).toEqual([
       'take off remote-debugging-port',
       'take off remote-debugging-pipe',
       'settle the home',
+      'ask whether the home can hold the lock',
     ]);
   });
 });

@@ -27,6 +27,8 @@ let freeBytes: number | null = null;
 let failCopyAt: string | null = null;
 /** Makes `rm` fail for a path containing this text. */
 let failRemoveAt: string | null = null;
+/** Under this directory no program can be started, as on a FAT32 drive. */
+let programsRefusedUnder: string | null = null;
 
 vi.mock('electron', () => ({
   app: { getPath: () => userData },
@@ -76,7 +78,17 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     }
     return actual.rm(p, options);
   };
-  const patched = { ...actual, stat, rename, statfs, copyFile, rm };
+  const access = async (p: Parameters<typeof actual.access>[0], mode?: number) => {
+    if (programsRefusedUnder !== null && String(p).startsWith(programsRefusedUnder)) {
+      if (mode !== undefined && (mode & actual.constants.X_OK) !== 0) {
+        const err = new Error('permission denied') as NodeJS.ErrnoException;
+        err.code = 'EACCES';
+        throw err;
+      }
+    }
+    return actual.access(p, mode);
+  };
+  const patched = { ...actual, stat, rename, statfs, copyFile, rm, access };
   return { ...patched, default: patched };
 });
 
@@ -155,6 +167,7 @@ beforeEach(async () => {
   freeBytes = null;
   failCopyAt = null;
   failRemoveAt = null;
+  programsRefusedUnder = null;
   delete process.env[DATA_DIR_ENV];
   reloadDataRoot();
 });
@@ -272,6 +285,19 @@ describe('resolving the root', () => {
   });
 });
 
+describe.skipIf(process.platform === 'win32')(
+  'who may look inside a root the launcher makes',
+  () => {
+    it('is its owner alone, for the folder the environment names', async () => {
+      const forced = path.join(tmp, 'stick', 'forced');
+      process.env[DATA_DIR_ENV] = forced;
+      reloadDataRoot();
+      expect(dataRoot()).toBe(forced);
+      expect((await realFs.stat(forced)).mode & 0o777).toBe(0o700);
+    });
+  },
+);
+
 describe('planning a change', () => {
   beforeEach(() => seedLauncherData(userData));
 
@@ -329,6 +355,22 @@ describe('planning a change', () => {
     expect(plan.action).toBe('move');
     expect(plan.target).toBe(path.join(games, 'raven-forge-launcher'));
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'refuses a folder no program can be started from, as on a FAT32 drive',
+    async () => {
+      // Java is started from the data folder: moved there, every game would
+      // stop at it.
+      const stick = path.join(tmp, 'stick');
+      await realFs.mkdir(stick);
+      programsRefusedUnder = stick;
+
+      const plan = await planDataRootChange(stick);
+
+      expect(plan.problem).toBe('cannotRun');
+      expect(await realFs.readdir(stick)).toEqual([]);
+    },
+  );
 
   it('refuses when even that folder is somebody else’s', async () => {
     const games = path.join(tmp, 'Games');
@@ -441,6 +483,26 @@ describe('applying it', () => {
       expect(paths.logsDir).toBe(path.join(target, 'logs'));
     });
   }
+
+  it.skipIf(process.platform === 'win32')(
+    'makes the folder it moves to closed to other accounts',
+    async () => {
+      const target = path.join(tmp, 'games');
+      await applyDataRoot(target);
+      expect((await realFs.stat(target)).mode & 0o777).toBe(0o700);
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'leaves a folder the player picked as it was',
+    async () => {
+      const target = path.join(tmp, 'games');
+      await realFs.mkdir(target);
+      await realFs.chmod(target, 0o755);
+      await applyDataRoot(target);
+      expect((await realFs.stat(target)).mode & 0o777).toBe(0o755);
+    },
+  );
 
   // Windows has no mode to keep: there the file is the account's own by where
   // it is, not by a bit on it.

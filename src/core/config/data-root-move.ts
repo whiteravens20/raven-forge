@@ -25,6 +25,7 @@ import type {
 import { isLaunchInProgress } from '../minecraft/game-launcher';
 import { hasActiveJobs } from '../util/cancellation';
 import { dataRoot, dataRootSource, defaultDataRoot, writeDataRootPointer } from './data-root';
+import { OWNER_ONLY_FOLDER } from './app-home';
 
 /**
  * Moving the data directory.
@@ -176,6 +177,34 @@ async function writable(dir: string): Promise<boolean> {
   const probe = path.join(base, `.rf-write-test-${process.pid}`);
   try {
     await fs.writeFile(probe, '');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await fs.rm(probe, { force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * Whether a program can be started from `dir`.
+ *
+ * The managed Java runtime lives in the data folder and is started from there,
+ * and a disk can take files without letting any of them run: a FAT32 drive as a
+ * desktop mounts it gives every file `644` and takes `chmod` without keeping it,
+ * and one mounted `noexec` refuses them all. Moved onto such a disk the launcher
+ * would start and save, and then stop every game at Java. Asked of a file made
+ * there and marked as a program, as `writable` asks with a file written. Windows
+ * runs a program by its name, not by a mode, and is not asked.
+ */
+async function canRunPrograms(dir: string): Promise<boolean> {
+  if (process.platform === 'win32') return true;
+  const base = await nearestExisting(dir);
+  if (!base) return false;
+  const probe = path.join(base, `.rf-run-test-${process.pid}`);
+  try {
+    await fs.writeFile(probe, '#!/bin/sh\n', { mode: 0o755 });
+    await fs.chmod(probe, 0o755);
+    await fs.access(probe, fs.constants.X_OK);
     return true;
   } catch {
     return false;
@@ -346,6 +375,7 @@ async function survey(chosen: string): Promise<Survey> {
   if (path.resolve(source) === target) return refuse('same', target);
   if (isInside(target, source) || isInside(source, target)) return refuse('nested', target);
   if (!(await writable(target))) return refuse('notWritable', target);
+  if (!(await canRunPrograms(target))) return refuse('cannotRun', target);
 
   const action = found === 'launcher-data' ? 'adopt' : 'move';
   const onSameVolume = await sameVolume(source, target);
@@ -475,7 +505,10 @@ async function move(
     totalSize(items.filter((i) => i.rel === entry || i.rel.startsWith(`${entry}${path.sep}`)));
 
   report(undefined, true);
-  await fs.mkdir(target, { recursive: true });
+  // Closed to other accounts, as the folder Electron makes is: the data is
+  // the same data wherever it goes. Only when it is made here — a folder the
+  // player picked that is already there keeps what they gave it.
+  await fs.mkdir(target, { recursive: true, mode: OWNER_ONLY_FOLDER });
 
   // From here until the pointer is written the data may be in two places.
   await fs.writeFile(path.join(target, MOVE_MARKER), `${MOVING_FROM}${source}\n`, 'utf-8');

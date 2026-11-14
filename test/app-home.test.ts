@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { heldByAnotherProgram } from './helpers/hold-file';
 import {
+  canHoldLinks,
   carryDiagnostics,
   fileBrowserDataAway,
   isDirectoryInUse,
+  keepHomeToOwner,
   resolveAppHome,
 } from '../src/core/config/app-home';
 
@@ -170,8 +172,98 @@ describe('resolveAppHome', () => {
     expect(fs.existsSync(world(legacy()))).toBe(true);
   });
 
+  it.skipIf(process.platform === 'win32')(
+    'makes the environment’s folder closed to other accounts',
+    () => {
+      const stick = path.join(appData, 'stick', 'raven');
+      resolveAppHome(appData, stick, process.platform);
+      expect(fs.statSync(stick).mode & 0o777).toBe(0o700);
+    },
+  );
+
   it('ignores an environment value that is not an absolute path', () => {
     expect(resolveAppHome(appData, 'relative/dir', process.platform).dir).toBe(home());
+  });
+});
+
+/**
+ * Who may look inside the home: its owner alone, as with the folder Chromium
+ * makes for itself. The mode bits mean nothing on Windows, so the cases that
+ * read them are asked of the other systems only.
+ */
+describe.skipIf(process.platform === 'win32')('keepHomeToOwner', () => {
+  const modeOf = (dir: string) => fs.statSync(dir).mode & 0o777;
+
+  it('makes a home that is not there yet closed to other accounts', () => {
+    keepHomeToOwner(home(), 'linux');
+    expect(modeOf(home())).toBe(0o700);
+  });
+
+  it('closes a home an older build left open', () => {
+    fs.mkdirSync(home());
+    fs.chmodSync(home(), 0o755);
+    keepHomeToOwner(home(), 'linux');
+    expect(modeOf(home())).toBe(0o700);
+  });
+
+  it('leaves the modes alone for Windows, which keeps its permissions some other way', () => {
+    fs.mkdirSync(home());
+    fs.chmodSync(home(), 0o755);
+    keepHomeToOwner(home(), 'win32');
+    expect(modeOf(home())).toBe(0o755);
+  });
+
+  it('does not throw where the home cannot be made', () => {
+    fs.writeFileSync(home(), 'in the way');
+    expect(() => keepHomeToOwner(path.join(home(), 'inside'), 'linux')).not.toThrow();
+  });
+});
+
+/**
+ * Whether the home can hold Chromium's single-instance lock, which everywhere
+ * but on Windows is a symbolic link — and a FAT32 or exFAT stick takes none.
+ */
+describe('canHoldLinks', () => {
+  const refusing = (code: string) =>
+    vi.spyOn(fs, 'symlinkSync').mockImplementation(() => {
+      throw Object.assign(new Error(`${code}: operation not permitted, symlink`), { code });
+    });
+
+  it.skipIf(process.platform === 'win32')(
+    'is true of an ordinary folder, and leaves nothing behind',
+    () => {
+      expect(canHoldLinks(appData, process.platform)).toBe(true);
+      expect(fs.readdirSync(appData)).toEqual([]);
+    },
+  );
+
+  it('is false where the filesystem refuses a link, as FAT32 and exFAT do', () => {
+    const symlink = refusing('EPERM');
+    try {
+      expect(canHoldLinks(appData, 'linux')).toBe(false);
+    } finally {
+      symlink.mockRestore();
+    }
+  });
+
+  it('does not take any other failure for a filesystem without links', () => {
+    // A folder that cannot be written to at all fails where it always has.
+    const symlink = refusing('EACCES');
+    try {
+      expect(canHoldLinks(appData, 'linux')).toBe(true);
+    } finally {
+      symlink.mockRestore();
+    }
+  });
+
+  it('asks nothing on Windows, which keeps that lock some other way', () => {
+    const symlink = refusing('EPERM');
+    try {
+      expect(canHoldLinks(appData, 'win32')).toBe(true);
+      expect(symlink).not.toHaveBeenCalled();
+    } finally {
+      symlink.mockRestore();
+    }
   });
 });
 

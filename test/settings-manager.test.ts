@@ -338,3 +338,47 @@ describe('getSettings', () => {
     expect((await getSettings()).theme).toBe(DEFAULT_SETTINGS.theme);
   });
 });
+
+/**
+ * `settings.json` can hold a proxy address with a password in it, the same kind
+ * of secret `auth.json` already keeps to its owner. The mode bits mean nothing
+ * on Windows, so this is asked of the other systems only.
+ */
+describe.skipIf(process.platform === 'win32')('who may read settings.json', () => {
+  const modeOf = async (file: string) => (await fs.stat(file)).mode & 0o777;
+
+  it('is its owner alone, from the first start', async () => {
+    const { loadSettings } = await loadModule();
+    await loadSettings();
+    expect(await modeOf(settingsFile())).toBe(0o600);
+  });
+
+  it('is its owner alone after a change', async () => {
+    const { loadSettings, updateSettings } = await loadModule();
+    await loadSettings();
+    await fs.chmod(settingsFile(), 0o644);
+    await updateSettings({ proxyUrl: 'http://user:secret@127.0.0.1:3128' });
+    expect(await modeOf(settingsFile())).toBe(0o600);
+  });
+
+  it('closes a file an older build left readable by others, as soon as it is read', async () => {
+    await fs.writeFile(
+      settingsFile(),
+      JSON.stringify({ ...DEFAULT_SETTINGS, proxyUrl: 'http://user:secret@127.0.0.1:3128' }),
+    );
+    await fs.chmod(settingsFile(), 0o644);
+    const { loadSettings } = await loadModule();
+    await loadSettings();
+    expect(await modeOf(settingsFile())).toBe(0o600);
+  });
+
+  it('keeps the copy of a file it could not read to its owner too', async () => {
+    await fs.writeFile(settingsFile(), '{ "proxyUrl": "http://user:secret@127.0.0.1:1", oops');
+    await fs.chmod(settingsFile(), 0o644);
+    const { loadSettings } = await loadModule();
+    await loadSettings();
+    const kept = (await fs.readdir(root)).filter((f) => f.includes('.broken-'));
+    expect(kept).toHaveLength(1);
+    expect(await modeOf(path.join(root, kept[0]))).toBe(0o600);
+  });
+});

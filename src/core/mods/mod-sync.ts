@@ -56,6 +56,7 @@ import type {
   TrustedKey,
 } from '../../shared/ipc-types';
 import { errorText } from '../util/error-text';
+import { shareableAddress } from '../util/shareable-address';
 import { isConnectionFailure } from '../net/connection-failure';
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -622,7 +623,10 @@ async function runSync(profileId: string, supplied?: ModManifest): Promise<void>
     throw new Error('Profile has no manifest URL configured');
   }
 
-  log.info(`Syncing manifest for profile ${profile.name}: ${profile.manifestUrl ?? 'imported'}`);
+  log.info(
+    `Syncing manifest for profile ${profile.name}: ` +
+      (profile.manifestUrl ? shareableAddress(profile.manifestUrl) : 'imported'),
+  );
 
   // A modpack sync is a long download; let the user call it off.
   const signal = beginJob(profileId);

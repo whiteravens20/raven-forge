@@ -67,6 +67,16 @@ całość, sprawdza kopię i dopiero wtedy usuwa oryginał; jeśli coś po drodz
 nie uda, przywraca stan sprzed przenoszenia, a jeśli czegoś nie dało się usunąć
 ze starego miejsca, wymienia dokładnie co.
 
+Na Linuksie i macOS launcher tworzy foldery, które zakłada dla siebie, jako
+dostępne tylko dla Ciebie (`0700`) — folder launchera i folder danych, który
+tworzy, gdy przenosisz dane — i zamyka folder launchera w Twoim katalogu
+domowym, jeśli starsza wersja zostawiła go otwartym. Folder danych, który już
+istniał, zachowuje uprawnienia, jakie miał, dlatego `settings.json`,
+`profiles.json` i `auth.json` też są zapisywane tylko dla Ciebie (`0600`): w
+dwóch pierwszych może być hasło do proxy albo adres paczki z tokenem. Na dysku,
+który w ogóle nie zna uprawnień — FAT32, exFAT, NTFS przez ntfs-3g — każdy plik,
+lista kont też, ma takie uprawnienia, jakie nadają mu opcje montowania.
+
 Żadnego z nich nie musisz szukać ręcznie. **Ustawienia → Dane** oraz strona
 prywatności w apce (Informacje → Prywatność) wymieniają każde miejsce, w którym
 launcher zapisuje na tym komputerze — ze ścieżką, rozmiarem zmierzonym na Twoim
@@ -79,17 +89,17 @@ W folderze danych:
 | `settings.json`               | Twoje ustawienia — motyw, język, adres proxy, adresy kanałów, liczba równoległych pobrań, zaufane klucze podpisu.                                                                             |
 | `profiles.json`               | Twoje profile: nazwy, wersje Minecrafta, loadery, przydzielony RAM, adresy manifestów, czas gry i daty ostatniego uruchomienia.                                                               |
 | `profiles/<id>/`              | Po jednym folderze na profil: `.minecraft/` — prawdziwy katalog gry ze światami, zrzutami ekranu, `options.txt`, modami, paczkami zasobów i shaderami — oraz kopie światów i obrazek profilu. |
-| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta i adres skórki. Zapisywany z uprawnieniami `0600`. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.                                        |
+| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta i adres skórki. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.                                                                           |
 | `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                                 |
 | `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                    |
 | `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, loadery, pliki samego Minecrafta i zbuforowane metadane. Nic osobistego; usunięte, pobiorą się ponownie.                                                             |
 
 W folderze launchera, gdziekolwiek są dane:
 
-| Ścieżka         | Zawartość                                                                                                                                                                                                                |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `browser/`      | Okno launchera to wbudowana przeglądarka, a to jej własne pliki: pamięć podręczna obrazków (ikony modów, grafiki z aktualności), zamknięte ogłoszenia, ostatnio wybrany profil i ciasteczka strony logowania Microsoftu. |
-| `data-root.txt` | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, dokąd trafił, i nic poza tym. Czytają go launcher i deinstalator Windows, żeby znaleźć dane.                                                    |
+| Ścieżka         | Zawartość                                                                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `browser/`      | Okno launchera to wbudowana przeglądarka, a to jej własne pliki: pamięć podręczna obrazków (ikony modów, grafiki z aktualności), zamknięte ogłoszenia, ostatnio wybrany profil i ciasteczka oraz dane strony logowania Microsoftu. |
+| `data-root.txt` | Jest tylko wtedy, gdy przeniosłeś folder danych: jedna linia ze ścieżką, dokąd trafił, i nic poza tym. Czytają go launcher i deinstalator Windows, żeby znaleźć dane.                                                              |
 
 I poza oboma:
 
@@ -146,7 +156,9 @@ offline to dosłownie znak `0`.
 `logs/main.log` zapisuje, co launcher robił: który profil wystartował, jakie
 pliki pobrał, jakie błędy wystąpiły. Zawiera Twoją nazwę gracza
 (`Authenticated Microsoft account: <nazwa>`) i bezwzględne ścieżki plików, w
-których na Windows siedzi nazwa Twojego konta systemowego.
+których na Windows siedzi nazwa Twojego konta systemowego. Adres paczki trafia
+tam bez nazwy, hasła i zapytania, które może zawierać — to w nich prywatna
+paczka trzyma to, co Cię wpuszcza.
 
 Trzyma też **wyjście samej gry** — i to jest ta część, na którą trzeba uważać:
 mod może wypisać tam cokolwiek. Launcher usuwa token sesji z każdej linii, zanim
@@ -297,9 +309,9 @@ wyjścia gry.
 **Zapisuje się już zredagowany.** Zanim plik trafi na dysk, launcher usuwa:
 każdy token o kształcie JWT, wartość każdego argumentu `--accessToken` /
 `--clientId` / `--xuid` / `--uuid` / `--username` / `--session`, dosłowny token
-dostępu, UUID i nazwę gracza użyte w tym uruchomieniu, oraz ścieżkę Twojego
-katalogu domowego — która na Windows zawiera nazwę Twojego konta — zastępowaną
-znakiem `~`.
+dostępu, UUID i nazwę gracza użyte w tym uruchomieniu, nazwę, hasło i
+zapytanie z adresu paczki profilu, oraz ścieżkę Twojego katalogu domowego —
+która na Windows zawiera nazwę Twojego konta — zastępowaną znakiem `~`.
 
 **Nic go nie wysyła.** Leży w folderze, dopóki nie zdecydujesz inaczej. Karta
 pokazywana po awarii proponuje jego otwarcie, a **Ustawienia → Dane** wymieniają
@@ -330,7 +342,8 @@ przejrzyj raport, zanim dołączysz go do publicznego zgłoszenia.
 
 - **Jedno konto:** „Wyloguj” na stronie Konta usuwa je z `auth.json` i kasuje
   jego wpisy w magazynie poświadczeń. Wylogowanie z konta Microsoft czyści też
-  ciasteczka okna logowania, więc następne logowanie zaczyna się od pustej
+  to, co zostawiło okno logowania — ciasteczka i dane stron Microsoftu — więc
+  następne logowanie zaczyna się od pustej
   strony, a nie od rozpoznania Ciebie.
 - **Wszystkie dane launchera:** zamknij launcher i usuń wymienione wyżej folder
   danych i folder launchera. Poza nimi nie zostaje nic oprócz wpisów w magazynie

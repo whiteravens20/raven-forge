@@ -35,7 +35,7 @@ since still has the old name.
 opens it, so you never have to find one by hand — as long as the launcher is
 still installed. Look there before you uninstall if you plan to keep anything.
 
-**Settings → Data → Move…** puts the data anywhere you like. All of it goes —
+**Settings → Data → Move…** puts the data anywhere you like, as long as a program can be started from there — Java runs out of it, so a FAT32 drive is refused. All of it goes —
 the log and the crash reports included — and two things stay in the launcher
 folder: `browser/`, the embedded browser's own storage, and `data-root.txt`,
 one line naming where the data went. Moving changes nothing on Linux, where
@@ -154,7 +154,7 @@ deliberately not in the data folder, which is why **deleting files does not
 remove them**.
 
 The clean way is to log out on the Accounts page **before** uninstalling: that
-deletes the keychain entries and clears the sign-in window's cookies. If the
+deletes the keychain entries and clears what the sign-in window kept. If the
 launcher is already gone, open your keychain manager and delete the
 `com.ravenforge.launcher` entries by hand.
 

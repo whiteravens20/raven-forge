@@ -41,6 +41,29 @@ if (linuxNamed && otherNamed) {
 }
 const forLinux = linuxNamed || (!otherNamed && process.platform === 'linux');
 
+const fs = require('node:fs/promises');
+const path = require('node:path');
+
+/**
+ * Take the right to change it away from everyone but its owner, for `target`
+ * and everything under it.
+ *
+ * Electron comes as a zip, and the modes in that zip are open to everyone:
+ * unpacked, the program, its libraries and `chrome-sandbox` were `rwxrwxrwx`,
+ * and the `.deb` installed them so — owned by root, in `/opt`, and writable by
+ * any account on the computer, which could then put a program of its own in the
+ * launcher's place for whoever starts it next. Links are passed over: a link
+ * has no mode of its own, and following one could reach outside the package.
+ */
+async function closeToOthers(target) {
+  const found = await fs.lstat(target);
+  if (found.isSymbolicLink()) return;
+  const mode = found.mode & 0o7777;
+  if (mode & 0o022) await fs.chmod(target, mode & ~0o022);
+  if (!found.isDirectory()) return;
+  for (const name of await fs.readdir(target)) await closeToOthers(path.join(target, name));
+}
+
 /** @type {import('electron-builder').Configuration} */
 const config = {
   appId: 'com.ravenforge.launcher',
@@ -52,7 +75,20 @@ const config = {
     buildResources: 'build',
   },
 
-  files: ['dist/**/*', 'package.json'],
+  files: [
+    'dist/**/*',
+    // The launcher's own source maps stay in `dist/` for working on it: the
+    // packaged program has no debugger to show them in and nothing else reads
+    // them, and the renderer's alone was a fifth of the archive.
+    '!dist/**/*.map',
+    'package.json',
+    // What dependencies carry for working on them and the running program never
+    // reads: source maps, TypeScript sources (zod ships all of its own, its test
+    // suite with them), and the headers and gyp files a native module is built
+    // from — keytar is built in node_modules before anything is packed.
+    '!node_modules/**/*.{map,ts,mts,cts}',
+    '!node_modules/**/*.{h,hpp,c,cc,cpp,gyp,gypi}',
+  ],
 
   // The licence asks that every copy come with its text, and NOTICE that the
   // attribution travel with it. The NSIS licence page shows the first only, and
@@ -65,6 +101,13 @@ const config = {
     // Native modules that can't run from asar
     'node_modules/keytar/**',
   ],
+
+  // Before anything is packed: what the packages carry is the unpacked folder
+  // as it is, modes and all. Windows keeps no such modes, so there is nothing
+  // to take away there. See `closeToOthers` above.
+  afterPack: async ({ appOutDir }) => {
+    if (process.platform !== 'win32') await closeToOthers(appOutDir);
+  },
 
   // ── What the packaged program refuses to be ──────────────
   // Electron's binary comes with two ways to make any app built on it into
@@ -88,11 +131,25 @@ const config = {
   // for that one there is no fuse: the launcher takes it off its own command
   // line as it starts — `refuseRemoteDebugging` in src/main/security.ts.
   //
+  // The launcher's own code is one archive, `resources/app.asar`, and two more
+  // fuses hold the program to it. Without the archive Electron goes looking for
+  // a folder called `resources/app` and runs that instead; with
+  // `onlyLoadAppFromAsar` it runs the archive or nothing. With
+  // `enableEmbeddedAsarIntegrityValidation` it checks the archive against the
+  // digest electron-builder writes into the program as it packs — on Windows
+  // and macOS, which is all Electron does it on: a Linux build runs a changed
+  // archive as before, and what keeps the archive as it was shipped there is
+  // that only root may change it (`closeToOthers`). A program that is not
+  // signed can be changed along with its archive, digest and fuses included,
+  // so on Windows this is worth most once the program is signed.
+  //
   // `npm run dev` and the tests run the Electron in node_modules, which this
   // does not touch.
   electronFuses: {
     runAsNode: false,
     enableNodeCliInspectArguments: false,
+    onlyLoadAppFromAsar: true,
+    enableEmbeddedAsarIntegrityValidation: true,
   },
 
   // ── Windows ──────────────────────────────────────────────

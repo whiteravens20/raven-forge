@@ -64,6 +64,16 @@ carries all of it across, checks the copy, and only then removes the original;
 if anything fails on the way it puts things back as they were, and if something
 could not be removed from the old place it lists exactly what.
 
+On Linux and macOS the launcher makes the folders it creates for itself open to
+you alone (`0700`) — the launcher folder, and a data folder it makes when you
+move the data — and closes the launcher folder in your home if an older version
+left it open. A data folder that was already there keeps the permissions it had,
+so `settings.json`, `profiles.json` and `auth.json` are written for you alone
+(`0600`) as well: the first two can hold a proxy password or a pack address with
+a token in it. On a disk that keeps no permissions at all — FAT32, exFAT, NTFS
+through ntfs-3g — every file, the account list included, is as its mount
+options make it.
+
 You never have to find either by hand. **Settings → Data** and the in-app
 privacy page (About → Privacy) list every place the launcher writes to on this
 computer, with the path, the size measured on your disk, and a button that
@@ -76,17 +86,17 @@ In the data folder:
 | `settings.json`               | Your preferences — theme, language, proxy address, feed URLs, download concurrency, trusted signing keys.                                                                               |
 | `profiles.json`               | Your profiles: names, Minecraft versions, mod loaders, allocated RAM, manifest URLs, play time and last-played timestamps.                                                              |
 | `profiles/<id>/`              | One folder per profile: `.minecraft/` — a real game directory with worlds, screenshots, `options.txt`, mods, resource packs and shaders — plus world backups and the profile's picture. |
-| `auth.json`                   | The account list: Minecraft username, UUID, account type and skin URL. Written with `0600` permissions. **Secrets are not normally in this file** — see below.                          |
+| `auth.json`                   | The account list: Minecraft username, UUID, account type and skin URL. **Secrets are not normally in this file** — see below.                                                           |
 | `logs/main.log`               | The launcher's log, rotated at 5 MB. See "What ends up in the log".                                                                                                                     |
 | `crash-reports/`              | One file per crash, redacted, newest 20 kept. See "Crash reports".                                                                                                                      |
 | `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loaders, Minecraft's own files, and cached metadata. Nothing personal; deleted, they are downloaded again.                                                |
 
 In the launcher folder, wherever the data is:
 
-| Path            | Contents                                                                                                                                                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `browser/`      | The launcher's window is an embedded browser, and this is its own storage: a cache of images (mod icons, news pictures), the announcements you dismissed, which profile was selected last, and the Microsoft sign-in page's cookies. |
-| `data-root.txt` | Present only if you moved the data folder: one line naming where it went, and nothing else. The launcher and the Windows uninstaller read it to find the data.                                                                       |
+| Path            | Contents                                                                                                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `browser/`      | The launcher's window is an embedded browser, and this is its own storage: a cache of images (mod icons, news pictures), the announcements you dismissed, which profile was selected last, and the Microsoft sign-in page's cookies and storage. |
+| `data-root.txt` | Present only if you moved the data folder: one line naming where it went, and nothing else. The launcher and the Windows uninstaller read it to find the data.                                                                                   |
 
 And outside both:
 
@@ -144,7 +154,9 @@ is the literal string `0`.
 `logs/main.log` records what the launcher did: which profile launched, which
 files were downloaded, which errors occurred. It includes your Minecraft
 username (`Authenticated Microsoft account: <name>`) and absolute file paths,
-which on Windows contain your account name.
+which on Windows contain your account name. A pack's address is written
+without the name, password and query it may carry, which is where a private
+pack keeps what lets you in.
 
 It also keeps **the game's own output**, and that is the part to be careful
 with: a mod can print anything into it. The launcher takes the session token out
@@ -290,8 +302,9 @@ last 100 lines of game output.
 **It is written already redacted.** Before the file is saved, the launcher
 removes: any JWT-shaped token, any `--accessToken` / `--clientId` / `--xuid` /
 `--uuid` / `--username` / `--session` argument value, the literal access token,
-UUID and player name used by that launch, and your home directory path — which
-on Windows contains your account name — replaced with `~`.
+UUID and player name used by that launch, the name, password and query of the
+profile's pack address, and your home directory path — which on Windows
+contains your account name — replaced with `~`.
 
 **Nothing uploads it.** It sits in a folder until you decide otherwise. The card
 shown after a crash offers to open it, and **Settings → Data** lists the folder
@@ -322,7 +335,8 @@ read a report through before attaching it to a public issue.
 
 - **One account:** "Log out" on the Accounts page removes it from `auth.json`
   and deletes its entries in the credential store. Logging out of a Microsoft
-  account also clears the sign-in window's cookies, so the next sign-in starts
+  account also clears what the sign-in window kept — the cookies and storage of
+  Microsoft's pages — so the next sign-in starts
   from a blank page rather than recognising you.
 - **All launcher data:** quit the launcher and delete the data folder and the
   launcher folder listed above. Nothing survives outside them except the

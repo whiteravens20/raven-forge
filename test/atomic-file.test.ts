@@ -274,3 +274,21 @@ describe('writeFileAtomic', () => {
     },
   );
 });
+
+describe('a write that asks for a mode', () => {
+  it('fails when the mode cannot be given, and leaves nothing behind', async () => {
+    const chmod = vi
+      .spyOn(fs, 'chmod')
+      .mockRejectedValue(
+        Object.assign(new Error('EIO: could not change mode, chmod'), { code: 'EIO' }),
+      );
+    try {
+      await expect(writeFileAtomic(path.join(dir, 'auth.json'), 'secret', 0o600)).rejects.toThrow(
+        'EIO',
+      );
+    } finally {
+      chmod.mockRestore();
+    }
+    expect(await fs.readdir(dir)).toEqual([]);
+  });
+});

@@ -89,6 +89,69 @@ export interface AppHome {
   legacyInUse?: string;
 }
 
+/**
+ * In, list and change for the account that runs the launcher, nothing for any
+ * other: the mode Chromium gives a folder it makes for itself, and the one the
+ * launcher gives a folder it makes for its data.
+ */
+export const OWNER_ONLY_FOLDER = 0o700;
+
+/**
+ * Make the home, or close the one there is, to every account but the one that
+ * runs the launcher.
+ *
+ * It used to come about as a side effect of making `browser/` inside it, open
+ * to everyone like any new folder: the log, the crash reports and every
+ * profile's worlds, screenshots and chat logs were then there for any account
+ * that could reach the folder above it. For the home in the system's own
+ * application data only — the launcher's by where it is. A folder it was
+ * pointed at instead is somebody's choice of place, and is only made closed
+ * when the launcher is the one making it. Windows keeps its permissions some
+ * other way. Nothing is decided by whether this works: a home that cannot be
+ * made fails later, where that is said.
+ */
+export function keepHomeToOwner(dir: string, platform: NodeJS.Platform): void {
+  if (platform === 'win32') return;
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: OWNER_ONLY_FOLDER });
+    if ((fs.statSync(dir).mode & 0o077) !== 0) fs.chmodSync(dir, OWNER_ONLY_FOLDER);
+  } catch {
+    /* see above */
+  }
+}
+
+/**
+ * What a filesystem that has no symbolic links answers a request for one with:
+ * FAT32 and exFAT say `EPERM`; others say outright that they do not do it.
+ */
+const NO_LINKS = new Set(['EPERM', 'ENOTSUP', 'ENOSYS']);
+
+/**
+ * Whether `dir` can hold a symbolic link.
+ *
+ * Everywhere but on Windows, Chromium's single-instance lock is one:
+ * `SingletonLock` in the home, a link naming the computer and the process that
+ * holds it. A stick formatted as FAT32 or exFAT refuses it, and Electron took
+ * that for the lock held by another copy, so the launcher closed before it had
+ * written a line. Asked once, at the start, of a link made and taken away again.
+ */
+export function canHoldLinks(dir: string, platform: NodeJS.Platform): boolean {
+  if (platform === 'win32') return true;
+  const probe = path.join(dir, `.rf-link-test-${process.pid}`);
+  try {
+    fs.symlinkSync('.', probe);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EEXIST') {
+      fs.rmSync(probe, { force: true });
+      return true;
+    }
+    return !(code && NO_LINKS.has(code));
+  }
+  fs.rmSync(probe, { force: true });
+  return true;
+}
+
 function isDirectory(dir: string): boolean {
   try {
     return fs.statSync(dir).isDirectory();
@@ -171,7 +234,7 @@ export function resolveAppHome(
   if (envRoot && path.isAbsolute(envRoot)) {
     const dir = path.resolve(envRoot);
     try {
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(dir, { recursive: true, mode: OWNER_ONLY_FOLDER });
     } catch {
       /* not creatable: fall through to the ordinary home */
     }
