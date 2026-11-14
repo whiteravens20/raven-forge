@@ -118,11 +118,25 @@ const config = {
   // for that one there is no fuse: the launcher takes it off its own command
   // line as it starts — `refuseRemoteDebugging` in src/main/security.ts.
   //
+  // The launcher's own code is one archive, `resources/app.asar`, and two more
+  // fuses hold the program to it. Without the archive Electron goes looking for
+  // a folder called `resources/app` and runs that instead; with
+  // `onlyLoadAppFromAsar` it runs the archive or nothing. With
+  // `enableEmbeddedAsarIntegrityValidation` it checks the archive against the
+  // digest electron-builder writes into the program as it packs — on Windows
+  // and macOS, which is all Electron does it on: a Linux build runs a changed
+  // archive as before, and what keeps the archive as it was shipped there is
+  // that only root may change it (`closeToOthers`). A program that is not
+  // signed can be changed along with its archive, digest and fuses included,
+  // so on Windows this is worth most once the program is signed.
+  //
   // `npm run dev` and the tests run the Electron in node_modules, which this
   // does not touch.
   electronFuses: {
     runAsNode: false,
     enableNodeCliInspectArguments: false,
+    onlyLoadAppFromAsar: true,
+    enableEmbeddedAsarIntegrityValidation: true,
   },
 
   // ── Windows ──────────────────────────────────────────────

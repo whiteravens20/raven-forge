@@ -277,6 +277,19 @@ jobs:
         timeout-minutes: 6
         run: node .github/scripts/verify-update-download.mjs out/win-unpacked evidence/update
 
+      # Last, on a copy, so that nothing it starts can be in the way of the
+      # steps above. Windows' error reporting is told not to show its window
+      # for a program that is stopped, which would otherwise hold the stopped
+      # one open until somebody closed it.
+      - name: Refuse a changed app.asar on Windows
+        if: runner.os == 'Windows'
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          New-Item -Path 'HKCU:\Software\Microsoft\Windows\Windows Error Reporting' -Force | Out-Null
+          Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\Windows Error Reporting' -Name DontShowUI -Value 1 -Type DWord
+          node .github/scripts/verify-asar-integrity.mjs out/win-unpacked 'Raven Forge Launcher.exe'
+
       # The launcher's logs and the screen as it was, for whoever reads a miss.
       - name: Upload what was seen on Windows
         if: always() && runner.os == 'Windows'
