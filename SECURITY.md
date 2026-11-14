@@ -148,9 +148,16 @@ download.
   it: the packaged launcher takes both off its command line as the first thing
   it does, before the browser has read them (`refuseRemoteDebugging` in
   `src/main/security.ts`), and the packaging job starts the installed program
-  with the switch, on Linux and on Windows, to see that nothing answers. All of
-  this limits what the launcher can be started as; it is not a defence against
-  a program that already runs as the player.
+  with the switch, on Linux and on Windows, to see that nothing answers. Two
+  more fuses hold the program to its own code: it runs `resources/app.asar` or
+  nothing, and on Windows checks that archive against the digest written into
+  the program when it was packed — the packaging job changes one character of a
+  copy's archive and holds that Electron stops it. Electron makes no such check
+  on Linux; there, nothing the `.deb` installs can be changed by any account but
+  root, which the packaging job and every release check. A Windows build that is
+  not signed (see Supply chain) can have its digest changed along with its
+  archive. All of this limits what the launcher can be started as; it is not a
+  defence against a program that already runs as the player.
 
 ### Supply chain
 
