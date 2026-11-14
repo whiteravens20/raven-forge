@@ -5,6 +5,7 @@ import { app } from 'electron';
 import {
   carryDiagnostics,
   fileBrowserDataAway,
+  keepHomeToOwner,
   resolveAppHome,
   type AppHome,
 } from '../core/config/app-home';
@@ -27,7 +28,10 @@ const BROWSER_CACHE_BYTES = 32 * 1024 * 1024;
  * directory in use and leaves it alone.
  */
 export function establishAppHome(): AppHome {
-  const home = resolveAppHome(app.getPath('appData'), process.env[DATA_DIR_ENV], process.platform);
+  const appData = app.getPath('appData');
+  const home = resolveAppHome(appData, process.env[DATA_DIR_ENV], process.platform);
+  // Before anything is made inside it. See keepHomeToOwner.
+  if (path.dirname(home.dir) === path.resolve(appData)) keepHomeToOwner(home.dir, process.platform);
 
   app.setPath('userData', home.dir);
   if (home.browserDir !== home.dir) {

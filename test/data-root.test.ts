@@ -272,6 +272,19 @@ describe('resolving the root', () => {
   });
 });
 
+describe.skipIf(process.platform === 'win32')(
+  'who may look inside a root the launcher makes',
+  () => {
+    it('is its owner alone, for the folder the environment names', async () => {
+      const forced = path.join(tmp, 'stick', 'forced');
+      process.env[DATA_DIR_ENV] = forced;
+      reloadDataRoot();
+      expect(dataRoot()).toBe(forced);
+      expect((await realFs.stat(forced)).mode & 0o777).toBe(0o700);
+    });
+  },
+);
+
 describe('planning a change', () => {
   beforeEach(() => seedLauncherData(userData));
 
@@ -441,6 +454,26 @@ describe('applying it', () => {
       expect(paths.logsDir).toBe(path.join(target, 'logs'));
     });
   }
+
+  it.skipIf(process.platform === 'win32')(
+    'makes the folder it moves to closed to other accounts',
+    async () => {
+      const target = path.join(tmp, 'games');
+      await applyDataRoot(target);
+      expect((await realFs.stat(target)).mode & 0o777).toBe(0o700);
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'leaves a folder the player picked as it was',
+    async () => {
+      const target = path.join(tmp, 'games');
+      await realFs.mkdir(target);
+      await realFs.chmod(target, 0o755);
+      await applyDataRoot(target);
+      expect((await realFs.stat(target)).mode & 0o777).toBe(0o755);
+    },
+  );
 
   // Windows has no mode to keep: there the file is the account's own by where
   // it is, not by a bit on it.

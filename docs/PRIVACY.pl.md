@@ -67,6 +67,15 @@ całość, sprawdza kopię i dopiero wtedy usuwa oryginał; jeśli coś po drodz
 nie uda, przywraca stan sprzed przenoszenia, a jeśli czegoś nie dało się usunąć
 ze starego miejsca, wymienia dokładnie co.
 
+Na Linuksie i macOS żadne inne konto na komputerze nie zajrzy do żadnego z tych
+folderów: launcher tworzy je dostępne tylko dla Ciebie (`0700`) i zamyka folder
+launchera w Twoim katalogu domowym, jeśli starsza wersja zostawiła go otwartym.
+Folder, który wybrałeś na dane i który już istniał, zachowuje uprawnienia, jakie
+mu dałeś, dlatego `settings.json`, `profiles.json` i `auth.json` też są
+zapisywane tylko dla Ciebie (`0600`) — w dwóch pierwszych może być hasło do
+proxy albo adres paczki z tokenem. Dysk, który w ogóle nie zna uprawnień, jak
+pendrive z FAT albo exFAT, dostaje pliki tak, jak trzyma każdy plik.
+
 Żadnego z nich nie musisz szukać ręcznie. **Ustawienia → Dane** oraz strona
 prywatności w apce (Informacje → Prywatność) wymieniają każde miejsce, w którym
 launcher zapisuje na tym komputerze — ze ścieżką, rozmiarem zmierzonym na Twoim
@@ -79,7 +88,7 @@ W folderze danych:
 | `settings.json`               | Twoje ustawienia — motyw, język, adres proxy, adresy kanałów, liczba równoległych pobrań, zaufane klucze podpisu.                                                                             |
 | `profiles.json`               | Twoje profile: nazwy, wersje Minecrafta, loadery, przydzielony RAM, adresy manifestów, czas gry i daty ostatniego uruchomienia.                                                               |
 | `profiles/<id>/`              | Po jednym folderze na profil: `.minecraft/` — prawdziwy katalog gry ze światami, zrzutami ekranu, `options.txt`, modami, paczkami zasobów i shaderami — oraz kopie światów i obrazek profilu. |
-| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta i adres skórki. Zapisywany z uprawnieniami `0600`. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.                                        |
+| `auth.json`                   | Lista kont: nazwa gracza, UUID, typ konta i adres skórki. **Sekrety normalnie w tym pliku nie leżą** — patrz niżej.                                                                           |
 | `logs/main.log`               | Log launchera, rotowany przy 5 MB. Patrz „Co trafia do logu”.                                                                                                                                 |
 | `crash-reports/`              | Po jednym pliku na awarię, ze zredagowaną treścią, przechowywane 20 najnowszych. Patrz „Raporty z awarii”.                                                                                    |
 | `java/`, `loaders/`, `cache/` | Pobrane środowiska Javy, loadery, pliki samego Minecrafta i zbuforowane metadane. Nic osobistego; usunięte, pobiorą się ponownie.                                                             |

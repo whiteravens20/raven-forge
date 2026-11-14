@@ -11,6 +11,7 @@ import {
   FILE_SETTINGS,
 } from '../../shared/constants';
 import type { DataRootSource } from '../../shared/ipc/settings';
+import { OWNER_ONLY_FOLDER } from './app-home';
 
 /**
  * Where the launcher keeps its data, and how that stops being the default.
@@ -150,7 +151,7 @@ function resolve(): Resolved {
     // launched the process, and on a portable install the stick is empty.
     const dir = path.resolve(fromEnv);
     try {
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(dir, { recursive: true, mode: OWNER_ONLY_FOLDER });
     } catch {
       /* reported below, by way of the fallback */
     }

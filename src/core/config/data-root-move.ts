@@ -25,6 +25,7 @@ import type {
 import { isLaunchInProgress } from '../minecraft/game-launcher';
 import { hasActiveJobs } from '../util/cancellation';
 import { dataRoot, dataRootSource, defaultDataRoot, writeDataRootPointer } from './data-root';
+import { OWNER_ONLY_FOLDER } from './app-home';
 
 /**
  * Moving the data directory.
@@ -475,7 +476,10 @@ async function move(
     totalSize(items.filter((i) => i.rel === entry || i.rel.startsWith(`${entry}${path.sep}`)));
 
   report(undefined, true);
-  await fs.mkdir(target, { recursive: true });
+  // Closed to other accounts, as the folder Electron makes is: the data is
+  // the same data wherever it goes. Only when it is made here — a folder the
+  // player picked that is already there keeps what they gave it.
+  await fs.mkdir(target, { recursive: true, mode: OWNER_ONLY_FOLDER });
 
   // From here until the pointer is written the data may be in two places.
   await fs.writeFile(path.join(target, MOVE_MARKER), `${MOVING_FROM}${source}\n`, 'utf-8');

@@ -89,6 +89,37 @@ export interface AppHome {
   legacyInUse?: string;
 }
 
+/**
+ * In, list and change for the account that runs the launcher, nothing for any
+ * other: the mode Chromium gives a folder it makes for itself, and the one the
+ * launcher gives a folder it makes for its data.
+ */
+export const OWNER_ONLY_FOLDER = 0o700;
+
+/**
+ * Make the home, or close the one there is, to every account but the one that
+ * runs the launcher.
+ *
+ * It used to come about as a side effect of making `browser/` inside it, open
+ * to everyone like any new folder: the log, the crash reports and every
+ * profile's worlds, screenshots and chat logs were then there for any account
+ * that could reach the folder above it. For the home in the system's own
+ * application data only — the launcher's by where it is. A folder it was
+ * pointed at instead is somebody's choice of place, and is only made closed
+ * when the launcher is the one making it. Windows keeps its permissions some
+ * other way. Nothing is decided by whether this works: a home that cannot be
+ * made fails later, where that is said.
+ */
+export function keepHomeToOwner(dir: string, platform: NodeJS.Platform): void {
+  if (platform === 'win32') return;
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: OWNER_ONLY_FOLDER });
+    if ((fs.statSync(dir).mode & 0o077) !== 0) fs.chmodSync(dir, OWNER_ONLY_FOLDER);
+  } catch {
+    /* see above */
+  }
+}
+
 function isDirectory(dir: string): boolean {
   try {
     return fs.statSync(dir).isDirectory();
@@ -171,7 +202,7 @@ export function resolveAppHome(
   if (envRoot && path.isAbsolute(envRoot)) {
     const dir = path.resolve(envRoot);
     try {
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(dir, { recursive: true, mode: OWNER_ONLY_FOLDER });
     } catch {
       /* not creatable: fall through to the ordinary home */
     }

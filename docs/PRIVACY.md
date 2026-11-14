@@ -64,6 +64,15 @@ carries all of it across, checks the copy, and only then removes the original;
 if anything fails on the way it puts things back as they were, and if something
 could not be removed from the old place it lists exactly what.
 
+On Linux and macOS no other account on the computer can look inside either
+folder: the launcher makes them open to you alone (`0700`), and closes the
+launcher folder in your home if an older version left it open. A folder you
+picked for the data that was already there keeps the permissions you gave it,
+so `settings.json`, `profiles.json` and `auth.json` are written for you alone
+(`0600`) as well — the first two can hold a proxy password or a pack address
+with a token in it. A disk that keeps no permissions at all, such as a FAT or
+exFAT stick, is written to as it keeps every file.
+
 You never have to find either by hand. **Settings → Data** and the in-app
 privacy page (About → Privacy) list every place the launcher writes to on this
 computer, with the path, the size measured on your disk, and a button that
@@ -76,7 +85,7 @@ In the data folder:
 | `settings.json`               | Your preferences — theme, language, proxy address, feed URLs, download concurrency, trusted signing keys.                                                                               |
 | `profiles.json`               | Your profiles: names, Minecraft versions, mod loaders, allocated RAM, manifest URLs, play time and last-played timestamps.                                                              |
 | `profiles/<id>/`              | One folder per profile: `.minecraft/` — a real game directory with worlds, screenshots, `options.txt`, mods, resource packs and shaders — plus world backups and the profile's picture. |
-| `auth.json`                   | The account list: Minecraft username, UUID, account type and skin URL. Written with `0600` permissions. **Secrets are not normally in this file** — see below.                          |
+| `auth.json`                   | The account list: Minecraft username, UUID, account type and skin URL. **Secrets are not normally in this file** — see below.                                                           |
 | `logs/main.log`               | The launcher's log, rotated at 5 MB. See "What ends up in the log".                                                                                                                     |
 | `crash-reports/`              | One file per crash, redacted, newest 20 kept. See "Crash reports".                                                                                                                      |
 | `java/`, `loaders/`, `cache/` | Downloaded Java runtimes, mod loaders, Minecraft's own files, and cached metadata. Nothing personal; deleted, they are downloaded again.                                                |
