@@ -77,6 +77,10 @@ const config = {
 
   files: [
     'dist/**/*',
+    // The launcher's own source maps stay in `dist/` for working on it: the
+    // packaged program has no debugger to show them in and nothing else reads
+    // them, and the renderer's alone was a fifth of the archive.
+    '!dist/**/*.map',
     'package.json',
     // What dependencies carry for working on them and the running program never
     // reads: source maps, TypeScript sources (zod ships all of its own, its test
