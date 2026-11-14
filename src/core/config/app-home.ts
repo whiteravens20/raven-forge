@@ -120,6 +120,38 @@ export function keepHomeToOwner(dir: string, platform: NodeJS.Platform): void {
   }
 }
 
+/**
+ * What a filesystem that has no symbolic links answers a request for one with:
+ * FAT32 and exFAT say `EPERM`; others say outright that they do not do it.
+ */
+const NO_LINKS = new Set(['EPERM', 'ENOTSUP', 'ENOSYS']);
+
+/**
+ * Whether `dir` can hold a symbolic link.
+ *
+ * Everywhere but on Windows, Chromium's single-instance lock is one:
+ * `SingletonLock` in the home, a link naming the computer and the process that
+ * holds it. A stick formatted as FAT32 or exFAT refuses it, and Electron took
+ * that for the lock held by another copy, so the launcher closed before it had
+ * written a line. Asked once, at the start, of a link made and taken away again.
+ */
+export function canHoldLinks(dir: string, platform: NodeJS.Platform): boolean {
+  if (platform === 'win32') return true;
+  const probe = path.join(dir, `.rf-link-test-${process.pid}`);
+  try {
+    fs.symlinkSync('.', probe);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EEXIST') {
+      fs.rmSync(probe, { force: true });
+      return true;
+    }
+    return !(code && NO_LINKS.has(code));
+  }
+  fs.rmSync(probe, { force: true });
+  return true;
+}
+
 function isDirectory(dir: string): boolean {
   try {
     return fs.statSync(dir).isDirectory();

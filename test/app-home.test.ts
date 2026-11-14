@@ -4,9 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { heldByAnotherProgram } from './helpers/hold-file';
 import {
+  canHoldLinks,
   carryDiagnostics,
   fileBrowserDataAway,
   isDirectoryInUse,
@@ -215,6 +216,54 @@ describe.skipIf(process.platform === 'win32')('keepHomeToOwner', () => {
   it('does not throw where the home cannot be made', () => {
     fs.writeFileSync(home(), 'in the way');
     expect(() => keepHomeToOwner(path.join(home(), 'inside'), 'linux')).not.toThrow();
+  });
+});
+
+/**
+ * Whether the home can hold Chromium's single-instance lock, which everywhere
+ * but on Windows is a symbolic link — and a FAT32 or exFAT stick takes none.
+ */
+describe('canHoldLinks', () => {
+  const refusing = (code: string) =>
+    vi.spyOn(fs, 'symlinkSync').mockImplementation(() => {
+      throw Object.assign(new Error(`${code}: operation not permitted, symlink`), { code });
+    });
+
+  it.skipIf(process.platform === 'win32')(
+    'is true of an ordinary folder, and leaves nothing behind',
+    () => {
+      expect(canHoldLinks(appData, process.platform)).toBe(true);
+      expect(fs.readdirSync(appData)).toEqual([]);
+    },
+  );
+
+  it('is false where the filesystem refuses a link, as FAT32 and exFAT do', () => {
+    const symlink = refusing('EPERM');
+    try {
+      expect(canHoldLinks(appData, 'linux')).toBe(false);
+    } finally {
+      symlink.mockRestore();
+    }
+  });
+
+  it('does not take any other failure for a filesystem without links', () => {
+    // A folder that cannot be written to at all fails where it always has.
+    const symlink = refusing('EACCES');
+    try {
+      expect(canHoldLinks(appData, 'linux')).toBe(true);
+    } finally {
+      symlink.mockRestore();
+    }
+  });
+
+  it('asks nothing on Windows, which keeps that lock some other way', () => {
+    const symlink = refusing('EPERM');
+    try {
+      expect(canHoldLinks(appData, 'win32')).toBe(true);
+      expect(symlink).not.toHaveBeenCalled();
+    } finally {
+      symlink.mockRestore();
+    }
   });
 });
 

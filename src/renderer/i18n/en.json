@@ -549,6 +549,8 @@
   "dataRoot.problem.same": "That is already the folder in use.",
   "dataRoot.problem.nested": "That folder is inside the current one — pick one outside it.",
   "dataRoot.problem.notWritable": "Nothing can be written to that folder.",
+  "startup.homeCannotHoldLinks.title": "Raven Forge can't start from this folder",
+  "startup.homeCannotHoldLinks.detail": "{folder} is on a drive that cannot hold a symbolic link — a stick formatted as FAT32 or exFAT is like that. On this system the launcher needs one there to make sure that only one copy of it runs. Put the folder on a drive formatted as ext4 or NTFS, or start the launcher without RAVENFORGE_DATA_DIR.",
   "dataRoot.problem.cannotRun": "No program can be started from that folder — a drive formatted as FAT32 is like that — so neither Java nor the game would start from it. Pick a folder on another drive.",
   "dataRoot.problem.notEmpty": "That folder holds other files, and the “raven-forge-launcher” folder the launcher would make inside it is taken as well. Pick somewhere else.",
   "dataRoot.problem.noSpace": "Not enough room: {size} to move, {free} free.",

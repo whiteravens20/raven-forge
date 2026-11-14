@@ -567,6 +567,8 @@
   "dataRoot.problem.same": "To już jest używany folder.",
   "dataRoot.problem.nested": "Ten folder jest wewnątrz obecnego — wybierz taki spoza niego.",
   "dataRoot.problem.notWritable": "Do tego folderu nie da się nic zapisać.",
+  "startup.homeCannotHoldLinks.title": "Raven Forge nie uruchomi się z tego folderu",
+  "startup.homeCannotHoldLinks.detail": "{folder} jest na dysku, który nie przyjmuje dowiązań symbolicznych — tak jest na przykład na pendrivie sformatowanym jako FAT32 lub exFAT. Na tym systemie launcher potrzebuje tam jednego, żeby działała tylko jedna jego kopia. Przenieś folder na dysk sformatowany jako ext4 lub NTFS albo uruchom launcher bez RAVENFORGE_DATA_DIR.",
   "dataRoot.problem.cannotRun": "Z tego folderu nie da się uruchomić żadnego programu — tak jest na przykład na dysku sformatowanym jako FAT32 — więc nie wystartowałaby z niego ani Java, ani gra. Wybierz folder na innym dysku.",
   "dataRoot.problem.notEmpty": "W tym folderze są inne pliki, a podfolder „raven-forge-launcher”, który launcher by w nim utworzył, też jest zajęty. Wybierz inne miejsce.",
   "dataRoot.problem.noSpace": "Za mało miejsca: do przeniesienia {size}, wolne {free}.",
