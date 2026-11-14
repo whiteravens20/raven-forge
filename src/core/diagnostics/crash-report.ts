@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import { app } from 'electron';
 import { log } from '../../main/logger';
 import { paths } from '../config/paths';
+import { shareableAddress } from '../util/shareable-address';
 import type { Profile } from '../../shared/ipc-types';
 
 /** How many crash files to keep before the oldest start being deleted. */
@@ -249,8 +250,9 @@ export function buildCrashReport(input: CrashReportInput, mods: string[]): strin
       '# Raven Forge crash report',
       '',
       'Generated automatically when the game exited with an error. Access tokens,',
-      'the account UUID, the player name and the home directory have been replaced',
-      'with `<redacted>` — read it through before attaching it anyway.',
+      'the account UUID, the player name, the home directory, and the login and',
+      'query of the pack address have been replaced with `<redacted>` — read it',
+      'through before attaching it anyway.',
       '',
       '## Launcher',
       field('Version', app.getVersion()),
@@ -283,7 +285,7 @@ export function buildCrashReport(input: CrashReportInput, mods: string[]): strin
       ),
       field('Allocated RAM', `${profile.allocatedRamMb} MB`),
       field('Custom JVM args', profile.javaArgs),
-      field('Manifest', profile.manifestUrl),
+      field('Manifest', profile.manifestUrl && shareableAddress(profile.manifestUrl)),
       field('Game directory', input.gameDir),
       field(
         'Account type',
@@ -322,7 +324,13 @@ export function buildCrashReport(input: CrashReportInput, mods: string[]): strin
       : '## Game output\n\nThe game produced no output before it exited.',
   );
 
-  return redactSecrets(`${sections.join('\n\n')}\n`, input.secrets);
+  // The address is given above as it can be shared; this is for anywhere else
+  // the report quotes it whole.
+  let report = `${sections.join('\n\n')}\n`;
+  if (profile.manifestUrl) {
+    report = report.replaceAll(profile.manifestUrl, shareableAddress(profile.manifestUrl));
+  }
+  return redactSecrets(report, input.secrets);
 }
 
 /** `White Ravens Classic` → `white-ravens-classic`, for use in a file name. */

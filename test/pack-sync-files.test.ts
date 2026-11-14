@@ -31,9 +31,12 @@ let beforeDownload: (url: string) => void | Promise<void> = () => {};
 let afterDownload: (dest: string) => Promise<void> = async () => {};
 
 vi.mock('../src/main/window', () => ({ getMainWindow: () => null }));
-vi.mock('../src/main/logger', () => ({
-  log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
-}));
+/** Every line the sync logged, at any level. */
+const { logged } = vi.hoisted(() => ({ logged: [] as string[] }));
+vi.mock('../src/main/logger', () => {
+  const keep = (...parts: unknown[]) => logged.push(parts.map(String).join(' '));
+  return { log: { info: keep, warn: keep, error: keep, debug: keep } };
+});
 vi.mock('../src/core/config/settings-manager', () => ({
   getSettings: async () => ({ trustedPublicKeys: [], downloadConcurrency: 1 }),
 }));
@@ -124,6 +127,7 @@ beforeEach(async () => {
   published.clear();
   modrinthBuilds.clear();
   fetched.length = 0;
+  logged.length = 0;
   beforeDownload = () => {};
   afterDownload = async () => {};
   profile = {
@@ -418,5 +422,26 @@ describe('a pack that names a Modrinth build by its id', () => {
     // the profile already has it.
     expect((await lock())[0]).toMatchObject({ id: 'sodium', projectId: 'AANobbMI' });
     expect(pendingChanges(manifest.mods, await lock())).toBe(0);
+  });
+});
+
+describe('the log of a sync', () => {
+  it.each([
+    [
+      'token from the query',
+      'https://example.test/manifest.json?token=s3cr3t-pack-key',
+      's3cr3t-pack-key',
+    ],
+    [
+      'password from before the host',
+      'https://raven:hunter22@example.test/manifest.json',
+      'hunter22',
+    ],
+  ])('carries no %s of the pack address', async (_, manifestUrl, secret) => {
+    profile = { ...profile, manifestUrl };
+    await syncManifest('p1', pack([mod('sodium')]));
+    const text = logged.join('\n');
+    expect(text).toContain('example.test/manifest.json');
+    expect(text).not.toContain(secret);
   });
 });
