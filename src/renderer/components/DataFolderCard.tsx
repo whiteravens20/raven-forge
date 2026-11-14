@@ -184,6 +184,8 @@ function DataRootDialog({
         return t('dataRoot.problem.nested');
       case 'notWritable':
         return t('dataRoot.problem.notWritable');
+      case 'cannotRun':
+        return t('dataRoot.problem.cannotRun');
       case 'notEmpty':
         return t('dataRoot.problem.notEmpty');
       case 'noSpace':

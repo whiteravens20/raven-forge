@@ -549,6 +549,7 @@
   "dataRoot.problem.same": "That is already the folder in use.",
   "dataRoot.problem.nested": "That folder is inside the current one — pick one outside it.",
   "dataRoot.problem.notWritable": "Nothing can be written to that folder.",
+  "dataRoot.problem.cannotRun": "No program can be started from that folder — a drive formatted as FAT32 is like that — so neither Java nor the game would start from it. Pick a folder on another drive.",
   "dataRoot.problem.notEmpty": "That folder holds other files, and the “raven-forge-launcher” folder the launcher would make inside it is taken as well. Pick somewhere else.",
   "dataRoot.problem.noSpace": "Not enough room: {size} to move, {free} free.",
   "dataRoot.problem.envLocked": "RAVENFORGE_DATA_DIR decides where the data lives for this install.",

@@ -185,6 +185,34 @@ async function writable(dir: string): Promise<boolean> {
   }
 }
 
+/**
+ * Whether a program can be started from `dir`.
+ *
+ * The managed Java runtime lives in the data folder and is started from there,
+ * and a disk can take files without letting any of them run: a FAT32 drive as a
+ * desktop mounts it gives every file `644` and takes `chmod` without keeping it,
+ * and one mounted `noexec` refuses them all. Moved onto such a disk the launcher
+ * would start and save, and then stop every game at Java. Asked of a file made
+ * there and marked as a program, as `writable` asks with a file written. Windows
+ * runs a program by its name, not by a mode, and is not asked.
+ */
+async function canRunPrograms(dir: string): Promise<boolean> {
+  if (process.platform === 'win32') return true;
+  const base = await nearestExisting(dir);
+  if (!base) return false;
+  const probe = path.join(base, `.rf-run-test-${process.pid}`);
+  try {
+    await fs.writeFile(probe, '#!/bin/sh\n', { mode: 0o755 });
+    await fs.chmod(probe, 0o755);
+    await fs.access(probe, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await fs.rm(probe, { force: true }).catch(() => undefined);
+  }
+}
+
 async function freeSpace(dir: string): Promise<number | undefined> {
   const base = await nearestExisting(dir);
   if (!base) return undefined;
@@ -347,6 +375,7 @@ async function survey(chosen: string): Promise<Survey> {
   if (path.resolve(source) === target) return refuse('same', target);
   if (isInside(target, source) || isInside(source, target)) return refuse('nested', target);
   if (!(await writable(target))) return refuse('notWritable', target);
+  if (!(await canRunPrograms(target))) return refuse('cannotRun', target);
 
   const action = found === 'launcher-data' ? 'adopt' : 'move';
   const onSameVolume = await sameVolume(source, target);

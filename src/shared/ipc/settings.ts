@@ -115,6 +115,8 @@ export type DataRootProblem =
   | 'nested'
   /** Cannot be written to. */
   | 'notWritable'
+  /** Programs cannot be started from there, so neither Java nor the game would. */
+  | 'cannotRun'
   /** Holds other files, and so does the folder the launcher would make in it. */
   | 'notEmpty'
   /** Less free space than the move needs. */

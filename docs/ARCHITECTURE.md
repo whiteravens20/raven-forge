@@ -441,7 +441,10 @@ Electron has opened a file in either:
 Moving the data root (`core/config/data-root-move.ts`) is all or nothing. The
 target is classified first — empty, already launcher data, debris of an earlier
 attempt, or somebody else's folder, in which case a `raven-forge-launcher`
-folder is made inside it. On the same volume the entries are renamed; across
+folder is made inside it. A target is refused that cannot be written to, or that
+no program can be started from: the managed Java runs out of the data folder,
+and a drive formatted as FAT32, as a desktop mounts it, takes no mode that would
+let it (`canRunPrograms`, a file written there and asked for `X_OK`). On the same volume the entries are renamed; across
 volumes they are copied, the copy is counted and sized against the original, and
 only then is the pointer switched and the original removed. A marker file in
 both places names the other, so a move cut off by a crash or a power cut is
